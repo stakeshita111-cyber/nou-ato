@@ -1,27 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+// さきほど作った通信窓口を呼び出す
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
-  const [quests, setQuests] = useState([
-    { id: 1, title: "トマトの脇芽をハントせよ！", status: "未完了" },
-    { id: 2, title: "追肥の儀式（6月の一撃）", status: "未完了" },
-    { id: 3, title: "道具のお手入れ", status: "完了" },
-  ]);
+  const [quests, setQuests] = useState<any[]>([]);
 
-  const completeQuest = (id: number) => {
-    const updatedQuests = quests.map((quest) => {
-      if (quest.id === id) {
-        return { ...quest, status: "完了" };
+  // ① 画面が表示された時に、一度だけSupabaseからデータを取ってくる
+  useEffect(() => {
+    const fetchQuests = async () => {
+      // test_questsテーブルから全データを取得し、id順に並べる
+      const { data, error } = await supabase.from("test_quests").select("*").order("id");
+      
+      if (error) {
+        console.error("データ取得エラー:", error);
+      } else if (data) {
+        setQuests(data);
       }
-      return quest;
-    });
-    setQuests(updatedQuests);
+    };
+
+    fetchQuests();
+  }, []);
+
+  // ② ボタンを押したときに、データベースのstatusを更新する関数
+  const completeQuest = async (id: number) => {
+    // Supabaseのデータを「完了」に書き換える
+    const { error } = await supabase
+      .from("test_quests")
+      .update({ status: "完了" })
+      .eq("id", id);
+
+    if (!error) {
+      // 画面の表示も「完了」に更新する
+      const updatedQuests = quests.map((quest) => {
+        if (quest.id === id) {
+          return { ...quest, status: "完了" };
+        }
+        return quest;
+      });
+      setQuests(updatedQuests);
+    } else {
+      alert("更新に失敗しました");
+    }
   };
 
   return (
     <div className="p-8 max-w-md mx-auto bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-green-700">今週のクエスト</h1>
+      <h1 className="text-2xl font-bold mb-6 text-green-700">のうあと - 今週のクエスト</h1>
       
       <ul className="space-y-4">
         {quests.map((quest) => (
