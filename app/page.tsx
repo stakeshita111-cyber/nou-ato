@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 // さきほど作った通信窓口を呼び出す
-import { supabase } from "../lib/supabase";
+import { supabase } from "../src/lib/supabase";
 
 export default function Home() {
   const [quests, setQuests] = useState<any[]>([]);
