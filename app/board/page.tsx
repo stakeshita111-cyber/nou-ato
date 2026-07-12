@@ -69,46 +69,129 @@ export default function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [farmId, setFarmId] = useState<string | null>(null); // ★追加：農園IDを保持する
 
-  // 初回読み込み（Read）：ログイン中のユーザーを確認し、その人のタスクだけを取得する
+  // 初回読み込み（Read）
   useEffect(() => {
     const fetchTasks = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
+      console.log("【デバッグ】タスク取得を開始します...");
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log("【デバッグ】取得したユーザー情報:", user);
+        if (!user) {
+          console.warn("【デバッグ】ログインユーザーが取得できませんでした。");
+          return;
+        }
+        setUserId(user.id);
 
-      const { data } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false });
+        // 変更点①：自分が所属している「農園ID」を取得する
+        console.log("【デバッグ】users テーブルから farm_id を取得中... user.id:", user.id);
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("farm_id")
+          .eq("id", user.id)
+          .single();
+        
+        if (userError) {
+          console.error("【デバッグ】users テーブル取得エラー:", userError);
+        }
+        console.log("【デバッグ】取得したユーザーデータ:", userData);
+        
+        if (userData?.farm_id) {
+          setFarmId(userData.farm_id);
+        } else {
+          console.warn("【デバッグ】userData.farm_id が存在しません。");
+        }
 
-      if (data) setTasks(data);
+        // 変更点②：RLSが守ってくれるので「自分の農園」かつ「削除されていない」データだけが自動で返ってきます！
+        console.log("【デバッグ】tasks テーブルからタスク一覧を取得中...");
+        const { data: tasksData, error: tasksError } = await supabase
+          .from("tasks")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (tasksError) {
+          console.error("【デバッグ】tasks テーブル取得エラー:", tasksError);
+        }
+        console.log("【デバッグ】取得したタスク一覧:", tasksData);
+
+        if (tasksData) setTasks(tasksData);
+      } catch (e) {
+        console.error("【デバッグ】fetchTasks 中に例外が発生しました:", e);
+      }
     };
     fetchTasks();
   }, []);
 
   // タスクの追加（Create）
   const addTask = async () => {
-    if (!newTaskTitle.trim() || !userId) return;
+    console.log("【デバッグ】addTask が呼ばれました。", { newTaskTitle, userId, farmId });
+    // ★追加：ボタンを押した瞬間に、現在の状態をすべて画面に出す
+    alert(`テスト！\nタスク名: ${newTaskTitle}\nユーザーID: ${userId}\n農園ID: ${farmId}`);
     
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert([{ title: newTaskTitle, status: "pool", category: "work", created_by: userId }])
-      .select()
-      .single();
+    if (!newTaskTitle.trim()) {
+      console.warn("【デバッグ】タスク名が空です。");
+      alert("タスク名が入力されていません！");
+      return;
+    }
+    if (!userId) {
+      console.warn("【デバッグ】userId がありません。");
+      alert("ユーザーIDが取得できていません！");
+      return;
+    }
+    if (!farmId) {
+      console.warn("【デバッグ】farmId がありません。");
+      alert("農園ID（farm_id）が取得できていません！\n※ブラウザをリロードするか、Supabaseの users テーブルを確認してください。");
+      return;
+    }
+    
+    console.log("【デバッグ】Supabase へのタスク挿入を開始します...", {
+      title: newTaskTitle, 
+      status: "pool", 
+      category: "work", 
+      created_by: userId,
+      farm_id: farmId
+    });
 
-    if (data) {
-      setTasks([data, ...tasks]);
-      setNewTaskTitle(""); // 入力欄を空にする
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert([{ 
+          title: newTaskTitle, 
+          status: "pool", 
+          category: "work", 
+          created_by: userId,
+          farm_id: farmId 
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("【デバッグ】データベース追加エラー (RLSなどの可能性):", error);
+        alert("データベース追加エラー: " + error.message);
+        return;
+      }
+
+      console.log("【デバッグ】タスクの追加に成功しました:", data);
+      if (data) {
+        setTasks([data, ...tasks]);
+        setNewTaskTitle("");
+      }
+    } catch (e) {
+      console.error("【デバッグ】addTask 実行中に例外が発生しました:", e);
     }
   };
 
-  // タスクの削除（Delete）
+  // タスクの削除（Delete：論理削除）
   const deleteTask = async (id: string) => {
-    if (!confirm("本当に削除しますか？")) return;
+    if (!confirm("本当に削除しますか？（ゴミ箱へ移動します）")) return;
     
-    await supabase.from("tasks").delete().eq("id", id);
+    // 変更点④：完全に消す（delete）のではなく、deleted_at に現在時刻を入れて論理削除する
+    await supabase
+      .from("tasks")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
+
     setTasks(tasks.filter((task) => task.id !== id));
   };
 
