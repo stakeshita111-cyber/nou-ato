@@ -1,257 +1,75 @@
 "use client";
 
-import { useEffect, useState } from "react";
-// さきほど作った通信窓口を呼び出す
-import { supabase } from "@/lib/supabase";
-import { DndContext, DragEndEvent, closestCorners, useDroppable } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { DndContext, closestCorners } from "@dnd-kit/core";
+// ★タスク操作に必要なロジック（Supabase連携、状態管理等）を集約したカスタムフックをインポート
+import { useKanbanBoard } from "@/hooks/useKanbanBoard";
+// ★文字色の改善と入力時の不要な再レンダリング対策を施した入力フォームコンポーネントをインポート
+import TaskForm from "@/components/board/TaskForm";
+// ★タスクを並べるカラム（ドラッグ＆ドロップ対応）をインポート
+import BoardColumn from "@/components/board/BoardColumn";
+// ★詳細設定モーダルをインポート
+import TaskEditModal from "@/components/board/TaskEditModal";
+import { ColumnType } from "@/types/task";
 
-// ① タスクの型定義と、3つのカラム（ステータス）の定義
-type Task = {
-  id: string;
-  title: string;
-  status: string;
-};
-
-const COLUMNS = [
+const COLUMNS: ColumnType[] = [
   { id: "pool", title: "📚 教材プール" },
   { id: "prep", title: "📖 今週の予習" },
   { id: "todo", title: "✅ 今週のToDo" },
 ];
 
-// ② ドラッグして動かせる「カード」の部品（Delete機能付き）
-function SortableTaskCard({ task, onDelete }: { task: Task; onDelete: (id: string) => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="p-3 mb-3 bg-white border rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:border-green-400 flex justify-between items-center group"
-    >
-      <span className="font-medium text-gray-700">{task.title}</span>
-      {/* 削除ボタン（ドラッグ操作と干渉しないように onPointerDown でイベントを止める） */}
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => onDelete(task.id)}
-        className="text-gray-300 hover:text-red-500 font-bold px-2 hidden group-hover:block transition"
-      >
-        ✕
-      </button>
-    </div>
-  );
-}
-
-// ③ カードを入れる「カラム（列）」の部品
-function Column({ id, title, tasks, onDelete }: { id: string; title: string; tasks: Task[]; onDelete: (id: string) => void }) {
-  const { setNodeRef } = useDroppable({ id }); // 空のカラムにもドロップできるようにする
-
-  return (
-    <div ref={setNodeRef} className="flex-1 min-w-[250px] bg-gray-50 p-4 rounded-xl border border-gray-200">
-      <h2 className="font-bold text-gray-700 mb-4">{title}</h2>
-      <SortableContext id={id} items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="min-h-[300px]">
-          {tasks.map((task) => (
-            <SortableTaskCard key={task.id} task={task} onDelete={onDelete} />
-          ))}
-        </div>
-      </SortableContext>
-    </div>
-  );
-}
-
-// ④ メインの看板ボード画面
 export default function KanbanBoard() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [userId, setUserId] = useState<string | null>(null);
-  const [farmId, setFarmId] = useState<string | null>(null); // ★追加：農園IDを保持する
-
-  // 初回読み込み（Read）
-  useEffect(() => {
-    const fetchTasks = async () => {
-      console.log("【デバッグ】タスク取得を開始します...");
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log("【デバッグ】取得したユーザー情報:", user);
-        if (!user) {
-          console.warn("【デバッグ】ログインユーザーが取得できませんでした。");
-          return;
-        }
-        setUserId(user.id);
-
-        // 変更点①：自分が所属している「農園ID」を取得する
-        console.log("【デバッグ】users テーブルから farm_id を取得中... user.id:", user.id);
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("farm_id")
-          .eq("id", user.id)
-          .single();
-        
-        if (userError) {
-          console.error("【デバッグ】users テーブル取得エラー:", userError);
-        }
-        console.log("【デバッグ】取得したユーザーデータ:", userData);
-        
-        if (userData?.farm_id) {
-          setFarmId(userData.farm_id);
-        } else {
-          console.warn("【デバッグ】userData.farm_id が存在しません。");
-        }
-
-        // 変更点②：RLSが守ってくれるので「自分の農園」かつ「削除されていない」データだけが自動で返ってきます！
-        console.log("【デバッグ】tasks テーブルからタスク一覧を取得中...");
-        const { data: tasksData, error: tasksError } = await supabase
-          .from("tasks")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (tasksError) {
-          console.error("【デバッグ】tasks テーブル取得エラー:", tasksError);
-        }
-        console.log("【デバッグ】取得したタスク一覧:", tasksData);
-
-        if (tasksData) setTasks(tasksData);
-      } catch (e) {
-        console.error("【デバッグ】fetchTasks 中に例外が発生しました:", e);
-      }
-    };
-    fetchTasks();
-  }, []);
-
-  // タスクの追加（Create）
-  const addTask = async () => {
-    console.log("【デバッグ】addTask が呼ばれました。", { newTaskTitle, userId, farmId });
-    // ★追加：ボタンを押した瞬間に、現在の状態をすべて画面に出す
-    alert(`テスト！\nタスク名: ${newTaskTitle}\nユーザーID: ${userId}\n農園ID: ${farmId}`);
-    
-    if (!newTaskTitle.trim()) {
-      console.warn("【デバッグ】タスク名が空です。");
-      alert("タスク名が入力されていません！");
-      return;
-    }
-    if (!userId) {
-      console.warn("【デバッグ】userId がありません。");
-      alert("ユーザーIDが取得できていません！");
-      return;
-    }
-    if (!farmId) {
-      console.warn("【デバッグ】farmId がありません。");
-      alert("農園ID（farm_id）が取得できていません！\n※ブラウザをリロードするか、Supabaseの users テーブルを確認してください。");
-      return;
-    }
-    
-    console.log("【デバッグ】Supabase へのタスク挿入を開始します...", {
-      title: newTaskTitle, 
-      status: "pool", 
-      category: "work", 
-      created_by: userId,
-      farm_id: farmId
-    });
-
-    try {
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert([{ 
-          title: newTaskTitle, 
-          status: "pool", 
-          category: "work", 
-          created_by: userId,
-          farm_id: farmId 
-        }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("【デバッグ】データベース追加エラー (RLSなどの可能性):", error);
-        alert("データベース追加エラー: " + error.message);
-        return;
-      }
-
-      console.log("【デバッグ】タスクの追加に成功しました:", data);
-      if (data) {
-        setTasks([data, ...tasks]);
-        setNewTaskTitle("");
-      }
-    } catch (e) {
-      console.error("【デバッグ】addTask 実行中に例外が発生しました:", e);
-    }
-  };
-
-  // タスクの削除（Delete：論理削除）
-  const deleteTask = async (id: string) => {
-    if (!confirm("本当に削除しますか？（ゴミ箱へ移動します）")) return;
-    
-    // 変更点④：完全に消す（delete）のではなく、deleted_at に現在時刻を入れて論理削除する
-    await supabase
-      .from("tasks")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", id);
-
-    setTasks(tasks.filter((task) => task.id !== id));
-  };
-
-  // ドラッグ＆ドロップ終了時の処理（Update）
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return; // 画面外に落とした場合は無視
-
-    const taskId = active.id as string;
-    let newStatus = over.id as string;
-
-    // ドロップ先が「別のタスクの上」だった場合、そのタスクが属するカラムのステータスを取得する
-    const overTask = tasks.find((t) => t.id === newStatus);
-    if (overTask) {
-      newStatus = overTask.status;
-    }
-
-    const task = tasks.find((t) => t.id === taskId);
-    if (task && task.status !== newStatus && COLUMNS.some(c => c.id === newStatus)) {
-      // 1. 画面の見た目を先に切り替える（サクサク動かすため）
-      setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-
-      // 2. 裏側のデータベース（Supabase）を更新する
-      await supabase.from("tasks").update({ status: newStatus }).eq("id", taskId);
-    }
-  };
+  // ★タスクの「取得、追加、削除、ドラッグ完了時の更新、編集」などのロジックは hooks/useKanbanBoard.ts にすべて移行したため、
+  // この画面（UI側）からはフックを呼び出して必要なデータと関数を取り出すだけになりました。
+  const { 
+    tasks, 
+    addTask, 
+    deleteTask, 
+    handleDragEnd, 
+    editingTask, 
+    setEditingTask, 
+    saveTaskDetails 
+  } = useKanbanBoard(COLUMNS);
 
   return (
     <div className="p-8 max-w-5xl mx-auto min-h-screen">
       <h1 className="text-3xl font-bold mb-2 text-green-700">のうあと - 講師ダッシュボード</h1>
       <p className="text-gray-500 mb-8">教材を追加し、ドラッグ＆ドロップで生徒へ配信（今週のToDoへ移動）します。</p>
       
-      {/* 入力エリア */}
-      <div className="mb-8 flex gap-2">
-        <input
-          type="text"
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          placeholder="新しい教材やタスクを入力（例：トマトの脇芽かき）..."
-          className="p-3 border border-gray-300 rounded-lg flex-1 shadow-sm focus:outline-none focus:border-green-500"
-        />
-        <button onClick={addTask} className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-sm hover:bg-green-700 transition">
-          追加
-        </button>
-      </div>
+      {/* 
+        ★以前の <input> と <button> のUI、および入力文字が薄かった問題、
+        タイピングするたびに画面全体が再レンダリングされてしまう問題は、
+        TaskForm.tsx コンポーネントに分離して解決しました。
+      */}
+      <TaskForm onAddTask={addTask} />
 
-      {/* 看板ボードエリア（@dnd-kit のコンテキストで囲む） */}
+      {/* 看板ボードエリア */}
       <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div className="flex gap-6 overflow-x-auto pb-4">
           {COLUMNS.map((col) => (
-            <Column
+            /* 
+              ★以前ここに直接記述されていた Column と SortableTaskCard のUIは、
+              BoardColumn.tsx （およびその下で動く TaskCard.tsx）に集約して簡略化しました。
+            */
+            <BoardColumn
               key={col.id}
               id={col.id}
               title={col.title}
               tasks={tasks.filter((t) => t.status === col.id)}
               onDelete={deleteTask}
+              onEdit={setEditingTask}
             />
           ))}
         </div>
       </DndContext>
+
+      {/* 編集モーダルの表示 */}
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSave={saveTaskDetails}
+        />
+      )}
     </div>
   );
 }
