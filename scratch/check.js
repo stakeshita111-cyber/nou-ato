@@ -6,20 +6,15 @@ const supabaseAnonKey = 'sb_publishable_fxOlNtgJTxAZNzP6QxN-Uw_8SwxpgIe';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function main() {
-  const { data: tasks, error: err1 } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('title', 'ううう');
-  
-  console.log("=== tasks table matching 'ううう' ===");
-  console.log(tasks);
-
-  const { data: studentTasks, error: err2 } = await supabase
-    .from('student_tasks')
-    .select('*, tasks(*)');
-
-  console.log("=== student_tasks table ===");
-  console.log(studentTasks);
+  const columns = ['tasks_id', 'taskid', 'parent_id', 'task_uuid'];
+  for (const col of columns) {
+    const { error } = await supabase.from('student_tasks').select(col).limit(1);
+    if (error) {
+      console.log(`Column [${col}]: ❌ NOT EXISTS`);
+    } else {
+      console.log(`Column [${col}]:  EXISTS`);
+    }
+  }
 }
 
 main();
