@@ -45,7 +45,7 @@ export default function Sidebar({ activeMenu, onMenuClick }: SidebarProps) {
         <div className="mb-6 sm:mb-8 px-2 pt-1">
           <Link href="/board" className="block">
             <h1 className="text-xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
-              農業ビジネス・プロ
+              NOU-ATO
             </h1>
             <p className="text-xs text-gray-500 font-bold mt-0.5">講師用管理画面</p>
           </Link>

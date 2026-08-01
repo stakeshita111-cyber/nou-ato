@@ -4,10 +4,12 @@ import React from "react";
 
 export type StudentUser = {
   id: string;
-  email: string;
+  email?: string;
   role: string;
   farm_id: string;
   created_at: string;
+  display_name?: string;
+  name?: string;
   task_count?: number;
   completed_task_count?: number;
 };
@@ -21,20 +23,23 @@ export default function StudentCard({ student }: StudentCardProps) {
   const completed = student.completed_task_count || 0;
   const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
+  const displayName = student.display_name || student.name || (student.email ? student.email.split("@")[0] : "受講生");
+  const initial = displayName ? displayName[0].toUpperCase() : "生";
+
   return (
     <div className="bg-white rounded-3xl p-6 border border-gray-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between">
       <div>
-        {/* プロフィールアイコン ＆ メール */}
+        {/* プロフィールアイコン ＆ 名前・メール */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white font-extrabold flex items-center justify-center text-lg shadow-sm shrink-0">
-            {student.email ? student.email[0].toUpperCase() : "生"}
+            {initial}
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-extrabold text-gray-900 truncate">
-              {student.email ? student.email.split("@")[0] : "受講生"}
+              {displayName}
             </h3>
             <p className="text-xs text-gray-400 font-medium truncate">
-              {student.email}
+              {student.email || "メール未登録"}
             </p>
           </div>
         </div>
