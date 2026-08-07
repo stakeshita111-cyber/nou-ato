@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* デフォルト：パステルピスタチオ (自然・グリーン) */
+  --bg-main: #f3f7f2;
+  --bg-card: #ffffff;
+  --text-main: #1b331e;
+  --text-muted: #607363;
+  --accent-main: #2e7d32;
+  --accent-hover: #1b5e20;
+  --accent-light: #e8f5e9;
+  --border-main: #d1e2d3;
+  --input-bg: #f7faf7;
+  --input-border: #c8dbc9;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* 🌸 パステルストロベリー (いちごミルキーピンク) */
+[data-theme="strawberry"] {
+  --bg-main: #fdf2f4;
+  --bg-card: #ffffff;
+  --text-main: #3d1c24;
+  --text-muted: #7d5963;
+  --accent-main: #d8527c;
+  --accent-hover: #b03a60;
+  --accent-light: #fce8ee;
+  --border-main: #f7d9e1;
+  --input-bg: #fff7f9;
+  --input-border: #f2c4d0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 🫐 パステルサファイア (あおぞらスカイブルー) */
+[data-theme="sapphire"] {
+  --bg-main: #f0f5fa;
+  --bg-card: #ffffff;
+  --text-main: #182a3a;
+  --text-muted: #53697d;
+  --accent-main: #3182ce;
+  --accent-hover: #2b6cb0;
+  --accent-light: #ebf8ff;
+  --border-main: #d2e3f3;
+  --input-bg: #f4f9fd;
+  --input-border: #bdbe5f;
+}
+
+/* 🍊 パステルシトラス (ミルキーオレンジ & クリーム) */
+[data-theme="citrus"] {
+  --bg-main: #fdf7ed;
+  --bg-card: #ffffff;
+  --text-main: #3d2314;
+  --text-muted: #7a5e4d;
+  --accent-main: #e06d2d;
+  --accent-hover: #c05621;
+  --accent-light: #feebc8;
+  --border-main: #f7e2ce;
+  --input-bg: #fffaf2;
+  --input-border: #f5d4b8;
+}
+
+/* 🌿 パステルピスタチオ */
+[data-theme="pistachio"] {
+  --bg-main: #f3f7f2;
+  --bg-card: #ffffff;
+  --text-main: #1b331e;
+  --text-muted: #607363;
+  --accent-main: #2e7d32;
+  --accent-hover: #1b5e20;
+  --accent-light: #e8f5e9;
+  --border-main: #d1e2d3;
+  --input-bg: #f7faf7;
+  --input-border: #c8dbc9;
+}
+
+/* フォントサイズコントロール */
+[data-font-size="normal"] {
+  font-size: 14px;
+}
+[data-font-size="large"] {
+  font-size: 16px;
+}
+[data-font-size="xlarge"] {
+  font-size: 18px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-geist-sans), sans-serif;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* 入力欄・テキストボックス統制 */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  background-color: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--text-main) !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent-main) !important;
+  box-shadow: 0 0 0 2px var(--accent-light) !important;
+}
+
+/* ユーティリティクラス */
+.app-bg-main {
+  background-color: var(--bg-main) !important;
+}
+
+.app-bg-card {
+  background-color: var(--bg-card) !important;
+}
+
+.app-text-main {
+  color: var(--text-main) !important;
+}
+
+.app-text-muted {
+  color: var(--text-muted) !important;
+}
+
+.app-accent-btn {
+  background-color: var(--accent-main) !important;
+  color: #ffffff !important;
+}
+
+.app-accent-btn:hover {
+  background-color: var(--accent-hover) !important;
+}
+
+.app-accent-light {
+  background-color: var(--accent-light) !important;
+  color: var(--accent-main) !important;
+}
+
+.app-border {
+  border-color: var(--border-main) !important;
 }

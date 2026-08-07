@@ -12,11 +12,15 @@ function InviteContent() {
 
   const [farmName, setFarmName] = useState("たなか自然農園");
   const [teacherName, setTeacherName] = useState("田中 太郎");
+  const [tab, setTab] = useState<"email" | "line">("email");
+
+  // 入力フォームステート
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
-  const [isLineAuthed, setIsLineAuthed] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Supabase から農園・講師情報を取得
   useEffect(() => {
@@ -38,39 +42,108 @@ function InviteContent() {
     fetchFarmInfo();
   }, [farmIdParam]);
 
-  // LINE連携（疑似）
-  const handleLineAuth = () => {
-    setIsLineAuthed(true);
-    setName("LINE登録ユーザー");
-    setToastMessage("LINE連携が完了しました");
-    setShowToast(true);
-  };
-
-  // 参加登録
-  const handleJoin = async (e: React.FormEvent) => {
+  // 1. メールアドレスとパスワードでアカウント作成・参加
+  const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!name.trim()) {
-      setToastMessage("お名前を入力してください");
+      setToastMessage("お名前（本名）を入力してください");
+      setShowToast(true);
+      return;
+    }
+    if (!email.trim()) {
+      setToastMessage("メールアドレスを入力してください");
+      setShowToast(true);
+      return;
+    }
+    if (!password || password.length < 6) {
+      setToastMessage("パスワードは6文字以上で入力してください");
       setShowToast(true);
       return;
     }
 
-    const studentEmail = email.trim() || `student_${Date.now()}@nou-ato.jp`;
-    const { error } = await supabase.auth.signUp({
-      email: studentEmail,
-      password: "password123",
-    });
+    setLoading(true);
 
-    if (error) {
-      console.log("SignUp note:", error.message);
+    try {
+      // Supabase Auth 登録
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (authError) {
+        // すでに登録済みの場合はログイン試行
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password,
+        });
+        if (loginError) {
+          setToastMessage("登録エラー: " + authError.message);
+          setShowToast(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // users テーブルに生徒情報保存
+      const userId = authData?.user?.id || `user_${Date.now()}`;
+      await supabase.from("users").upsert([
+        {
+          id: userId,
+          email: email.trim(),
+          role: "student",
+          farm_id: farmIdParam || "tanaka_farm",
+        },
+      ]);
+
+      setToastMessage("🎉 アカウントを作成しました！農園へ参加します");
+      setShowToast(true);
+
+      setTimeout(() => {
+        router.push("/student/quests");
+      }, 900);
+    } catch (err: any) {
+      setToastMessage("登録中にエラーが発生しました: " + (err.message || ""));
+      setShowToast(true);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setToastMessage("農園への参加が完了しました！生徒画面へ移動します");
-    setShowToast(true);
+  // 2. LINE連携でアカウント作成・参加
+  const handleLineSignUp = async () => {
+    setLoading(true);
+    try {
+      const lineName = name.trim() || "LINE登録ユーザー";
+      const lineEmail = `line_${Date.now()}@nou-ato.jp`;
 
-    setTimeout(() => {
-      router.push("/student/quests");
-    }, 1000);
+      const { data: authData } = await supabase.auth.signUp({
+        email: lineEmail,
+        password: "linepassword123",
+      });
+
+      const userId = authData?.user?.id || `user_${Date.now()}`;
+      await supabase.from("users").upsert([
+        {
+          id: userId,
+          email: `${lineName} (${lineEmail})`,
+          role: "student",
+          farm_id: farmIdParam || "tanaka_farm",
+        },
+      ]);
+
+      setToastMessage("🟢 LINE連携アカウントを作成しました！農園へ参加します");
+      setShowToast(true);
+
+      setTimeout(() => {
+        router.push("/student/quests");
+      }, 900);
+    } catch (e: any) {
+      setToastMessage("LINE登録に失敗しました");
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -111,77 +184,117 @@ function InviteContent() {
           </div>
         </div>
 
-        {/* 2. SNS登録エリア */}
-        <div className="text-center space-y-2 pt-1">
-          <p className="text-xs text-gray-500 font-medium">SNSアカウントで簡単登録</p>
-
+        {/* アカウント作成方法 切り替えタブ */}
+        <div className="bg-gray-200/80 p-1.5 rounded-2xl flex text-xs font-bold space-x-1">
           <button
             type="button"
-            onClick={handleLineAuth}
-            className={`w-full py-3.5 px-4 rounded-full font-bold text-white shadow-md flex items-center justify-center gap-2.5 transition active:scale-[0.98] ${
-              isLineAuthed
-                ? "bg-[#00a000] hover:bg-[#008f00]"
-                : "bg-[#00c300] hover:bg-[#00b100]"
+            onClick={() => setTab("email")}
+            className={`flex-1 py-3 rounded-xl transition ${
+              tab === "email" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
-            </svg>
-            <span>{isLineAuthed ? "✓ LINE連携済み" : "LINEでサインアップ"}</span>
+            ✉️ メールアドレスで作成
           </button>
-
-          <p className="text-[11px] text-gray-500">※LINEのプロフィール情報のみを取得します</p>
+          <button
+            type="button"
+            onClick={() => setTab("line")}
+            className={`flex-1 py-3 rounded-xl transition ${
+              tab === "line" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            🟢 LINE連携で参加
+          </button>
         </div>
 
-        {/* 3. 区切り線 */}
-        <div className="relative flex py-2 items-center">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <span className="flex-shrink mx-4 text-xs text-gray-400 font-medium">または</span>
-          <div className="flex-grow border-t border-gray-300"></div>
-        </div>
+        {/* 2-A. メールアドレスでのアカウント作成フォーム */}
+        {tab === "email" ? (
+          <form onSubmit={handleEmailSignUp} className="space-y-4 animate-fade-in">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  お名前（農園で表示する本名）<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="例: 田中 太郎"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
+                />
+              </div>
 
-        {/* 4. 入力フォーム */}
-        <form onSubmit={handleJoin} className="space-y-4">
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                農園で表示するお名前（本名）
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  メールアドレス<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@nou-ato.jp"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  パスワード（6文字以上）<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-[#245229] hover:bg-[#193b1d] text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 text-base transition transform active:scale-[0.99]"
+            >
+              <span>{loading ? "作成処理中..." : "メールアドレスで作成して参加"}</span>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </form>
+        ) : (
+          /* 2-B. LINE連携でのアカウント作成 */
+          <div className="space-y-4 animate-fade-in">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-3">
+              <label className="block text-xs font-semibold text-gray-700">
+                お名前（任意・本名）
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="お名前（例: 田中 太郎）"
+                placeholder="例: たろー (未入力時はLINE名を使用)"
                 className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
               />
+              <p className="text-[11px] text-gray-500">※LINEのプロフィール情報のみ取得します</p>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                メールアドレス（任意）
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="メールアドレス"
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
-              />
-            </div>
-          </div>
-
-          <div className="pt-2">
             <button
-              type="submit"
-              className="w-full py-4 bg-[#245229] hover:bg-[#193b1d] text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 text-base transition transform active:scale-[0.99]"
+              type="button"
+              onClick={handleLineSignUp}
+              disabled={loading}
+              className="w-full py-4 bg-[#00c300] hover:bg-[#00b100] text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 text-base transition active:scale-[0.98]"
             >
-              <span>農園に参加して始める</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
               </svg>
+              <span>{loading ? "連携中..." : "LINEでサインアップして参加"}</span>
             </button>
           </div>
-        </form>
+        )}
 
         <p className="text-[11px] text-center text-gray-500 leading-relaxed pt-1">
           登録することで、利用規約およびプライバシーポリシーに同意したものとみなされます。

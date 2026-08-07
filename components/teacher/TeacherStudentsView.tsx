@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
+import StudentPreviewModal from "@/components/teacher/StudentPreviewModal";
 
 interface StudentData {
   id: string;
@@ -21,30 +22,29 @@ export default function TeacherStudentsView() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      // 1. 生徒ユーザーを取得
+      // 1. まず public.users (display_name) から受講生データを取得
       const { data: usersData, error: usersError } = await supabase
         .from("users")
         .select("*")
         .eq("role", "student");
 
-      if (usersError) {
-        console.error("Fetch students error:", usersError);
-      } else if (usersData) {
+      if (!usersError && usersData && usersData.length > 0) {
+        const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
         const formatted: StudentData[] = usersData.map((u: any, idx: number) => {
-          const emailName = u.email ? u.email.split("@")[0] : `受講生${idx + 1}`;
-          const colors = ["bg-[#1d5c23]", "bg-[#855444]", "bg-[#1d3e5c]", "bg-[#7b1d5c]"];
+          const studentName = u.display_name || `受講生 ${idx + 1}`;
           return {
             id: u.id,
-            name: emailName,
-            avatar: emailName.slice(0, 2).toUpperCase(),
+            name: studentName,
+            avatar: studentName.slice(0, 2),
             avatarBg: colors[idx % colors.length],
-            plot: `区画 A-${idx + 1}`,
+            plot: `割当確認中`,
             step: "受講中",
             progress: 50,
             unreadCount: 0,
@@ -53,9 +53,39 @@ export default function TeacherStudentsView() {
           };
         });
         setStudents(formatted);
+        return;
+      }
+
+      // 2. profiles テーブルから取得
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", "student");
+
+      if (!profilesError && profilesData && profilesData.length > 0) {
+        const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
+        const formatted: StudentData[] = profilesData.map((u: any, idx: number) => {
+          const studentName = u.full_name || `受講生 ${idx + 1}`;
+          return {
+            id: u.id,
+            name: studentName,
+            avatar: studentName.slice(0, 2),
+            avatarBg: colors[idx % colors.length],
+            plot: `割当確認中`,
+            step: "受講中",
+            progress: 50,
+            unreadCount: 0,
+            lastReport: u.created_at ? new Date(u.created_at).toLocaleDateString("ja-JP") : "最近",
+            hasOverdue: false,
+          };
+        });
+        setStudents(formatted);
+      } else {
+        setStudents([]);
       }
     } catch (e) {
       console.error("fetchStudents exception:", e);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -71,127 +101,115 @@ export default function TeacherStudentsView() {
     return true;
   });
 
-  const handleRemind = (name: string) => {
-    setToastMessage(`📱 ${name} さんへLINEでリマインド通知を送信しました`);
-    setShowToast(true);
-  };
-
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      <div className="flex items-center justify-between">
+      {/* ヘッダー＆フィルター */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-200 shadow-xs">
         <div>
-          <h2 className="text-2xl font-black text-gray-900">受講生一覧・個別サポート</h2>
-          <p className="text-xs text-gray-500 mt-1">登録されている生徒の進行状況を追跡します。</p>
+          <h2 className="text-xl font-black text-emerald-950 flex items-center gap-2">
+            <span>🎓 受講生一覧</span>
+            <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
+              登録中 {students.length} 名
+            </span>
+          </h2>
+          <p className="text-xs text-gray-500 font-bold mt-1">
+            データベースに実際に登録された受講生の状況・進捗を一元管理できます
+          </p>
         </div>
 
-        {/* フィルタータブ */}
-        <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold space-x-1">
+        <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 text-xs font-bold">
           <button
             onClick={() => setFilter("all")}
-            className={`px-3 py-1.5 rounded-lg transition ${filter === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"}`}
+            className={`px-3.5 py-2 rounded-xl transition ${
+              filter === "all" ? "bg-white text-emerald-900 shadow-xs font-black" : "text-gray-600 hover:text-gray-900"
+            }`}
           >
-            全員 ({students.length})
+            全員
           </button>
           <button
             onClick={() => setFilter("unread")}
-            className={`px-3 py-1.5 rounded-lg transition ${filter === "unread" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"}`}
+            className={`px-3.5 py-2 rounded-xl transition ${
+              filter === "unread" ? "bg-white text-emerald-900 shadow-xs font-black" : "text-gray-600 hover:text-gray-900"
+            }`}
           >
-            未読報告あり ({students.filter((s) => s.unreadCount > 0).length})
-          </button>
-          <button
-            onClick={() => setFilter("overdue")}
-            className={`px-3 py-1.5 rounded-lg transition ${filter === "overdue" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"}`}
-          >
-            遅延中 ({students.filter((s) => s.hasOverdue).length})
+            未確認あり
           </button>
         </div>
       </div>
 
+      {/* 生徒カードグリッド */}
       {loading ? (
-        <div className="p-8 text-center text-xs text-gray-500">受講生データを読み込み中...</div>
-      ) : students.length === 0 ? (
-        /* 受講生がまだいない場合（サンプルデータなし） */
-        <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 space-y-3">
-          <div className="w-12 h-12 bg-green-50 text-[#1d5c23] rounded-2xl flex items-center justify-center mx-auto text-xl">
-            👥
-          </div>
-          <h3 className="font-bold text-gray-800 text-sm">受講生はまだ登録されていません</h3>
-          <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            「概要」画面からLINE招待リンクやQRコードを発行して生徒を招待してください。
-          </p>
+        <div className="text-center py-12 text-sm font-bold text-gray-400">受講生データを読み込み中...</div>
+      ) : filteredStudents.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center text-gray-400 font-bold text-sm border border-gray-200 space-y-2">
+          <p>登録された受講生アカウントはまだありません。</p>
+          <p className="text-xs text-gray-400 font-medium">ユーザー登録画面・招待リンクから受講生が登録されると、ここに表示されます。</p>
         </div>
       ) : (
-        /* 受講生リストテーブル (Supabaseデータ) */
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <th className="py-4 px-6">生徒名 / 区画</th>
-                <th className="py-4 px-6">現在のステップ</th>
-                <th className="py-4 px-6">進捗状況</th>
-                <th className="py-4 px-6">登録日/最終更新</th>
-                <th className="py-4 px-6 text-right">アクション</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-sm">
-              {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50/80 transition">
-                  <td className="py-4 px-6 flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full ${student.avatarBg} text-white font-bold flex items-center justify-center text-xs shadow-xs`}>
-                      {student.avatar}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold text-gray-900">{student.name}</span>
-                        {student.unreadCount > 0 && (
-                          <span className="bg-green-100 text-[#1d5c23] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {student.unreadCount}件 未読
-                          </span>
-                        )}
-                        {student.hasOverdue && (
-                          <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            遅延
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-400 font-medium">{student.plot}</span>
-                    </div>
-                  </td>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredStudents.map((student) => (
+            <div
+              key={student.id}
+              onClick={() => setSelectedStudent(student)}
+              className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs hover:shadow-lg transition cursor-pointer space-y-4 group relative overflow-hidden"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`w-12 h-12 rounded-2xl ${student.avatarBg} font-black text-sm flex items-center justify-center shadow-xs shrink-0`}
+                  >
+                    {student.avatar}
+                  </div>
+                  <div>
+                    <h3 className="font-black text-gray-900 text-base group-hover:text-emerald-800 transition">
+                      {student.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 font-bold">{student.plot}</p>
+                  </div>
+                </div>
 
-                  <td className="py-4 px-6 font-semibold text-gray-800">
-                    {student.step}
-                  </td>
+                {student.unreadCount > 0 && (
+                  <span className="w-3 h-3 rounded-full bg-amber-500 ring-4 ring-amber-100 animate-pulse"></span>
+                )}
+              </div>
 
-                  <td className="py-4 px-6">
-                    <div className="w-36 space-y-1">
-                      <div className="flex justify-between text-[11px] font-bold text-gray-500">
-                        <span>{student.progress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#1d5c23] rounded-full" style={{ width: `${student.progress}%` }}></div>
-                      </div>
-                    </div>
-                  </td>
+              <div className="space-y-2 text-xs font-bold pt-2 border-t border-gray-100">
+                <div className="flex justify-between text-gray-500">
+                  <span>現在のステップ:</span>
+                  <span className="text-emerald-950 font-black">{student.step}</span>
+                </div>
 
-                  <td className="py-4 px-6 text-xs text-gray-500">
-                    {student.lastReport}
-                  </td>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-gray-400">受講進捗</span>
+                    <span className="text-emerald-800 font-black">{student.progress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                      style={{ width: `${student.progress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
 
-                  <td className="py-4 px-6 text-right space-x-2">
-                    <button
-                      onClick={() => handleRemind(student.name)}
-                      className="px-3 py-1.5 bg-green-50 text-[#1d5c23] border border-green-200 font-bold text-xs rounded-lg hover:bg-green-100 transition"
-                    >
-                      LINE通知
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              <div className="flex justify-between items-center text-[10px] text-gray-400 pt-1 font-semibold">
+                <span>登録日: {student.lastReport}</span>
+                <span className="text-emerald-800 font-bold group-hover:underline">詳細を見る →</span>
+              </div>
+            </div>
+          ))}
         </div>
+      )}
+
+      {/* 詳細 Modal */}
+      {selectedStudent && (
+        <StudentPreviewModal
+          student={selectedStudent}
+          onClose={() => setSelectedStudent(null)}
+        />
       )}
     </div>
   );

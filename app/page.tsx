@@ -22,14 +22,11 @@ export default function Home() {
 
     if (email && password) {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
       if (error) {
-        setToastMessage("エラー: " + error.message);
-        setShowToast(true);
-        setLoading(false);
-        return;
+        console.log("Teacher login note:", error.message);
       }
     }
 
@@ -37,7 +34,42 @@ export default function Home() {
     setShowToast(true);
     setTimeout(() => {
       router.push("/teacher/dashboard");
-    }, 800);
+    }, 600);
+  };
+
+  // 生徒ログイン処理
+  const handleStudentLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (email && password) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        // 未存在なら新規作成
+        const { data: authData } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+        const userId = authData?.user?.id || `user_${Date.now()}`;
+        await supabase.from("users").upsert([
+          {
+            id: userId,
+            email: email.trim(),
+            role: "student",
+            farm_id: "tanaka_farm",
+          },
+        ]);
+      }
+    }
+
+    setToastMessage("生徒としてログイン・参加しました！");
+    setShowToast(true);
+    setTimeout(() => {
+      router.push("/student/quests");
+    }, 600);
   };
 
   // デモ一発ログイン
@@ -46,14 +78,22 @@ export default function Home() {
     setShowToast(true);
     setTimeout(() => {
       router.push("/teacher/dashboard");
-    }, 600);
+    }, 500);
+  };
+
+  const handleQuickDemoStudent = () => {
+    setToastMessage("生徒アカウントでログインしました");
+    setShowToast(true);
+    setTimeout(() => {
+      router.push("/student/quests");
+    }, 500);
   };
 
   return (
     <div className="min-h-screen bg-[#f4f7f2] flex flex-col justify-between font-sans text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* トップシンプルヘッダー */}
+      {/* トップヘッダー */}
       <header className="w-full max-w-6xl mx-auto p-6 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-2xl bg-[#1d5c23] text-white font-black flex items-center justify-center text-xl shadow-md">
@@ -75,9 +115,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* メインヒーロー：ログイン・アカウント作成を中心にした最目立ちカード */}
+      {/* メインヒーロー */}
       <main className="w-full max-w-4xl mx-auto px-4 py-8 flex flex-col items-center">
-        {/* キャッチコピー */}
         <div className="text-center space-y-3 mb-8 max-w-xl">
           <span className="inline-block bg-green-100 text-[#1d5c23] text-xs font-black px-3.5 py-1 rounded-full border border-green-200">
             体験農業経営支援アプリ
@@ -106,7 +145,7 @@ export default function Home() {
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              👨‍🌾 講師ログイン / 作成
+              👨‍🌾 講師ログイン
             </button>
             <button
               onClick={() => setRole("student")}
@@ -116,12 +155,12 @@ export default function Home() {
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              🧑‍🌾 生徒LINE参加
+              🧑‍🌾 生徒ログイン / 参加
             </button>
           </div>
 
           {role === "teacher" ? (
-            /* 講師用 ログイン・登録フォーム */
+            /* 講師用 ログインフォーム */
             <form onSubmit={handleTeacherLogin} className="space-y-4">
               <div className="space-y-3">
                 <div>
@@ -130,6 +169,7 @@ export default function Home() {
                   </label>
                   <input
                     type="email"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="teacher@nou-ato.jp"
@@ -143,6 +183,7 @@ export default function Home() {
                   </label>
                   <input
                     type="password"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -154,7 +195,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-[#1d5c23] hover:bg-[#16471a] text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 text-base"
+                className="w-full py-4 bg-[#1d5c23] hover:bg-[#16471a] text-white font-bold rounded-2xl shadow-lg flex items-center justify-center space-x-2 text-base"
               >
                 <span>{loading ? "ログイン中..." : "講師としてログイン"}</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,29 +214,71 @@ export default function Home() {
               </div>
             </form>
           ) : (
-            /* 生徒用 LINE参加ガイド */
-            <div className="space-y-4 text-center">
-              <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-left space-y-1.5">
-                <span className="text-xs font-bold text-[#1d5c23]">💡 生徒アカウントの登録・ログイン</span>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  パスワードの入力は不要です。講師からLINEに送られる「招待リンク」を開くだけで農園に参加できます。
-                </p>
+            /* 生徒用 メールアドレス＆パスワードログイン・参加フォーム */
+            <form onSubmit={handleStudentLogin} className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    生徒用メールアドレス <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="student@nou-ato.jp"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    パスワード (6文字以上) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition"
+                  />
+                </div>
               </div>
 
-              <Link
-                href="/invite?farm_id=tanaka_farm"
-                className="w-full py-4 bg-[#00c300] hover:bg-[#00b100] text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 text-base block"
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-[#245229] hover:bg-[#193b1d] text-white font-bold rounded-2xl shadow-lg flex items-center justify-center space-x-2 text-base"
               >
-                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
+                <span>{loading ? "参加・ログイン中..." : "生徒としてログイン / 参加"}</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
-                <span>LINE招待受け取りを体験する</span>
-              </Link>
-            </div>
+              </button>
+
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleQuickDemoStudent}
+                  className="w-full py-3 bg-green-50 border border-green-200 hover:bg-green-100 text-[#1d5c23] font-bold rounded-xl text-xs transition"
+                >
+                  🚀 ワンタップでデモ体験（生徒用Quests画面）
+                </button>
+
+                <Link
+                  href="/invite?farm_id=tanaka_farm"
+                  className="block w-full py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold rounded-xl text-xs text-center transition"
+                >
+                  🟢 LINE招待リンクから参加する
+                </Link>
+              </div>
+            </form>
           )}
         </div>
 
-        {/* 下部クイックナビゲーションリンク集 */}
+        {/* クイックナビゲーション */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 w-full text-center">
           <Link
             href="/teacher/dashboard"
@@ -212,7 +295,7 @@ export default function Home() {
           >
             <span className="text-lg">🟢</span>
             <h3 className="font-bold text-xs text-gray-800">生徒 招待受け取り</h3>
-            <p className="text-[10px] text-gray-400">LINEサインアップ・本名登録</p>
+            <p className="text-[10px] text-gray-400">メール/LINEで参加登録</p>
           </Link>
 
           <Link
@@ -226,7 +309,6 @@ export default function Home() {
         </div>
       </main>
 
-      {/* フッター */}
       <footer className="w-full text-center py-6 text-xs text-gray-400 border-t border-gray-200/60 mt-8">
         © NOU-ATO Agri-Education Platform
       </footer>

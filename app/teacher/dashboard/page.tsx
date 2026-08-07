@@ -8,6 +8,10 @@ import TeacherTaskBoardView from "@/components/teacher/TeacherTaskBoardView";
 import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
 import TeacherJournalsView from "@/components/teacher/TeacherJournalsView";
 import TeacherSettingsView from "@/components/teacher/TeacherSettingsView";
+import TeacherPaymentsView from "@/components/teacher/TeacherPaymentsView";
+import TeacherEventsView from "@/components/teacher/TeacherEventsView";
+import TeacherTemplatesView from "@/components/teacher/TeacherTemplatesView";
+import TeacherFarmCanvasView from "@/components/teacher/TeacherFarmCanvasView";
 
 export default function TeacherDashboardPage() {
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -21,7 +25,7 @@ export default function TeacherDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8faf7] flex text-gray-800 font-sans">
+    <div className="min-h-screen app-bg-main flex app-text-main font-sans transition-colors duration-300">
       {/* 1. 左サイドバー */}
       <TeacherSidebar activeMenu={activeMenu} onMenuClick={setActiveMenu} />
 
@@ -32,18 +36,26 @@ export default function TeacherDashboardPage() {
           title={
             activeMenu === "dashboard"
               ? "農園管理ダッシュボード"
+              : activeMenu === "farm"
+              ? "第1農場レイアウト・キャンバス区画管理 (D&D対応)"
               : activeMenu === "tasks"
               ? "看板教材・タスク管理"
+              : activeMenu === "templates"
+              ? "教材・タスクテンプレート作成・管理"
               : activeMenu === "students"
               ? "受講生一覧"
               : activeMenu === "journals"
               ? "相談・交換日記確認"
+              : activeMenu === "payments"
+              ? "集金・月額会費・売上管理"
+              : activeMenu === "events"
+              ? "イベントスケジュール・講習予約管理"
               : "農園設定"
           }
           onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
         />
 
-        {/* ページコンテンツ */}
+        {/* ページコンテンツ (全ビューテーマ統一連動) */}
         <main className="p-8 max-w-7xl w-full mx-auto flex-1">
           {activeMenu === "dashboard" && (
             <TeacherOverviewView
@@ -53,6 +65,8 @@ export default function TeacherDashboardPage() {
             />
           )}
 
+          {activeMenu === "farm" && <TeacherFarmCanvasView />}
+
           {activeMenu === "tasks" && (
             <TeacherTaskBoardView
               searchQuery={searchQuery}
@@ -60,9 +74,15 @@ export default function TeacherDashboardPage() {
             />
           )}
 
+          {activeMenu === "templates" && <TeacherTemplatesView />}
+
           {activeMenu === "students" && <TeacherStudentsView />}
 
           {activeMenu === "journals" && <TeacherJournalsView />}
+
+          {activeMenu === "payments" && <TeacherPaymentsView />}
+
+          {activeMenu === "events" && <TeacherEventsView />}
 
           {activeMenu === "settings" && <TeacherSettingsView />}
         </main>

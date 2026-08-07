@@ -1,0 +1,41 @@
+export type GrowthStage = "播種・苗植え" | "発芽・活着" | "本葉展開・つる伸び" | "開花・受粉" | "果実肥大" | "収穫期";
+
+export type WorkType = "水やり" | "追肥" | "わき芽かき・仕立て" | "除草・土寄せ" | "病害虫対策" | "収穫";
+
+export type CropRecord = {
+  id: string;
+  bed_id: string;
+  date: string;
+  growth_stage: GrowthStage;
+  height_cm?: number;
+  work_types: WorkType[];
+  notes: string;
+  harvest_amount?: string;
+  created_at: string;
+};
+
+export type FarmBed = {
+  id: string;
+  plot_id: string;
+  bed_number: number;
+  is_updated: boolean;
+  updated_at?: string;
+  latest_record?: CropRecord;
+};
+
+export type FarmPlot = {
+  id: string;
+  farm_id: string;
+  name: string;
+  code: string;
+  student_id?: string;
+  student_name?: string;
+  position: { x: number; y: number };
+  beds: FarmBed[];
+};
+
+export type Farm = {
+  id: string;
+  name: string;
+  created_at?: string;
+};

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOU-ATO 講師↔生徒 データ双方向関係図 ＆ 画面リンク一覧</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background-color: #f4f6f3;
+      color: #2d3748;
+    }
+    .flow-card {
+      transition: all 0.2s ease;
+    }
+    .flow-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+    }
+    .code-link {
+      font-family: monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body class="p-6 md:p-10">
+
+  <div class="max-w-6xl mx-auto space-y-10">
+
+    <!-- ヘッダー -->
+    <header class="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <h1 class="text-3xl font-black text-gray-900 tracking-tight">🌱 NOU-ATO 講師↔生徒 データ双方向関係図</h1>
+        <p class="text-xs text-gray-500 mt-1 font-medium">講師の操作が生徒画面にどうつながり、生徒の状態が講師にどう伝わるかの相互データフロー (テンプレート自作対応)</p>
+      </div>
+
+      <div class="flex items-center space-x-3 bg-emerald-50 p-3 rounded-2xl border border-emerald-100 text-xs font-bold">
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-600"></span> 講師の操作 ➔ 生徒</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500"></span> 生徒の状態 ➔ 講師</span>
+      </div>
+    </header>
+
+    <!-- ================================================================= -->
+    <!-- 🔀 MAIN: 講師の操作が生徒の画面にどうつながり、生徒の状態が講師にどう伝わるか -->
+    <!-- ================================================================= -->
+    <section class="bg-white p-8 rounded-3xl border-2 border-emerald-300 shadow-md space-y-8">
+      
+      <div class="border-b border-gray-100 pb-4 text-center">
+        <h2 class="text-2xl font-black text-gray-900">🔀 講師 ↔ 生徒 データの相互つながり図</h2>
+        <p class="text-xs text-gray-500 mt-1">Supabase データベースおよび共有フックを介した双方向フィードバック</p>
+      </div>
+
+      <div class="space-y-6">
+
+        <!-- Flow 1: タスクテンプレート作成 ➔ タスク作成 ➔ 生徒課題 ➔ 完了報告 ➔ 講師ダッシュボード -->
+        <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4">
+          <div class="flex items-center space-x-2">
+            <span class="bg-emerald-600 text-white text-xs font-extrabold px-2.5 py-1 rounded-md">フロー 1</span>
+            <h3 class="font-black text-gray-900 text-base">タスクテンプレート作成 ＆ 課題配信フィードバック</h3>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center text-xs">
+            <!-- 講師操作 -->
+            <div class="bg-emerald-100/70 p-4 rounded-xl border border-emerald-300 space-y-1">
+              <span class="font-extrabold text-emerald-900 block">👨‍🌾 講師の操作</span>
+              <p class="font-bold text-gray-800">「テンプレート管理」で独自の作業手順・バッジを作成 ➔ タスク追加時にワンタップ呼び出し配信</p>
+              <span class="code-link text-emerald-700 block mt-1">components/teacher/TeacherTemplatesView.tsx</span>
+            </div>
+
+            <!-- 矢印コメントA -->
+            <div class="text-center space-y-1 py-2">
+              <div class="font-bold text-emerald-700 bg-white p-2 rounded-xl border shadow-xs">
+                ➔ 【講師 ➔ 生徒】<br>自作テンプレート課題が配信されスマホカードに即時登場！
+              </div>
+              <div class="font-bold text-amber-700 bg-white p-2 rounded-xl border shadow-xs mt-2">
+                ⬅ 【生徒 ➔ 講師】<br>完了写真報告で受講生進捗率が上がり、講師DBに即時カウント！
+              </div>
+            </div>
+
+            <!-- 生徒画面 -->
+            <div class="bg-amber-100/70 p-4 rounded-xl border border-amber-300 space-y-1">
+              <span class="font-extrabold text-amber-900 block">🌱 生徒の画面 ＆ 状態</span>
+              <p class="font-bold text-gray-800">課題カードをフリック確認 ➔ 作業完了・写真提出 ➔ 独自スキルバッジ解放</p>
+              <span class="code-link text-amber-700 block mt-1">components/student/TaskSlider.tsx</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flow 2: 気づき日誌投稿 ➔ 講師確認・返信 ➔ 生徒Q&A表示 -->
+        <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4">
+          <div class="flex items-center space-x-2">
+            <span class="bg-amber-500 text-white text-xs font-extrabold px-2.5 py-1 rounded-md">フロー 2</span>
+            <h3 class="font-black text-gray-900 text-base">相談・交換日記の投稿 ＆ 指導返信アドバイス</h3>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center text-xs">
+            <!-- 生徒状態 -->
+            <div class="bg-amber-100/70 p-4 rounded-xl border border-amber-300 space-y-1">
+              <span class="font-extrabold text-amber-900 block">🌱 生徒の状態 ＆ 操作</span>
+              <p class="font-bold text-gray-800">栽培の悩みや気づきメモを投稿（写真添付）</p>
+              <span class="code-link text-amber-700 block mt-1">components/student/JournalInput.tsx</span>
+            </div>
+
+            <!-- 矢印コメントB -->
+            <div class="text-center space-y-1 py-2">
+              <div class="font-bold text-amber-700 bg-white p-2 rounded-xl border shadow-xs">
+                ⬅ 【生徒 ➔ 講師】<br>交換日記帳の新ページとして届き、講師右上ベルに未読通知！
+              </div>
+              <div class="font-bold text-emerald-700 bg-white p-2 rounded-xl border shadow-xs mt-2">
+                ➔ 【講師 ➔ 生徒】<br>講師の指導アドバイスが日記帳に表示され、再編集も即時反映！
+              </div>
+            </div>
+
+            <!-- 講師操作 -->
+            <div class="bg-emerald-100/70 p-4 rounded-xl border border-emerald-300 space-y-1">
+              <span class="font-extrabold text-emerald-900 block">👨‍🌾 講師の操作</span>
+              <p class="font-bold text-gray-800">めくり日記帳で確認・アドバイス返信・過去回答の再編集</p>
+              <span class="code-link text-emerald-700 block mt-1">components/teacher/TeacherJournalsView.tsx</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 📄 機能ページ一覧 (名前 と ページリンクのみ) -->
+    <section class="space-y-6">
+      <div class="border-b border-gray-200 pb-3">
+        <h2 class="text-xl font-black text-gray-900">📄 全機能ページ ＆ コンポーネントリンク一覧</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- 1. 認証・共通 -->
+        <div class="bg-white p-6 rounded-3xl border border-blue-200 shadow-xs space-y-3">
+          <h3 class="font-black text-base text-blue-900 border-b border-blue-100 pb-2">🔑 認証・共通ページ</h3>
+          <ul class="space-y-2.5 text-xs font-bold">
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">役割選択トップ</span>
+              <a href="/" class="code-link text-blue-600 hover:underline">/ (app/page.tsx)</a>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">ログイン画面</span>
+              <a href="/login" class="code-link text-blue-600 hover:underline">/login (app/login/page.tsx)</a>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">生徒招待・受講登録</span>
+              <a href="/invite" class="code-link text-blue-600 hover:underline">/invite (app/invite/page.tsx)</a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 2. 講師ポータル (Teacher) -->
+        <div class="bg-white p-6 rounded-3xl border border-emerald-200 shadow-xs space-y-3">
+          <h3 class="font-black text-base text-emerald-900 border-b border-emerald-100 pb-2">👨‍🌾 講師ダッシュボード</h3>
+          <div class="text-[11px] font-mono text-emerald-700 bg-emerald-50 p-2 rounded-xl mb-2 font-bold">
+            親URL: /teacher/dashboard (app/teacher/dashboard/page.tsx)
+          </div>
+          <ul class="space-y-2 text-xs font-bold">
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📊 概要ダッシュボード</span>
+              <span class="code-link text-emerald-700">TeacherOverviewView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📋 タスク作成・看板管理</span>
+              <span class="code-link text-emerald-700">TeacherTaskBoardView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📝 テンプレート作成・管理</span>
+              <span class="code-link text-purple-700">TeacherTemplatesView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">👥 受講生一覧・サポート</span>
+              <span class="code-link text-emerald-700">TeacherStudentsView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📖 相談・交換日記確認</span>
+              <span class="code-link text-emerald-700">TeacherJournalsView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">💳 集金・月額会費・売上</span>
+              <span class="code-link text-purple-700">TeacherPaymentsView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📅 イベントカレンダー予約</span>
+              <span class="code-link text-purple-700">TeacherEventsView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">🎨 農園設定・パステルテーマ</span>
+              <span class="code-link text-emerald-700">TeacherSettingsView.tsx</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 3. 生徒受講画面 (Student) -->
+        <div class="bg-white p-6 rounded-3xl border border-amber-200 shadow-xs space-y-3">
+          <h3 class="font-black text-base text-amber-900 border-b border-amber-100 pb-2">🌱 生徒受講画面</h3>
+          <div class="text-[11px] font-mono text-amber-700 bg-amber-50 p-2 rounded-xl mb-2 font-bold">
+            親URL: /student/quests (app/student/quests/page.tsx)
+          </div>
+          <ul class="space-y-2 text-xs font-bold">
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">🎯 Quests (課題デッキ)</span>
+              <span class="code-link text-amber-700">TaskSlider.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📅 イベントカレンダー予約</span>
+              <span class="code-link text-purple-700">EventCalendar.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">📈 Feed (成長スキルボード)</span>
+              <span class="code-link text-amber-700">StudentSkillBoardView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">💬 Talk (相談・交換日記)</span>
+              <span class="code-link text-amber-700">StudentTalkView.tsx</span>
+            </li>
+            <li class="flex items-center justify-between p-2 rounded-xl bg-gray-50">
+              <span class="text-gray-900">🌤️ 農園天気ウィジェット</span>
+              <span class="code-link text-blue-700">WeatherWidget.tsx</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- フッター -->
+    <footer class="bg-white p-6 rounded-3xl border border-gray-200 text-center text-xs text-gray-500 font-medium">
+      NOU-ATO (農の跡) 講師↔生徒データ双方向関係図 ＆ ページファイルリンク集
+    </footer>
+
+  </div>
+
+</body>
+</html>

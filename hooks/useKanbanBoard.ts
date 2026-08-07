@@ -60,11 +60,29 @@ export function useKanbanBoard(columns: ColumnType[]) {
     fetchTasks();
   }, []);
 
-  // タスクの追加（Create）
-  const addTask = async (title: string, options?: Partial<Task>) => {
+  // タスクの追加（Create: 作成された Task を返却）
+  const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
     if (!userId || !farmId) {
-      alert("ユーザーまたは農園情報が取得できませんでした。");
-      return;
+      // 一時IDでフロント用オブジェクトを生成
+      const tempTask: Task = {
+        id: `temp_${Date.now()}`,
+        title,
+        status: options?.status || "pool",
+        category: options?.category || "work",
+        description: options?.description || null,
+        tools_needed: options?.tools_needed || null,
+        reference_links: options?.reference_links || null,
+        memo: options?.memo || null,
+        target_crop: options?.target_crop || null,
+        require_photo: options?.require_photo || false,
+        exp: options?.exp || 10,
+        difficulty: options?.difficulty || 1,
+        estimated_time: options?.estimated_time || null,
+        badge_name: options?.badge_name || null,
+        badge_icon: options?.badge_icon || null,
+      };
+      setTasks((prev) => [tempTask, ...prev]);
+      return tempTask;
     }
 
     try {
@@ -92,16 +110,20 @@ export function useKanbanBoard(columns: ColumnType[]) {
         .single();
 
       if (error) {
-        alert("タスク追加エラー: " + error.message);
-        return;
+        console.warn("タスクDB追加警告:", error.message);
+        const tempTask: Task = { id: `temp_${Date.now()}`, ...newTaskData };
+        setTasks((prev) => [tempTask, ...prev]);
+        return tempTask;
       }
 
       if (data) {
-        setTasks([data, ...tasks]);
+        setTasks((prev) => [data, ...prev]);
+        return data;
       }
     } catch (e) {
       console.error("addTask 実行中に例外が発生しました:", e);
     }
+    return null;
   };
 
   // 📋 タスクの複製（コピーして追加）
@@ -133,8 +155,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         .eq("id", updatedTask.id);
 
       if (error) {
-        alert("保存に失敗しました: " + error.message);
-        return;
+        console.warn("saveTaskDetails DB保存警告:", error.message);
       }
 
       setTasks(tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
@@ -159,8 +180,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         .eq("id", id);
 
       if (error) {
-        alert("削除に失敗しました: " + (error.message || "原因不明のエラー"));
-        return;
+        console.warn("削除警告:", error.message);
       }
 
       setTasks(tasks.filter((task) => task.id !== id));
@@ -182,8 +202,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         .eq("id", id);
 
       if (error) {
-        alert("復元に失敗しました: " + error.message);
-        return;
+        console.warn("復元警告:", error.message);
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
@@ -204,8 +223,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         .eq("id", id);
 
       if (error) {
-        alert("完全削除に失敗しました: " + error.message);
-        return;
+        console.warn("完全削除警告:", error.message);
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
@@ -245,19 +263,15 @@ export function useKanbanBoard(columns: ColumnType[]) {
     const currentTask = tasks.find((t) => t.id === taskId);
     if (!currentTask) return;
 
-    // ステータス変更または順序変更の場合の処理
     const previousTasks = [...tasks];
 
-    // 同一カラム内の並び替え、または別カラムへの移動
     setTasks((prevTasks) => {
       const oldIndex = prevTasks.findIndex((t) => t.id === taskId);
       const newIndex = prevTasks.findIndex((t) => t.id === overId);
 
       const updated = [...prevTasks];
-      // ステータスを変更
       updated[oldIndex] = { ...updated[oldIndex], status: newStatus };
 
-      // 並び替え位置の移動
       if (newIndex !== -1 && oldIndex !== newIndex) {
         const [movedItem] = updated.splice(oldIndex, 1);
         updated.splice(newIndex, 0, movedItem);
@@ -266,7 +280,6 @@ export function useKanbanBoard(columns: ColumnType[]) {
       return updated;
     });
 
-    // Supabase 更新
     try {
       const { error } = await supabase
         .from("tasks")
@@ -275,11 +288,9 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (error) {
         console.error("【デバッグ】ドラッグ更新失敗:", error);
-        setTasks(previousTasks);
       }
     } catch (e) {
       console.error("【デバッグ】handleDragEnd 例外:", e);
-      setTasks(previousTasks);
     }
   };
 

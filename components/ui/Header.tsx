@@ -3,19 +3,37 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // ※パスは環境に合わせて調整してください
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
 export default function Header() {
   const [user, setUser] = useState<any>(null);
+  const [displayName, setDisplayName] = useState<string>("田中 太郎");
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
-  // 画面を開いた時にSupabaseからログイン中のユーザー情報を取得する
+  // 画面を開いた時に代表者氏名およびユーザー情報を取得する
   useEffect(() => {
     const fetchUser = async () => {
+      const savedName = localStorage.getItem("nouato_owner_name");
+      if (savedName) {
+        setDisplayName(savedName);
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        const { data: uData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (uData && uData.name && !savedName) {
+          setDisplayName(uData.name);
+        }
+      }
     };
     fetchUser();
   }, []);
@@ -25,10 +43,9 @@ export default function Header() {
     if (!confirm("ログアウトしますか？")) return;
     
     await supabase.auth.signOut();
-    router.push("/login"); // ログアウト後はログイン画面へ飛ばす（パスは環境に合わせてください）
+    router.push("/login");
   };
 
-  // ユーザー情報が取得できていない（未ログイン）時は何も表示しない
   if (!user) return null;
 
   return (
@@ -41,14 +58,15 @@ export default function Header() {
         🏠
       </button>
 
-      {/* ドロップダウンメニュー（isOpenがtrueの時だけ表示） */}
+      {/* ドロップダウンメニュー */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
           
-          {/* ① ログインユーザー名（メールアドレス） */}
+          {/* ① 設定した代表者氏名 ＆ メールアドレス */}
           <div className="p-4 border-b bg-gray-50">
-            <p className="text-xs text-gray-500 font-bold mb-1">ログイン中のアカウント</p>
-            <p className="text-sm text-gray-800 font-medium truncate">
+            <p className="text-xs text-gray-500 font-bold mb-0.5">ログイン中のアカウント</p>
+            <p className="text-sm font-black text-gray-900">{displayName}</p>
+            <p className="text-xs text-gray-500 font-medium truncate">
               {user.email}
             </p>
           </div>
@@ -56,18 +74,18 @@ export default function Header() {
           {/* ② 画面選択（リンク） */}
           <div className="p-2 border-b">
             <Link 
-              href="/board" 
+              href="/teacher/dashboard" 
               onClick={() => setIsOpen(false)}
               className="block p-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 rounded-lg font-bold transition"
             >
               👨‍🌾 講師ダッシュボードへ
             </Link>
             <Link 
-              href="/student" 
+              href="/student/quests" 
               onClick={() => setIsOpen(false)}
               className="block p-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg font-bold transition"
             >
-              🌱 生徒マイページへ
+              🌱 生徒受講画面へ
             </Link>
           </div>
 

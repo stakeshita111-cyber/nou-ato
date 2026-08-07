@@ -1,109 +1,147 @@
 "use client";
 
+import { useState } from "react";
 import Badge from "@/components/ui/Badge";
+import { useFarmManager } from "@/hooks/useFarmManager";
 
-export default function TaskDetailModel({ 
-  task, 
-  onClose 
-}: { 
-  task: any | null; 
-  onClose: () => void 
-}) {
+interface TaskDetailModelProps {
+  task: any;
+  studentName?: string;
+  onClose: () => void;
+  onComplete?: (id: string, bedId?: string, photoUrl?: string, memo?: string) => void;
+}
+
+export default function TaskDetailModel({
+  task,
+  studentName = "佐藤 健太",
+  onClose,
+  onComplete,
+}: TaskDetailModelProps) {
+  const { plots, addCropRecord } = useFarmManager();
+
+  // 生徒自身の割当区画＆畝一覧を取得
+  const myPlot = plots.find((p) => p.student_name === studentName || p.student_name?.includes(studentName)) || plots[0];
+  const myBeds = myPlot?.beds || [];
+
+  const [selectedBedId, setSelectedBedId] = useState<string>(myBeds[0]?.id || "");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [reportMemo, setReportMemo] = useState<string>("");
+
   if (!task) return null;
 
-  // tasks テーブル側の最新マスターデータを優先的に参照
-  const taskDetails = task.tasks || {};
-  const title = taskDetails.title || task.title;
-  const exp = taskDetails.exp ?? task.exp ?? 10;
-  const difficulty = taskDetails.difficulty ?? task.difficulty ?? 1;
-  const estimatedTime = taskDetails.estimated_time || task.estimated_time;
-  const toolsNeeded = taskDetails.tools_needed || task.tools_needed;
-  const description = taskDetails.description || task.description;
-  const memo = taskDetails.memo || task.memo;
-  const referenceLinks = taskDetails.reference_links || task.reference_links;
-  const requirePhoto = taskDetails.require_photo ?? task.require_photo;
+  const t = task.tasks || task;
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleReportComplete = () => {
+    const targetBed = myBeds.find((b) => b.id === selectedBedId) || myBeds[0];
+
+    // 対象の畝ベッドへ作業記録・現場写真を送信保存
+    if (targetBed) {
+      addCropRecord(targetBed.id, {
+        bed_id: targetBed.id,
+        date: new Date().toLocaleDateString("ja-JP"),
+        growth_stage: "果実肥大",
+        height_cm: 75,
+        work_types: [t.title],
+        notes: reportMemo.trim() || `タスク「${t.title}」を完了報告しました。`,
+        harvest_amount: photoPreview ? "📷 現場写真あり" : undefined,
+      });
+    }
+
+    if (onComplete) {
+      onComplete(task.id, selectedBedId, photoPreview || undefined, reportMemo);
+    }
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl flex flex-col text-gray-800">
-        
-        {/* ヘッダー */}
-        <div className="p-5 border-b sticky top-0 bg-white z-10 flex justify-between items-center rounded-t-2xl">
-          <h2 className="text-xl font-bold text-green-700">クエスト詳細</h2>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-gray-700 font-bold text-2xl w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full"
-          >
-            ✕
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+      <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto border border-gray-200">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 font-bold"
+        >
+          ✕
+        </button>
+
+        <div className="space-y-1">
+          <Badge type="crop">{t.target_crop || "春野菜"}</Badge>
+          <h3 className="text-xl font-black text-gray-900 leading-snug">{t.title}</h3>
         </div>
-        
-        {/* コンテンツエリア */}
-        <div className="p-6 space-y-6">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">{title}</h3>
-            <div className="flex gap-2 flex-wrap items-center">
-              <Badge type="exp">EXP: {exp}</Badge>
-              <Badge type="difficulty">難易度: {difficulty}</Badge>
-              {estimatedTime && (
-                <Badge type="time">目安: {estimatedTime}</Badge>
-              )}
-            </div>
-          </div>
 
-          {toolsNeeded && (
-            <div>
-              <p className="text-sm text-gray-500 font-bold mb-1">🛠 必要な道具</p>
-              <p className="bg-gray-50 p-3 rounded-lg border text-gray-800">{toolsNeeded}</p>
-            </div>
-          )}
+        <div className="text-xs text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-1">
+          <h4 className="font-bold text-gray-800">📖 作業手順・概要</h4>
+          <p>{t.description || "苗や土の観察を行い、状態に合わせて手入れを行います。"}</p>
+        </div>
 
-          {description && (
-            <div>
-              <p className="text-sm text-gray-500 font-bold mb-1">📋 作業手順・チェックリスト</p>
-              <div className="bg-gray-50 p-4 rounded-lg border whitespace-pre-wrap leading-relaxed text-gray-800">
-                {description}
+        {/* 🌟 1. 対象の畑(畝ベッド)の選択 🌟 */}
+        <div className="space-y-1.5 pt-1">
+          <label className="block text-xs font-black text-emerald-950">
+            🌱 対象の畑(畝ベッド)を選択 *
+          </label>
+          <select
+            value={selectedBedId}
+            onChange={(e) => setSelectedBedId(e.target.value)}
+            className="w-full p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-xs cursor-pointer shadow-xs"
+          >
+            {myBeds.map((b) => (
+              <option key={b.id} value={b.id}>
+                畝 {myPlot?.code}-{b.bed_number}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 🌟 2. 作業メモ・気づきの入力 🌟 */}
+        <div className="space-y-1">
+          <label className="block text-xs font-bold text-gray-700">作業メモ・気づきコメント</label>
+          <textarea
+            rows={3}
+            placeholder="作業時に気づいたことや状態を入力してください..."
+            value={reportMemo}
+            onChange={(e) => setReportMemo(e.target.value)}
+            className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 text-xs font-medium"
+          />
+        </div>
+
+        {/* 🌟 3. 現場写真の撮影・添付 🌟 */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-gray-700">📷 現場写真の添付</label>
+          <div className="border-2 border-dashed border-gray-300 rounded-2xl p-3 bg-gray-50 flex flex-col items-center justify-center text-center relative cursor-pointer min-h-[90px] hover:bg-gray-100 transition">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoSelect}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            />
+            {photoPreview ? (
+              <img src={photoPreview} alt="現場写真" className="h-28 object-cover rounded-xl shadow-xs" />
+            ) : (
+              <div className="text-xs text-gray-500 space-y-1">
+                <span className="text-xl">📷</span>
+                <p className="font-bold">タップして作業写真を撮影・追加</p>
               </div>
-            </div>
-          )}
-
-          {memo && (
-            <div>
-              <p className="text-sm text-gray-500 font-bold mb-1">💡 師匠からの補足</p>
-              <p className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-yellow-900 font-medium">
-                {memo}
-              </p>
-            </div>
-          )}
-
-          {referenceLinks && (
-            <div>
-              <p className="text-sm text-gray-500 font-bold mb-1">📺 参考リンク</p>
-              <a 
-                href={referenceLinks} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-blue-600 underline break-all font-medium hover:text-blue-800"
-              >
-                {referenceLinks}
-              </a>
-            </div>
-          )}
-          
-          {requirePhoto && (
-            <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2">
-              📸 このクエストは完了後に写真の提出（日記への添付）が必要です！
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* フッター */}
-        <div className="p-5 border-t bg-gray-50 rounded-b-2xl">
-          <button 
-            onClick={onClose} 
-            className="w-full py-3 bg-gray-800 text-white rounded-xl font-bold shadow-md hover:bg-gray-900 transition"
+        {/* 完了送信ボタン */}
+        <div className="pt-2">
+          <button
+            onClick={handleReportComplete}
+            className="w-full py-3.5 bg-[#1d5c23] hover:bg-[#16471a] text-white font-black text-sm rounded-xl shadow-md transition active:scale-95"
           >
-            閉じる
+            ✓ 畝に記録して作業完了を報告
           </button>
         </div>
       </div>

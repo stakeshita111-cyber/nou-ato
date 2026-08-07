@@ -9,11 +9,11 @@ interface TeacherSidebarProps {
 
 export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSidebarProps) {
   return (
-    <aside className="w-64 bg-[#eeefec] border-r border-gray-200 flex flex-col justify-between flex-shrink-0 min-h-screen">
+    <aside className="w-64 app-bg-card border-r app-border flex flex-col justify-between flex-shrink-0 min-h-screen transition-colors duration-300">
       <div>
         {/* ブランドロゴ */}
-        <div className="p-6 border-b border-gray-200/80 flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#1d5c23] text-white font-bold flex items-center justify-center text-sm shadow-md">
+        <div className="p-6 border-b border-gray-100 flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-2xl app-accent-btn font-bold flex items-center justify-center text-sm shadow-md">
             AE
           </div>
           <div>
@@ -28,8 +28,8 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             onClick={() => onMenuClick("dashboard")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
               activeMenu === "dashboard"
-                ? "bg-[#dfdfda] text-gray-900 shadow-xs font-bold"
-                : "text-gray-600 hover:bg-gray-200/60"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
             }`}
           >
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -38,12 +38,25 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <span>ダッシュボード</span>
           </button>
 
+          {/* 🌟 新機能: 畑・区画ビジュアル管理 🌟 */}
+          <button
+            onClick={() => onMenuClick("farm")}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              activeMenu === "farm"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
+            }`}
+          >
+            <span className="text-base">🌾</span>
+            <span>畑・区画管理</span>
+          </button>
+
           <button
             onClick={() => onMenuClick("tasks")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
               activeMenu === "tasks"
-                ? "bg-[#dfdfda] text-gray-900 shadow-xs font-bold"
-                : "text-gray-600 hover:bg-gray-200/60"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
             }`}
           >
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,11 +66,23 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
           </button>
 
           <button
+            onClick={() => onMenuClick("templates")}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              activeMenu === "templates"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
+            }`}
+          >
+            <span className="text-base">📝</span>
+            <span>テンプレート管理</span>
+          </button>
+
+          <button
             onClick={() => onMenuClick("students")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
               activeMenu === "students"
-                ? "bg-[#dfdfda] text-gray-900 shadow-xs font-bold"
-                : "text-gray-600 hover:bg-gray-200/60"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
             }`}
           >
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,8 +95,8 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             onClick={() => onMenuClick("journals")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
               activeMenu === "journals"
-                ? "bg-[#dfdfda] text-gray-900 shadow-xs font-bold"
-                : "text-gray-600 hover:bg-gray-200/60"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
             }`}
           >
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,12 +105,38 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <span>相談・日誌確認</span>
           </button>
 
+          {/* 集金・売上管理 */}
+          <button
+            onClick={() => onMenuClick("payments")}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              activeMenu === "payments"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
+            }`}
+          >
+            <span className="text-base">💳</span>
+            <span>集金・売上管理</span>
+          </button>
+
+          {/* イベント・予約管理 */}
+          <button
+            onClick={() => onMenuClick("events")}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              activeMenu === "events"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
+            }`}
+          >
+            <span className="text-base">📅</span>
+            <span>イベント・予約</span>
+          </button>
+
           <button
             onClick={() => onMenuClick("settings")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
               activeMenu === "settings"
-                ? "bg-[#dfdfda] text-gray-900 shadow-xs font-bold"
-                : "text-gray-600 hover:bg-gray-200/60"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
             }`}
           >
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,10 +149,10 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
       </div>
 
       {/* サイドバー下部 ログアウト/リンク */}
-      <div className="p-4 border-t border-gray-200 space-y-2">
+      <div className="p-4 border-t border-gray-100 space-y-2">
         <Link
           href="/student/quests"
-          className="flex items-center space-x-2 text-xs font-semibold text-[#1d5c23] hover:underline p-2 rounded-lg transition"
+          className="flex items-center space-x-2 text-xs font-semibold app-text-main hover:underline p-2 rounded-lg transition"
         >
           <span>📱 生徒画面ビューを開く</span>
         </Link>
