@@ -39,16 +39,16 @@ export function useStudentDashboard() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser) {
           // デフォルトのテスト生徒プロファイルを取得
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("id, full_name")
+          const { data: defaultUsers } = await supabase
+            .from("users")
+            .select("id, display_name")
             .eq("role", "student")
             .limit(1);
 
-          if (profiles && profiles.length > 0) {
-            setUser({ id: profiles[0].id, name: profiles[0].full_name });
+          if (defaultUsers && defaultUsers.length > 0) {
+            setUser({ id: defaultUsers[0].id, name: defaultUsers[0].display_name });
           } else {
-            setUser({ id: "student_default", name: "佐藤 健太" });
+            setUser({ id: "student_default", name: "テスト生徒" });
           }
 
           setTasks(DEFAULT_STUDENT_TASKS);
@@ -62,7 +62,10 @@ export function useStudentDashboard() {
           authUser.user_metadata?.preferred_username ||
           (authUser.email ? authUser.email.split("@")[0] : "");
 
-        // 1. users テーブルから表示名を取得
+        const displayName = oauthName || "受講生";
+        const storedFarmId = typeof window !== "undefined" ? localStorage.getItem("nouato_invite_farm_id") : null;
+
+        // 1. users テーブルから表示名を取得＆自動補正保管
         const { data: userData } = await supabase
           .from("users")
           .select("*")
@@ -72,41 +75,32 @@ export function useStudentDashboard() {
         if (userData) {
           setUser({
             ...userData,
-            name: userData.display_name || oauthName || userData.email || "生徒",
+            name: userData.display_name || displayName,
           });
+
+          // farm_id が未設定または招待IDがある場合は補正更新
+          if (storedFarmId && userData.farm_id !== storedFarmId) {
+            await supabase.from("users").update({ farm_id: storedFarmId }).eq("id", authUser.id);
+          } else if (!userData.display_name && displayName) {
+            await supabase.from("users").update({ display_name: displayName }).eq("id", authUser.id);
+          }
         } else {
-          // 2. profiles テーブルから表示名を取得
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", authUser.id)
-            .single();
+          setUser({ id: authUser.id, name: displayName, email: authUser.email });
+          const targetFarmId = storedFarmId || "5cf1b060-8229-4669-85e6-3bfca5d04c6d";
 
-          if (profileData && profileData.full_name) {
-            setUser({
-              id: authUser.id,
-              name: profileData.full_name,
-              email: authUser.email,
-            });
-          } else {
-            // OAuth名またはメール名をデフォルト設定
-            const displayName = oauthName || "生徒";
-            setUser({ id: authUser.id, name: displayName, email: authUser.email });
-
-            // 今後のために users テーブルへ自動保管
-            try {
-              await supabase.from("users").upsert([
-                {
-                  id: authUser.id,
-                  email: authUser.email || `${authUser.id}@line.user`,
-                  display_name: displayName,
-                  role: "student",
-                  farm_id: "tanaka_farm",
-                },
-              ]);
-            } catch (err) {
-              console.error(err);
-            }
+          // users テーブルへ確実に作成・保管
+          try {
+            await supabase.from("users").upsert([
+              {
+                id: authUser.id,
+                email: authUser.email || `${authUser.id}@line.user`,
+                display_name: displayName,
+                role: "student",
+                farm_id: targetFarmId,
+              },
+            ], { onConflict: "id" });
+          } catch (err) {
+            console.error("useStudentDashboard auto-upsert error:", err);
           }
         }
 

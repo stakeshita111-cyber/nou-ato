@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import IndividualTaskAssignModal from "@/components/teacher/IndividualTaskAssignModal";
 import StudentPreviewModal from "@/components/teacher/StudentPreviewModal";
+import QRCodeModal from "@/components/ui/QRCodeModal";
 
 interface StudentData {
   id: string;
@@ -26,8 +27,70 @@ export default function TeacherStudentsView() {
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [assignModalStudent, setAssignModalStudent] = useState<StudentData | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  const [origin, setOrigin] = useState("http://localhost:3000");
+  const [farmId, setFarmId] = useState<string>("tanaka_farm");
+  const [farmName, setFarmName] = useState<string>("たなか自然農園");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+
+    const fetchTeacherFarm = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // 1. 講師所有の農園検索
+          const { data: farm } = await supabase
+            .from("farms")
+            .select("*")
+            .eq("owner_id", user.id)
+            .single();
+
+          if (farm) {
+            setFarmId(farm.id);
+            if (farm.name) setFarmName(farm.name);
+            return;
+          }
+        }
+
+        // 2. owner_idに一致しない場合、DB上の最新の農園を取得
+        const { data: latestFarm } = await supabase
+          .from("farms")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (latestFarm) {
+          setFarmId(latestFarm.id);
+          if (latestFarm.name) setFarmName(latestFarm.name);
+        }
+      } catch (err) {
+        console.error("fetchTeacherFarm error:", err);
+      }
+    };
+
+    fetchTeacherFarm();
+  }, []);
+
+  const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
+
+  const handleCopyInviteUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setToastMessage("📋 招待URLをクリップボードにコピーしました！受講生へ共有してください");
+      setShowToast(true);
+    } catch (err) {
+      setToastMessage("URLのコピーに失敗しました");
+      setShowToast(true);
+    }
+  };
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -62,34 +125,7 @@ export default function TeacherStudentsView() {
         return;
       }
 
-      // 2. profiles テーブルから取得
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("role", "student");
-
-      if (!profilesError && profilesData && profilesData.length > 0) {
-        const filteredProfiles = profilesData.filter((p: any) => !dummyNames.includes(p.full_name));
-        const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
-        const formatted: StudentData[] = filteredProfiles.map((u: any, idx: number) => {
-          const studentName = u.full_name || `受講生 ${idx + 1}`;
-          return {
-            id: u.id,
-            name: studentName,
-            avatar: studentName.slice(0, 2),
-            avatarBg: colors[idx % colors.length],
-            plot: `割当確認中`,
-            step: "受講中",
-            progress: 50,
-            unreadCount: 0,
-            lastReport: u.created_at ? new Date(u.created_at).toLocaleDateString("ja-JP") : "最近",
-            hasOverdue: false,
-          };
-        });
-        setStudents(formatted);
-      } else {
-        setStudents([]);
-      }
+      setStudents([]);
     } catch (e) {
       console.error("fetchStudents exception:", e);
       setStudents([]);
@@ -126,7 +162,14 @@ export default function TeacherStudentsView() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+          >
+            <span>🟢 受講生を招待する</span>
+          </button>
+
           <button
             onClick={() => {
               setAssignModalStudent(null);
@@ -162,9 +205,27 @@ export default function TeacherStudentsView() {
       {loading ? (
         <div className="text-center py-12 text-sm font-bold text-gray-400">受講生データを読み込み中...</div>
       ) : filteredStudents.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center text-gray-400 font-bold text-sm border border-gray-200 space-y-2">
-          <p>登録された受講生アカウントはまだありません。</p>
-          <p className="text-xs text-gray-400 font-medium">ユーザー登録画面・招待リンクから受講生が登録されると、ここに表示されます。</p>
+        <div className="bg-white rounded-3xl p-12 text-center text-gray-500 font-bold text-sm border border-gray-200 space-y-4 shadow-xs">
+          <span className="text-4xl block">🧑‍🌾</span>
+          <div className="space-y-1">
+            <p className="text-base font-black text-gray-900">登録された受講生アカウントはまだありません</p>
+            <p className="text-xs text-gray-400 font-medium">LINE招待リンクまたはQRコードを受講生に共有して登録を始めましょう。</p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              onClick={handleCopyInviteUrl}
+              className="px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+            >
+              <span>📋 招待URLをコピー</span>
+            </button>
+            <button
+              onClick={() => setShowQRModal(true)}
+              className="px-5 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+            >
+              <span>📱 QRコードを表示</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -240,6 +301,71 @@ export default function TeacherStudentsView() {
           ))}
         </div>
       )}
+
+      {/* 生徒招待 Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-gray-200 relative">
+            <button
+              onClick={() => setShowInviteModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+            >
+              ✕
+            </button>
+
+            <div>
+              <h3 className="text-lg font-black text-emerald-950 flex items-center gap-2">
+                <span>🟢 受講生を招待する</span>
+              </h3>
+              <p className="text-xs text-gray-500 font-bold mt-1">
+                LINE招待リンクまたはQRコードを受講生に共有して登録を案内できます
+              </p>
+            </div>
+
+            <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+              <label className="block text-xs font-bold text-gray-700">
+                招待専用URL
+              </label>
+              <div className="bg-white p-3 rounded-xl border text-xs font-mono break-all text-gray-700">
+                {inviteUrl}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={handleCopyInviteUrl}
+                  className="py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
+                >
+                  <span>📋 URLをコピー</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowInviteModal(false);
+                    setShowQRModal(true);
+                  }}
+                  className="py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
+                >
+                  <span>📱 QRコード表示</span>
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowInviteModal(false)}
+              className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* QRコード Modal */}
+      <QRCodeModal
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        inviteUrl={inviteUrl}
+        farmName={farmName}
+      />
 
       {/* 個別タスク割り当て Modal */}
       {showAssignModal && (

@@ -8,7 +8,7 @@ interface PaymentRecord {
   id: string;
   studentName: string;
   plot: string;
-  itemTitle: string; // 請求項目 (月額区画料, 資材セット代等)
+  itemTitle: string; // 請求項目
   amount: number;
   dueDate: string;
   status: "paid" | "unpaid" | "reminded";
@@ -63,13 +63,44 @@ export default function TeacherPaymentsView() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  // サマリー計算
+  // ----------------------------------------------------
+  // 📊 収支シミュレーション用ステート (生徒数×年間受講料 - 経費 - システム利用料(1%))
+  // ----------------------------------------------------
+  const [studentCount, setStudentCount] = useState<number>(4); // DBから自動計算
+  const [annualTuitionFee, setAnnualTuitionFee] = useState<number>(120000); // 手動設定 (年間12万円/人)
+  const [annualExpenses, setAnnualExpenses] = useState<number>(150000); // 手動設定 (年間経費15万円)
+
+  // Supabase から実際の生徒数を自動取得
+  useEffect(() => {
+    const fetchStudentCount = async () => {
+      try {
+        const { count } = await supabase
+          .from("users")
+          .select("*", { count: "exact" })
+          .eq("role", "student");
+
+        if (count && count > 0) {
+          setStudentCount(count);
+        }
+      } catch (err) {
+        console.error("fetchStudentCount error:", err);
+      }
+    };
+    fetchStudentCount();
+  }, []);
+
+  // シミュレーション自動計算ロジック
+  const grossRevenue = studentCount * annualTuitionFee; // 収入 (生徒数 × 年間受講料)
+  const systemFee = Math.round(grossRevenue * 0.01); // システム利用料 (収入の1%で仮置き)
+  const netProfit = grossRevenue - annualExpenses - systemFee; // 利益 (収入 - 経費 - システム利用料)
+
+  // 現行実績のサマリー計算
   const totalRevenue = payments.reduce((acc, cur) => acc + cur.amount, 0);
   const paidRevenue = payments
     .filter((p) => p.status === "paid")
     .reduce((acc, cur) => acc + cur.amount, 0);
   const unpaidRevenue = totalRevenue - paidRevenue;
-  const collectionRate = Math.round((paidRevenue / totalRevenue) * 100);
+  const collectionRate = totalRevenue > 0 ? Math.round((paidRevenue / totalRevenue) * 100) : 0;
 
   // 支払い催促LINE送信
   const handleSendRemind = (id: string, studentName: string) => {
@@ -95,31 +126,134 @@ export default function TeacherPaymentsView() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in text-gray-800 font-sans">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       <div>
         <h2 className="text-2xl font-black text-gray-900">💳 集金・月額会費・売上管理</h2>
         <p className="text-xs text-gray-500 mt-1">
-          受講生の月額区画料・資材代の決済状況、LINE督促通知、月次売上の回収率をリアルタイムに一括管理します。
+          受講生の月額区画料・資材代の決済状況、LINE催促、月次収支シミュレーションを一括管理します。
         </p>
       </div>
 
-      {/* 1. 売上サマリーカード (4分割) */}
+      {/* 🌟 1. 収支・利益シミュレーター (ご指定の計算式) 🌟 */}
+      <div className="bg-white p-6 rounded-3xl border border-emerald-900/10 shadow-lg space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
+          <div>
+            <h3 className="text-lg font-black text-emerald-950 flex items-center gap-2">
+              <span>📊 収支・利益シミュレーター</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
+                試算ツール
+              </span>
+            </h3>
+            <p className="text-xs text-gray-500 font-bold mt-0.5">
+              計算式: [生徒数 (自動)] × [年間受講料] － [経費] － [システム利用料 (収入の1%)]
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-[11px] font-bold text-gray-400 block">現在の登録生徒数</span>
+            <span className="text-xl font-black text-emerald-800">{studentCount} 名</span>
+          </div>
+        </div>
+
+        {/* シミュレーション入力コントロール */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200/60">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              ① 生徒数（DB自動計算）
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={studentCount}
+                onChange={(e) => setStudentCount(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              />
+              <span className="text-xs font-bold text-gray-600 shrink-0">名</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              ② 年間受講料 (1人あたり / 手動)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step={1000}
+                value={annualTuitionFee}
+                onChange={(e) => setAnnualTuitionFee(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              />
+              <span className="text-xs font-bold text-gray-600 shrink-0">円/年</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              ③ 年間経費（資材・肥料等 / 手動）
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step={5000}
+                value={annualExpenses}
+                onChange={(e) => setAnnualExpenses(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              />
+              <span className="text-xs font-bold text-gray-600 shrink-0">円/年</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 試算結果カード表示 (4区分) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-1">
+            <span className="text-[11px] font-bold text-gray-500 block">💰 年間想定総収入</span>
+            <span className="text-2xl font-black text-gray-900">¥{grossRevenue.toLocaleString()}</span>
+            <span className="text-[10px] text-gray-400 font-medium block">
+              {studentCount}名 × ¥{annualTuitionFee.toLocaleString()}
+            </span>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-1">
+            <span className="text-[11px] font-bold text-gray-500 block">🛠️ 年間想定経費</span>
+            <span className="text-2xl font-black text-gray-700">¥{annualExpenses.toLocaleString()}</span>
+            <span className="text-[10px] text-gray-400 font-medium block">手動設定分</span>
+          </div>
+
+          <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-1">
+            <span className="text-[11px] font-bold text-amber-900 block">⚡ システム利用料 (1%)</span>
+            <span className="text-2xl font-black text-amber-900">¥{systemFee.toLocaleString()}</span>
+            <span className="text-[10px] text-amber-700 font-medium block">総収入の 1.0% 仮設定</span>
+          </div>
+
+          <div className="bg-emerald-800 text-white p-4 rounded-2xl shadow-md space-y-1">
+            <span className="text-[11px] font-bold text-emerald-200 block">🌟 年間手取り想定純利益</span>
+            <span className="text-2xl font-black text-white">¥{netProfit.toLocaleString()}</span>
+            <span className="text-[10px] text-emerald-100 font-medium block">
+              月換算: 約 ¥{Math.round(netProfit / 12).toLocaleString()}/月
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 現行実績の売上サマリーカード (4分割) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="app-bg-card p-5 rounded-2xl border app-border shadow-xs space-y-1">
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-gray-500 block">今月の総請求額</span>
           <span className="text-2xl font-black text-gray-900">¥{totalRevenue.toLocaleString()}</span>
           <span className="text-[10px] text-gray-400 block">全 {payments.length} 件の請求</span>
         </div>
 
-        <div className="app-bg-card p-5 rounded-2xl border border-green-200 shadow-xs space-y-1">
+        <div className="bg-white p-5 rounded-2xl border border-green-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-[#2e7d32] block">回収済み入金額</span>
           <span className="text-2xl font-black text-[#2e7d32]">¥{paidRevenue.toLocaleString()}</span>
           <span className="text-[10px] text-green-700 font-bold block">回収率 {collectionRate}%</span>
         </div>
 
-        <div className="app-bg-card p-5 rounded-2xl border border-red-200 shadow-xs space-y-1">
+        <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-red-600 block">未回収・未払い金</span>
           <span className="text-2xl font-black text-red-600">¥{unpaidRevenue.toLocaleString()}</span>
           <span className="text-[10px] text-red-500 font-bold block">
@@ -127,7 +261,7 @@ export default function TeacherPaymentsView() {
           </span>
         </div>
 
-        <div className="app-bg-card p-5 rounded-2xl border app-border shadow-xs space-y-1 flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-gray-500 block">決済方式割合</span>
           <div className="flex items-center space-x-2 text-xs font-bold text-gray-700">
             <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">クレカ 50%</span>
@@ -136,7 +270,7 @@ export default function TeacherPaymentsView() {
         </div>
       </div>
 
-      {/* 2. 集金・決済明細テーブル */}
+      {/* 3. 集金・決済明細テーブル */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-gray-900 text-sm">📋 月次請求・集金ステータス一覧</h3>
@@ -145,20 +279,20 @@ export default function TeacherPaymentsView() {
           <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold space-x-1">
             <button
               onClick={() => setFilter("all")}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"}`}
+              className={`px-3 py-1.5 rounded-lg transition ${filter === "all" ? "bg-white text-gray-900 shadow-xs font-black" : "text-gray-500"}`}
             >
               全員 ({payments.length})
             </button>
             <button
               onClick={() => setFilter("unpaid")}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === "unpaid" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"}`}
+              className={`px-3 py-1.5 rounded-lg transition ${filter === "unpaid" ? "bg-white text-gray-900 shadow-xs font-black" : "text-gray-500"}`}
             >
               未払いのみ ({payments.filter((p) => p.status !== "paid").length})
             </button>
           </div>
         </div>
 
-        <div className="app-bg-card rounded-2xl border app-border shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/70 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">

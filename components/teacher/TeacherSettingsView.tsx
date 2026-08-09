@@ -46,31 +46,37 @@ export default function TeacherSettingsView() {
         if (authData?.user) {
           setEmail(authData.user.email || "");
           
-          const { data: uData } = await supabase
-            .from("users")
+          const { data: farmData } = await supabase
+            .from("farms")
             .select("*")
-            .eq("id", authData.user.id)
+            .eq("owner_id", authData.user.id)
             .single();
 
-          if (uData && uData.name && !savedNameHasPriority()) {
-            setOwnerName(uData.name);
-          }
-        }
+          if (farmData) {
+            setFarmId(farmData.id);
+            setFarmName(farmData.name || "自然農園");
+            if (farmData.owner_name && !savedOwnerName) {
+              setOwnerName(farmData.owner_name);
+            }
+          } else {
+            const { data: uData } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", authData.user.id)
+              .single();
 
-        const { data: farmData } = await supabase
-          .from("farms")
-          .select("*")
-          .limit(1)
-          .single();
-
-        if (farmData) {
-          setFarmId(farmData.id);
-          setFarmName(farmData.name || "たなか自然農園");
-          if (farmData.owner_name && !savedOwnerName) {
-            setOwnerName(farmData.owner_name);
+            if (uData?.farm_id) {
+              setFarmId(uData.farm_id);
+              const { data: linkedFarm } = await supabase
+                .from("farms")
+                .select("name")
+                .eq("id", uData.farm_id)
+                .single();
+              if (linkedFarm?.name) {
+                setFarmName(linkedFarm.name);
+              }
+            }
           }
-        } else {
-          setFarmName("たなか自然農園");
         }
       } catch (e) {
         console.error("fetchFarmSettings error:", e);

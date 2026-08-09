@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { FarmBed, FarmPlot } from "@/types/farm";
 import Toast from "@/components/ui/Toast";
@@ -31,9 +31,7 @@ export default function TeacherFarmCanvasView() {
     unassignStudentFromPlot,
   } = useFarmManager();
 
-  const [unassignedList, setUnassignedList] = useState<UnassignedStudent[]>([]);
-
-  useEffect(() => {
+  const unassignedList = useMemo<UnassignedStudent[]>(() => {
     const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
     const assignedStudentIds = new Set(
       currentFarmPlots.map((p) => p.student_id).filter(Boolean)
@@ -41,7 +39,7 @@ export default function TeacherFarmCanvasView() {
 
     const colorBgs = ["bg-emerald-800", "bg-[#e89980]", "bg-[#0b548b]", "bg-purple-800"];
 
-    const unassigned = (supabaseStudents || [])
+    return (supabaseStudents || [])
       .filter((s) => !assignedStudentIds.has(s.id) && !dummyNames.includes(s.full_name))
       .map((s, idx) => ({
         id: s.id,
@@ -50,9 +48,8 @@ export default function TeacherFarmCanvasView() {
         grade: "受講生",
         colorBg: colorBgs[idx % colorBgs.length],
       }));
-
-    setUnassignedList(unassigned);
   }, [supabaseStudents, currentFarmPlots]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
@@ -224,7 +221,6 @@ export default function TeacherFarmCanvasView() {
     }
 
     assignStudentToPlot(plot.id, draggingStudent.id, draggingStudent.name);
-    setUnassignedList(unassignedList.filter((s) => s.id !== draggingStudent.id));
     setDraggingStudent(null);
 
     setToastMessage(`🎯 ${plot.code}区画に ${draggingStudent.name} さんを割り当てました！ (${plot.code} - ${draggingStudent.name})`);
@@ -235,19 +231,6 @@ export default function TeacherFarmCanvasView() {
     if (!confirmChangeStudentModal) return;
 
     const { plot, newStudent } = confirmChangeStudentModal;
-
-    if (plot.student_name) {
-      const restoredStudent: UnassignedStudent = {
-        id: plot.student_id || `s_${Date.now()}`,
-        name: plot.student_name,
-        initials: plot.student_name.slice(0, 2),
-        grade: "受講生",
-        colorBg: "bg-emerald-800",
-      };
-      setUnassignedList((prev) => [...prev.filter((s) => s.id !== newStudent.id), restoredStudent]);
-    } else {
-      setUnassignedList((prev) => prev.filter((s) => s.id !== newStudent.id));
-    }
 
     assignStudentToPlot(plot.id, newStudent.id, newStudent.name);
 
@@ -261,15 +244,6 @@ export default function TeacherFarmCanvasView() {
   const handleUnassignPlot = (plot: FarmPlot) => {
     if (!plot.student_name) return;
 
-    const restoredStudent: UnassignedStudent = {
-      id: plot.student_id || `s_${Date.now()}`,
-      name: plot.student_name,
-      initials: plot.student_name.slice(0, 2),
-      grade: "受講生",
-      colorBg: "bg-emerald-800",
-    };
-
-    setUnassignedList([...unassignedList, restoredStudent]);
     unassignStudentFromPlot(plot.id);
     setSelectedPlot(null);
 

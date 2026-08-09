@@ -22,10 +22,15 @@ export default function EventCalendar({
   onApproveAttendee,
   onAddNewEventClick,
 }: EventCalendarProps) {
-  // 表示年月の State (初期値: 2026年5月)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(5); // 1-indexed (5月)
-  const [selectedDateStr, setSelectedDateStr] = useState<string>("2026-05-24");
+  // 表示年月の State (初期値: 今日の日付を含む年月)
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1; // 1-indexed
+  const todayDateFormatted = `${todayYear}-${String(todayMonth).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const [currentYear, setCurrentYear] = useState(todayYear);
+  const [currentMonth, setCurrentMonth] = useState(todayMonth);
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateFormatted);
 
   // 月変更操作
   const handlePrevMonth = () => {
@@ -89,9 +94,13 @@ export default function EventCalendar({
           </button>
           <button
             onClick={() => {
-              setCurrentYear(2026);
-              setCurrentMonth(5);
-              setSelectedDateStr("2026-05-24");
+              const t = new Date();
+              const y = t.getFullYear();
+              const m = t.getMonth() + 1;
+              const dStr = `${y}-${String(m).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+              setCurrentYear(y);
+              setCurrentMonth(m);
+              setSelectedDateStr(dStr);
             }}
             className="px-3.5 py-1.5 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition"
           >

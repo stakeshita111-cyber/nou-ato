@@ -6,25 +6,33 @@ import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
-export default function UnifiedLoginPage() {
+export default function TeacherSignUpPage() {
   const router = useRouter();
 
   // フォームステート
+  const [farmName, setFarmName] = useState("");
+  const [teacherName, setTeacherName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // トーストステート
+  // トースト
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
 
-  // メールアドレス ＋ パスワード ログイン (自動ロール判定付き)
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  // 講師アカウント登録処理
+  const handleTeacherSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim() || !password) {
-      setToastMessage("メールアドレスとパスワードを入力してください");
+    if (!farmName.trim() || !teacherName.trim() || !email.trim() || !password) {
+      setToastMessage("すべての必須項目を入力してください");
+      setShowToast(true);
+      return;
+    }
+
+    if (password.length < 6) {
+      setToastMessage("パスワードは6文字以上で入力してください");
       setShowToast(true);
       return;
     }
@@ -32,46 +40,59 @@ export default function UnifiedLoginPage() {
     setLoading(true);
 
     try {
-      // 1. Supabase Auth ログイン
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      // 1. Supabase Auth 登録
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
       });
 
       if (authError) {
-        setToastMessage(`ログイン失敗: ${authError.message}`);
-        setShowToast(true);
-        setLoading(false);
-        return;
-      }
+        // すでに登録済みの場合はログイン試行
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
-      const userId = authData?.user?.id;
-
-      // 2. 自動ロール判定 (users テーブルの role 参照)
-      let destination = "/student/quests";
-      if (userId) {
-        const { data: userData } = await supabase
-          .from("users")
-          .select("role, display_name")
-          .eq("id", userId)
-          .single();
-
-        if (userData?.role === "teacher") {
-          destination = "/teacher/dashboard";
-          setToastMessage(`🎉 講師「${userData.display_name || "先生"}」としてログインしました！`);
-        } else {
-          destination = "/student/quests";
-          setToastMessage(`🎉 受講生「${userData?.display_name || "様"}」としてログインしました！`);
+        if (loginError) {
+          setToastMessage(`登録エラー: ${authError.message}`);
+          setShowToast(true);
+          setLoading(false);
+          return;
         }
-      } else {
-        setToastMessage("🎉 ログインしました！");
       }
 
+      const userId = authData?.user?.id || `user_${Date.now()}`;
+
+      // 2. users テーブルに講師情報保存
+      await supabase.from("users").upsert([
+        {
+          id: userId,
+          email: email.trim(),
+          display_name: teacherName.trim(),
+          role: "teacher",
+          farm_id: farmName.trim(),
+        },
+      ]);
+
+      // 3. farms テーブルに農園情報保存
+      try {
+        await supabase.from("farms").upsert([
+          {
+            id: `farm_${Date.now()}`,
+            name: farmName.trim(),
+            owner_id: userId,
+          },
+        ]);
+      } catch (fErr) {
+        console.error("farms table upsert error:", fErr);
+      }
+
+      setToastMessage("🎉 講師アカウントおよび農場を開設しました！ダッシュボードへ移動します");
       setShowToast(true);
 
       setTimeout(() => {
-        router.push(destination);
-      }, 800);
+        router.push("/teacher/dashboard");
+      }, 900);
     } catch (err: any) {
       setToastMessage(`エラーが発生しました: ${err.message || ""}`);
       setShowToast(true);
@@ -80,8 +101,8 @@ export default function UnifiedLoginPage() {
     }
   };
 
-  // LINE サインイン処理
-  const handleLineLogin = async () => {
+  // LINE で登録
+  const handleLineSignUp = async () => {
     setLoading(true);
     try {
       const origin = window.location.origin;
@@ -89,12 +110,12 @@ export default function UnifiedLoginPage() {
         provider: "custom:line" as any,
         options: {
           scopes: "openid profile email",
-          redirectTo: `${origin}/auth/callback`,
+          redirectTo: `${origin}/auth/callback?next=/teacher/dashboard`,
         },
       });
 
       if (error) {
-        setToastMessage(`LINEログインエラー: ${error.message}`);
+        setToastMessage(`LINE登録エラー: ${error.message}`);
         setShowToast(true);
       }
     } catch (err: any) {
@@ -113,21 +134,21 @@ export default function UnifiedLoginPage() {
         {/* ロゴ ＆ タイトル (デザインモックに完全一致) */}
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-black text-[#1c4d21] tracking-tight">NOU-ATO</h1>
-          <p className="text-xs text-gray-500 font-bold">ログイン</p>
+          <p className="text-xs text-gray-500 font-bold">講師アカウント作成</p>
         </div>
 
-        {/* 💬 LINEでサインイン ボタン */}
+        {/* 💬 LINEで登録 ボタン */}
         <div className="space-y-3">
           <button
             type="button"
-            onClick={handleLineLogin}
+            onClick={handleLineSignUp}
             disabled={loading}
             className="w-full py-3.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm"
           >
             <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
             </svg>
-            <span>{loading ? "LINEへ接続中..." : "LINEでサインイン"}</span>
+            <span>{loading ? "LINEへ接続中..." : "LINEで登録"}</span>
           </button>
 
           <div className="relative flex py-1 items-center">
@@ -137,8 +158,36 @@ export default function UnifiedLoginPage() {
           </div>
         </div>
 
-        {/* 2. メールアドレス & パスワード フォーム */}
-        <form onSubmit={handleEmailLogin} className="space-y-4">
+        {/* 登録フォーム */}
+        <form onSubmit={handleTeacherSignUp} className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">
+              農場名
+            </label>
+            <input
+              type="text"
+              required
+              value={farmName}
+              onChange={(e) => setFarmName(e.target.value)}
+              placeholder="例: 佐藤農園"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] focus:bg-white transition placeholder-gray-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">
+              講師名
+            </label>
+            <input
+              type="text"
+              required
+              value={teacherName}
+              onChange={(e) => setTeacherName(e.target.value)}
+              placeholder="例: 佐藤 太郎"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] focus:bg-white transition placeholder-gray-400"
+            />
+          </div>
+
           <div>
             <label className="block text-[11px] font-bold text-gray-600 mb-1">
               メールアドレス
@@ -148,7 +197,7 @@ export default function UnifiedLoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
+              placeholder="example@nou-ato.jp"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] focus:bg-white transition placeholder-gray-400"
             />
           </div>
@@ -161,6 +210,7 @@ export default function UnifiedLoginPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -182,22 +232,16 @@ export default function UnifiedLoginPage() {
             disabled={loading}
             className="w-full py-3.5 bg-[#16471a] hover:bg-[#123915] text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center space-x-2 text-sm mt-2"
           >
-            <span>{loading ? "ログイン処理中..." : "ログインする"}</span>
+            <span>{loading ? "登録中..." : "登録する"}</span>
           </button>
         </form>
 
-        {/* フッターリンク (パスワードをお忘れの場合 / アカウントをお持ちでない方はこちら) */}
-        <div className="pt-2 text-center space-y-1.5 text-xs text-gray-500 font-medium">
-          <div>
-            <a href="#" onClick={(e) => { e.preventDefault(); alert("パスワードの再設定リンクを送信します。登録されたメールアドレスを入力してください。"); }} className="hover:underline text-gray-500">
-              パスワードをお忘れの場合
-            </a>
-          </div>
-          <div>
-            <Link href="/invite?farm_id=tanaka_farm" className="text-[#1c4d21] font-bold hover:underline">
-              アカウントをお持ちでない方はこちら
-            </Link>
-          </div>
+        {/* フッターリンク (すでにアカウントをお持ちですか？ ログイン) */}
+        <div className="pt-2 text-center text-xs font-medium text-gray-500">
+          すでにアカウントをお持ちですか？{" "}
+          <Link href="/login" className="text-[#1c4d21] font-bold hover:underline">
+            ログイン
+          </Link>
         </div>
       </div>
     </div>

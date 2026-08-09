@@ -59,23 +59,6 @@ export default function IndividualTaskAssignModal({
           if (!selectedStudentId) {
             setSelectedStudentId(usersData[0].id);
           }
-        } else {
-          const { data: profilesData } = await supabase
-            .from("profiles")
-            .select("id, full_name")
-            .eq("role", "student");
-
-          if (profilesData && profilesData.length > 0) {
-            setStudents(
-              profilesData.map((p: any) => ({
-                id: p.id,
-                name: p.full_name || "受講生",
-              }))
-            );
-            if (!selectedStudentId) {
-              setSelectedStudentId(profilesData[0].id);
-            }
-          }
         }
 
         // 2. 利用可能なタスク一覧の取得

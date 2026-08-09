@@ -25,7 +25,54 @@ export default function TeacherOverviewView({
   const [toastMessage, setToastMessage] = useState("");
   const [showQRModal, setShowQRModal] = useState(false);
 
-  const inviteUrl = "https://nou-ato.com/invite?farm_id=tanaka_farm";
+  const [origin, setOrigin] = useState("http://localhost:3000");
+  const [farmId, setFarmId] = useState<string>("tanaka_farm");
+  const [farmName, setFarmName] = useState<string>("たなか自然農園");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+
+    const fetchTeacherFarm = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // 1. 講師所有の農園検索
+          const { data: farm } = await supabase
+            .from("farms")
+            .select("*")
+            .eq("owner_id", user.id)
+            .single();
+
+          if (farm) {
+            setFarmId(farm.id);
+            if (farm.name) setFarmName(farm.name);
+            return;
+          }
+        }
+
+        // 2. owner_idに一致しない場合、DB上の最新の農園を取得
+        const { data: latestFarm } = await supabase
+          .from("farms")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (latestFarm) {
+          setFarmId(latestFarm.id);
+          if (latestFarm.name) setFarmName(latestFarm.name);
+        }
+      } catch (err) {
+        console.error("fetchTeacherFarm error:", err);
+      }
+    };
+
+    fetchTeacherFarm();
+  }, []);
+
+  const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -67,7 +114,7 @@ export default function TeacherOverviewView({
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
         inviteUrl={inviteUrl}
-        farmName="たなか自然農園"
+        farmName={farmName}
       />
 
       {/* ヘッダー＆タスク追加ボタン */}

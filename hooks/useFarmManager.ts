@@ -66,21 +66,7 @@ export function useFarmManager() {
           usersList.map((u) => ({ id: u.id, full_name: u.display_name, role: u.role }))
         );
       } else {
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id, full_name, role")
-          .eq("role", "student");
-
-        if (profilesData && profilesData.length > 0) {
-          usersList = profilesData
-            .filter((p: any) => !dummyNames.includes(p.full_name))
-            .map((p) => ({ id: p.id, display_name: p.full_name, role: p.role }));
-          setSupabaseStudents(
-            usersList.map((p) => ({ id: p.id, full_name: p.display_name, role: p.role }))
-          );
-        } else {
-          setSupabaseStudents([{ id: "test_student_1", full_name: "テスト生徒", role: "student" }]);
-        }
+        setSupabaseStudents([{ id: "test_student_1", full_name: "テスト生徒", role: "student" }]);
       }
 
       // 2. 観察記録 (crop_records)
