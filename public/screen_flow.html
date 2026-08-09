@@ -3,211 +3,326 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOU-ATO 講師↔生徒 データ双方向関係図 ＆ 最新進捗アーキテクチャマップ</title>
+  <title>NOU-ATO 全機能・全データ連携使い方 完全仕様マップ</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Noto Sans JP', sans-serif;
       background-color: #f4f6f3;
-      color: #2d3748;
+      color: #1a202c;
     }
-    .flow-card {
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    .feature-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .flow-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.1);
-    }
-    .code-badge {
-      font-family: monospace;
-      font-size: 11px;
+    .feature-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.08);
     }
   </style>
 </head>
-<body class="p-6 md:p-10">
+<body class="p-4 md:p-8">
 
-  <div class="max-w-6xl mx-auto space-y-10">
+  <div class="max-w-7xl mx-auto space-y-10">
 
     <!-- ヘッダー -->
-    <header class="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <div className="flex items-center space-x-2">
-          <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
-            最新バージョン: 2026.08.07 更新完了
-          </span>
-        </div>
-        <h1 class="text-3xl font-black text-gray-900 tracking-tight mt-2">🌱 NOU-ATO 講師↔生徒 相互データ関係図 ＆ システム全フローマップ</h1>
-        <p class="text-xs text-gray-500 mt-1 font-medium">Supabase DB 直結 ＋ HTML5 BroadcastChannel API によるリアルタイム双方向連動アーキテクチャ</p>
+    <header class="bg-white p-6 rounded-3xl border-2 border-emerald-300 text-center shadow-sm">
+      <div class="flex justify-center space-x-2">
+        <span class="text-xs bg-emerald-800 text-white px-3 py-1 rounded-full font-bold">全9大機能 ＆ 全データ連携シナリオ</span>
+        <span class="text-xs bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold">集金・日誌・テンプレート・LINE完全網羅</span>
       </div>
-
-      <div class="flex items-center space-x-3 bg-emerald-50 p-3 rounded-2xl border border-emerald-100 text-xs font-bold shrink-0">
-        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-600"></span> 講師操作 ➔ 生徒</span>
-        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500"></span> 生徒入力 ➔ 講師</span>
-        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-600"></span> Supabase / BroadcastChannel</span>
-      </div>
+      <h1 class="text-2xl md:text-3xl font-black text-emerald-950 mt-2">🌱 NOU-ATO 全機能 ＆ データ連携使い方 完全仕様マップ</h1>
+      <p class="text-xs text-gray-500 font-bold mt-1">ログインから集金管理・日誌相談・畑キャンバス・予約まで、システムの全データ連携と使い方を抜け漏れなく網羅</p>
     </header>
 
     <!-- ================================================================= -->
-    <!-- 🔀 MAIN: 講師 ↔ 生徒 データの相互つながり＆最新実装フロー -->
+    <!-- 🔑 STEP 0: ログイン ＆ 役割(ロール)別利用開始フロー -->
     <!-- ================================================================= -->
-    <section class="bg-white p-8 rounded-3xl border-2 border-emerald-300 shadow-md space-y-8">
-      
-      <div class="border-b border-gray-100 pb-4 text-center">
-        <h2 class="text-2xl font-black text-gray-900">🔀 講師 ↔ 生徒 リアルタイムデータ双方向つながり図</h2>
-        <p class="text-xs text-gray-500 mt-1">最新実装されたすべての相互データフローと動作メカニズム</p>
+    <section class="bg-white p-8 rounded-3xl border-2 border-blue-400 shadow-md space-y-6">
+      <div class="border-b border-gray-100 pb-3 text-center">
+        <span class="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-md">1. サインイン ＆ オンボーディング</span>
+        <h2 class="text-2xl font-black text-gray-900 mt-1">🔑 ログイン・LINE招待から利用開始までの分岐フロー</h2>
+        <p class="text-xs text-gray-500 mt-1">ユーザーがアクセスしてから、権限（講師か生徒か）によって自動分岐して利用開始する流れ</p>
       </div>
 
-      <div class="space-y-6">
-
-        <!-- フロー 1: 畑キャンバスレイアウト ＆ 畝ベッドの双方向同期 -->
-        <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4 flow-card">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <span class="bg-emerald-700 text-white text-xs font-extrabold px-3 py-1 rounded-md">機能 1</span>
-              <h3 class="font-black text-gray-900 text-base">🌾 キャンバス区画自由配置 ＆ 畝(ベッド)の増減双方向同期</h3>
-            </div>
-            <span class="text-[11px] bg-emerald-100 text-emerald-900 font-bold px-2.5 py-0.5 rounded-full">リアルタイム同期</span>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs items-center">
-            
-            <div class="bg-white p-4 rounded-xl border border-emerald-200 space-y-1">
-              <span class="text-[10px] text-emerald-700 font-bold block">1. 講師画面 (TeacherFarmCanvas)</span>
-              <p class="font-black text-gray-900">キャンバス上でカードを自由ドラッグ (AABB衝突自動磁石スナップ)</p>
-              <p class="text-[10px] text-gray-500">「＋ 畝(ベッド)を1つ追加」または「🗑️ ゴミ箱削除」を実行</p>
-            </div>
-
-            <div class="text-center font-black text-emerald-600 text-base">➔ (Supabase DB & Broadcast) ➔</div>
-
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-1">
-              <span class="text-[10px] text-blue-700 font-bold block">2. データ層 (Supabase & BroadcastChannel)</span>
-              <p class="font-black text-gray-900">`farm_beds` / `farm_plots` へ直接 INSERT / DELETE 保存</p>
-              <p class="text-[10px] text-blue-600">BroadcastChannel 経由で全画面へ0.01秒通知</p>
-            </div>
-
-            <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 space-y-1">
-              <span class="text-[10px] text-emerald-800 font-bold block">3. 生徒画面 (StudentFarmRecord)</span>
-              <p class="font-black text-gray-900">自分の担当区画の畝(ベッド)リストに即座に反映</p>
-              <p class="text-[10px] text-gray-600">増えた畝 (例: 畝 1-8) や削除がリアルタイム連動</p>
-            </div>
-          </div>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-center text-center text-xs font-bold">
+        <div class="bg-gray-50 p-4 rounded-2xl border-2 border-gray-300 space-y-1 shadow-2xs">
+          <span class="text-xl block">🔐</span>
+          <span class="font-black text-gray-900 block">1. ログイン ＆ LINE招待</span>
+          <p class="text-[11px] text-gray-500 font-medium">`/login` または LINE招待URL (`/invite`) から登録</p>
         </div>
 
-        <!-- フロー 2: 生徒の観察ノート・タスク完了結果 ➔ 講師畑管理発光＆確認 -->
-        <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4 flow-card">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <span class="bg-amber-600 text-white text-xs font-extrabold px-3 py-1 rounded-md">機能 2</span>
-              <h3 class="font-black text-gray-900 text-base">📝 生徒の畝指定タスク完了・観察記録 ➔ 講師画面リアルタイム発光・確認</h3>
-            </div>
-            <span class="text-[11px] bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full">フィードバック循環</span>
-          </div>
+        <div class="font-black text-blue-600 text-lg md:text-xl">➔ ➔</div>
 
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs items-center">
-            
-            <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 space-y-1">
-              <span class="text-[10px] text-amber-800 font-bold block">1. 生徒画面 (TaskDetail / RecordView)</span>
-              <p class="font-black text-gray-900">タスク完了時に対象畝 (例: 畝 1-1) を選択して報告</p>
-              <p class="text-[10px] text-gray-600">草丈、作業内容、写真、観察ノートを入力して送信</p>
-            </div>
-
-            <div class="text-center font-black text-amber-600 text-base">➔ (Supabase INSERT) ➔</div>
-
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-1">
-              <span class="text-[10px] text-blue-700 font-bold block">2. データベース (crop_records)</span>
-              <p class="font-black text-gray-900">Supabase `crop_records` テーブルへ永続化保存</p>
-              <p class="text-[10px] text-blue-600">`farm_beds` の状態を更新</p>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl border border-emerald-300 space-y-1">
-              <span class="text-[10px] text-emerald-800 font-bold block">3. 講師画面 (TeacherFarmCanvas)</span>
-              <p class="font-black text-emerald-950">該当の畝が「✨ 更新あり (エメラルドグリーン)」に即時点灯！</p>
-              <p class="text-[10px] text-gray-600">タップして生徒の全作業メモ・収穫・写真を詳細閲覧</p>
-            </div>
-          </div>
+        <div class="bg-blue-50 p-4 rounded-2xl border-2 border-blue-300 space-y-1 shadow-2xs">
+          <span class="text-xl block">🗄️</span>
+          <span class="font-black text-blue-950 block">2. 認証 ＆ ロール判別</span>
+          <p class="text-[11px] text-blue-800 font-medium">Supabase Auth 認証後、`users.role` (講師か生徒か) を自動判別</p>
         </div>
 
-        <!-- フロー 3: 生徒画面の時系列タイムライン ＆ 過去記録の編集・削除 -->
-        <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4 flow-card">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <span class="bg-purple-700 text-white text-xs font-extrabold px-3 py-1 rounded-md">機能 3</span>
-              <h3 class="font-black text-gray-900 text-base">📅 生徒の畝別時系列タイムライン ＆ 過去ログの「✏️ 編集」・「🗑️ 削除」</h3>
-            </div>
-            <span class="text-[11px] bg-purple-100 text-purple-900 font-bold px-2.5 py-0.5 rounded-full">管理機能</span>
-          </div>
+        <div class="font-black text-blue-600 text-lg md:text-xl">➔ ➔</div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-1">
-              <span class="font-black text-gray-900">① 時系列タイムライン (Timeline)</span>
-              <p class="text-gray-600 text-[11px]">選択した畝ごとに過去の全タスク報告・写真・成長記録を新しい順でグラフ表示。</p>
-            </div>
-            <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-1">
-              <span class="font-black text-gray-900">② 過去記録の修正 (✏️ 編集)</span>
-              <p class="text-gray-600 text-[11px]">過去の誤記や更新があった場合、モーダルから上書き保存 (Supabase UPDATE)。</p>
-            </div>
-            <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-1">
-              <span class="font-black text-gray-900">③ 誤ログの消去 (🗑️ 削除)</span>
-              <p class="text-gray-600 text-[11px]">不要なテストデータや誤投稿を Supabase から完全消去 (Supabase DELETE)。</p>
-            </div>
-          </div>
+        <div class="bg-purple-50 p-4 rounded-2xl border-2 border-purple-300 space-y-1 shadow-2xs">
+          <span class="text-xl block">🔀</span>
+          <span class="font-black text-purple-950 block">3. ポータル自動分岐</span>
+          <p class="text-[11px] text-purple-800 font-medium">講師 ➔ `/teacher/dashboard`<br>生徒 ➔ `/student` へ自動導線</p>
         </div>
-
       </div>
     </section>
 
     <!-- ================================================================= -->
-    <!-- 📄 COMPONENT MAP: 主要コンポーネントとソースコード一覧 -->
+    <!-- 🗂️ 1. 全9大機能一覧 (講師専用・共通基盤・生徒専用) -->
     <!-- ================================================================= -->
-    <section class="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm space-y-6">
-      <div class="border-b border-gray-100 pb-3">
-        <h2 class="text-xl font-black text-gray-900">📄 NOU-ATO システム主要コンポーネント構成一覧</h2>
-        <p class="text-xs text-gray-500 mt-1">実装済み全ファイルとそれぞれの役割定義</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+
+      <!-- ------------------------------------------------------------- -->
+      <!-- 👨‍🌾 A. 講師専用 全9大機能 -->
+      <!-- ------------------------------------------------------------- -->
+      <div class="bg-emerald-50/90 p-6 rounded-3xl border-2 border-emerald-400 space-y-4 flex flex-col justify-between feature-card">
+        <div class="space-y-4">
+          <div class="bg-emerald-800 text-white p-3 rounded-2xl text-center shadow-xs">
+            <span class="text-2xl block">👨‍🌾</span>
+            <h2 class="font-black text-base">講師専用 全機能 (Teacher)</h2>
+            <span class="text-[10px] text-emerald-200">全9メニュー完全網羅</span>
+          </div>
+
+          <div class="space-y-2 text-xs font-bold text-gray-800">
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">1. 📊 ダッシュボード概要</span>
+              <p class="text-gray-600 text-[11px]">受講生数、本日日誌、天気予報、LINE/QR招待発行</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">2. 🌾 畑・区画管理キャンバス</span>
+              <p class="text-gray-600 text-[11px]">D&D配置、AABB磁石スナップ、畝追加・ゴミ箱削除🗑️、発光閲覧</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">3. 📖 タスク作成・管理</span>
+              <p class="text-gray-600 text-[11px]">新しい栽培課題の登録・生徒への配信設定</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">4. 📋 テンプレート管理</span>
+              <p class="text-gray-600 text-[11px]">作物別の標準タスクテンプレート自作・保存・一括配信</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">5. 🎓 受講生一覧マスター</span>
+              <p class="text-gray-600 text-[11px]">本物実登録生徒一覧、進捗確認、区画ドラッグ割当</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">6. 💬 相談・日誌確認</span>
+              <p class="text-gray-600 text-[11px]">生徒からの栽培日誌・相談へのフィードバック回答</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">7. 💰 集金・売上管理</span>
+              <p class="text-gray-600 text-[11px]">月額会費・区画利用料・教材費の決済＆未払い集金確認</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">8. 📅 イベント・予約管理</span>
+              <p class="text-gray-600 text-[11px]">対面講習会・収穫体験イベントの定員枠カレンダー登録</p>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-2xs">
+              <span class="text-emerald-950 font-black block">9. ⚙️ 農園設定</span>
+              <p class="text-gray-600 text-[11px]">農園基本プロフ、LINE Notification連携設定</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+      <!-- ------------------------------------------------------------- -->
+      <!-- ⚡ B. 共通機能 ＆ データ同期基盤 (SHARED HUB) -->
+      <!-- ------------------------------------------------------------- -->
+      <div class="bg-blue-50/90 p-6 rounded-3xl border-2 border-blue-400 space-y-4 flex flex-col justify-between feature-card">
+        <div class="space-y-4">
+          <div class="bg-blue-700 text-white p-3 rounded-2xl text-center shadow-xs">
+            <span class="text-2xl block">⚡</span>
+            <h2 class="font-black text-base">共通機能 ＆ データ基盤</h2>
+            <span class="text-[10px] text-blue-200">Supabase DB & Broadcast</span>
+          </div>
 
-        <!-- 講師側コンポーネント -->
-        <div class="bg-emerald-50/70 p-5 rounded-2xl border border-emerald-200 space-y-3">
-          <h3 class="font-black text-emerald-950 text-sm flex items-center gap-1.5">
-            <span>👨‍🌾 講師側コンポーネント (Teacher Portal)</span>
-          </h3>
-          <ul class="space-y-2 text-gray-700">
-            <li class="bg-white p-2.5 rounded-xl border border-emerald-100">
-              <span class="code-badge text-emerald-800 block">TeacherFarmCanvasView.tsx</span>
-              <span>畑キャンバスレイアウト自由配置、AABB衝突スナップ、畝追加・ゴミ箱削除🗑️、リアルタイム更新発光・結果詳細閲覧</span>
-            </li>
-            <li class="bg-white p-2.5 rounded-xl border border-emerald-100">
-              <span class="code-badge text-emerald-800 block">TeacherStudentsView.tsx</span>
-              <span>Supabase `profiles` / `users` テーブル連動の登録済み実受講生一覧・個別進捗管理</span>
-            </li>
-            <li class="bg-white p-2.5 rounded-xl border border-emerald-100">
-              <span class="code-badge text-emerald-800 block">TeacherOverviewView.tsx</span>
-              <span>受講生数、本日報告数、未回答質問数のリアルタイム集計ダッシュボード</span>
-            </li>
-          </ul>
+          <div class="space-y-2.5 text-xs font-bold text-gray-800">
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs space-y-1">
+              <span class="text-blue-950 font-black block">1. 🌐 BroadcastChannel API</span>
+              <p class="text-gray-600 text-[11px]">シークレットモード間でも画面間 0.01秒超高速通信</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs space-y-1">
+              <span class="text-blue-950 font-black block">2. 🗄️ Supabase Postgres DB</span>
+              <p class="text-gray-600 text-[11px]">`farm_plots`, `farm_beds`, `crop_records`, `users` 直結保存</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs space-y-1">
+              <span class="text-blue-950 font-black block">3. 📡 Realtime チャネル常時購読</span>
+              <p class="text-gray-600 text-[11px]">全テーブルの変更を自動検知して全画面一括再読み込み</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs space-y-1">
+              <span class="text-blue-950 font-black block">4. 🔐 ユーザー認証 ＆ RLS セキュリティ</span>
+              <p class="text-gray-600 text-[11px]">Google/Email/LINEログイン、RLS アクセス安全保護</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-blue-200 shadow-2xs space-y-1">
+              <span class="text-blue-950 font-black block">5. 🔄 共通フック (useFarmManager)</span>
+              <p class="text-gray-600 text-[11px]">講師・生徒で共有するデータ管理 ＆ 同期ロジック</p>
+            </div>
+          </div>
         </div>
 
-        <!-- 生徒側コンポーネント -->
-        <div class="bg-amber-50/70 p-5 rounded-2xl border border-amber-200 space-y-3">
-          <h3 class="font-black text-amber-950 text-sm flex items-center gap-1.5">
-            <span>👩‍🌾 生徒側コンポーネント (Student Portal)</span>
-          </h3>
-          <ul class="space-y-2 text-gray-700">
-            <li class="bg-white p-2.5 rounded-xl border border-amber-100">
-              <span class="code-badge text-amber-800 block">StudentFarmRecordView.tsx</span>
-              <span>担当区画限定表示、畝ベッド選択、時系列タイムライン閲覧、観察ログ登録・編集✏️・削除🗑️</span>
-            </li>
-            <li class="bg-white p-2.5 rounded-xl border border-amber-100">
-              <span class="code-badge text-amber-800 block">TaskDetailModel.tsx</span>
-              <span>クエスト完了時の対象畝ベッド選択、写真・作業メモの添付報告</span>
-            </li>
-            <li class="bg-white p-2.5 rounded-xl border border-amber-100">
-              <span class="code-badge text-amber-800 block">useFarmManager.ts</span>
-              <span>Supabase DB 直結保存 ＆ HTML5 BroadcastChannel API 統合リアルタイム双方向同期フック</span>
-            </li>
-          </ul>
+        <span class="text-[10px] text-blue-800 font-extrabold text-center block pt-2">共通モジュール: hooks/useFarmManager.ts</span>
+      </div>
+
+      <!-- ------------------------------------------------------------- -->
+      <!-- 👩‍🌾 C. 生徒専用 全機能 (STUDENT) -->
+      <!-- ------------------------------------------------------------- -->
+      <div class="bg-amber-50/90 p-6 rounded-3xl border-2 border-amber-400 space-y-4 flex flex-col justify-between feature-card">
+        <div class="space-y-4">
+          <div class="bg-amber-600 text-white p-3 rounded-2xl text-center shadow-xs">
+            <span class="text-2xl block">👩‍🌾</span>
+            <h2 class="font-black text-base">生徒専用 全機能 (Student)</h2>
+            <span class="text-[10px] text-amber-200">生徒ポータル / マイ畑</span>
+          </div>
+
+          <div class="space-y-2.5 text-xs font-bold text-gray-800">
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+              <span class="text-amber-950 font-black block">1. 🌾 担当区画 ＆ 畝選択タブ</span>
+              <p class="text-gray-600 text-[11px]">自分の担当区画の畝(ベッド)のみを絞り込み選択表示</p>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+              <span class="text-amber-950 font-black block">2. 📖 クエスト報告 ＆ 写真添付</span>
+              <p class="text-gray-600 text-[11px]">対象畝を選んで草丈・現場作業写真・ノートを投稿</p>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+              <span class="text-amber-950 font-black block">3. 📅 畝別時系列タイムライン</span>
+              <p class="text-gray-600 text-[11px]">過去の観察・作業記録を新しい順でグラフ・リスト閲覧</p>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+              <span class="text-amber-950 font-black block">4. ✏️ 過去ログ編集 ＆ 🗑️ 削除</span>
+              <p class="text-gray-600 text-[11px]">過去投稿の「✏️ 上書き更新」および「🗑️ 誤削除」</p>
+            </div>
+
+            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+              <span class="text-amber-950 font-black block">5. 📅 イベントカレンダー予約</span>
+              <p class="text-gray-600 text-[11px]">講習会や収穫体験イベントの参加申し込み予約</p>
+            </div>
+          </div>
+        </div>
+
+        <span class="text-[10px] text-amber-800 font-extrabold text-center block pt-2">専用URL: /student</span>
+      </div>
+
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 🔀 2. 全データ連携の使い方シナリオ (抜け漏れゼロ・5大フロー) -->
+    <!-- ================================================================= -->
+    <section class="bg-white p-8 rounded-3xl border-2 border-emerald-400 shadow-md space-y-6">
+      <div class="border-b border-gray-100 pb-3 text-center">
+        <h2 class="text-2xl font-black text-gray-900">🔀 データ連携による具体的な使い方シナリオ (全5パターン)</h2>
+        <p class="text-xs text-gray-500 mt-1">講師と生徒の間でデータがどう結びついてどう使われるかの完全プロセス図解</p>
+      </div>
+
+      <div class="space-y-6 text-xs font-bold">
+
+        <!-- 連携シナリオ 1: 畝の増減連動 -->
+        <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-3">
+          <span class="bg-emerald-800 text-white px-3 py-1 rounded-lg text-xs font-black inline-block">使い方 1: 畝(ベッド)の追加・削除連動</span>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-center">
+            <div class="bg-emerald-100 p-3 rounded-xl border border-emerald-300">
+              <span class="font-black text-emerald-950 block">【講師】</span>
+              <p class="text-[11px] text-emerald-800 font-medium mt-1">畑キャンバスで「＋畝追加」または「🗑️ゴミ箱削除」</p>
+            </div>
+            <div class="font-black text-emerald-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-blue-100 p-3 rounded-xl border border-blue-300">
+              <span class="font-black text-blue-950 block">【DB & Broadcast】</span>
+              <p class="text-[11px] text-blue-800 font-medium mt-1">`farm_beds` DB更新 ＋ Broadcast 0.01秒送信</p>
+            </div>
+            <div class="font-black text-emerald-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-amber-100 p-3 rounded-xl border border-amber-300">
+              <span class="font-black text-amber-950 block">【生徒】</span>
+              <p class="text-[11px] text-amber-800 font-medium mt-1">マイ畑の「畝選択タブ」に即座に新しい畝が出現・削除</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 連携シナリオ 2: 観察ノート・成果報告 -->
+        <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-3">
+          <span class="bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-black inline-block">使い方 2: 観察ノート・作業結果の送信と確認</span>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-center">
+            <div class="bg-amber-100 p-3 rounded-xl border border-amber-300">
+              <span class="font-black text-amber-950 block">【生徒】</span>
+              <p class="text-[11px] text-amber-800 font-medium mt-1">畝を指定して草丈・作業写真・ノートを投稿</p>
+            </div>
+            <div class="font-black text-amber-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-blue-100 p-3 rounded-xl border border-blue-300">
+              <span class="font-black text-blue-950 block">【DB & Broadcast】</span>
+              <p class="text-[11px] text-blue-800 font-medium mt-1">`crop_records` DB 挿入 ＋ `farm_beds` フラグ更新</p>
+            </div>
+            <div class="font-black text-amber-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-emerald-100 p-3 rounded-xl border border-emerald-300">
+              <span class="font-black text-emerald-950 block">【講師】</span>
+              <p class="text-[11px] text-emerald-800 font-medium mt-1">該当畝が「✨更新あり」点灯。タップして詳細アドバイス</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 連携シナリオ 3: 生徒登録 ＆ 集金支払い状態 -->
+        <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-3">
+          <span class="bg-purple-700 text-white px-3 py-1 rounded-lg text-xs font-black inline-block">使い方 3: ユーザー登録 ＆ 集金・売上連動</span>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-center">
+            <div class="bg-gray-100 p-3 rounded-xl border border-gray-300">
+              <span class="font-black text-gray-900 block">【生徒新規登録】</span>
+              <p class="text-[11px] text-gray-600 font-medium mt-1">LINE招待リンクからプロフ・会費登録</p>
+            </div>
+            <div class="font-black text-purple-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-blue-100 p-3 rounded-xl border border-blue-300">
+              <span class="font-black text-blue-950 block">【Supabase DB】</span>
+              <p class="text-[11px] text-blue-800 font-medium mt-1">`users` & `payments` テーブルへ自動保存</p>
+            </div>
+            <div class="font-black text-purple-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-emerald-100 p-3 rounded-xl border border-emerald-300">
+              <span class="font-black text-emerald-950 block">【講師管理】</span>
+              <p class="text-[11px] text-emerald-800 font-medium mt-1">「受講生一覧」と「集金管理」で支払い済み・未払いを一元確認</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 連携シナリオ 4: 日誌投稿 ＆ 講師フィードバック返信 -->
+        <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-3">
+          <span class="bg-teal-700 text-white px-3 py-1 rounded-lg text-xs font-black inline-block">使い方 4: 相談・日誌投稿 ＆ 講師フィードバック</span>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-center">
+            <div class="bg-amber-100 p-3 rounded-xl border border-amber-300">
+              <span class="font-black text-amber-950 block">【生徒】</span>
+              <p class="text-[11px] text-amber-800 font-medium mt-1">「病気かも？」と写真を添えて日誌・相談を送信</p>
+            </div>
+            <div class="font-black text-teal-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-blue-100 p-3 rounded-xl border border-blue-300">
+              <span class="font-black text-blue-950 block">【Supabase DB】</span>
+              <p class="text-[11px] text-blue-800 font-medium mt-1">`journals` テーブルへ保存</p>
+            </div>
+            <div class="font-black text-teal-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-emerald-100 p-3 rounded-xl border border-emerald-300">
+              <span class="font-black text-emerald-950 block">【講師】</span>
+              <p class="text-[11px] text-emerald-800 font-medium mt-1">「相談・日誌確認」に即座に表示され、回答・返信を送付</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 連携シナリオ 5: イベントカレンダー予約 -->
+        <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-3">
+          <span class="bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-black inline-block">使い方 5: 講習会・収穫体験イベントの予約</span>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-center">
+            <div class="bg-emerald-100 p-3 rounded-xl border border-emerald-300">
+              <span class="font-black text-emerald-950 block">【講師】</span>
+              <p class="text-[11px] text-emerald-800 font-medium mt-1">「イベント・予約」画面で収穫体験の日時・定員を設定</p>
+            </div>
+            <div class="font-black text-indigo-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-blue-100 p-3 rounded-xl border border-blue-300">
+              <span class="font-black text-blue-950 block">【Supabase DB】</span>
+              <p class="text-[11px] text-blue-800 font-medium mt-1">`events` & `reservations` テーブルで予約枠管理</p>
+            </div>
+            <div class="font-black text-indigo-600 text-base md:text-lg">➔ ➔ ➔</div>
+            <div class="bg-amber-100 p-3 rounded-xl border border-amber-300">
+              <span class="font-black text-amber-950 block">【生徒】</span>
+              <p class="text-[11px] text-amber-800 font-medium mt-1">生徒画面のカレンダーから参加予約（残枠自動カウント）</p>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -215,7 +330,7 @@
 
     <!-- フッター -->
     <footer class="text-center text-xs text-gray-400 font-bold py-4">
-      NOU-ATO システム関係図 ＆ アプリケーション構成仕様書 (2026.08.07 更新完了)
+      NOU-ATO 全9大機能 ＆ 全データ連携使い方完全仕様図 (2026.08.07 更新完了)
     </footer>
 
   </div>

@@ -22,6 +22,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import { ColumnType, Task } from "@/types/task";
 import { TaskTemplate } from "@/lib/taskTemplates";
 
+import IndividualTaskAssignModal from "@/components/teacher/IndividualTaskAssignModal";
+
 const COLUMNS: ColumnType[] = [
   {
     id: "pool",
@@ -69,10 +71,12 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
     editingTask,
     setEditingTask,
     saveTaskDetails,
+    refetchTasks,
   } = useKanbanBoard(COLUMNS);
 
   const [showQuickForm, setShowQuickForm] = useState(initialShowForm);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTrashModal, setShowTrashModal] = useState(false);
 
   const sensors = useSensors(
@@ -130,6 +134,13 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
         />
 
         <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowAssignModal(true)}
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"
+          >
+            <span>🎯 生徒に個別割当</span>
+          </button>
+
           {/* 要件: テンプレート選択画面ボタン復元 */}
           <button
             onClick={() => setShowTemplateModal(true)}
@@ -224,6 +235,16 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
           onClose={() => setShowTrashModal(false)}
           onRestore={restoreTask}
           onPermanentlyDelete={permanentlyDeleteTask}
+        />
+      )}
+
+      {/* 個別タスク割り当てモーダル */}
+      {showAssignModal && (
+        <IndividualTaskAssignModal
+          onClose={() => setShowAssignModal(false)}
+          onAssigned={() => {
+            refetchTasks();
+          }}
         />
       )}
     </div>

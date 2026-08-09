@@ -13,12 +13,6 @@ interface UnassignedStudent {
   colorBg: string;
 }
 
-const UNASSIGNED_STUDENTS_MOCK: UnassignedStudent[] = [
-  { id: "s_ks", name: "佐藤 健太", initials: "KS", grade: "2年A組", colorBg: "bg-emerald-800" },
-  { id: "s_mt", name: "高橋 美咲", initials: "MT", grade: "2年B組", colorBg: "bg-[#e89980]" },
-  { id: "s_di", name: "伊藤 大輝", initials: "DI", grade: "1年A組", colorBg: "bg-[#0b548b]" },
-];
-
 export default function TeacherFarmCanvasView() {
   const {
     farms,
@@ -30,6 +24,7 @@ export default function TeacherFarmCanvasView() {
     snapToNonCollidingPosition,
     updatePlotPositionFree,
     addPlot,
+    deletePlot,
     addBedToPlot,
     deleteBedFromPlot,
     assignStudentToPlot,
@@ -39,25 +34,24 @@ export default function TeacherFarmCanvasView() {
   const [unassignedList, setUnassignedList] = useState<UnassignedStudent[]>([]);
 
   useEffect(() => {
-    if (supabaseStudents && supabaseStudents.length > 0) {
-      const assignedStudentIds = new Set(
-        currentFarmPlots.map((p) => p.student_id).filter(Boolean)
-      );
+    const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
+    const assignedStudentIds = new Set(
+      currentFarmPlots.map((p) => p.student_id).filter(Boolean)
+    );
 
-      const colorBgs = ["bg-emerald-800", "bg-[#e89980]", "bg-[#0b548b]", "bg-purple-800"];
+    const colorBgs = ["bg-emerald-800", "bg-[#e89980]", "bg-[#0b548b]", "bg-purple-800"];
 
-      const unassigned = supabaseStudents
-        .filter((s) => !assignedStudentIds.has(s.id))
-        .map((s, idx) => ({
-          id: s.id,
-          name: s.full_name,
-          initials: s.full_name.slice(0, 2),
-          grade: "受講生",
-          colorBg: colorBgs[idx % colorBgs.length],
-        }));
+    const unassigned = (supabaseStudents || [])
+      .filter((s) => !assignedStudentIds.has(s.id) && !dummyNames.includes(s.full_name))
+      .map((s, idx) => ({
+        id: s.id,
+        name: s.full_name,
+        initials: s.full_name.slice(0, 2),
+        grade: "受講生",
+        colorBg: colorBgs[idx % colorBgs.length],
+      }));
 
-      setUnassignedList(unassigned);
-    }
+    setUnassignedList(unassigned);
   }, [supabaseStudents, currentFarmPlots]);
   const [searchQuery, setSearchQuery] = useState("");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -446,22 +440,36 @@ export default function TeacherFarmCanvasView() {
                           <p className="text-[10px] text-gray-400 font-bold">カード全域ドラッグ可能 (重なり即座スナップ)</p>
                         </div>
 
-                        {/* 割り当てボタン */}
-                        {isPlotAssigned ? (
+                        {/* 割り当て・削除ボタン */}
+                        <div className="flex items-center space-x-1">
+                          {isPlotAssigned ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPlot(plot);
+                              }}
+                              className="bg-[#0b548b] text-white px-2.5 py-1 rounded-xl text-xs font-extrabold shadow-xs"
+                            >
+                              変更 / 解除
+                            </button>
+                          ) : (
+                            <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
+                              生徒ドロップ
+                            </span>
+                          )}
+
                           <button
+                            type="button"
+                            title="この区画を削除する"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedPlot(plot);
+                              deletePlot(plot.id);
                             }}
-                            className="bg-[#0b548b] text-white px-2.5 py-1 rounded-xl text-xs font-extrabold shadow-xs"
+                            className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 flex items-center justify-center transition font-bold text-xs"
                           >
-                            変更 / 解除
+                            🗑️
                           </button>
-                        ) : (
-                          <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
-                            生徒ドロップ
-                          </span>
-                        )}
+                        </div>
                       </div>
 
                       {/* 区画内の長方形ベッド */}

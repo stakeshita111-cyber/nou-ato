@@ -49,18 +49,21 @@ export function useFarmManager() {
 
   const broadcastRef = useRef<BroadcastChannel | null>(null);
 
-  // Supabase から全データの一括リロード
   const reloadAllFromSupabase = useCallback(async () => {
     try {
+      let usersList: any[] = [];
       // 1. 生徒ユーザー一覧
       const { data: usersData } = await supabase
         .from("users")
         .select("id, display_name, role")
         .eq("role", "student");
 
+      const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
+
       if (usersData && usersData.length > 0) {
+        usersList = usersData.filter((u: any) => !dummyNames.includes(u.display_name));
         setSupabaseStudents(
-          usersData.map((u) => ({ id: u.id, full_name: u.display_name, role: u.role }))
+          usersList.map((u) => ({ id: u.id, full_name: u.display_name, role: u.role }))
         );
       } else {
         const { data: profilesData } = await supabase
@@ -69,9 +72,14 @@ export function useFarmManager() {
           .eq("role", "student");
 
         if (profilesData && profilesData.length > 0) {
-          setSupabaseStudents(profilesData);
+          usersList = profilesData
+            .filter((p: any) => !dummyNames.includes(p.full_name))
+            .map((p) => ({ id: p.id, display_name: p.full_name, role: p.role }));
+          setSupabaseStudents(
+            usersList.map((p) => ({ id: p.id, full_name: p.display_name, role: p.role }))
+          );
         } else {
-          setSupabaseStudents([{ id: "student_test_id", full_name: "テスト生徒", role: "student" }]);
+          setSupabaseStudents([{ id: "test_student_1", full_name: "テスト生徒", role: "student" }]);
         }
       }
 
@@ -129,7 +137,7 @@ export function useFarmManager() {
               bed_number: parseInt(mb.bed_number) || bIdx + 1,
               is_updated: false,
             }));
-          } else if (savedP && savedP.beds.length > 0) {
+          } else if (savedP && Array.isArray(savedP.beds)) {
             bedsList = savedP.beds;
           } else {
             for (let i = 1; i <= 4; i++) {
@@ -144,11 +152,7 @@ export function useFarmManager() {
 
           const bedsWithStatus = bedsList.map((bed) => {
             const latest = formattedRecords.find(
-              (rec) =>
-                rec.bed_id === bed.id ||
-                (rec.bed_id && bed.id.endsWith(rec.bed_id)) ||
-                (rec.bed_id && rec.bed_id.endsWith(bed.id)) ||
-                (rec.bed_id && rec.bed_id.includes(`bed_${bed.bed_number}`))
+              (rec) => rec.bed_id === bed.id
             );
             if (latest) {
               return {
@@ -161,13 +165,16 @@ export function useFarmManager() {
             return bed;
           });
 
+          const foundStudent = (usersList || []).find((u: any) => u.id === dp.student_id);
+          const studentName = dp.student_id ? (foundStudent?.display_name || "受講生") : undefined;
+
           return {
             id: dp.id,
-            farm_id: "farm_1",
-            name: dp.student_id ? `${dp.code} - テスト生徒` : dp.name || `区画 ${dp.code}`,
+            farm_id: dp.farm_id || "farm_1",
+            name: dp.student_id ? `区画 ${dp.code || idx + 1} (${studentName})` : dp.name || `区画 ${dp.code || idx + 1}`,
             code: dp.code || String(idx + 1),
-            student_id: dp.student_id || savedP?.student_id || (idx === 0 ? "student_test_id" : undefined),
-            student_name: dp.student_id || idx === 0 ? "テスト生徒" : savedP?.student_name,
+            student_id: dp.student_id || undefined,
+            student_name: dp.student_id ? studentName : undefined,
             position: savedP?.position || { x: 40 + col * 330, y: 40 + row * 400 },
             beds: bedsWithStatus,
           };
@@ -357,6 +364,9 @@ export function useFarmManager() {
 
   // 🌟【新機能 2】講師画面: 畝(ベッド)の削除 (ゴミ箱機能) 🌟
   const deleteBedFromPlot = async (plotId: string, bedId: string) => {
+    const targetPlot = plots.find((p) => p.id === plotId);
+    const targetBed = targetPlot?.beds.find((b) => b.id === bedId);
+
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId) {
         const remainingBeds = plot.beds.filter((b) => b.id !== bedId);
@@ -378,7 +388,13 @@ export function useFarmManager() {
 
     try {
       await supabase.from("farm_beds").delete().eq("id", bedId);
-      console.log(`🗑️ Supabase farm_beds から畝 ${bedId} を削除しました`);
+      if (targetBed) {
+        await supabase
+          .from("farm_beds")
+          .delete()
+          .eq("plot_id", plotId)
+          .eq("bed_number", String(targetBed.bed_number));
+      }
     } catch (e) {
       console.error(e);
     }
@@ -440,6 +456,30 @@ export function useFarmManager() {
 
     notifyBroadcast();
     return newPlot;
+  };
+
+  // 🌟 講師画面: 区画(プロット)自体の削除機能 🌟
+  const deletePlot = async (plotId: string) => {
+    const targetPlot = plots.find((p) => p.id === plotId);
+    if (!targetPlot) return;
+
+    if (!confirm(`「${targetPlot.name}」を本当に削除しますか？`)) return;
+
+    const nextPlots = plots.filter((p) => p.id !== plotId);
+    setPlots(nextPlots);
+    localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
+
+    try {
+      await supabase.from("farm_beds").delete().eq("plot_id", plotId);
+      await supabase.from("farm_plots").delete().eq("id", plotId);
+      if (targetPlot.code) {
+        await supabase.from("farm_plots").delete().eq("code", targetPlot.code);
+      }
+    } catch (e) {
+      console.error("deletePlot error:", e);
+    }
+
+    notifyBroadcast();
   };
 
   const assignStudentToPlot = async (plotId: string, studentId: string, studentName: string) => {
@@ -596,6 +636,7 @@ export function useFarmManager() {
     snapToNonCollidingPosition,
     updatePlotPositionFree,
     addPlot,
+    deletePlot,
     addBedToPlot,
     deleteBedFromPlot,
     assignStudentToPlot,

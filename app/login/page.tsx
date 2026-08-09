@@ -84,9 +84,6 @@ export default function Login() {
         ]);
       }
 
-      setToastMessage("🎉 生徒として参加・ログインしました！");
-      setShowToast(true);
-
       setTimeout(() => {
         router.push("/student/quests");
       }, 800);
@@ -114,6 +111,35 @@ export default function Login() {
     setTimeout(() => {
       router.push("/student/quests");
     }, 600);
+  };
+
+  // LINEログイン処理
+  const handleLineLogin = async () => {
+    setLoading(true);
+    try {
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'custom:line' as any,
+        options: {
+          scopes: 'openid profile email',
+          redirectTo: `${origin}/auth/callback?next=${role === 'teacher' ? '/teacher/dashboard' : '/student/quests'}`,
+        },
+      });
+
+      if (error) {
+        if (error.message.includes('already registered')) {
+          router.push('/auth/merge?reason=already_registered');
+        } else {
+          setToastMessage(`LINEログインエラー: ${error.message}`);
+          setShowToast(true);
+        }
+      }
+    } catch (err: any) {
+      setToastMessage(`エラーが発生しました: ${err.message || ''}`);
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -154,6 +180,24 @@ export default function Login() {
           >
             🧑‍🌾 生徒として参加・ログイン
           </button>
+        </div>
+
+        {/* LINE ログインボタン (共通) */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleLineLogin}
+            disabled={loading}
+            className="w-full py-3 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-xl shadow-sm transition flex items-center justify-center space-x-2 text-xs"
+          >
+            <span>💬</span>
+            <span>{loading ? "LINEへ遷移中..." : "LINEアカウントでログイン / 連携"}</span>
+          </button>
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink mx-3 text-[10px] text-gray-400 font-bold uppercase">またはメールでログイン</span>
+            <div className="flex-grow border-t border-gray-200"></div>
+          </div>
         </div>
 
         {/* 1. 講師ログインフォーム */}

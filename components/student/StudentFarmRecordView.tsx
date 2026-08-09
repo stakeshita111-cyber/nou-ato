@@ -9,14 +9,17 @@ interface StudentFarmRecordViewProps {
   studentName?: string;
 }
 
-export default function StudentFarmRecordView({ studentName = "テスト生徒" }: StudentFarmRecordViewProps) {
+export default function StudentFarmRecordView({ studentName = "受講生" }: StudentFarmRecordViewProps) {
   const { plots, records, addCropRecord, updateCropRecord, deleteCropRecord } = useFarmManager();
 
-  // 🌟【要件1】自分に割り当てられた担当区画のみを抽出 (未割り当て区画が混ざらないよう制御) 🌟
-  const myPlot =
-    plots.find((p) => p.student_name === studentName || p.student_name?.includes(studentName) || p.student_id === "student_test_id") ||
-    plots.find((p) => p.student_id !== undefined) ||
-    plots[0];
+  // 🌟 自分に割り当てられた担当区画のみを厳密に抽出 🌟
+  const myPlot = plots.find(
+    (p) =>
+      p.student_name &&
+      studentName &&
+      studentName !== "受講生" &&
+      (p.student_name === studentName || p.student_name.includes(studentName))
+  );
 
   const myBeds = myPlot?.beds || [];
 
@@ -89,7 +92,7 @@ export default function StudentFarmRecordView({ studentName = "テスト生徒" 
         notes: notes.trim(),
         harvest_amount: harvestAmount.trim() || undefined,
       });
-      setToastMessage(`🎉 畝 ${myPlot.code}-${currentBed.bed_number} に新しい記録を登録しました！`);
+      setToastMessage(`🎉 畝 ${myPlot?.code || ""}-${currentBed.bed_number} に新しい記録を登録しました！`);
     }
 
     setShowInputModal(false);
@@ -121,14 +124,36 @@ export default function StudentFarmRecordView({ studentName = "テスト生徒" 
 
   // 選択した畝(ベッド)の時系列記録
   const currentBedRecords = records
-    .filter(
-      (r) =>
-        r.bed_id === currentBed?.id ||
-        (r.bed_id && currentBed?.id && r.bed_id.endsWith(currentBed.id)) ||
-        (r.bed_id && currentBed?.id && currentBed.id.endsWith(r.bed_id)) ||
-        (r.bed_id && currentBed?.bed_number && r.bed_id.includes(`bed_${currentBed.bed_number}`))
-    )
+    .filter((r) => r.bed_id === currentBed?.id)
     .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+
+  if (!myPlot) {
+    return (
+      <div className="space-y-6 animate-fade-in text-gray-800">
+        <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
+
+        <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-6 rounded-3xl shadow-md">
+          <span className="text-xs bg-emerald-700/80 px-3 py-1 rounded-full font-bold">
+            マイ畑ダッシュボード
+          </span>
+          <h2 className="text-xl font-black mt-2">
+            🌾 担当区画の確認
+          </h2>
+          <p className="text-xs text-emerald-100/80 mt-1 font-medium">
+            受講生アカウント ({studentName}) に紐づく専用区画の準備を行なっています
+          </p>
+        </div>
+
+        <div className="bg-white rounded-3xl p-10 border border-gray-200 shadow-xs text-center space-y-3">
+          <span className="text-4xl">🧑‍🌾</span>
+          <h3 className="font-black text-gray-900 text-base">担当の畑区画はまだ割り当てられていません</h3>
+          <p className="text-xs text-gray-500 font-bold max-w-sm mx-auto leading-relaxed">
+            講師が「畑管理」画面であなたのアカウントに区画を割り当てると、ここに区画とベッドが表示され、観察日記や成長記録を保存できるようになります。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in text-gray-800">
@@ -141,7 +166,7 @@ export default function StudentFarmRecordView({ studentName = "テスト生徒" 
             マイ畑ダッシュボード
           </span>
           <h2 className="text-2xl font-black mt-1">
-            {myPlot ? `${myPlot.name} の栽培・タスク記録` : "担当区画の確認"}
+            {myPlot.name} の栽培・タスク記録
           </h2>
           <p className="text-xs text-emerald-100/80 mt-1 font-medium">
             担当の畝(ベッド)を選択して、これまでのタスク記録や過去ログの編集・削除ができます

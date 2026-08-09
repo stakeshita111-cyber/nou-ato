@@ -55,6 +55,13 @@ export function useStudentDashboard() {
           return;
         }
 
+        // authUser の LINE / OAuth メタデータから名前を取得
+        const oauthName =
+          authUser.user_metadata?.full_name ||
+          authUser.user_metadata?.name ||
+          authUser.user_metadata?.preferred_username ||
+          (authUser.email ? authUser.email.split("@")[0] : "");
+
         // 1. users テーブルから表示名を取得
         const { data: userData } = await supabase
           .from("users")
@@ -65,7 +72,7 @@ export function useStudentDashboard() {
         if (userData) {
           setUser({
             ...userData,
-            name: userData.display_name || userData.email || "佐藤 健太",
+            name: userData.display_name || oauthName || userData.email || "生徒",
           });
         } else {
           // 2. profiles テーブルから表示名を取得
@@ -75,27 +82,57 @@ export function useStudentDashboard() {
             .eq("id", authUser.id)
             .single();
 
-          if (profileData) {
+          if (profileData && profileData.full_name) {
             setUser({
               id: authUser.id,
               name: profileData.full_name,
               email: authUser.email,
             });
           } else {
-            setUser({ id: authUser.id, name: authUser.email ? authUser.email.split("@")[0] : "佐藤 健太" });
+            // OAuth名またはメール名をデフォルト設定
+            const displayName = oauthName || "生徒";
+            setUser({ id: authUser.id, name: displayName, email: authUser.email });
+
+            // 今後のために users テーブルへ自動保管
+            try {
+              await supabase.from("users").upsert([
+                {
+                  id: authUser.id,
+                  email: authUser.email || `${authUser.id}@line.user`,
+                  display_name: displayName,
+                  role: "student",
+                  farm_id: "tanaka_farm",
+                },
+              ]);
+            } catch (err) {
+              console.error(err);
+            }
           }
         }
 
-        // student_tasks 取得
+        // student_tasks 取得 (tasks詳細とリレーション取得)
         const { data: stData } = await supabase
           .from("student_tasks")
-          .select("*")
+          .select("*, tasks(*)")
           .eq("student_id", authUser.id);
 
         if (stData && stData.length > 0) {
-          setTasks(stData);
+          // tasks が未設定の場合のフォーマット補正
+          const formattedTasks = stData.map((st: any) => ({
+            id: st.id,
+            status: st.status || "not_started",
+            tasks: st.tasks || {
+              id: st.task_id || st.id,
+              title: st.title || "個別割当タスク",
+              description: st.description || "",
+              target_crop: st.target_crop || "野菜",
+              exp: st.exp || 30,
+            },
+          }));
+          setTasks(formattedTasks);
         } else {
-          setTasks(DEFAULT_STUDENT_TASKS);
+          // 新規ログイン・未割当の生徒にはダミーデータを流し込まずきれいな空状態にする
+          setTasks([]);
         }
 
         // journals 取得
