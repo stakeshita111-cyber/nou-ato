@@ -18,9 +18,11 @@ interface UnassignedStudent {
 export default function TeacherFarmCanvasView() {
   const {
     farms,
+    setFarms,
     activeFarmId,
     setActiveFarmId,
     addFarm,
+    plots,
     currentFarmPlots,
     supabaseStudents,
     snapToNonCollidingPosition,
@@ -84,16 +86,74 @@ export default function TeacherFarmCanvasView() {
 
   const { themeColor, fontSize, applyTheme } = useTheme();
 
-  // 農園・代表者設定 Modal State
+  // 農園・代表者設定 Modal State (農園名・講師名・メールアドレス・住所)
   const [showFarmSettingsModal, setShowFarmSettingsModal] = useState(false);
   const [farmSettingsName, setFarmSettingsName] = useState("");
   const [ownerNameInput, setOwnerNameInput] = useState("");
-  const [draftTheme, setDraftTheme] = useState<ThemeColor>(themeColor);
-  const [draftFontSize, setDraftFontSize] = useState<FontSize>(fontSize);
+  const [emailInput, setEmailInput] = useState("testtest@gmail.com");
+  const [farmAddressInput, setFarmAddressInput] = useState("千葉県千葉市緑区あすみが丘 1-23");
+
+  // 🏰 農園設備・インフラオブジェクト (ハウス、水場、作業小屋等)
+  interface FarmFacility {
+    id: string;
+    type: "greenhouse" | "water" | "shed" | "rest" | "path" | "compost";
+    title: string;
+    icon: string;
+    x: number;
+    y: number;
+  }
+
+  const [facilities, setFacilities] = useState<FarmFacility[]>([
+    { id: "fac_1", type: "greenhouse", title: "育苗ビニールハウス A", icon: "🏠", x: 40, y: 460 },
+    { id: "fac_2", type: "water", title: "メイン水栓・散水ポンプ", icon: "💧", x: 380, y: 460 },
+    { id: "fac_3", type: "shed", title: "農機具・資材保管庫", icon: "🛠️", x: 720, y: 460 },
+  ]);
+
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
+  const [showGridlines, setShowGridlines] = useState<boolean>(true);
+
+  // 設備オブジェクト追加
+  const handleAddFacility = (type: FarmFacility["type"], title: string, icon: string) => {
+    const newFac: FarmFacility = {
+      id: `fac_${Date.now()}`,
+      type,
+      title,
+      icon,
+      x: 40 + (facilities.length % 3) * 330,
+      y: 460,
+    };
+    setFacilities([...facilities, newFac]);
+    setToastMessage(`✨ 設備「${icon} ${title}」を農場レイアウトに追加しました！`);
+    setShowToast(true);
+  };
 
   useEffect(() => {
-    const savedOwner = typeof window !== "undefined" ? (localStorage.getItem("nouato_owner_name") || "田中 太郎") : "田中 太郎";
-    setOwnerNameInput(savedOwner);
+    const fetchUserAndFarm = async () => {
+      const savedOwner = typeof window !== "undefined" ? (localStorage.getItem("nouato_owner_name") || "テスト講師") : "テスト講師";
+      const savedAddress = typeof window !== "undefined" ? (localStorage.getItem("nouato_farm_address") || "千葉県千葉市緑区あすみが丘 1-23") : "千葉県千葉市緑区あすみが丘 1-23";
+      setOwnerNameInput(savedOwner);
+      setFarmAddressInput(savedAddress);
+
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          if (authData.user.email) setEmailInput(authData.user.email);
+
+          const { data: uData } = await supabase
+            .from("users")
+            .select("display_name, email")
+            .eq("id", authData.user.id)
+            .single();
+
+          if (uData?.display_name) setOwnerNameInput(uData.display_name);
+          if (uData?.email) setEmailInput(uData.email);
+        }
+      } catch (err) {
+        console.error("fetchUserAndFarm error:", err);
+      }
+    };
+
+    fetchUserAndFarm();
   }, []);
 
   const handleSaveFarmSettings = async (e: React.FormEvent) => {
@@ -107,13 +167,17 @@ export default function TeacherFarmCanvasView() {
     try {
       const cleanOwner = ownerNameInput.trim();
       const cleanFarm = farmSettingsName.trim();
+      const cleanAddress = farmAddressInput.trim();
+      const cleanEmail = emailInput.trim();
+
       localStorage.setItem("nouato_owner_name", cleanOwner);
+      localStorage.setItem("nouato_farm_address", cleanAddress);
 
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user) {
         await supabase
           .from("users")
-          .update({ display_name: cleanOwner })
+          .update({ display_name: cleanOwner, email: cleanEmail })
           .eq("id", authData.user.id);
 
         await supabase
@@ -122,13 +186,79 @@ export default function TeacherFarmCanvasView() {
           .eq("id", activeFarmId);
       }
 
-      applyTheme(draftTheme, draftFontSize);
       setShowFarmSettingsModal(false);
-      setToastMessage("✨ 農園名・代表者情報およびテーマ設定を確定保存しました！");
+      setToastMessage("✨ 農園設定（農園名・代表者氏名・メールアドレス・住所）を確定保存しました！");
       setShowToast(true);
     } catch (err: any) {
       console.error("handleSaveFarmSettings error:", err);
     }
+  };
+
+  // 🌟 エリア編集 Modal State 🌟
+  const [showEditAreaModal, setShowEditAreaModal] = useState(false);
+  const [editAreaNameInput, setEditAreaNameInput] = useState("");
+  const [newAreaNameInModal, setNewAreaNameInModal] = useState("");
+
+  const openEditAreaModal = () => {
+    const currentF = farms.find((f) => f.id === activeFarmId);
+    setEditAreaNameInput(currentF?.name || "第1エリア (メイン区画エリア)");
+    setShowEditAreaModal(true);
+  };
+
+  const handleSaveEditArea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editAreaNameInput.trim()) return;
+
+    const cleanName = editAreaNameInput.trim();
+
+    const updatedFarms = farms.map((f) => (f.id === activeFarmId ? { ...f, name: cleanName } : f));
+    setFarms(updatedFarms);
+
+    try {
+      await supabase.from("farms").update({ name: cleanName }).eq("id", activeFarmId);
+    } catch (err) {
+      console.error("handleSaveEditArea error:", err);
+    }
+
+    setShowEditAreaModal(false);
+    setToastMessage(`✨ エリア名を「${cleanName}」に変更保存しました！`);
+    setShowToast(true);
+  };
+
+  const handleAddNewAreaFromModal = async () => {
+    if (!newAreaNameInModal.trim()) return;
+
+    const createdFarm = addFarm(newAreaNameInModal.trim());
+    setNewAreaNameInModal("");
+    setShowEditAreaModal(false);
+    setToastMessage(`🎉 新しいエリア「${createdFarm.name}」を作成し、キャンバスを切り替えました！`);
+    setShowToast(true);
+  };
+
+  const handleDeleteArea = async () => {
+    const currentF = farms.find((f) => f.id === activeFarmId);
+    if (farms.length <= 1) {
+      setToastMessage("⚠️ 最後の1つのエリアは削除できません");
+      setShowToast(true);
+      return;
+    }
+
+    if (!confirm(`エリア「${currentF?.name}」を削除しますか？紐づく区画も削除されます。`)) return;
+
+    const nextFarms = farms.filter((f) => f.id !== activeFarmId);
+    setFarms(nextFarms);
+    setActiveFarmId(nextFarms[0].id);
+
+    try {
+      await supabase.from("farm_plots").delete().eq("farm_id", activeFarmId);
+      await supabase.from("farms").delete().eq("id", activeFarmId);
+    } catch (err) {
+      console.error(err);
+    }
+
+    setShowEditAreaModal(false);
+    setToastMessage(`🗑️ エリア「${currentF?.name}」を削除しました`);
+    setShowToast(true);
   };
 
   // 新区画追加 Modal State
@@ -144,7 +274,7 @@ export default function TeacherFarmCanvasView() {
     s.name.includes(searchQuery) || s.grade.includes(searchQuery)
   );
 
-  // スクロールホイールでの拡大縮小 (画面表示倍率 scale)
+  // スクロールホイールでの拡大縮小 (画面表示倍率 scale: 15% 〜 200%)
   useEffect(() => {
     const canvasEl = canvasRef.current;
     if (!canvasEl) return;
@@ -152,8 +282,8 @@ export default function TeacherFarmCanvasView() {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) {
         e.preventDefault();
-        const delta = e.deltaY < 0 ? 2 : -2;
-        setZoomLevel((prev) => Math.min(180, Math.max(40, prev + delta)));
+        const delta = e.deltaY < 0 ? 5 : -5;
+        setZoomLevel((prev) => Math.min(200, Math.max(15, prev + delta)));
       }
     };
 
@@ -323,65 +453,183 @@ export default function TeacherFarmCanvasView() {
     setShowToast(true);
   };
 
+  // 🌟 区画の複製/コピー機能 (畝数のみ複製し、生徒/ベッド状態はリセット) 🌟
+  const handleDuplicatePlot = async (plot: FarmPlot) => {
+    const bedCount = plot.beds ? plot.beds.length : 4;
+    const newPlot = await addPlot(bedCount);
+    setToastMessage(`📋 「区画 ${plot.code}」をコピーし、新しい「区画 ${newPlot.code}（畝数: ${bedCount}）」を作成しました！`);
+    setShowToast(true);
+  };
+
+  // 🌟 区画情報の編集 Modal State 🌟
+  const [editingPlot, setEditingPlot] = useState<FarmPlot | null>(null);
+  const [editPlotCode, setEditPlotCode] = useState("");
+  const [editBedCount, setEditBedCount] = useState(4);
+
+  const handleSaveEditPlot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlot) return;
+
+    const targetPlot = (currentFarmPlots || []).find((p) => p.id === editingPlot.id);
+    if (!targetPlot) return;
+
+    try {
+      await supabase
+        .from("farm_plots")
+        .update({ code: editPlotCode, name: `区画 ${editPlotCode}` })
+        .eq("id", editingPlot.id);
+
+      if (editBedCount > targetPlot.beds.length) {
+        for (let i = targetPlot.beds.length + 1; i <= editBedCount; i++) {
+          await supabase.from("farm_beds").upsert([{
+            id: `${editingPlot.id}_bed_${i}`,
+            plot_id: editingPlot.id,
+            bed_number: String(i),
+          }]);
+        }
+      } else if (editBedCount < targetPlot.beds.length) {
+        for (let i = editBedCount + 1; i <= targetPlot.beds.length; i++) {
+          await supabase.from("farm_beds").delete().eq("id", `${editingPlot.id}_bed_${i}`);
+        }
+      }
+    } catch (err) {
+      console.error("handleSaveEditPlot error:", err);
+    }
+
+    setEditingPlot(null);
+    setToastMessage(`✨ 区画「${editPlotCode}」の設定（畝数: ${editBedCount}）を変更保存しました！`);
+    setShowToast(true);
+  };
+
+  // 🌟 農園設定モーダルオープン (DBから実際の講師農園名を取得) 🌟
+  const openFarmSettingsModal = async () => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        const { data: teacherFarm } = await supabase
+          .from("farms")
+          .select("name")
+          .eq("owner_id", authData.user.id)
+          .single();
+
+        if (teacherFarm?.name) {
+          setFarmSettingsName(teacherFarm.name);
+        } else {
+          const { data: latestFarm } = await supabase
+            .from("farms")
+            .select("name")
+            .limit(1)
+            .single();
+          setFarmSettingsName(latestFarm?.name || "テスト農園");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      setFarmSettingsName("テスト農園");
+    }
+    setShowFarmSettingsModal(true);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* トップヘッダー ＆ 農場切り替え ＆ 新農園作成ボタン */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-200 shadow-xs">
+      {/* トップヘッダー ＆ エリア切り替え ＆ 新エリア作成 ＆ ⚙️ 農園設定 */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-200 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 mb-0.5">🌾 管理農場の切り替え</label>
+          <div className="flex items-center space-x-2">
+            <label className="text-xs font-bold text-gray-500 whitespace-nowrap">🌾 エリア:</label>
             <select
               value={activeFarmId}
               onChange={(e) => setActiveFarmId(e.target.value)}
-              className="p-2.5 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-sm cursor-pointer shadow-xs"
+              className="px-3 py-2 rounded-xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-xs cursor-pointer shadow-xs h-10"
             >
               {farms.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.name}
+                  {f.name.replace("農場", "エリア").replace("農園", "エリア")}
                 </option>
               ))}
             </select>
           </div>
 
           <button
-            onClick={() => setShowAddFarmModal(true)}
-            className="px-3.5 py-2.5 mt-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-xs transition transform active:scale-95 flex items-center space-x-1"
+            onClick={openEditAreaModal}
+            className="px-3.5 py-2 h-10 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"
           >
-            <span className="text-base leading-none">＋</span>
-            <span>新しい農園を作成</span>
+            <span>✏️ エリアを編集</span>
           </button>
 
           <button
-            onClick={() => {
-              const currentF = farms.find((f) => f.id === activeFarmId);
-              setFarmSettingsName(currentF?.name || "テスト農園");
-              setShowFarmSettingsModal(true);
-            }}
-            className="px-3.5 py-2.5 mt-4 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-xs transition flex items-center space-x-1"
+            onClick={openFarmSettingsModal}
+            className="px-3.5 py-2 h-10 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"
           >
-            <span>🏡 農園・代表者設定</span>
+            <span>⚙️ 農園設定</span>
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAddPlotModal(true)}
-            className="px-4 py-2.5 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"
+            className="px-4 py-2 h-10 app-accent-btn font-extrabold text-xs rounded-xl shadow-md transition flex items-center space-x-1"
           >
             <span>＋ 区画を追加</span>
           </button>
         </div>
       </div>
 
-      {/* メインレイアウトエリア: 左キャンバス + 右未割り当て生徒サイドバー */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
+      {/* 🏰 拡張設計ツールバー: 現場設備オブジェクト追加 ＆ 吸着グリッド機能 🏰 */}
+      <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">🏰 現場設備配置</span>
+          <button
+            onClick={() => handleAddFacility("greenhouse", "育苗ビニールハウス", "🏠")}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl transition flex items-center gap-1"
+          >
+            <span>🏠 ビニールハウス</span>
+          </button>
+          <button
+            onClick={() => handleAddFacility("water", "給排水・散水栓", "💧")}
+            className="px-3 py-1.5 bg-blue-50 text-blue-800 hover:bg-blue-100 rounded-xl transition flex items-center gap-1 border border-blue-200"
+          >
+            <span>💧 水場・ポンプ</span>
+          </button>
+          <button
+            onClick={() => handleAddFacility("shed", "農機具倉庫", "🛠️")}
+            className="px-3 py-1.5 bg-amber-50 text-amber-900 hover:bg-amber-100 rounded-xl transition flex items-center gap-1 border border-amber-200"
+          >
+            <span>🛠️ 資材庫</span>
+          </button>
+          <button
+            onClick={() => handleAddFacility("rest", "見学・休憩テラス", "☕")}
+            className="px-3 py-1.5 bg-purple-50 text-purple-800 hover:bg-purple-100 rounded-xl transition flex items-center gap-1 border border-purple-200"
+          >
+            <span>☕ 休憩所</span>
+          </button>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setSnapToGrid(!snapToGrid)}
+            className={`px-3 py-1.5 rounded-xl border transition ${snapToGrid ? "bg-emerald-800 text-white font-black" : "bg-gray-100 text-gray-600"}`}
+          >
+            📐 吸着グリッド: {snapToGrid ? "ON" : "OFF"}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 rounded-xl transition flex items-center gap-1 shadow-xs"
+          >
+            <span>📸 配置図を出力/印刷</span>
+          </button>
+        </div>
+      </div>
+
+      {/* メインレイアウトエリア: 左大型広域キャンバス + 右スリム未割り当て生徒サイドバー */}
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
         
-        {/* 左側: スクロール可能キャンバスボード */}
+        {/* 左側: 大容量スクロール可能キャンバスボード */}
         <div
           ref={canvasRef}
-          className="flex-1 w-full bg-[#e8e9e4] rounded-3xl p-6 border border-gray-300 shadow-inner space-y-4 min-h-[700px] flex flex-col justify-between overflow-hidden"
+          className="flex-1 w-full bg-[#e8e9e4] rounded-3xl p-5 border border-gray-300 shadow-inner space-y-4 min-h-[850px] flex flex-col justify-between overflow-hidden"
         >
           {/* キャンバス上部ツールバー */}
           <div className="flex flex-wrap items-center justify-between border-b border-gray-300/60 pb-3 gap-2 z-10">
@@ -390,7 +638,7 @@ export default function TeacherFarmCanvasView() {
                 {farms.find((f) => f.id === activeFarmId)?.name}
               </span>
               <span className="text-xs text-gray-500 font-bold">
-                (全 {currentFarmPlots.length} 区画 • 衝突回避＆自動スナップ)
+                (全 {currentFarmPlots.length} 区画 • 自動スナップ)
               </span>
             </div>
 
@@ -403,44 +651,93 @@ export default function TeacherFarmCanvasView() {
               </span>
             </div>
 
-            {/* 🌟 ズームコントロール (数値整形) 🌟 */}
-            <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-2xl border shadow-xs text-xs font-bold">
+            {/* 🌟 広域対応 ズームコントロール (15% 〜 200%) 🌟 */}
+            <div className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-2xl border shadow-xs text-xs font-bold">
               <button
-                onClick={() => setZoomLevel(Math.max(40, zoomLevel - 10))}
+                onClick={() => setZoomLevel(Math.max(15, zoomLevel - 15))}
                 className="w-7 h-7 flex items-center justify-center font-black text-gray-700 hover:bg-gray-100 rounded-lg text-xs"
+                title="縮小"
               >
                 🔍-
               </button>
 
-              <span className="text-xs font-black text-emerald-800 w-12 text-center">
+              <span className="text-xs font-black text-emerald-800 w-14 text-center">
                 {Math.round(zoomLevel)}%
               </span>
 
               <button
-                onClick={() => setZoomLevel(Math.min(180, zoomLevel + 10))}
+                onClick={() => setZoomLevel(Math.min(200, zoomLevel + 15))}
                 className="w-7 h-7 flex items-center justify-center font-black text-gray-700 hover:bg-gray-100 rounded-lg text-xs"
+                title="拡大"
               >
                 🔍+
               </button>
 
+              <div className="h-4 w-px bg-gray-200 mx-1"></div>
+
+              <button
+                onClick={() => setZoomLevel(15)}
+                className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition ${zoomLevel === 15 ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                title="全体俯瞰 (15%)"
+              >
+                15%
+              </button>
+              <button
+                onClick={() => setZoomLevel(50)}
+                className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition ${zoomLevel === 50 ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                50%
+              </button>
               <button
                 onClick={() => setZoomLevel(100)}
-                className="px-2 py-0.5 text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-bold"
+                className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition ${zoomLevel === 100 ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
               >
                 100%
+              </button>
+              <button
+                onClick={() => setZoomLevel(150)}
+                className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition ${zoomLevel === 150 ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                150%
+              </button>
+              <button
+                onClick={() => setZoomLevel(200)}
+                className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition ${zoomLevel === 200 ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                200%
               </button>
             </div>
           </div>
 
-          {/* 🌟 キャンバス本体: スクロール領域 ＆ 実座標×scale 表示 ＆ ドラッグ最前面 z-50 🌟 */}
-          <div className="flex-1 w-full overflow-auto max-h-[720px] relative p-4">
+          {/* 🌟 キャンバス本体: 大型スクロール領域 🌟 */}
+          <div className="flex-1 w-full overflow-auto max-h-[880px] min-h-[800px] relative p-4">
             <div
-              className="transition-transform duration-75 min-h-[600px] min-w-[900px] relative"
+              className={`transition-transform duration-75 min-h-[800px] min-w-[1200px] relative ${showGridlines ? "bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]" : ""}`}
               style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top left" }}
             >
+              {/* 現場設備インフラ (ビニールハウス、給水栓、資材庫等) の描画 */}
+              {facilities.map((fac) => (
+                <div
+                  key={fac.id}
+                  className="absolute p-3 rounded-2xl bg-white/90 border-2 border-emerald-600/60 shadow-md flex items-center space-x-2 select-none text-xs font-black text-gray-800 z-0"
+                  style={{ left: `${fac.x}px`, top: `${fac.y}px` }}
+                >
+                  <span className="text-xl">{fac.icon}</span>
+                  <div>
+                    <div>{fac.title}</div>
+                    <div className="text-[9px] text-gray-400 font-bold">現場インフラ設備</div>
+                  </div>
+                  <button
+                    onClick={() => setFacilities(facilities.filter((f) => f.id !== fac.id))}
+                    className="text-gray-300 hover:text-red-500 font-bold ml-1 text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
               {currentFarmPlots.length === 0 ? (
                 <div className="p-12 text-center text-gray-400 font-bold text-sm">
-                  この農場にはまだ区画がありません。「＋ 区画を追加」から作成してください。
+                  このエリアにはまだ区画がありません。「＋ 区画を追加」から作成してください。
                 </div>
               ) : (
                 currentFarmPlots.map((plot) => {
@@ -473,10 +770,10 @@ export default function TeacherFarmCanvasView() {
                           <h4 className="font-black text-emerald-950 text-base flex items-center space-x-1.5">
                             <span>{plotDisplayName}</span>
                           </h4>
-                          <p className="text-[10px] text-gray-400 font-bold">カード全域ドラッグ可能 (重なり即座スナップ)</p>
+                          <p className="text-[10px] text-gray-400 font-bold">ドラッグ移動可能 (自動スナップ)</p>
                         </div>
 
-                        {/* 割り当て・削除ボタン */}
+                        {/* 割り当て・編集・コピー・削除ボタン */}
                         <div className="flex items-center space-x-1">
                           {isPlotAssigned ? (
                             <button
@@ -484,15 +781,41 @@ export default function TeacherFarmCanvasView() {
                                 e.stopPropagation();
                                 setSelectedPlot(plot);
                               }}
-                              className="bg-[#0b548b] text-white px-2.5 py-1 rounded-xl text-xs font-extrabold shadow-xs"
+                              className="bg-[#0b548b] text-white px-2 py-0.5 rounded-lg text-[10px] font-black shadow-xs"
                             >
-                              変更 / 解除
+                              生徒変更
                             </button>
                           ) : (
-                            <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
-                              生徒ドロップ
+                            <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold">
+                              未割当
                             </span>
                           )}
+
+                          <button
+                            type="button"
+                            title="この区画コード・畝数を編集する"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingPlot(plot);
+                              setEditPlotCode(plot.code || "");
+                              setEditBedCount(plot.beds ? plot.beds.length : 4);
+                            }}
+                            className="w-6 h-6 rounded-md bg-gray-100 hover:bg-emerald-100 text-gray-600 hover:text-emerald-700 flex items-center justify-center transition text-xs font-bold"
+                          >
+                            ✏️
+                          </button>
+
+                          <button
+                            type="button"
+                            title="この区画を複製・コピー (畝数のみコピー)"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicatePlot(plot);
+                            }}
+                            className="w-6 h-6 rounded-md bg-gray-100 hover:bg-amber-100 text-gray-600 hover:text-amber-800 flex items-center justify-center transition text-xs font-bold"
+                          >
+                            📋
+                          </button>
 
                           <button
                             type="button"
@@ -501,7 +824,7 @@ export default function TeacherFarmCanvasView() {
                               e.stopPropagation();
                               deletePlot(plot.id);
                             }}
-                            className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 flex items-center justify-center transition font-bold text-xs"
+                            className="w-6 h-6 rounded-md bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 flex items-center justify-center transition text-xs font-bold"
                           >
                             🗑️
                           </button>
@@ -524,40 +847,32 @@ export default function TeacherFarmCanvasView() {
                                 handleBedDrop(plot.id, index);
                               }}
                               onClick={() => setSelectedBed(bed)}
-                              className={`h-11 rounded-xl border-2 transition flex items-center justify-between px-3.5 cursor-pointer relative group ${
+                              className={`p-3 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
                                 isUpdated
-                                  ? "bg-[#2e7d32] border-green-800 text-white font-extrabold shadow-md ring-2 ring-green-400/40"
-                                  : "bg-white border-gray-300 text-gray-700 font-bold hover:border-gray-500"
+                                  ? "bg-[#2e7d32] text-white border-[#2e7d32] shadow-xs"
+                                  : "bg-white text-gray-800 border-gray-200 hover:border-gray-400"
                               }`}
                             >
                               <div className="flex items-center space-x-2">
-                                <span className="text-xs">
-                                  畝 {plot.code}-{bed.bed_number}
-                                </span>
+                                <span className="text-xs font-black">畝 #{bed.bed_number}</span>
+                                {isUpdated && (
+                                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-extrabold">
+                                    本日更新あり
+                                  </span>
+                                )}
                               </div>
 
-                              <div className="flex items-center space-x-2">
-                                {isUpdated ? (
-                                  <span className="bg-amber-400 text-amber-950 font-black text-[10px] px-2 py-0.5 rounded-md animate-pulse">
-                                    ✨ 更新あり
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] text-gray-400 font-medium">未更新</span>
-                                )}
-
-                                {/* 🌟 ゴミ箱(削除)ボタン 🗑️ 🌟 */}
+                              <div className="flex items-center space-x-1">
                                 <button
                                   type="button"
-                                  title="この畝(ベッド)を削除する"
+                                  title="この畝を削除"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`「畝 ${plot.code}-${bed.bed_number}」を削除してもよろしいですか？`)) {
-                                      deleteBedFromPlot(plot.id, bed.id);
-                                    }
+                                    deleteBedFromPlot(plot.id, bed.id);
                                   }}
-                                  className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 flex items-center justify-center transition font-bold text-xs"
+                                  className="w-6 h-6 rounded-md bg-black/10 hover:bg-red-500 hover:text-white flex items-center justify-center transition text-[10px]"
                                 >
-                                  🗑️
+                                  ✕
                                 </button>
                               </div>
                             </div>
@@ -647,18 +962,18 @@ export default function TeacherFarmCanvasView() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-black text-gray-900 text-base flex items-center gap-2">
-                <span>🌾 新しい農園を作成</span>
+                <span>🌾 新しいエリアを作成</span>
               </h3>
               <button onClick={() => setShowAddFarmModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
             </div>
 
             <form onSubmit={handleCreateNewFarm} className="space-y-4 text-xs font-bold">
               <div>
-                <label className="block text-gray-700 mb-1">農園の名称 *</label>
+                <label className="block text-gray-700 mb-1">エリアの名称 *</label>
                 <input
                   type="text"
                   required
-                  placeholder="例: 第4農場 (オリーブ・果樹エリア)"
+                  placeholder="例: 第2エリア (ハーブ・体験区画エリア)"
                   value={newFarmNameInput}
                   onChange={(e) => setNewFarmNameInput(e.target.value)}
                   className="w-full p-3.5 rounded-2xl border border-gray-300 bg-gray-50 text-sm focus:bg-white transition font-bold"
@@ -677,7 +992,7 @@ export default function TeacherFarmCanvasView() {
                   type="submit"
                   className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow"
                 >
-                  農園を作成してキャンバスを開く
+                  エリアを作成してキャンバスを開く
                 </button>
               </div>
             </form>
@@ -828,6 +1143,134 @@ export default function TeacherFarmCanvasView() {
         </div>
       )}
 
+      {editingPlot && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-black text-gray-900 text-base">✏️ 区画情報の編集 (区画コード ＆ 畝数)</h3>
+              <button onClick={() => setEditingPlot(null)} className="text-gray-400 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEditPlot} className="space-y-4 text-xs font-bold">
+              <div>
+                <label className="block text-gray-700 mb-1">区画コード / 番号 *</label>
+                <input
+                  type="text"
+                  required
+                  value={editPlotCode}
+                  onChange={(e) => setEditPlotCode(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">区画内の畝(ベッド)数 *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={editBedCount}
+                  onChange={(e) => setEditBedCount(Number(e.target.value))}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlot(null)}
+                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
+                >
+                  変更を保存
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 エリアの編集・管理 Modal 🌟 */}
+      {showEditAreaModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-gray-200">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full">エリア加工・設定変更</span>
+                <h3 className="font-black text-gray-900 text-base mt-0.5">✏️ エリアの編集・管理</h3>
+              </div>
+              <button onClick={() => setShowEditAreaModal(false)} className="text-gray-400 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEditArea} className="space-y-4 text-xs font-bold">
+              <div>
+                <label className="block text-gray-700 mb-1">現在の選択エリア名 *</label>
+                <input
+                  type="text"
+                  required
+                  value={editAreaNameInput}
+                  onChange={(e) => setEditAreaNameInput(e.target.value)}
+                  placeholder="例: 第1エリア (メイン区画エリア)"
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteArea}
+                  className="px-3.5 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                >
+                  <span>🗑️ このエリアを削除</span>
+                </button>
+
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditAreaModal(false)}
+                    className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
+                  >
+                    エリア名を確定保存
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* 新エリアの追加展開オプション */}
+            <div className="pt-4 border-t border-gray-100 space-y-3">
+              <span className="text-[11px] text-gray-400 font-bold block">＋ 新しい管理エリアを新設追加</span>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newAreaNameInModal}
+                  onChange={(e) => setNewAreaNameInModal(e.target.value)}
+                  placeholder="例: 第2エリア (体験農園)"
+                  className="flex-1 p-2.5 rounded-xl border border-gray-300 text-xs font-bold"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNewAreaFromModal}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition"
+                >
+                  ＋ 追加作成
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddPlotModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
@@ -874,56 +1317,57 @@ export default function TeacherFarmCanvasView() {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-gray-200">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">農園情報・設定統合</span>
-                <h3 className="font-black text-gray-900 text-base mt-0.5">🏡 農園情報 ＆ 代表者設定</h3>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">農園情報・データベース更新</span>
+                <h3 className="font-black text-gray-900 text-base mt-0.5">🏫 農園・代表者情報</h3>
               </div>
               <button onClick={() => setShowFarmSettingsModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
             </div>
 
             <form onSubmit={handleSaveFarmSettings} className="space-y-4 text-xs font-bold">
               <div>
-                <label className="block text-gray-700 mb-1">🌱 農園名</label>
+                <label className="block text-gray-700 mb-1">農園名 *</label>
                 <input
                   type="text"
                   required
                   value={farmSettingsName}
                   onChange={(e) => setFarmSettingsName(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm"
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-extrabold"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-1">👨‍🌾 代表者氏名 (講師名)</label>
+                <label className="block text-gray-700 mb-1">代表者氏名 (右上アカウント名に反映) *</label>
                 <input
                   type="text"
                   required
                   value={ownerNameInput}
                   onChange={(e) => setOwnerNameInput(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm"
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-extrabold"
+                />
+                <p className="text-[11px] text-emerald-700 font-bold mt-1">✓ 保存すると右上のアカウントプロフィール名にも即座に反映されます</p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">通知受信用メールアドレス</label>
+                <input
+                  type="email"
+                  required
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
                 />
               </div>
 
-              {/* テーマカラー選択 */}
-              <div className="space-y-2 pt-2 border-t">
-                <label className="block text-gray-700">🎨 アプリテーマカラー選択</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDraftTheme("pistachio")}
-                    className={`p-3 rounded-xl border text-left flex items-center justify-between ${draftTheme === "pistachio" ? "bg-emerald-50 border-emerald-600 text-emerald-900" : "bg-gray-50 border-gray-200"}`}
-                  >
-                    <span>🌿 ピスタチオグリーン</span>
-                    {draftTheme === "pistachio" && <span>✓</span>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDraftTheme("citrus")}
-                    className={`p-3 rounded-xl border text-left flex items-center justify-between ${draftTheme === "citrus" ? "bg-amber-50 border-amber-600 text-amber-900" : "bg-gray-50 border-gray-200"}`}
-                  >
-                    <span>🍊 シトラスイエロー</span>
-                    {draftTheme === "citrus" && <span>✓</span>}
-                  </button>
-                </div>
+              <div>
+                <label className="block text-gray-700 mb-1">📍 農園住所 / アドレス</label>
+                <input
+                  type="text"
+                  required
+                  value={farmAddressInput}
+                  onChange={(e) => setFarmAddressInput(e.target.value)}
+                  placeholder="例: 千葉県千葉市緑区あすみが丘 1-23"
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
+                />
               </div>
 
               <div className="flex justify-end space-x-2 pt-3 border-t">
@@ -938,7 +1382,7 @@ export default function TeacherFarmCanvasView() {
                   type="submit"
                   className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
                 >
-                  設定を確定保存
+                  設定を確定保存 (DB更新)
                 </button>
               </div>
             </form>

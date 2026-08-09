@@ -609,6 +609,7 @@ export function useFarmManager() {
 
   return {
     farms,
+    setFarms,
     activeFarmId,
     setActiveFarmId,
     addFarm: (name: string) => {

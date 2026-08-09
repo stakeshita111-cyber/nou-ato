@@ -137,85 +137,70 @@ export default function TeacherOverviewView({
       {/* 🌟 農園ピンポイント天気予報 ＆ 自動気象連動アドバイスウィジェット 🌟 */}
       <WeatherWidget />
 
-      {/* 1. 概要サマリーカード (4分割・テーマ統一連動) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* カード1: 生徒を招待 */}
-        <div className="app-bg-card p-6 rounded-2xl border app-border shadow-sm flex flex-col justify-between space-y-4">
-          <div>
-            <h3 className="font-bold text-gray-900 text-base mb-1">生徒を招待</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              LINEと連携して進捗管理を開始します。
-            </p>
-          </div>
-
-          <div className="space-y-2 pt-2">
-            <button
-              onClick={handleCopyInviteLink}
-              className="w-full py-2.5 px-3 app-bg-card border app-border hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition"
-            >
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 005.656-5.656l-1.1 1.1" />
-              </svg>
-              <span>LINE招待リンクをコピー</span>
-            </button>
+      {/* 1. 概要サマリーカード (スリム3分割・重複なし) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* カード1: 受講生数 ＆ 招待機能 */}
+        <div className="app-bg-card p-6 rounded-2xl border app-border shadow-sm flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-2xl app-accent-light flex items-center justify-center">
+                <svg className="w-6 h-6 text-emerald-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <span className="text-3xl font-black text-gray-900 tracking-tight">{studentCount}</span>
+                <span className="text-xs text-gray-500 font-bold block">登録受講生数</span>
+              </div>
+            </div>
 
             <button
               onClick={() => setShowQRModal(true)}
-              className="w-full py-2.5 px-3 app-bg-card border app-border hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition"
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black text-xs rounded-xl border border-emerald-200 transition"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-              <span>QRコードを表示</span>
+              📱 招待QR
             </button>
           </div>
+
+          <button
+            onClick={handleCopyInviteLink}
+            className="w-full py-2 px-3 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs rounded-xl border border-gray-200 flex items-center justify-center space-x-1.5 transition"
+          >
+            <span>🔗 LINE招待リンクをコピー</span>
+          </button>
         </div>
 
-        {/* カード2: 受講生数 */}
-        <div
-          onClick={onNavigateToStudents}
-          className="app-bg-card p-6 rounded-2xl border app-border shadow-sm hover:border-gray-400 cursor-pointer flex flex-col items-center justify-center text-center transition group"
-        >
-          <div className="w-10 h-10 rounded-full app-accent-light flex items-center justify-center mb-3 group-hover:scale-110 transition">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </div>
-          <span className="text-4xl font-extrabold text-gray-900 tracking-tight">{studentCount}</span>
-          <span className="text-xs text-gray-500 font-medium mt-1">受講生数</span>
-        </div>
-
-        {/* カード3: 本日の報告 */}
+        {/* カード2: 本日の報告数 */}
         <div
           onClick={onNavigateToJournals}
-          className="app-bg-card p-6 rounded-2xl border app-border shadow-sm hover:border-gray-400 cursor-pointer flex flex-col items-center justify-center text-center transition group"
+          className="app-bg-card p-6 rounded-2xl border app-border shadow-sm hover:border-emerald-300 cursor-pointer flex flex-col items-center justify-center text-center transition group"
         >
-          <div className="w-10 h-10 rounded-full app-accent-light flex items-center justify-center mb-3 group-hover:scale-110 transition">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-10 h-10 rounded-2xl app-accent-light flex items-center justify-center mb-2 group-hover:scale-110 transition">
+            <svg className="w-6 h-6 text-emerald-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <span className="text-4xl font-extrabold text-gray-900 tracking-tight">{reportCount}</span>
-          <span className="text-xs text-gray-500 font-medium mt-1">本日の報告</span>
+          <span className="text-3xl font-extrabold text-gray-900 tracking-tight">{reportCount}</span>
+          <span className="text-xs text-gray-500 font-bold mt-1">本日の日誌報告</span>
         </div>
 
-        {/* カード4: 未回答の質問 */}
+        {/* カード3: 未回答の質問 */}
         <div
           onClick={onNavigateToJournals}
           className="app-bg-card p-6 rounded-2xl border app-border shadow-sm hover:border-red-300 cursor-pointer flex flex-col items-center justify-center text-center transition group"
         >
-          <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+          <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mb-2 group-hover:scale-110 transition">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <span className="text-4xl font-extrabold text-red-600 tracking-tight">{unrepliedCount}</span>
-          <span className="text-xs text-gray-500 font-medium mt-1">未回答の質問</span>
+          <span className="text-3xl font-extrabold text-red-600 tracking-tight">{unrepliedCount}</span>
+          <span className="text-xs text-gray-500 font-bold mt-1">未回答の日誌質問</span>
         </div>
       </div>
 
-      {/* 2. 生徒の進捗 ＆ 受講生一覧の完全統合セクション */}
-      <div className="space-y-4 pt-4">
+      {/* 2. 受講生一覧・進捗管理セクション (完全統合) */}
+      <div className="space-y-4 pt-2">
         <TeacherStudentsView />
       </div>
     </div>

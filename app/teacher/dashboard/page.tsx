@@ -107,33 +107,31 @@ export default function TeacherDashboardPage() {
         {/* トップヘッダー */}
         <TeacherHeader
           title={
-            activeMenu === "dashboard"
-              ? "農園管理ダッシュボード"
+            activeMenu === "dashboard" || activeMenu === "students"
+              ? "農園管理ダッシュボード・受講生一覧"
               : activeMenu === "farm"
               ? "第1農場レイアウト・キャンバス区画管理 (D&D対応)"
               : activeMenu === "tasks"
               ? "看板教材・タスク管理"
               : activeMenu === "templates"
               ? "教材・タスクテンプレート作成・管理"
-              : activeMenu === "students"
-              ? "受講生一覧"
               : activeMenu === "journals"
               ? "相談・交換日記確認"
               : activeMenu === "payments"
               ? "集金・月額会費・売上管理"
               : activeMenu === "events"
               ? "イベントスケジュール・講習予約管理"
-              : "農園設定"
+              : "画面・表示・運用カスタマイズ設定"
           }
           onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
         />
 
         {/* ページコンテンツ (全ビューテーマ統一連動) */}
         <main className="p-8 max-w-7xl w-full mx-auto flex-1">
-          {activeMenu === "dashboard" && (
+          {(activeMenu === "dashboard" || activeMenu === "students") && (
             <TeacherOverviewView
               onAddNewTaskClick={handleAddNewTask}
-              onNavigateToStudents={() => setActiveMenu("students")}
+              onNavigateToStudents={() => setActiveMenu("dashboard")}
               onNavigateToJournals={() => setActiveMenu("journals")}
             />
           )}
@@ -148,8 +146,6 @@ export default function TeacherDashboardPage() {
           )}
 
           {activeMenu === "templates" && <TeacherTemplatesView />}
-
-          {activeMenu === "students" && <TeacherStudentsView />}
 
           {activeMenu === "journals" && <TeacherJournalsView />}
 

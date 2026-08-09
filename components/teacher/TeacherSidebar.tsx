@@ -22,9 +22,9 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
           </div>
         </div>
 
-        {/* 統合メニューリスト (7区分に集約) */}
+        {/* 最適化メニューリスト (受講生一覧はダッシュボードへ完全統合) */}
         <nav className="p-4 space-y-1.5">
-          {/* 1. ダッシュボード (受講生一覧・進捗管理を統合) */}
+          {/* 1. ダッシュボード・受講生 */}
           <button
             onClick={() => onMenuClick("dashboard")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -39,17 +39,17 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <span>ダッシュボード・受講生</span>
           </button>
 
-          {/* 2. 畑・区画管理 (農園名・代表者情報・キャンバス区画を統合) */}
+          {/* 2. 畑・区画管理 (拡張キャンバス & ⚙️農園設定) */}
           <button
             onClick={() => onMenuClick("farm")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
-              activeMenu === "farm" || activeMenu === "settings"
+              activeMenu === "farm"
                 ? "app-accent-light font-bold shadow-xs"
                 : "text-gray-600 hover:bg-gray-100/70"
             }`}
           >
             <span className="text-base">🌾</span>
-            <span>畑・区画管理（農園設定）</span>
+            <span>畑・区画管理</span>
           </button>
 
           {/* 3. タスク作成・管理 */}
@@ -80,7 +80,7 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <span>テンプレート管理</span>
           </button>
 
-          {/* 5. 相談・交換日記確認 */}
+          {/* 5. 相談・日誌確認 */}
           <button
             onClick={() => onMenuClick("journals")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -119,6 +119,22 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
           >
             <span className="text-base">📅</span>
             <span>イベント・予約</span>
+          </button>
+
+          {/* 8. 画面・表示・システム設定 */}
+          <button
+            onClick={() => onMenuClick("settings")}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              activeMenu === "settings"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
+            }`}
+          >
+            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>画面・表示設定</span>
           </button>
         </nav>
       </div>

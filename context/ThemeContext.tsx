@@ -26,11 +26,17 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const savedTheme = localStorage.getItem("nouato_theme_color") as ThemeColor;
     const savedSize = localStorage.getItem("nouato_font_size") as FontSize;
+    const savedContrast = localStorage.getItem("nouato_outdoor_contrast") === "true";
+
     if (savedTheme && ["pistachio", "strawberry", "sapphire", "citrus"].includes(savedTheme)) {
       setThemeColorState(savedTheme);
     }
     if (savedSize && ["normal", "large", "xlarge"].includes(savedSize)) {
       setFontSizeState(savedSize);
+    }
+
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-contrast", savedContrast ? "high" : "normal");
     }
   }, []);
 

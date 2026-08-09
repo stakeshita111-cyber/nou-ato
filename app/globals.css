@@ -70,6 +70,21 @@
   --input-border: #c8dbc9;
 }
 
+/* ☀️ 屋外高コントラストモード */
+[data-contrast="high"] {
+  --bg-main: #f8fafc !important;
+  --bg-card: #ffffff !important;
+  --text-main: #020617 !important;
+  --text-muted: #0f172a !important;
+  --border-main: #020617 !important;
+  --input-bg: #ffffff !important;
+  --input-border: #020617 !important;
+}
+
+[data-contrast="high"] button {
+  font-weight: 900 !important;
+}
+
 /* フォントサイズコントロール */
 [data-font-size="normal"] {
   font-size: 14px;
