@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { FarmBed, FarmPlot } from "@/types/farm";
 import Toast from "@/components/ui/Toast";
+import { useTheme, ThemeColor, FontSize } from "@/context/ThemeContext";
+import { supabase } from "@/lib/supabase";
 
 interface UnassignedStudent {
   id: string;
@@ -79,6 +81,55 @@ export default function TeacherFarmCanvasView() {
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  const { themeColor, fontSize, applyTheme } = useTheme();
+
+  // 農園・代表者設定 Modal State
+  const [showFarmSettingsModal, setShowFarmSettingsModal] = useState(false);
+  const [farmSettingsName, setFarmSettingsName] = useState("");
+  const [ownerNameInput, setOwnerNameInput] = useState("");
+  const [draftTheme, setDraftTheme] = useState<ThemeColor>(themeColor);
+  const [draftFontSize, setDraftFontSize] = useState<FontSize>(fontSize);
+
+  useEffect(() => {
+    const savedOwner = typeof window !== "undefined" ? (localStorage.getItem("nouato_owner_name") || "田中 太郎") : "田中 太郎";
+    setOwnerNameInput(savedOwner);
+  }, []);
+
+  const handleSaveFarmSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!farmSettingsName.trim() || !ownerNameInput.trim()) {
+      setToastMessage("農園名と代表者氏名を入力してください");
+      setShowToast(true);
+      return;
+    }
+
+    try {
+      const cleanOwner = ownerNameInput.trim();
+      const cleanFarm = farmSettingsName.trim();
+      localStorage.setItem("nouato_owner_name", cleanOwner);
+
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        await supabase
+          .from("users")
+          .update({ display_name: cleanOwner })
+          .eq("id", authData.user.id);
+
+        await supabase
+          .from("farms")
+          .update({ name: cleanFarm, owner_id: authData.user.id })
+          .eq("id", activeFarmId);
+      }
+
+      applyTheme(draftTheme, draftFontSize);
+      setShowFarmSettingsModal(false);
+      setToastMessage("✨ 農園名・代表者情報およびテーマ設定を確定保存しました！");
+      setShowToast(true);
+    } catch (err: any) {
+      console.error("handleSaveFarmSettings error:", err);
+    }
+  };
 
   // 新区画追加 Modal State
   const [showAddPlotModal, setShowAddPlotModal] = useState(false);
@@ -300,6 +351,17 @@ export default function TeacherFarmCanvasView() {
           >
             <span className="text-base leading-none">＋</span>
             <span>新しい農園を作成</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const currentF = farms.find((f) => f.id === activeFarmId);
+              setFarmSettingsName(currentF?.name || "テスト農園");
+              setShowFarmSettingsModal(true);
+            }}
+            className="px-3.5 py-2.5 mt-4 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-xs transition flex items-center space-x-1"
+          >
+            <span>🏡 農園・代表者設定</span>
           </button>
         </div>
 
@@ -800,6 +862,83 @@ export default function TeacherFarmCanvasView() {
                   className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
                 >
                   区画を作成して追加
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showFarmSettingsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-gray-200">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">農園情報・設定統合</span>
+                <h3 className="font-black text-gray-900 text-base mt-0.5">🏡 農園情報 ＆ 代表者設定</h3>
+              </div>
+              <button onClick={() => setShowFarmSettingsModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveFarmSettings} className="space-y-4 text-xs font-bold">
+              <div>
+                <label className="block text-gray-700 mb-1">🌱 農園名</label>
+                <input
+                  type="text"
+                  required
+                  value={farmSettingsName}
+                  onChange={(e) => setFarmSettingsName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">👨‍🌾 代表者氏名 (講師名)</label>
+                <input
+                  type="text"
+                  required
+                  value={ownerNameInput}
+                  onChange={(e) => setOwnerNameInput(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm"
+                />
+              </div>
+
+              {/* テーマカラー選択 */}
+              <div className="space-y-2 pt-2 border-t">
+                <label className="block text-gray-700">🎨 アプリテーマカラー選択</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDraftTheme("pistachio")}
+                    className={`p-3 rounded-xl border text-left flex items-center justify-between ${draftTheme === "pistachio" ? "bg-emerald-50 border-emerald-600 text-emerald-900" : "bg-gray-50 border-gray-200"}`}
+                  >
+                    <span>🌿 ピスタチオグリーン</span>
+                    {draftTheme === "pistachio" && <span>✓</span>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraftTheme("citrus")}
+                    className={`p-3 rounded-xl border text-left flex items-center justify-between ${draftTheme === "citrus" ? "bg-amber-50 border-amber-600 text-amber-900" : "bg-gray-50 border-gray-200"}`}
+                  >
+                    <span>🍊 シトラスイエロー</span>
+                    {draftTheme === "citrus" && <span>✓</span>}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowFarmSettingsModal(false)}
+                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
+                >
+                  設定を確定保存
                 </button>
               </div>
             </form>

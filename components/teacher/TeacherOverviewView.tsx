@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import QRCodeModal from "@/components/ui/QRCodeModal";
 import WeatherWidget from "@/components/ui/WeatherWidget";
+import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
 
 interface TeacherOverviewViewProps {
   onAddNewTaskClick: () => void;
@@ -213,57 +214,9 @@ export default function TeacherOverviewView({
         </div>
       </div>
 
-      {/* 2. 生徒の進捗セクション */}
+      {/* 2. 生徒の進捗 ＆ 受講生一覧の完全統合セクション */}
       <div className="space-y-4 pt-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-black text-gray-900 tracking-tight">生徒の進捗</h3>
-          <button
-            onClick={onNavigateToStudents}
-            className="text-xs font-bold app-text-main hover:underline"
-          >
-            全員の進捗を見る →
-          </button>
-        </div>
-
-        {studentsList.length === 0 ? (
-          <div className="app-bg-card rounded-2xl p-8 border app-border text-center space-y-2">
-            <p className="text-xs font-bold text-gray-700">登録されている生徒はまだありません</p>
-            <p className="text-xs text-gray-400">「LINE招待リンク」または「QRコード」を提示して生徒を招待してください。</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {studentsList.map((st, idx) => {
-              const name = st.email ? st.email.split("@")[0] : `生徒${idx + 1}`;
-              return (
-                <div
-                  key={st.id}
-                  onClick={onNavigateToStudents}
-                  className="app-bg-card rounded-2xl border app-border overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer p-5 space-y-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-gray-900 text-base">{name}</h4>
-                      <p className="text-xs text-gray-500 font-medium">区画 {idx + 1}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full app-accent-btn font-bold flex items-center justify-center text-xs">
-                      {name.slice(0, 2).toUpperCase()}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex justify-between text-xs font-semibold text-gray-700">
-                      <span>現在のステップ</span>
-                      <span className="app-text-main font-bold">受講中</span>
-                    </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full app-accent-btn w-1/2 rounded-full"></div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <TeacherStudentsView />
       </div>
     </div>
   );

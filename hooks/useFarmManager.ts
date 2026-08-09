@@ -373,6 +373,7 @@ export function useFarmManager() {
     localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
 
     try {
+      await supabase.from("crop_records").delete().eq("bed_id", bedId);
       await supabase.from("farm_beds").delete().eq("id", bedId);
       if (targetBed) {
         await supabase
@@ -446,19 +447,20 @@ export function useFarmManager() {
 
   // 🌟 講師画面: 区画(プロット)自体の削除機能 🌟
   const deletePlot = async (plotId: string) => {
-    const targetPlot = plots.find((p) => p.id === plotId);
-    if (!targetPlot) return;
+    const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId || p.name.includes(plotId));
+    const plotIdToDelete = targetPlot?.id || plotId;
 
-    if (!confirm(`「${targetPlot.name}」を本当に削除しますか？`)) return;
+    if (!confirm(`「${targetPlot?.name || "この区画"}」を本当に削除しますか？`)) return;
 
-    const nextPlots = plots.filter((p) => p.id !== plotId);
+    const nextPlots = plots.filter((p) => p.id !== plotIdToDelete && p.code !== targetPlot?.code);
     setPlots(nextPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
 
     try {
-      await supabase.from("farm_beds").delete().eq("plot_id", plotId);
-      await supabase.from("farm_plots").delete().eq("id", plotId);
-      if (targetPlot.code) {
+      await supabase.from("crop_records").delete().eq("bed_id", plotIdToDelete);
+      await supabase.from("farm_beds").delete().eq("plot_id", plotIdToDelete);
+      await supabase.from("farm_plots").delete().eq("id", plotIdToDelete);
+      if (targetPlot?.code) {
         await supabase.from("farm_plots").delete().eq("code", targetPlot.code);
       }
     } catch (e) {
