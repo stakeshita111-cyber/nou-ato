@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useThemeStore } from "@/store/useThemeStore";
+import { formatDate, formatShirubeSpeech } from "@/lib/utils/formatHelper";
 
 interface StudentTalkViewProps {
   journals: any[];
 }
 
 export default function StudentTalkView({ journals }: StudentTalkViewProps) {
+  const { settings } = useThemeStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "replied" | "waiting">("all");
 
@@ -103,10 +106,7 @@ export default function StudentTalkView({ journals }: StudentTalkViewProps) {
                 </div>
                 <span className="text-[10px] text-gray-400">
                   {j.created_at
-                    ? new Date(j.created_at).toLocaleDateString("ja-JP", {
-                        month: "short",
-                        day: "numeric",
-                      })
+                    ? formatDate(j.created_at, settings.dateFormat)
                     : "送信済み"}
                 </span>
               </div>
@@ -117,18 +117,20 @@ export default function StudentTalkView({ journals }: StudentTalkViewProps) {
                 {j.content}
               </div>
 
-              {/* 講師からの返信メッセージ */}
+              {/* 講師からの返信メッセージ / しるべぇの口調置換適用 */}
               {j.reply ? (
-                <div className="bg-green-50/90 p-3.5 rounded-xl border border-green-200 text-xs space-y-1">
-                  <div className="flex items-center justify-between font-bold text-[#1d5c23] text-[11px]">
+                <div className="bg-emerald-50/90 p-3.5 rounded-xl border border-emerald-200 text-xs space-y-1">
+                  <div className="flex items-center justify-between font-bold text-emerald-800 text-[11px]">
                     <span className="flex items-center space-x-1">
-                      <span>👨‍🌾 講師アドバイス</span>
+                      <span>🌾 講師 & しるべぇのアドバイス</span>
                     </span>
-                    <span className="bg-green-200 text-green-800 text-[9px] px-1.5 py-0.2 rounded font-bold">
+                    <span className="bg-emerald-200 text-emerald-900 text-[9px] px-1.5 py-0.2 rounded font-bold">
                       回答済み
                     </span>
                   </div>
-                  <p className="text-gray-800 leading-relaxed">{j.reply}</p>
+                  <p className="text-gray-800 leading-relaxed">
+                    {formatShirubeSpeech(j.reply, settings.politeStyle)}
+                  </p>
                 </div>
               ) : (
                 <div className="flex items-center justify-between bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-[11px] text-amber-800 font-medium">

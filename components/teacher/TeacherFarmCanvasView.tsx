@@ -31,6 +31,7 @@ export default function TeacherFarmCanvasView() {
     deletePlot,
     addBedToPlot,
     deleteBedFromPlot,
+    updatePlotBedsCount,
     assignStudentToPlot,
     unassignStudentFromPlot,
   } = useFarmManager();
@@ -479,19 +480,7 @@ export default function TeacherFarmCanvasView() {
         .update({ code: editPlotCode, name: `区画 ${editPlotCode}` })
         .eq("id", editingPlot.id);
 
-      if (editBedCount > targetPlot.beds.length) {
-        for (let i = targetPlot.beds.length + 1; i <= editBedCount; i++) {
-          await supabase.from("farm_beds").upsert([{
-            id: `${editingPlot.id}_bed_${i}`,
-            plot_id: editingPlot.id,
-            bed_number: String(i),
-          }]);
-        }
-      } else if (editBedCount < targetPlot.beds.length) {
-        for (let i = editBedCount + 1; i <= targetPlot.beds.length; i++) {
-          await supabase.from("farm_beds").delete().eq("id", `${editingPlot.id}_bed_${i}`);
-        }
-      }
+      await updatePlotBedsCount(editingPlot.id, editBedCount);
     } catch (err) {
       console.error("handleSaveEditPlot error:", err);
     }
@@ -833,12 +822,13 @@ export default function TeacherFarmCanvasView() {
 
                       {/* 区画内の長方形ベッド */}
                       <div className="space-y-2">
-                        {plot.beds.map((bed, index) => {
+                        {Array.from(new Map((plot.beds || []).map((b, bIdx) => [b.id || `${plot.id}_bed_${b.bed_number || bIdx + 1}`, b])).values()).map((bed, index) => {
                           const isUpdated = bed.is_updated;
+                          const bedKey = `${plot.id}_${bed.id}_${index}`;
 
                           return (
                             <div
-                              key={bed.id}
+                              key={bedKey}
                               draggable
                               onDragStart={(e) => handleBedDragStart(e, plot.id, index)}
                               onDragOver={(e) => e.preventDefault()}

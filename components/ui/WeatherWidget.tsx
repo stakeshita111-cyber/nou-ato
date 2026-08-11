@@ -669,17 +669,37 @@ export default function WeatherWidget() {
     // 現在または選択中の時間の気象データ
     const displayData = hoveredPointInfo ? hoveredPointInfo.hourData : (currentP ? currentP.rawData : data[0]);
 
-    // 選択時刻に連動する簡易農業指標計算
+    // 選択時刻に連動する時間単位のリアルタイム農業指標計算
     const activeWind = displayData ? displayData.wind : weather.today.windSpeed;
     const activeRainSum = displayData ? displayData.rain : weather.today.rainSum;
+    const activeRainProb = displayData ? displayData.rainProb : 0;
     const activeTemp = displayData ? (displayData.isPast ? displayData.tempActual : displayData.tempPredicted) : weather.today.tempMax;
+    const activeWeather = displayData ? displayData.weather : "sunny";
 
+    // 1. 防除適期判定
     const sprayingStatus = activeWind > 5 ? "散布不可" : activeWind >= 3 ? "風注意" : "散布最適";
     const sprayingColor = activeWind > 5 ? "text-red-400 border-red-500/40 bg-red-500/20" : activeWind >= 3 ? "text-amber-300 border-amber-500/40 bg-amber-500/20" : "text-emerald-300 border-emerald-500/40 bg-emerald-500/20";
 
-    const irrigationStatus = activeRainSum >= 5 ? "水やり不要" : activeTemp >= 30 ? "給水必須" : "標準給水";
-    const irrigationColor = activeRainSum >= 5 ? "text-cyan-300 border-cyan-500/40 bg-cyan-500/20" : activeTemp >= 30 ? "text-amber-300 border-amber-500/40 bg-amber-500/20" : "text-blue-300 border-blue-500/40 bg-blue-500/20";
+    // 2. 灌水・水やり判定 (降雨1mm以上または降水確率50%以上で「水やり不要」、30°C以上乾燥で「給水必須」)
+    const irrigationStatus = (activeRainSum >= 1 || activeRainProb >= 50) ? "水やり不要" : activeTemp >= 30 ? "給水必須" : "標準給水";
+    const irrigationColor = (activeRainSum >= 1 || activeRainProb >= 50) ? "text-cyan-300 border-cyan-500/40 bg-cyan-500/20" : activeTemp >= 30 ? "text-amber-300 border-amber-500/40 bg-amber-500/20" : "text-blue-300 border-blue-500/40 bg-blue-500/20";
 
+    // 3. 光合成速度判定 (雨天・荒天・降水ありで「日照不足」、曇りで「良好」、晴天かつ適温18〜32°Cで「絶好」)
+    const photosynthesisStatus = (activeWeather === "rainy" || activeWeather === "storm" || activeRainSum > 0)
+      ? "日照不足"
+      : (activeWeather === "cloudy")
+      ? "良好"
+      : (activeTemp >= 18 && activeTemp <= 32)
+      ? "絶好"
+      : "良好";
+
+    const photosynthesisColor = (photosynthesisStatus === "日照不足")
+      ? "text-gray-300 border-gray-500/40 bg-gray-500/20"
+      : (photosynthesisStatus === "絶好")
+      ? "text-amber-300 border-amber-500/40 bg-amber-500/20"
+      : "text-emerald-300 border-emerald-500/40 bg-emerald-500/20";
+
+    // 4. 熱中症警戒判定
     const heatAlertStatus = activeTemp >= 32 ? "厳重警戒" : activeTemp >= 28 ? "暑さ注意" : "熱中症安全";
     const heatColor = activeTemp >= 32 ? "text-red-400 border-red-500/40 bg-red-500/20" : activeTemp >= 28 ? "text-amber-300 border-amber-500/40 bg-amber-500/20" : "text-emerald-300 border-emerald-500/40 bg-emerald-500/20";
 
@@ -913,27 +933,130 @@ export default function WeatherWidget() {
 
             {/* 農業指標リアルタイムサマリー (防除・灌水・光合成・熱中症) */}
             <div className="space-y-1.5 pt-1">
-              <span className="text-[11px] font-black text-emerald-300 block">📊 農業作業指標サマリー:</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-emerald-300 block">📊 農業作業指標サマリー:</span>
+                <span className="text-[9px] text-gray-400 font-bold">💡 マウスオーバーで解説表示</span>
+              </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between font-bold ${sprayingColor}`}>
+                {/* 1. 🚜 防除 */}
+                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${sprayingColor}`}>
                   <span className="text-[11px]">🚜 防除</span>
                   <span className="font-black text-xs">{sprayingStatus}</span>
+
+                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
+                    <div className="font-black text-cyan-300 border-b border-white/10 pb-1 flex justify-between items-center">
+                      <span>🚜 防除作業適期判定</span>
+                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
+                      <p className="text-gray-200 pl-1">時間風速 \(v\) (m/s) に基づく農薬漂流(ドリフト)リスク判定</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
+                      <p className="text-cyan-200 pl-1">Open-Meteo 高精度気象データ / 気象庁アメダス風速</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
+                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
+                        <li>🟢 <strong className="text-emerald-300">散布最適</strong>: 風速 &lt; 3m/s (漂流極少・理想)</li>
+                        <li>🟡 <strong className="text-amber-300">風注意</strong>: 風速 3〜5m/s (飛散注意)</li>
+                        <li>🔴 <strong className="text-red-400">散布不可</strong>: 風速 &gt; 5m/s (漂流障害防止・中止)</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
 
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between font-bold ${irrigationColor}`}>
+                {/* 2. 💧 灌水 */}
+                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${irrigationColor}`}>
                   <span className="text-[11px]">💧 灌水</span>
                   <span className="font-black text-xs">{irrigationStatus}</span>
+
+                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
+                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
+                    <div className="font-black text-cyan-300 border-b border-white/10 pb-1 flex justify-between items-center">
+                      <span>💧 灌水・水やり適正判定</span>
+                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
+                      <p className="text-gray-200 pl-1">時間気温 \(T\) (°C) および 時間降水量 \(P\) (mm) の判定複合条件</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
+                      <p className="text-cyan-200 pl-1">気象庁局地気温 ＋ 高解像度降水ナウキャスト</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
+                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
+                        <li>🟡 <strong className="text-amber-300">給水必須</strong>: 気温 &ge; 30°C (乾燥萎れ防止)</li>
+                        <li>🔵 <strong className="text-cyan-300">水やり不要</strong>: 降水 &ge; 5mm (自然雨充分)</li>
+                        <li>🟦 <strong className="text-blue-300">標準給水</strong>: 安定環境 (定時点量水やり)</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/20 text-amber-300 flex items-center justify-between font-bold">
+                {/* 3. ☀️ 光合成 */}
+                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${photosynthesisColor}`}>
                   <span className="text-[11px]">☀️ 光合成</span>
-                  <span className="font-black text-xs">絶好</span>
+                  <span className="font-black text-xs">{photosynthesisStatus}</span>
+
+                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
+                    <div className="font-black text-amber-300 border-b border-white/10 pb-1 flex justify-between items-center">
+                      <span>☀️ 光合成・成長速度指標</span>
+                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
+                      <p className="text-gray-200 pl-1">雲量・日照量 ＋ 作物最適温度域(20°C〜30°C)適合度</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
+                      <p className="text-cyan-200 pl-1">有効光量子束密度(PPFD)推定モデル ＋ 全天日射量</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
+                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
+                        <li>🟡 <strong className="text-amber-300">絶好</strong>: 晴天 ＋ 20〜30°C (糖分蓄積最大)</li>
+                        <li>🌤️ <strong className="text-emerald-300">良好</strong>: 薄曇り (光合成量十分)</li>
+                        <li>🌧️ <strong className="text-gray-400">日照不足</strong>: 曇雨天 (光量不足で鈍化)</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
 
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between font-bold ${heatColor}`}>
+                {/* 4. 🌡️ 熱中症 */}
+                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${heatColor}`}>
                   <span className="text-[11px]">🌡️ 熱中症</span>
                   <span className="font-black text-xs">{heatAlertStatus}</span>
+
+                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
+                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
+                    <div className="font-black text-red-400 border-b border-white/10 pb-1 flex justify-between items-center">
+                      <span>🌡️ 熱中症警戒レベル (WBGT)</span>
+                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
+                      <p className="text-gray-200 pl-1">湿球黒球温度(WBGT)近似式: 外気温度 \(T\) (°C) と日射量</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
+                      <p className="text-cyan-200 pl-1">環境省熱中症予防情報 ＋ 局地リアルタイム気温</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
+                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
+                        <li>🟢 <strong className="text-emerald-300">熱中症安全</strong>: 気温 &lt; 28°C (通常作業可能)</li>
+                        <li>🟡 <strong className="text-amber-300">暑さ注意</strong>: 気温 28〜32°C (水分補給と休憩)</li>
+                        <li>🔴 <strong className="text-red-400">厳重警戒</strong>: 気温 &ge; 32°C (過度作業自粛)</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

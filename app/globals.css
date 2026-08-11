@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
 :root {
+  /* テーマ動的適用用デフォルト値 */
+  --color-primary: #10b981;
+  --color-secondary: #f59e0b;
+  --font-size-base: 16px;
+  --font-family-base: var(--font-geist-sans), sans-serif;
+  --font-weight-base: 500;
+  --line-height-base: 1.625;
+  --border-radius-button: 8px;
+  --button-padding: 8px 16px;
+
   /* デフォルト：パステルピスタチオ (自然・グリーン) */
   --bg-main: #f3f7f2;
   --bg-card: #ffffff;
@@ -99,8 +109,40 @@
 body {
   background-color: var(--bg-main);
   color: var(--text-main);
-  font-family: var(--font-geist-sans), sans-serif;
-  transition: background-color 0.4s ease, color 0.4s ease;
+  font-family: var(--font-family-base, var(--font-geist-sans), sans-serif);
+  font-size: var(--font-size-base, 16px);
+  font-weight: var(--font-weight-base, 500);
+  line-height: var(--line-height-base, 1.625);
+  transition: font-size 0.2s ease, font-weight 0.2s ease, background-color 0.4s ease, color 0.4s ease;
+}
+
+/* アクセシビリティ：キーボード操作用の強コントラスト・フォーカスリング */
+input:focus-visible, 
+select:focus-visible, 
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* 設定値が動的に反映されるボタンコンポーネントクラス */
+.btn-farm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  padding: var(--button-padding, 8px 16px);
+  border-radius: var(--border-radius-button, 8px);
+  background-color: var(--color-primary, #10b981);
+  color: white;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.btn-farm:hover {
+  filter: brightness(0.9);
+}
+.btn-farm:active {
+  transform: scale(0.98);
 }
 
 /* 入力欄・テキストボックス統制 */
