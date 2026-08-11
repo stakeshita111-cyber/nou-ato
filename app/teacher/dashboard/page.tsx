@@ -8,7 +8,6 @@ import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import TeacherHeader from "@/components/teacher/TeacherHeader";
 import TeacherOverviewView from "@/components/teacher/TeacherOverviewView";
 import TeacherTaskBoardView from "@/components/teacher/TeacherTaskBoardView";
-import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
 import TeacherJournalsView from "@/components/teacher/TeacherJournalsView";
 import TeacherSettingsView from "@/components/teacher/TeacherSettingsView";
 import TeacherPaymentsView from "@/components/teacher/TeacherPaymentsView";
@@ -36,7 +35,6 @@ export default function TeacherDashboardPage() {
           return;
         }
 
-        // users テーブルからロールを取得
         const { data: userData } = await supabase
           .from("users")
           .select("role")
@@ -56,14 +54,13 @@ export default function TeacherDashboardPage() {
         setIsAuthorized(true);
       } catch (err) {
         console.error("Auth role check error:", err);
-        setIsAuthorized(true); // 万が一のフォールバック
+        setIsAuthorized(true);
       }
     };
 
     checkTeacherRole();
   }, [router]);
 
-  // 「＋ 新しいタスクを追加」ボタンクリック時
   const handleAddNewTask = () => {
     setActiveMenu("tasks");
     setShowTaskFormImmediate(true);
@@ -108,31 +105,34 @@ export default function TeacherDashboardPage() {
         <TeacherHeader
           title={
             activeMenu === "dashboard" || activeMenu === "students"
-              ? "農園管理ダッシュボード・受講生一覧"
+              ? "ダッシュボード"
               : activeMenu === "farm"
-              ? "第1農場レイアウト・キャンバス区画管理 (D&D対応)"
+              ? "畑区画管理 (農地レイアウト)"
               : activeMenu === "tasks"
-              ? "看板教材・タスク管理"
+              ? "看板タスク管理"
               : activeMenu === "templates"
-              ? "教材・タスクテンプレート作成・管理"
+              ? "教材・タスクテンプレート"
               : activeMenu === "journals"
-              ? "相談・交換日記確認"
-              : activeMenu === "payments"
-              ? "集金・月額会費・売上管理"
+              ? "相談・日記確認"
               : activeMenu === "events"
-              ? "イベントスケジュール・講習予約管理"
-              : "画面・表示・運用カスタマイズ設定"
+              ? "イベント・講習予約"
+              : activeMenu === "payments"
+              ? "売上管理"
+              : "画面設定"
           }
           onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
         />
 
-        {/* ページコンテンツ (全ビューテーマ統一連動) */}
-        <main className="p-8 max-w-7xl w-full mx-auto flex-1">
+        {/* ページコンテンツ */}
+        <main className="p-4 sm:p-8 max-w-7xl w-full mx-auto flex-1">
           {(activeMenu === "dashboard" || activeMenu === "students") && (
             <TeacherOverviewView
               onAddNewTaskClick={handleAddNewTask}
               onNavigateToStudents={() => setActiveMenu("dashboard")}
               onNavigateToJournals={() => setActiveMenu("journals")}
+              onNavigateToFarm={() => setActiveMenu("farm")}
+              onNavigateToTasks={() => setActiveMenu("tasks")}
+              onNavigateToEvents={() => setActiveMenu("events")}
             />
           )}
 

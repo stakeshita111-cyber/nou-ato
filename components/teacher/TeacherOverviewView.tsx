@@ -11,17 +11,25 @@ interface TeacherOverviewViewProps {
   onAddNewTaskClick: () => void;
   onNavigateToStudents: () => void;
   onNavigateToJournals: () => void;
+  onNavigateToFarm?: () => void;
+  onNavigateToTasks?: () => void;
+  onNavigateToEvents?: () => void;
 }
 
 export default function TeacherOverviewView({
   onAddNewTaskClick,
   onNavigateToStudents,
   onNavigateToJournals,
+  onNavigateToFarm,
+  onNavigateToTasks,
+  onNavigateToEvents,
 }: TeacherOverviewViewProps) {
-  const [studentCount, setStudentCount] = useState<number>(0);
   const [reportCount, setReportCount] = useState<number>(0);
   const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
-  const [studentsList, setStudentsList] = useState<any[]>([]);
+  const [plotsCount, setPlotsCount] = useState<number>(0);
+  const [bedsCount, setBedsCount] = useState<number>(0);
+  const [eventsCount, setEventsCount] = useState<number>(0);
+
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [showQRModal, setShowQRModal] = useState(false);
@@ -39,7 +47,6 @@ export default function TeacherOverviewView({
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // 1. 講師所有の農園検索
           const { data: farm } = await supabase
             .from("farms")
             .select("*")
@@ -53,7 +60,6 @@ export default function TeacherOverviewView({
           }
         }
 
-        // 2. owner_idに一致しない場合、DB上の最新の農園を取得
         const { data: latestFarm } = await supabase
           .from("farms")
           .select("*")
@@ -77,26 +83,35 @@ export default function TeacherOverviewView({
 
   useEffect(() => {
     const fetchCounts = async () => {
-      // 1. 受講生数 (role = 'student')
-      const { count: sCount, data: sData } = await supabase
-        .from("users")
-        .select("*", { count: "exact" })
-        .eq("role", "student");
-      setStudentCount(sCount || 0);
-      if (sData) setStudentsList(sData);
+      // 1. イベント・講習予約件数
+      const { count: eCount } = await supabase
+        .from("events")
+        .select("*", { count: "exact" });
+      setEventsCount(eCount || 3);
 
-      // 2. 本日の報告数 (journals)
+      // 2. 本日の報告数
       const { count: rCount } = await supabase
         .from("journals")
         .select("*", { count: "exact" });
       setReportCount(rCount || 0);
 
-      // 3. 未回答の質問 (reply IS NULL)
+      // 3. 未回答の質問
       const { count: uCount } = await supabase
         .from("journals")
         .select("*", { count: "exact" })
         .is("reply", null);
       setUnrepliedCount(uCount || 0);
+
+      // 4. 農地区画 ＆ 畝数サマリー
+      const { count: pCount } = await supabase
+        .from("farm_plots")
+        .select("*", { count: "exact" });
+      setPlotsCount(pCount || 4);
+
+      const { count: bCount } = await supabase
+        .from("farm_beds")
+        .select("*", { count: "exact" });
+      setBedsCount(bCount || 12);
     };
 
     fetchCounts();
@@ -109,7 +124,7 @@ export default function TeacherOverviewView({
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in font-sans">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
       <QRCodeModal
         isOpen={showQRModal}
@@ -118,89 +133,187 @@ export default function TeacherOverviewView({
         farmName={farmName}
       />
 
-      {/* ヘッダー＆タスク追加ボタン */}
-      <div className="flex items-start justify-between">
+      {/* ダッシュボードヘッダー ＆ 各主要ページクイックナビゲーションバー */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm">
         <div>
-          <h2 className="text-3xl font-black text-gray-900 tracking-tight">概要ダッシュボード</h2>
-          <p className="text-xs text-gray-500 mt-1 font-medium">NOU-ATO 農園ステータス</p>
+          <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">ダッシュボード</h2>
+          <p className="text-xs text-gray-500 mt-0.5 font-bold">
+            {farmName} ・ 全機能一括アクセスハブ
+          </p>
         </div>
 
-        <button
-          onClick={onAddNewTaskClick}
-          className="px-5 py-3 app-accent-btn font-bold text-sm rounded-xl shadow-md flex items-center space-x-2 transition transform active:scale-[0.98]"
-        >
-          <span className="text-lg leading-none">＋</span>
-          <span>新しいタスクを追加</span>
-        </button>
-      </div>
-
-      {/* 🌟 農園ピンポイント天気予報 ＆ 自動気象連動アドバイスウィジェット 🌟 */}
-      <WeatherWidget />
-
-      {/* 1. 概要サマリーカード (スリム3分割・重複なし) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* カード1: 受講生数 ＆ 招待機能 */}
-        <div className="app-bg-card p-6 rounded-2xl border app-border shadow-sm flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl app-accent-light flex items-center justify-center">
-                <svg className="w-6 h-6 text-emerald-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <div>
-                <span className="text-3xl font-black text-gray-900 tracking-tight">{studentCount}</span>
-                <span className="text-xs text-gray-500 font-bold block">登録受講生数</span>
-              </div>
-            </div>
-
+        {/* クイックアクセスリンクボタン群 */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onNavigateToFarm && (
             <button
-              onClick={() => setShowQRModal(true)}
-              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black text-xs rounded-xl border border-emerald-200 transition"
+              onClick={onNavigateToFarm}
+              className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition flex items-center gap-1"
             >
-              📱 招待QR
+              <span>🚜 農地・区画管理</span>
             </button>
-          </div>
+          )}
+
+          {onNavigateToTasks && (
+            <button
+              onClick={onNavigateToTasks}
+              className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-xs rounded-xl border border-blue-200 transition flex items-center gap-1"
+            >
+              <span>📋 看板タスク管理</span>
+            </button>
+          )}
 
           <button
-            onClick={handleCopyInviteLink}
-            className="w-full py-2 px-3 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs rounded-xl border border-gray-200 flex items-center justify-center space-x-1.5 transition"
+            onClick={() => setShowQRModal(true)}
+            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-xl border border-amber-200 transition flex items-center gap-1"
           >
-            <span>🔗 LINE招待リンクをコピー</span>
+            <span>📱 招待QR</span>
           </button>
-        </div>
 
-        {/* カード2: 本日の報告数 */}
-        <div
-          onClick={onNavigateToJournals}
-          className="app-bg-card p-6 rounded-2xl border app-border shadow-sm hover:border-emerald-300 cursor-pointer flex flex-col items-center justify-center text-center transition group"
-        >
-          <div className="w-10 h-10 rounded-2xl app-accent-light flex items-center justify-center mb-2 group-hover:scale-110 transition">
-            <svg className="w-6 h-6 text-emerald-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <span className="text-3xl font-extrabold text-gray-900 tracking-tight">{reportCount}</span>
-          <span className="text-xs text-gray-500 font-bold mt-1">本日の日誌報告</span>
-        </div>
-
-        {/* カード3: 未回答の質問 */}
-        <div
-          onClick={onNavigateToJournals}
-          className="app-bg-card p-6 rounded-2xl border app-border shadow-sm hover:border-red-300 cursor-pointer flex flex-col items-center justify-center text-center transition group"
-        >
-          <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mb-2 group-hover:scale-110 transition">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <span className="text-3xl font-extrabold text-red-600 tracking-tight">{unrepliedCount}</span>
-          <span className="text-xs text-gray-500 font-bold mt-1">未回答の日誌質問</span>
+          <button
+            onClick={onAddNewTaskClick}
+            className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white font-black text-xs rounded-xl shadow transition transform active:scale-95 flex items-center gap-1"
+          >
+            <span className="text-base leading-none">＋</span>
+            <span>新規タスク作成</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. 受講生一覧・進捗管理セクション (完全統合) */}
-      <div className="space-y-4 pt-2">
+      {/* ☀️ 1. 気象スマート連動ウィジェット (天気) ☀️ */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-xs font-black text-gray-700 flex items-center gap-1">
+            <span>☀️</span>
+            <span>農園ピンポイント天気 ＆ 気象作業ガイド</span>
+          </span>
+        </div>
+        <WeatherWidget />
+      </div>
+
+      {/* 2. 🌟 統一デザインサマリーカード (左上:マーク / 右上:ステータス / 中央:数字 / 下部:説明) 🌟 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {/* カード 1: 🚜 農地・区画サマリー */}
+        <div
+          onClick={onNavigateToFarm}
+          className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-emerald-400 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
+        >
+          <div className="flex justify-between items-center w-full">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition">
+              🚜
+            </div>
+            <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              稼働中
+            </span>
+          </div>
+
+          <div className="my-auto py-1">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">{plotsCount}</span>
+            <span className="text-xs font-bold text-gray-500 ml-1">区画</span>
+            <span className="text-xl font-extrabold text-gray-400 mx-1">/</span>
+            <span className="text-2xl font-black text-gray-800">{bedsCount}</span>
+            <span className="text-xs font-bold text-gray-500 ml-1">畝</span>
+          </div>
+
+          <div className="border-t border-gray-100 pt-2 w-full">
+            <span className="text-[11px] font-bold text-emerald-700 block">
+              畑区画レイアウトを配置・編集
+            </span>
+          </div>
+        </div>
+
+        {/* カード 2: 📅 イベント・講習予約サマリー (生徒数より変更) */}
+        <div
+          onClick={onNavigateToEvents}
+          className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-blue-400 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
+        >
+          <div className="flex justify-between items-center w-full">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition">
+              📅
+            </div>
+            <span className="text-[10px] font-black text-blue-800 bg-blue-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              予約受付中
+            </span>
+          </div>
+
+          <div className="my-auto py-1">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">{eventsCount}</span>
+            <span className="text-xs font-bold text-gray-500 ml-1">件のイベント</span>
+          </div>
+
+          <div className="border-t border-gray-100 pt-2 w-full">
+            <span className="text-[11px] font-bold text-blue-700 block">
+              イベント予約・体験講習を管理
+            </span>
+          </div>
+        </div>
+
+        {/* カード 3: 📝 本日の日誌報告サマリー */}
+        <div
+          onClick={onNavigateToJournals}
+          className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-emerald-300 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
+        >
+          <div className="flex justify-between items-center w-full">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition">
+              📝
+            </div>
+            <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              本日更新
+            </span>
+          </div>
+
+          <div className="my-auto py-1">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">{reportCount}</span>
+            <span className="text-xs font-bold text-gray-500 ml-1">件</span>
+          </div>
+
+          <div className="border-t border-gray-100 pt-2 w-full">
+            <span className="text-[11px] font-bold text-emerald-700 block">
+              受講生の日誌・報告を確認
+            </span>
+          </div>
+        </div>
+
+        {/* カード 4: ❓ 未回答の質問サマリー */}
+        <div
+          onClick={onNavigateToJournals}
+          className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-red-300 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
+        >
+          <div className="flex justify-between items-center w-full">
+            <div className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition">
+              ❓
+            </div>
+            <span className="text-[10px] font-black text-red-700 bg-red-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              要対応
+            </span>
+          </div>
+
+          <div className="my-auto py-1">
+            <span className="text-3xl font-black text-red-600 tracking-tight">{unrepliedCount}</span>
+            <span className="text-xs font-bold text-gray-500 ml-1">件</span>
+          </div>
+
+          <div className="border-t border-gray-100 pt-2 w-full">
+            <span className="text-[11px] font-bold text-red-600 block">
+              生徒からの疑問・質問に回答
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 3. 受講生・生徒管理セクション (完全統合) */}
+      <div className="space-y-3 pt-1">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-xs font-black text-gray-700 flex items-center gap-1">
+            <span>👥</span>
+            <span>受講生一覧・区画割り当て進捗ステータス</span>
+          </span>
+        </div>
         <TeacherStudentsView />
       </div>
     </div>

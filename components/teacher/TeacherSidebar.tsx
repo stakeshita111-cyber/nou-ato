@@ -22,9 +22,9 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
           </div>
         </div>
 
-        {/* 最適化メニューリスト (受講生一覧はダッシュボードへ完全統合) */}
+        {/* サイドバーナビゲーションメニュー (「管理」「確認」を排除したシンプル表記) */}
         <nav className="p-4 space-y-1.5">
-          {/* 1. ダッシュボード・受講生 */}
+          {/* 1. ダッシュボード */}
           <button
             onClick={() => onMenuClick("dashboard")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -36,10 +36,10 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
-            <span>ダッシュボード・受講生</span>
+            <span>ダッシュボード</span>
           </button>
 
-          {/* 2. 畑・区画管理 (拡張キャンバス & ⚙️農園設定) */}
+          {/* 2. 畑・区画 (「管理」を削削) */}
           <button
             onClick={() => onMenuClick("farm")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -49,10 +49,10 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             }`}
           >
             <span className="text-base">🌾</span>
-            <span>畑・区画管理</span>
+            <span>畑・区画</span>
           </button>
 
-          {/* 3. タスク作成・管理 */}
+          {/* 3. タスク (「作成・管理」を削減) */}
           <button
             onClick={() => onMenuClick("tasks")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -64,10 +64,10 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
-            <span>タスク作成・管理</span>
+            <span>タスク</span>
           </button>
 
-          {/* 4. テンプレート管理 */}
+          {/* 4. テンプレート (「管理」を削減) */}
           <button
             onClick={() => onMenuClick("templates")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -77,10 +77,10 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             }`}
           >
             <span className="text-base">📝</span>
-            <span>テンプレート管理</span>
+            <span>テンプレート</span>
           </button>
 
-          {/* 5. 相談・日誌確認 */}
+          {/* 5. 相談・日誌 (「確認」を削減) */}
           <button
             onClick={() => onMenuClick("journals")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -92,23 +92,10 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
-            <span>相談・日誌確認</span>
+            <span>相談・日誌</span>
           </button>
 
-          {/* 6. 集金・売上管理 */}
-          <button
-            onClick={() => onMenuClick("payments")}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
-              activeMenu === "payments"
-                ? "app-accent-light font-bold shadow-xs"
-                : "text-gray-600 hover:bg-gray-100/70"
-            }`}
-          >
-            <span className="text-base">💳</span>
-            <span>集金・売上管理</span>
-          </button>
-
-          {/* 7. イベント・予約管理 */}
+          {/* 6. イベント・予約 */}
           <button
             onClick={() => onMenuClick("events")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -121,7 +108,20 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
             <span>イベント・予約</span>
           </button>
 
-          {/* 8. 画面・表示・システム設定 */}
+          {/* 7. 売上 (「管理」を削減) */}
+          <button
+            onClick={() => onMenuClick("payments")}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              activeMenu === "payments"
+                ? "app-accent-light font-bold shadow-xs"
+                : "text-gray-600 hover:bg-gray-100/70"
+            }`}
+          >
+            <span className="text-base">💳</span>
+            <span>売上</span>
+          </button>
+
+          {/* 8. 画面設定 */}
           <button
             onClick={() => onMenuClick("settings")}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -134,7 +134,7 @@ export default function TeacherSidebar({ activeMenu, onMenuClick }: TeacherSideb
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span>画面・表示設定</span>
+            <span>画面設定</span>
           </button>
         </nav>
       </div>

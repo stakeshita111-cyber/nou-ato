@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface TeacherHeaderProps {
@@ -16,8 +16,10 @@ interface NotificationItem {
   type: "report" | "question";
 }
 
-export default function TeacherHeader({ title = "農園管理", onSearch }: TeacherHeaderProps) {
+export default function TeacherHeader({ title = "ダッシュボード", onSearch }: TeacherHeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
   const [notifications, setNotifications] = useState<NotificationItem[]>([
     {
       id: "n1",
@@ -42,6 +44,25 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
     },
   ]);
 
+  // 画面外クリック（Outside Click）で通知ポップアップを折りたたむ
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showNotifications]);
+
   // Supabase から最新の日誌・報告通知を取得して反映
   useEffect(() => {
     const fetchLatestNotifications = async () => {
@@ -53,7 +74,7 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
           .limit(3);
 
         if (latestJournals && latestJournals.length > 0) {
-          const fetched: NotificationItem[] = latestJournals.map((j: any, idx: number) => ({
+          const fetched: NotificationItem[] = latestJournals.map((j: any) => ({
             id: j.id,
             title: `生徒からの新着日誌・質問: 「${j.content?.slice(0, 20)}...」`,
             time: j.created_at
@@ -86,10 +107,10 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
   };
 
   return (
-    <header className="h-16 app-bg-card border-b app-border px-8 flex items-center justify-between sticky top-0 z-20 transition-colors duration-300">
-      <h2 className="text-base font-bold text-gray-800">{title}</h2>
+    <header className="h-16 app-bg-card border-b app-border px-6 sm:px-8 flex items-center justify-between sticky top-0 z-20 transition-colors duration-300">
+      <h2 className="text-base sm:text-lg font-black text-gray-900 tracking-tight">{title}</h2>
 
-      <div className="flex items-center space-x-4 relative">
+      <div className="flex items-center space-x-3 sm:space-x-4 relative">
         {/* 検索入力欄 */}
         {onSearch && (
           <div className="relative">
@@ -97,7 +118,7 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
               type="text"
               placeholder="タスク・作物を検索..."
               onChange={(e) => onSearch(e.target.value)}
-              className="pl-9 pr-4 py-1.5 rounded-xl text-xs focus:outline-none transition w-48"
+              className="pl-9 pr-4 py-1.5 rounded-xl text-xs focus:outline-none transition w-40 sm:w-48 bg-gray-50 focus:bg-white border border-gray-200"
             />
             <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -105,15 +126,15 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
           </div>
         )}
 
-        {/* 通知ベルボタン (要件: 生徒からの通知 ＆ 既読機能実装) */}
-        <div className="relative">
+        {/* 🔔 通知ベルボタン ＆ 外側クリックで折りたたむポップアップ 🔔 */}
+        <div className="relative" ref={notificationRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100/60 rounded-full transition"
+            className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 rounded-full transition shadow-xs"
             title="通知を確認"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 01-6 0v-1m6 0H9" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             {unreadCount > 0 && (
               <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center animate-pulse">
@@ -122,9 +143,9 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
             )}
           </button>
 
-          {/* 通知ドロップダウン (生徒からの通知 ＆ 既読化) */}
+          {/* 通知ドロップダウン (外側クリックで自動消去) */}
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 app-bg-card rounded-2xl shadow-xl border app-border p-4 space-y-3 z-30 animate-fade-in">
+            <div className="absolute right-0 mt-2 w-80 sm:w-88 bg-white rounded-2xl shadow-2xl border border-gray-200 p-4 space-y-3 z-30 animate-fade-in text-gray-800">
               <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                 <div className="flex items-center space-x-1.5">
                   <span className="text-xs font-bold text-gray-900">生徒からの新着通知</span>
@@ -141,7 +162,7 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}
-                    className="text-[11px] app-text-main font-bold hover:underline cursor-pointer"
+                    className="text-[11px] text-emerald-700 font-bold hover:underline cursor-pointer"
                   >
                     すべて既読にする
                   </button>
@@ -156,12 +177,12 @@ export default function TeacherHeader({ title = "農園管理", onSearch }: Teac
                     onClick={() => handleMarkAsRead(n.id)}
                     className={`p-3 rounded-xl space-y-1 cursor-pointer transition border ${
                       !n.isRead
-                        ? "app-accent-light border-green-200"
-                        : "bg-gray-50/60 border-gray-100 opacity-60"
+                        ? "bg-emerald-50/70 border-emerald-200 text-gray-900"
+                        : "bg-gray-50/60 border-gray-100 text-gray-500 opacity-60"
                     }`}
                   >
                     <div className="flex justify-between items-start">
-                      <p className="font-bold text-gray-900 leading-snug">{n.title}</p>
+                      <p className="font-bold leading-snug">{n.title}</p>
                       {!n.isRead && (
                         <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 ml-1.5 mt-1"></span>
                       )}
