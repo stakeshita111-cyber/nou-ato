@@ -26,3 +26,16 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - マルチテナント保護のため、Supabaseの Row Level Security (RLS) を必ず適用すること。
 - データの取得・更新はユーザーの権限（`teacher` / `student`）に基づいて厳密に制御する。
 
+## 5. 自律型セルフ・コレクション (Self-Correction) 運用規定
+- **エラー自律修復:** コードの作成や修正を行った場合、ユーザーに完了報告を行う前に**必ず自律的に型チェックやビルドコマンドを実行すること**。
+- **ログ自己解析:** エラーや型不整合（TypeScript errors, build failures, lint errors）が発生した場合は、出力されたログを読み取り、該当箇所を自己修正してログが0エラーになるまで修正ループを回すこと。
+- **コード品質維持と軽量化:** 重複ロジックはカスタムフックや共有ユーティリティに抽出し、不要なコードやテスト用一時ファイルを適宜整理してクリーンでDRYなTypeScriptコードを維持すること。
+
+## 6. 検証・ビルド・開発コマンド一覧
+- **依存関係取得:** `npm install`
+- **型チェック（自律検証用）:** `npx tsc --noEmit`
+- **本番ビルド検証:** `npm run build`
+- **Lintエラーチェック:** `npm run lint`
+- **開発サーバー起動:** `npm run dev`
+
+

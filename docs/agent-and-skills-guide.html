@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOU-ATO エージェント＆スキル 完全活用ガイドマップ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '"Zen Kaku Gothic New"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            },
+            darkBg: '#090d16',
+            cardBg: '#111827',
+            cardBorder: 'rgba(255, 255, 255, 0.08)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #090d16;
+      color: #f3f4f6;
+      background-image: 
+        radial-gradient(at 15% 15%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
+        radial-gradient(at 85% 85%, rgba(99, 102, 241, 0.08) 0px, transparent 50%);
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card:hover {
+      border-color: rgba(16, 185, 129, 0.3);
+      box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.15);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+    }
+    .glow-indigo {
+      box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.25);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans antialiased pb-20 custom-scrollbar">
+
+  <!-- Header Section -->
+  <header class="sticky top-0 z-50 glass-card border-b border-gray-800/80 px-6 py-4 mb-8">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-emerald-500/20">
+          🌱
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            NOU-ATO <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Agent Engine v2.0</span>
+          </h1>
+          <p class="text-xs text-gray-400">体験農業経営支援アプリ - エージェント・スキル自律運用可視化ガイド</p>
+        </div>
+      </div>
+      
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-2 bg-gray-900/80 p-1.5 rounded-xl border border-gray-800">
+        <button onclick="switchTab('tab-agents')" id="btn-agents" class="tab-btn active px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 text-white transition-all duration-200">
+          🤖 サブエージェント (5)
+        </button>
+        <button onclick="switchTab('tab-skills')" id="btn-skills" class="tab-btn px-4 py-2 text-xs font-semibold rounded-lg text-gray-400 hover:text-white transition-all duration-200">
+          ⚡ スキル一覧 (5)
+        </button>
+        <button onclick="switchTab('tab-flow')" id="btn-flow" class="tab-btn px-4 py-2 text-xs font-semibold rounded-lg text-gray-400 hover:text-white transition-all duration-200">
+          🔄 自律修復フロー
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 space-y-8">
+
+    <!-- Section 1: Hero Banner -->
+    <section class="glass-card rounded-2xl p-8 relative overflow-hidden">
+      <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="max-w-3xl space-y-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+          <span>✨ 自律型セルフ・コレクション (Self-Correction) 対応完了</span>
+        </div>
+        <h2 class="text-3xl font-extrabold text-white tracking-tight">
+          「指示待ち」から「勝手にエラーを潰し、リファクタリングして完了報告する」次世代エージェントへ
+        </h2>
+        <p class="text-sm text-gray-300 leading-relaxed">
+          NOU-ATOプロジェクトでは、コード作成・修正時にエージェントが自発的に <code class="px-1.5 py-0.5 bg-gray-800 text-emerald-300 rounded font-mono text-xs">npx tsc --noEmit</code> や <code class="px-1.5 py-0.5 bg-gray-800 text-emerald-300 rounded font-mono text-xs">npm run build</code> を実行し、型エラーやビルド失敗を自力で0件にするまで修正ループを回します。
+        </p>
+      </div>
+    </section>
+
+    <!-- SECTION: Subagents Tab Content -->
+    <div id="tab-agents" class="tab-content space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>🤖 定義済みサブエージェント</span>
+            <span class="text-xs font-normal text-gray-400">(.agents/agents/*.md)</span>
+          </h3>
+          <p class="text-xs text-gray-400">特定の専門領域を担当させたり、バックグラウンドで並行作業させるための実行ユニット</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Agent 1: coder-debugger (新規・最重要) -->
+        <div class="glass-card rounded-2xl p-6 relative flex flex-col justify-between border-l-4 border-l-emerald-500 glow-emerald">
+          <div class="space-y-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                  🛠️
+                </div>
+                <div>
+                  <h4 class="font-bold text-white text-base">coder-debugger</h4>
+                  <span class="text-[10px] uppercase tracking-wider font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">NEW ★ 実務・自律デバッグ</span>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-1 rounded">Pro Model</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              UI調整、バグ修正、ビルドエラー解決、および品質を維持したコードの軽量化（リファクタリング）を完全に一人で抱え込んで0エラーまで完結させるリードエンジニア。
+            </p>
+            <div class="space-y-2">
+              <div class="text-[11px] font-semibold text-gray-400">使用可能なツール:</div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-[10px] font-mono bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded">view_file</span>
+                <span class="text-[10px] font-mono bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded">write_to_file</span>
+                <span class="text-[10px] font-mono bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded">replace_file_content</span>
+                <span class="text-[10px] font-mono bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded">run_command</span>
+                <span class="text-[10px] font-mono bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded">grep_search</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-6 pt-4 border-t border-gray-800">
+            <div class="text-[11px] font-semibold text-emerald-400 mb-1.5">💬 1行プロンプト例</div>
+            <div class="bg-gray-950 p-2.5 rounded-lg text-xs font-mono text-gray-300 flex items-center justify-between gap-2 border border-gray-800">
+              <span class="truncate">coder-debuggerサブエージェントを起動して、〇〇画面のUI調整と型エラー解決を行って</span>
+              <button onclick="copyText(this, 'coder-debuggerサブエージェントを起動して、画面のUI調整を行って。終わったら型チェックとビルドを回してエラー0を確認して')" class="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-2 py-1 rounded transition">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent 2: qa-debug-pro -->
+        <div class="glass-card rounded-2xl p-6 relative flex flex-col justify-between border-l-4 border-l-cyan-500">
+          <div class="space-y-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-lg">
+                  🔍
+                </div>
+                <div>
+                  <h4 class="font-bold text-white text-base">qa-debug-pro</h4>
+                  <span class="text-[10px] uppercase tracking-wider font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">QA & 根本原因分析</span>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-1 rounded">Pro Model</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              複雑な不具合の根本原因分析 (RCA) やユニットテスト作成、回帰（レグレッション）検証を担当。表面上の try-catch での隠蔽を防止。
+            </p>
+            <div class="space-y-2">
+              <div class="text-[11px] font-semibold text-gray-400">主要責務:</div>
+              <ul class="text-[11px] text-gray-300 list-disc list-inside space-y-1">
+                <li>コールスタック追跡・根本要因特定</li>
+                <li>自動テスト作成＆検証</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-gray-800">
+            <div class="text-[11px] font-semibold text-cyan-400 mb-1.5">💬 1行プロンプト例</div>
+            <div class="bg-gray-950 p-2.5 rounded-lg text-xs font-mono text-gray-300 flex items-center justify-between gap-2 border border-gray-800">
+              <span class="truncate">qa-debug-proを起動して、このバグの根本原因を分析してテストを作成して</span>
+              <button onclick="copyText(this, 'qa-debug-proサブエージェントを起動して、エラーの根本原因分析を行って防止テストを追加して')" class="text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 px-2 py-1 rounded transition">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent 3: supabase-expert -->
+        <div class="glass-card rounded-2xl p-6 relative flex flex-col justify-between border-l-4 border-l-emerald-400">
+          <div class="space-y-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-400/20 text-emerald-300 flex items-center justify-center font-bold text-lg">
+                  ⚡
+                </div>
+                <div>
+                  <h4 class="font-bold text-white text-base">supabase-expert</h4>
+                  <span class="text-[10px] uppercase tracking-wider font-mono text-emerald-300 bg-emerald-400/10 px-2 py-0.5 rounded">DB & RLS 専門</span>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-1 rounded">Pro Model</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              PostgreSQLスキーマ設計、Row Level Security (RLS) ポリシー構築、Realtimeサブスクリプション、pgvector (AI検索) の最適化を担当。
+            </p>
+            <div class="space-y-2">
+              <div class="text-[11px] font-semibold text-gray-400">主要責務:</div>
+              <ul class="text-[11px] text-gray-300 list-disc list-inside space-y-1">
+                <li>RLSによるマルチテナント保護 (teacher/student)</li>
+                <li>型生成同期 & SQLマイグレ設計</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-gray-800">
+            <div class="text-[11px] font-semibold text-emerald-300 mb-1.5">💬 1行プロンプト例</div>
+            <div class="bg-gray-950 p-2.5 rounded-lg text-xs font-mono text-gray-300 flex items-center justify-between gap-2 border border-gray-800">
+              <span class="truncate">supabase-expertを起動して、RLSポリシーを検証して</span>
+              <button onclick="copyText(this, 'supabase-expertサブエージェントを起動して、新しいテーブルのRLSポリシーと型定義を構築して')" class="text-xs bg-emerald-400/20 hover:bg-emerald-400/30 text-emerald-300 px-2 py-1 rounded transition">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent 4: integration-lead -->
+        <div class="glass-card rounded-2xl p-6 relative flex flex-col justify-between border-l-4 border-l-indigo-500">
+          <div class="space-y-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-lg">
+                  🧩
+                </div>
+                <div>
+                  <h4 class="font-bold text-white text-base">integration-lead</h4>
+                  <span class="text-[10px] uppercase tracking-wider font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">全体モジュール統合</span>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-1 rounded">Pro Model</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              UI・Supabase・AI連携（Gemini 1.5）などの各モジュール間インターフェースを調整し、端から端までのデータフローを統合。
+            </p>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-gray-800">
+            <div class="text-[11px] font-semibold text-indigo-400 mb-1.5">💬 1行プロンプト例</div>
+            <div class="bg-gray-950 p-2.5 rounded-lg text-xs font-mono text-gray-300 flex items-center justify-between gap-2 border border-gray-800">
+              <span class="truncate">integration-leadを起動して、UIとAI API接続を統合して</span>
+              <button onclick="copyText(this, 'integration-leadサブエージェントを起動して、Gemini APIとフロントエンドの連携部分を統合確認して')" class="text-xs bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 px-2 py-1 rounded transition">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent 5: consensus-council -->
+        <div class="glass-card rounded-2xl p-6 relative flex flex-col justify-between border-l-4 border-l-amber-500">
+          <div class="space-y-4">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg">
+                  🏛️
+                </div>
+                <div>
+                  <h4 class="font-bold text-white text-base">consensus-council</h4>
+                  <span class="text-[10px] uppercase tracking-wider font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">大規模設計判定審議会</span>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-1 rounded">Pro Model</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              大きなアーキテクチャ変更や破壊的変更を行う前に、セキュリティ・パフォーマンス・トレードオフを包括的にレビューし決定を下す。
+            </p>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-gray-800">
+            <div class="text-[11px] font-semibold text-amber-400 mb-1.5">💬 1行プロンプト例</div>
+            <div class="bg-gray-950 p-2.5 rounded-lg text-xs font-mono text-gray-300 flex items-center justify-between gap-2 border border-gray-800">
+              <span class="truncate">consensus-councilを起動して、この大規模設計案を評価して</span>
+              <button onclick="copyText(this, 'consensus-councilサブエージェントを起動して、今回のDBリファクタリングの影響範囲を審議評価して')" class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 px-2 py-1 rounded transition">コピー</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION: Skills Tab Content -->
+    <div id="tab-skills" class="tab-content hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>⚡ 自動化スキル一覧</span>
+            <span class="text-xs font-normal text-gray-400">(.agents/skills/*)</span>
+          </h3>
+          <p class="text-xs text-gray-400">定型化された自動作業・生成・最適化手順を呼び出すスキルプロトコル</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Skill 1: code-optimizer (NEW) -->
+        <div class="glass-card rounded-2xl p-6 border-l-4 border-l-emerald-500 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 font-mono text-xs rounded-lg font-bold">code-optimizer</span>
+              <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono">NEW ★ コード軽量化</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300">
+            品質と型安全性を維持したまま、重複ロジックのカスタムフック化、デッドコード除去、Server Component化を全自動で実行し、軽量なコードベースに整理します。
+          </p>
+          <div class="bg-gray-950 p-3 rounded-xl border border-gray-800 space-y-2">
+            <div class="text-[11px] font-semibold text-emerald-400">呼び出しコマンド例:</div>
+            <div class="text-xs font-mono text-gray-200 flex justify-between items-center">
+              <span>「code-optimizer スキルを適用して、hooks/ 周辺の重複コードを整理して」</span>
+              <button onclick="copyText(this, 'code-optimizer スキルを適用して、リポジトリ全体をスキャンし重複コードの共通化と軽量化を行って型チェックを通してください')" class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skill 2: doc-visualizer (NEW) -->
+        <div class="glass-card rounded-2xl p-6 border-l-4 border-l-teal-400 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 bg-teal-500/20 text-teal-300 font-mono text-xs rounded-lg font-bold">doc-visualizer</span>
+              <span class="text-xs text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded font-mono">NEW ★ HTML視覚化</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300">
+            リポジトリ構造、Next.jsルーティング、コンポーネント依存関係、Supabaseデータフローをスキャンし、ブラウザで開ける美しいHTMLマップ（docs/）を即座に生成します。
+          </p>
+          <div class="bg-gray-950 p-3 rounded-xl border border-gray-800 space-y-2">
+            <div class="text-[11px] font-semibold text-teal-300">呼び出しコマンド例:</div>
+            <div class="text-xs font-mono text-gray-200 flex justify-between items-center">
+              <span>「doc-visualizer スキルを実行して最新構造をHTMLマップで出力して」</span>
+              <button onclick="copyText(this, 'doc-visualizer スキルを実行して、現在のリポジトリ構造とエージェントガイドをHTMLファイルとして自動生成して')" class="text-xs bg-teal-500/20 text-teal-300 px-2 py-1 rounded">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skill 3: analyze-build-errors -->
+        <div class="glass-card rounded-2xl p-6 border-l-4 border-l-amber-500 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 bg-amber-500/20 text-amber-400 font-mono text-xs rounded-lg font-bold">analyze-build-errors</span>
+              <span class="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded font-mono">ビルド・型エラー解析</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300">
+            <code class="text-amber-300">npx tsc --noEmit</code> や <code class="text-amber-300">npm run build</code> のエラーメッセージを自動解析し、原因箇所を特定してコードの修正Diff案を出力します。
+          </p>
+          <div class="bg-gray-950 p-3 rounded-xl border border-gray-800 space-y-2">
+            <div class="text-[11px] font-semibold text-amber-400">呼び出しコマンド例:</div>
+            <div class="text-xs font-mono text-gray-200 flex justify-between items-center">
+              <span>「analyze-build-errors スキルで、現在の型エラーの原因と修正案を出して」</span>
+              <button onclick="copyText(this, 'analyze-build-errors スキルを実行して、ビルドエラーログを解析し修正手順を示して')" class="text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded">コピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skill 4: sync-supabase-types -->
+        <div class="glass-card rounded-2xl p-6 border-l-4 border-l-blue-500 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 bg-blue-500/20 text-blue-400 font-mono text-xs rounded-lg font-bold">sync-supabase-types</span>
+              <span class="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-mono">Supabase型定義同期</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300">
+            SupabaseのDBスキーマ変更があった際に、TypeScript型定義（types/supabase.ts）を最新状態で同期します。
+          </p>
+          <div class="bg-gray-950 p-3 rounded-xl border border-gray-800 space-y-2">
+            <div class="text-[11px] font-semibold text-blue-400">呼び出しコマンド例:</div>
+            <div class="text-xs font-mono text-gray-200 flex justify-between items-center">
+              <span>「sync-supabase-types スキルで型定義を再生成して」</span>
+              <button onclick="copyText(this, 'sync-supabase-types スキルを実行して、SupabaseのDBスキーマとTypeScript型を同期させて')" class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">コピー</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION: Flow Tab Content -->
+    <div id="tab-flow" class="tab-content hidden space-y-6">
+      <div class="glass-card rounded-2xl p-8 space-y-6">
+        <h3 class="text-xl font-bold text-white flex items-center gap-2">
+          <span>🔄 自律型セルフ・コレクション (Self-Correction) 実行パイプライン</span>
+        </h3>
+        <p class="text-sm text-gray-300">
+          Antigravityが手動でのデバッグ指示を介さず、裏側で自動的に0エラーまで完結させるステップです。
+        </p>
+
+        <!-- Pipeline Graphic -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 pt-4">
+          
+          <div class="bg-gray-900/90 border border-gray-800 rounded-xl p-4 text-center space-y-2 relative">
+            <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center mx-auto text-xs">1</div>
+            <div class="text-xs font-bold text-white">コード生成 / 修正</div>
+            <div class="text-[10px] text-gray-400">UI実装やロジック変更を実施</div>
+          </div>
+
+          <div class="bg-gray-900/90 border border-gray-800 rounded-xl p-4 text-center space-y-2">
+            <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center mx-auto text-xs">2</div>
+            <div class="text-xs font-bold text-white">自律型チェック</div>
+            <div class="text-[10px] text-gray-400 font-mono">npx tsc --noEmit</div>
+          </div>
+
+          <div class="bg-gray-900/90 border border-emerald-500/50 rounded-xl p-4 text-center space-y-2 bg-emerald-500/5">
+            <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center mx-auto text-xs">3</div>
+            <div class="text-xs font-bold text-emerald-400">エラー検知 & ログ解析</div>
+            <div class="text-[10px] text-gray-300">行番号・型不整合の特定</div>
+          </div>
+
+          <div class="bg-gray-900/90 border border-emerald-500/50 rounded-xl p-4 text-center space-y-2 bg-emerald-500/5">
+            <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center mx-auto text-xs">4</div>
+            <div class="text-xs font-bold text-purple-300">自律自己修正ループ</div>
+            <div class="text-[10px] text-gray-300">エラー0になるまで反復</div>
+          </div>
+
+          <div class="bg-gray-900/90 border border-emerald-500 rounded-xl p-4 text-center space-y-2 glow-emerald">
+            <div class="w-8 h-8 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center mx-auto text-xs">5</div>
+            <div class="text-xs font-bold text-white">本番検証 & 完了報告</div>
+            <div class="text-[10px] text-emerald-400 font-mono">npm run build 成功</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-emerald-500 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0 flex items-center gap-2">
+    <span>📋 プロンプトをクリップボードにコピーしました！</span>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('bg-emerald-500', 'text-white');
+        el.classList.add('text-gray-400');
+      });
+
+      document.getElementById(tabId).classList.remove('hidden');
+
+      const btnMap = {
+        'tab-agents': 'btn-agents',
+        'tab-skills': 'btn-skills',
+        'tab-flow': 'btn-flow'
+      };
+
+      const activeBtn = document.getElementById(btnMap[tabId]);
+      activeBtn.classList.add('bg-emerald-500', 'text-white');
+      activeBtn.classList.remove('text-gray-400');
+    }
+
+    function copyText(button, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('translate-y-20', 'opacity-0');
+        setTimeout(() => {
+          toast.classList.add('translate-y-20', 'opacity-0');
+        }, 2500);
+      });
+    }
+  </script>
+</body>
+</html>

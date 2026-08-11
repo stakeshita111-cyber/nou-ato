@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOU-ATO アプリケーション & データフロー アーキテクチャマップ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '"Zen Kaku Gothic New"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #090d16;
+      color: #f3f4f6;
+      background-image: radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 70%);
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-6 max-w-7xl mx-auto space-y-8">
+
+  <header class="flex items-center justify-between border-b border-gray-800 pb-4">
+    <div>
+      <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
+        🌱 NOU-ATO システム & データフロー マップ
+      </h1>
+      <p class="text-xs text-gray-400">Next.js 16 (App Router) × Supabase × Gemini 1.5 × Agent Engine</p>
+    </div>
+    <a href="agent-and-skills-guide.html" class="text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-3 py-1.5 rounded-lg border border-emerald-500/30 font-medium transition">
+      🤖 エージェント＆スキル使い方ガイドを開く →
+    </a>
+  </header>
+
+  <!-- Visual Architecture Layers -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Layer 1: App Router UI Pages -->
+    <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-emerald-500">
+      <div class="flex items-center justify-between">
+        <h2 class="font-bold text-white text-base">📱 Frontend (App Router)</h2>
+        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Next.js 16</span>
+      </div>
+      <div class="space-y-2 text-xs font-mono text-gray-300">
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/(auth)/login</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/dashboard</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/quests (ToDo・課題)</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/chat (交換日記・AI連携)</div>
+      </div>
+    </div>
+
+    <!-- Layer 2: Supabase Backend -->
+    <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-teal-400">
+      <div class="flex items-center justify-between">
+        <h2 class="font-bold text-white text-base">⚡ Database & Storage</h2>
+        <span class="text-[10px] font-mono text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded">Supabase PostgreSQL</span>
+      </div>
+      <div class="space-y-2 text-xs font-mono text-gray-300">
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">profiles (teacher / student)</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">farms & quests (農園・進行状況)</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">chat_messages & vector_embeddings</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800 text-emerald-400 font-bold">🔒 Row Level Security (RLS) 有効</div>
+      </div>
+    </div>
+
+    <!-- Layer 3: AI & Subagents -->
+    <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-indigo-500">
+      <div class="flex items-center justify-between">
+        <h2 class="font-bold text-white text-base">🤖 AI & Agent Engine</h2>
+        <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">Gemini 1.5 + Antigravity</span>
+      </div>
+      <div class="space-y-2 text-xs font-mono text-gray-300">
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">coder-debugger (自律デバッグ)</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">code-optimizer (コード軽量化)</div>
+        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">doc-visualizer (HTML生成)</div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
