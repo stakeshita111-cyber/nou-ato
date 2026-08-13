@@ -129,7 +129,7 @@ export default function StudentTalkView({ journals }: StudentTalkViewProps) {
                     </span>
                   </div>
                   <p className="text-gray-800 leading-relaxed">
-                    {formatShirubeSpeech(j.reply, settings.politeStyle)}
+                    {formatShirubeSpeech(j.reply)}
                   </p>
                 </div>
               ) : (

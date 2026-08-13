@@ -19,7 +19,6 @@ export interface ThemeSettings {
   // 4. アプリ固有の表示形式
   dateFormat: 'slash' | 'japanese'; // 「2026/08/11」 or 「8月11日(火)」
   numberFormat: 'raw' | 'comma' | 'unit'; // 「1500」 or 「1,500」 or 「1,500g」
-  politeStyle: 'polite' | 'shirube'; // AIしるべぇの口調（標準語 or ～べぇ！）
 }
 
 interface ThemeState {
@@ -39,7 +38,6 @@ const defaultSettings: ThemeSettings = {
   buttonPadding: 'normal',
   dateFormat: 'japanese',
   numberFormat: 'unit',
-  politeStyle: 'shirube',
 };
 
 export const useThemeStore = create<ThemeState>()(

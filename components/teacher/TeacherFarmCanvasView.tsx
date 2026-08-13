@@ -105,9 +105,9 @@ export default function TeacherFarmCanvasView() {
   }
 
   const [facilities, setFacilities] = useState<FarmFacility[]>([
-    { id: "fac_1", type: "greenhouse", title: "育苗ビニールハウス A", icon: "🏠", x: 40, y: 460 },
-    { id: "fac_2", type: "water", title: "メイン水栓・散水ポンプ", icon: "💧", x: 380, y: 460 },
-    { id: "fac_3", type: "shed", title: "農機具・資材保管庫", icon: "🛠️", x: 720, y: 460 },
+    { id: "fac_1", type: "greenhouse", title: "育苗ビニールハウス A", icon: "🏠", x: 40, y: 640 },
+    { id: "fac_2", type: "water", title: "メイン水栓・散水ポンプ", icon: "💧", x: 380, y: 640 },
+    { id: "fac_3", type: "shed", title: "農機具・資材保管庫", icon: "🛠️", x: 720, y: 640 },
   ]);
 
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
@@ -121,7 +121,7 @@ export default function TeacherFarmCanvasView() {
       title,
       icon,
       x: 40 + (facilities.length % 3) * 330,
-      y: 460,
+      y: 640 + Math.floor(facilities.length / 3) * 100,
     };
     setFacilities([...facilities, newFac]);
     setToastMessage(`✨ 設備「${icon} ${title}」を農場レイアウトに追加しました！`);

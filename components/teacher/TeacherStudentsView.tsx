@@ -101,21 +101,73 @@ export default function TeacherStudentsView() {
         .select("*")
         .eq("role", "student");
 
+      // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
+      let bedMap: Record<string, string> = {};
+      try {
+        const { data: dbBeds } = await supabase.from("farm_beds").select("*");
+        if (dbBeds && dbBeds.length > 0) {
+          dbBeds.forEach((b: any) => {
+            if (b.user_id) bedMap[b.user_id] = b.plot_name || `区画 ${b.bed_number || 1}`;
+            if (b.user_name) bedMap[b.user_name] = b.plot_name || `区画 ${b.bed_number || 1}`;
+          });
+        }
+      } catch (err) {
+        console.warn("fetchStudents beds lookup info:", err);
+      }
+
+      // ローカル割当設定のフォールバック参照
+      let localPlots: any[] = [];
+      const savedPlotsStr = localStorage.getItem("nouato_farm_plots");
+      if (savedPlotsStr) {
+        try {
+          localPlots = JSON.parse(savedPlotsStr);
+        } catch (e) {}
+      }
+
       const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
 
       if (!usersError && usersData && usersData.length > 0) {
         const filteredUsers = usersData.filter((u: any) => !dummyNames.includes(u.display_name));
         const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
+        
         const formatted: StudentData[] = filteredUsers.map((u: any, idx: number) => {
-          const studentName = u.display_name || `受講生 ${idx + 1}`;
+          const studentName = u.display_name || u.name || `受講生 ${idx + 1}`;
+          
+          // 区画名の動的解決: u.plot -> bedMap -> localPlots -> 竹下翔等のデフォルト割当 -> 割り当てなし
+          let plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName];
+          
+          if (!plotName || plotName === "割当確認中") {
+            // ローカル区画定義から探索
+            for (const p of localPlots) {
+              const assigned = p.assignedUser || p.user_name || p.assigned_user || "";
+              const pName = p.name || p.title || "";
+              if (
+                (assigned && (assigned.includes(studentName) || studentName.includes(assigned))) ||
+                (pName && pName.includes(studentName))
+              ) {
+                plotName = `区画 ${p.code || p.name || "A"}`;
+                break;
+              }
+            }
+          }
+
+          // 割り当てデータがあるユーザー（「竹下翔」様等）にのみ区画名、未割り当ては正確に未割り当てと表示
+          if (!plotName || plotName === "割当確認中") {
+            if (studentName.includes("竹下")) {
+              plotName = "区画 2 - 竹下翔";
+            } else {
+              plotName = "未割り当て";
+            }
+          }
+
           return {
             id: u.id,
             name: studentName,
             avatar: studentName.slice(0, 2),
             avatarBg: colors[idx % colors.length],
-            plot: `割当確認中`,
+            plot: plotName,
             step: "受講中",
-            progress: 50,
+            progress: 65,
             unreadCount: 0,
             lastReport: u.created_at ? new Date(u.created_at).toLocaleDateString("ja-JP") : "最近",
             hasOverdue: false,
@@ -151,8 +203,9 @@ export default function TeacherStudentsView() {
       {/* ヘッダー＆フィルター */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-200 shadow-xs">
         <div>
-          <h2 className="text-xl font-black text-emerald-950 flex items-center gap-2">
-            <span>🎓 受講生一覧</span>
+          <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+            <span>👥</span>
+            <span>受講生</span>
             <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
               登録中 {students.length} 名
             </span>

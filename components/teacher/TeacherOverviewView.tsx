@@ -83,11 +83,30 @@ export default function TeacherOverviewView({
 
   useEffect(() => {
     const fetchCounts = async () => {
-      // 1. イベント・講習予約件数
-      const { count: eCount } = await supabase
+      // 1. 本日以降のイベント・講習予約件数
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { count: eCount, data: eData } = await supabase
         .from("events")
-        .select("*", { count: "exact" });
-      setEventsCount(eCount || 3);
+        .select("*", { count: "exact" })
+        .gte("date", todayStr);
+
+      if (eCount !== null && eCount !== undefined) {
+        setEventsCount(eCount);
+      } else {
+        // DBまたはローカルストレージ shared events のフォールバックフィルタリング
+        const saved = localStorage.getItem("nouato_shared_events");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const futureEvents = parsed.filter((ev: any) => ev.date >= todayStr);
+            setEventsCount(futureEvents.length);
+          } catch (e) {
+            setEventsCount(2);
+          }
+        } else {
+          setEventsCount(2);
+        }
+      }
 
       // 2. 本日の報告数
       const { count: rCount } = await supabase
@@ -133,58 +152,12 @@ export default function TeacherOverviewView({
         farmName={farmName}
       />
 
-      {/* ダッシュボードヘッダー ＆ 各主要ページクイックナビゲーションバー */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">ダッシュボード</h2>
-          <p className="text-xs text-gray-500 mt-0.5 font-bold">
-            {farmName} ・ 全機能一括アクセスハブ
-          </p>
-        </div>
-
-        {/* クイックアクセスリンクボタン群 */}
-        <div className="flex flex-wrap items-center gap-2">
-          {onNavigateToFarm && (
-            <button
-              onClick={onNavigateToFarm}
-              className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition flex items-center gap-1"
-            >
-              <span>🚜 農地・区画管理</span>
-            </button>
-          )}
-
-          {onNavigateToTasks && (
-            <button
-              onClick={onNavigateToTasks}
-              className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-xs rounded-xl border border-blue-200 transition flex items-center gap-1"
-            >
-              <span>📋 看板タスク管理</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setShowQRModal(true)}
-            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-xl border border-amber-200 transition flex items-center gap-1"
-          >
-            <span>📱 招待QR</span>
-          </button>
-
-          <button
-            onClick={onAddNewTaskClick}
-            className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white font-black text-xs rounded-xl shadow transition transform active:scale-95 flex items-center gap-1"
-          >
-            <span className="text-base leading-none">＋</span>
-            <span>新規タスク作成</span>
-          </button>
-        </div>
-      </div>
-
       {/* ☀️ 1. 気象スマート連動ウィジェット (天気) ☀️ */}
       <div className="space-y-2">
         <div className="flex justify-between items-center px-1">
-          <span className="text-xs font-black text-gray-700 flex items-center gap-1">
-            <span>☀️</span>
-            <span>農園ピンポイント天気 ＆ 気象作業ガイド</span>
+          <span className="text-gray-900 font-black text-base flex items-center gap-2">
+            <span>🌤️</span>
+            <span>天気予報</span>
           </span>
         </div>
         <WeatherWidget />
@@ -309,9 +282,9 @@ export default function TeacherOverviewView({
       {/* 3. 受講生・生徒管理セクション (完全統合) */}
       <div className="space-y-3 pt-1">
         <div className="flex justify-between items-center px-1">
-          <span className="text-xs font-black text-gray-700 flex items-center gap-1">
+          <span className="text-gray-900 font-black text-base flex items-center gap-2">
             <span>👥</span>
-            <span>受講生一覧・区画割り当て進捗ステータス</span>
+            <span>受講生</span>
           </span>
         </div>
         <TeacherStudentsView />

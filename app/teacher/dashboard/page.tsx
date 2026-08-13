@@ -104,12 +104,14 @@ export default function TeacherDashboardPage() {
         {/* トップヘッダー */}
         <TeacherHeader
           title={
-            activeMenu === "dashboard" || activeMenu === "students"
+            activeMenu === "dashboard"
               ? "ダッシュボード"
+              : activeMenu === "students"
+              ? "受講生"
               : activeMenu === "farm"
               ? "畑区画管理 (農地レイアウト)"
               : activeMenu === "tasks"
-              ? "看板タスク管理"
+              ? "教材管理"
               : activeMenu === "templates"
               ? "教材・タスクテンプレート"
               : activeMenu === "journals"

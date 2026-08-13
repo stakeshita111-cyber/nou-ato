@@ -207,7 +207,139 @@ export default function TeacherPaymentsView() {
           </div>
         </div>
 
-        {/* 試算結果カード表示 (4区分) */}
+        {/* 🌟 試算結果の視覚的グラフ表示 (総収入構成 ＆ 収支比較) 🌟 */}
+        {grossRevenue > 0 && (
+          <div className="space-y-4 pt-2">
+            {/* 1. 総収入の構造内訳プログレス・バーグラフ */}
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-gray-900 font-black flex items-center gap-1.5">
+                  <span>📈 収支内訳比率グラフ (想定総収入: ¥{grossRevenue.toLocaleString()})</span>
+                </span>
+                <span className="text-emerald-800 font-black bg-emerald-100 px-2.5 py-0.5 rounded-md">
+                  純利益率: {grossRevenue > 0 ? Math.round((Math.max(0, netProfit) / grossRevenue) * 100) : 0}%
+                </span>
+              </div>
+
+              {/* 積み上げバーグラフ */}
+              <div className="w-full h-7 bg-gray-200 rounded-xl overflow-hidden flex shadow-inner">
+                {netProfit > 0 && (
+                  <div 
+                    style={{ width: `${(netProfit / grossRevenue) * 100}%` }}
+                    className="bg-emerald-600 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
+                    title={`純利益: ¥${netProfit.toLocaleString()}`}
+                  >
+                    {Math.round((netProfit / grossRevenue) * 100)}% 純利益
+                  </div>
+                )}
+                {annualExpenses > 0 && (
+                  <div 
+                    style={{ width: `${(annualExpenses / grossRevenue) * 100}%` }}
+                    className="bg-slate-600 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
+                    title={`年間経費: ¥${annualExpenses.toLocaleString()}`}
+                  >
+                    {Math.round((annualExpenses / grossRevenue) * 100)}% 経費
+                  </div>
+                )}
+                {systemFee > 0 && (
+                  <div 
+                    style={{ width: `${(systemFee / grossRevenue) * 100}%` }}
+                    className="bg-amber-500 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
+                    title={`システム利用料: ¥${systemFee.toLocaleString()}`}
+                  >
+                    1%
+                  </div>
+                )}
+              </div>
+
+              {/* グラフ凡例 */}
+              <div className="flex flex-wrap items-center justify-between text-[11px] font-bold text-gray-600 pt-1">
+                <span className="flex items-center gap-1 text-emerald-900">
+                  <span className="w-3 h-3 bg-emerald-600 rounded-sm inline-block" />
+                  🌟 手取り純利益: <strong>¥{netProfit.toLocaleString()}</strong>
+                </span>
+                <span className="flex items-center gap-1 text-slate-800">
+                  <span className="w-3 h-3 bg-slate-600 rounded-sm inline-block" />
+                  🛠️ 想定経費: <strong>¥{annualExpenses.toLocaleString()}</strong>
+                </span>
+                <span className="flex items-center gap-1 text-amber-900">
+                  <span className="w-3 h-3 bg-amber-500 rounded-sm inline-block" />
+                  ⚡ システム手数料(1%): <strong>¥{systemFee.toLocaleString()}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* 2. 月次推移・柱状グラフィック比較チャート */}
+            <div className="bg-gradient-to-br from-emerald-900 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                  <h4 className="text-sm font-black flex items-center gap-2 text-emerald-300">
+                    <span>📊 月次(12ヶ月)平均 収支バランス比較グラフ</span>
+                  </h4>
+                  <p className="text-[10px] text-emerald-100/80 font-bold mt-0.5">
+                    1ヶ月あたりの想定収入・経費・純利益の視認比較
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-emerald-300 block font-bold">月平均 手取り純利益</span>
+                  <span className="text-lg font-black text-emerald-400">
+                    ¥{Math.round(netProfit / 12).toLocaleString()}<span className="text-xs text-white">/月</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 12ヶ月柱状バー比較 */}
+              <div className="grid grid-cols-12 gap-1.5 items-end h-32 pt-2 px-1 border-b border-white/10 pb-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => {
+                  const mGross = Math.round(grossRevenue / 12);
+                  const mExpense = Math.round(annualExpenses / 12);
+                  const mNet = Math.round(netProfit / 12);
+                  const maxBarVal = Math.max(1, mGross);
+                  const netHeightPct = Math.max(10, Math.min(100, Math.round((mNet / maxBarVal) * 100)));
+                  const expHeightPct = Math.max(5, Math.min(100, Math.round((mExpense / maxBarVal) * 100)));
+
+                  return (
+                    <div key={m} className="flex flex-col items-center h-full justify-end group relative">
+                      {/* 柱状グラフ (純利益＋経費の組み合わせ) */}
+                      <div className="w-full max-w-[22px] flex flex-col justify-end h-full gap-0.5">
+                        {/* 経費部分 (グレー) */}
+                        <div 
+                          className="bg-slate-400/80 rounded-t-xs w-full transition-all group-hover:bg-slate-300"
+                          style={{ height: `${expHeightPct}%` }}
+                        />
+                        {/* 純利益部分 (エメラルドグリーン) */}
+                        <div 
+                          className="bg-emerald-400 rounded-t-xs w-full transition-all group-hover:bg-emerald-300"
+                          style={{ height: `${netHeightPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[9px] font-bold text-emerald-200 mt-1">{m}月</span>
+
+                      {/* ツールチップ */}
+                      <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 pointer-events-none transition-all bg-slate-950 text-white text-[9px] p-2 rounded-lg border border-emerald-400 shadow-xl whitespace-nowrap z-30">
+                        <div className="font-black text-emerald-300">{m}月度 収支試算</div>
+                        <div>収入: ¥{mGross.toLocaleString()}</div>
+                        <div>経費: ¥{mExpense.toLocaleString()}</div>
+                        <div className="font-bold text-emerald-400">純益: ¥{mNet.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* グラフ説明 */}
+              <div className="flex items-center justify-between text-[10px] font-bold text-emerald-200">
+                <span className="flex items-center gap-3">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-emerald-400 rounded-xs inline-block" /> 月間純利益</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-slate-400 rounded-xs inline-block" /> 月間経費</span>
+                </span>
+                <span>💡 バーにマウスオーバーで月次内訳詳細表示</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 試算結果数値カード表示 (4区分) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-1">
             <span className="text-[11px] font-bold text-gray-500 block">💰 年間想定総収入</span>

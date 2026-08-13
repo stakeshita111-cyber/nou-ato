@@ -29,19 +29,8 @@ export const formatNumber = (
 };
 
 /**
- * AIしるべぇの口調（敬体/常体）の動的置換
- * 例：常体「〜だべぇ！」 ➔ 敬体「〜ですよ！」
+ * 講師・アドバイスメッセージのフォーマット補助
  */
-export const formatShirubeSpeech = (text: string, style: ThemeSettings['politeStyle']): string => {
-  if (style === 'polite') {
-    return text
-      .replace(/だべぇ[！!]/g, 'ですよ！')
-      .replace(/するべぇ[！!]/g, 'しましょう！')
-      .replace(/だべ[。.]/g, 'ですね。')
-      .replace(/だべぇ/g, 'ですね')
-      .replace(/だべ？/g, 'ですか？')
-      .replace(/だべ/g, 'ですね')
-      .replace(/〜だべ/g, '〜ですね');
-  }
-  return text; // しるべぇのネイティブな常体口調
+export const formatShirubeSpeech = (text: string): string => {
+  return text;
 };
