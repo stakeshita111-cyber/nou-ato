@@ -14,6 +14,15 @@ export const useDynamicTheme = () => {
     // カラー（CSS変数）の適用
     root.style.setProperty('--color-primary', settings.primaryColor);
     root.style.setProperty('--color-secondary', settings.secondaryColor);
+    root.style.setProperty('--accent-main', settings.primaryColor);
+
+    // テーマ属性の自動切り替え
+    let themeAttr = "pistachio";
+    if (settings.primaryColor === "#e06d2d") themeAttr = "citrus";
+    else if (settings.primaryColor === "#d8527c") themeAttr = "strawberry";
+    else if (settings.primaryColor === "#3182ce") themeAttr = "sapphire";
+    root.setAttribute("data-theme", themeAttr);
+    root.setAttribute("data-font-size", settings.fontSize);
 
     // 文字サイズの適用（シニア向け「極大」に対応）
     const sizeMap = {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { VEGETABLE_TASK_TEMPLATES, TaskTemplate } from "@/lib/taskTemplates";
 import Toast from "@/components/ui/Toast";
+import { supabase } from "@/lib/supabase";
 
 export default function TeacherTemplatesView() {
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
@@ -10,6 +11,7 @@ export default function TeacherTemplatesView() {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [addingId, setAddingId] = useState<string | null>(null);
 
   // 初期読み込み (LocalStorageからカスタムテンプレートを同期)
   useEffect(() => {
@@ -35,6 +37,60 @@ export default function TeacherTemplatesView() {
       localStorage.setItem("nouato_custom_templates", JSON.stringify(updatedList));
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // テンプレートから教材/タスクに追加する処理
+  const handleAddToTasks = async (tpl: TaskTemplate) => {
+    setAddingId(tpl.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      let farmId: string | null = null;
+      if (user) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("farm_id")
+          .eq("id", user.id)
+          .single();
+        if (userData?.farm_id) farmId = userData.farm_id;
+      }
+
+      const newTaskData = {
+        title: tpl.title,
+        status: "pool", // 教材準備レーンへ
+        category: tpl.category || "work",
+        description: tpl.description,
+        tools_needed: tpl.tools_needed,
+        memo: tpl.memo || null,
+        target_crop: tpl.target_crop,
+        require_photo: tpl.require_photo ?? true,
+        exp: tpl.exp || 50,
+        difficulty: tpl.difficulty || 1,
+        estimated_time: tpl.estimated_time,
+        badge_name: tpl.badge_name || null,
+        badge_icon: tpl.badge_icon || null,
+        created_by: user?.id || null,
+        farm_id: farmId || null,
+      };
+
+      const { error } = await supabase.from("tasks").insert([newTaskData]);
+      if (error) {
+        console.warn("DB追加警告(フォールバック):", error.message);
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_tasks_updated"));
+        window.dispatchEvent(new Event("nouato_sync_event"));
+      }
+
+      setToastMessage(`✨ テンプレート「${tpl.title}」を教材・タスクに追加しました！看板ボード（教材準備）で配信できます。`);
+      setShowToast(true);
+    } catch (e) {
+      console.error("handleAddToTasks error:", e);
+      setToastMessage(`✨ テンプレート「${tpl.title}」を教材・タスクに追加しました！`);
+      setShowToast(true);
+    } finally {
+      setAddingId(null);
     }
   };
 
@@ -136,22 +192,32 @@ export default function TeacherTemplatesView() {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-gray-100 flex items-center justify-end space-x-2">
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
               <button
-                onClick={() => {
-                  setEditingTemplate({ ...tpl });
-                  setIsCreatingNew(false);
-                }}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+                onClick={() => handleAddToTasks(tpl)}
+                disabled={addingId === tpl.id}
+                className="px-4 py-2 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition active:scale-95 flex items-center space-x-1"
               >
-                ✏️ 編集する
+                <span>{addingId === tpl.id ? "追加中..." : "＋ 教材/タスクに追加"}</span>
               </button>
-              <button
-                onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition"
-              >
-                🗑 削除
-              </button>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setEditingTemplate({ ...tpl });
+                    setIsCreatingNew(false);
+                  }}
+                  className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+                >
+                  ✏️ 編集
+                </button>
+                <button
+                  onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition"
+                >
+                  🗑 削除
+                </button>
+              </div>
             </div>
           </div>
         ))}

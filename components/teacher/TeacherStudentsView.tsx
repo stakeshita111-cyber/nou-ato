@@ -15,9 +15,22 @@ interface StudentData {
   plot: string;
   step: string;
   progress: number;
+  completedCount: number;
+  totalTaskCount: number;
   unreadCount: number;
   lastReport: string;
   hasOverdue: boolean;
+  activeTask?: {
+    title: string;
+    description?: string;
+    target_crop?: string;
+    exp?: number;
+  } | null;
+  lastJournal?: {
+    content?: string;
+    photo_url?: string;
+    created_at?: string;
+  } | null;
 }
 
 export default function TeacherStudentsView() {
@@ -28,6 +41,10 @@ export default function TeacherStudentsView() {
   const [assignModalStudent, setAssignModalStudent] = useState<StudentData | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastBody, setBroadcastBody] = useState("");
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -92,6 +109,58 @@ export default function TeacherStudentsView() {
     }
   };
 
+  // 📢 受講生全員へのメッセージ・お知らせ一括配信処理
+  const handleSendBroadcastAll = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
+
+    setSendingBroadcast(true);
+    try {
+      const nowStr = new Date().toISOString();
+      const broadcastObj = {
+        id: `bc_${Date.now()}`,
+        title: broadcastTitle.trim(),
+        content: broadcastBody.trim(),
+        sender: "講師 (たなか自然農園)",
+        created_at: nowStr,
+      };
+
+      // 1. LocalStorageに一括配信リストをアペンド
+      const existingStr = localStorage.getItem("nouato_broadcast_announcements");
+      let list = [];
+      if (existingStr) {
+        try { list = JSON.parse(existingStr); } catch (e) {}
+      }
+      list.unshift(broadcastObj);
+      localStorage.setItem("nouato_broadcast_announcements", JSON.stringify(list));
+
+      // 2. Supabase の journals テーブルにも講師配信として保存
+      try {
+        await supabase.from("journals").insert([{
+          student_id: "all_students",
+          task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+          content: broadcastBody.trim(),
+          reply: `講師配信: ${broadcastBody.trim()}`,
+          created_at: nowStr,
+        }]);
+      } catch (err) {
+        console.warn("Supabase broadcast insert warn:", err);
+      }
+
+      setToastMessage(`🎉 登録中 ${students.length} 名の受講生全員へ一括配信を完了しました！`);
+      setShowToast(true);
+      setShowBroadcastModal(false);
+      setBroadcastTitle("");
+      setBroadcastBody("");
+    } catch (err) {
+      console.error("handleSendBroadcastAll error:", err);
+      setToastMessage("一括配信中にエラーが発生しました");
+      setShowToast(true);
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
   const fetchStudents = async () => {
     setLoading(true);
     try {
@@ -117,11 +186,69 @@ export default function TeacherStudentsView() {
 
       // ローカル割当設定のフォールバック参照
       let localPlots: any[] = [];
-      const savedPlotsStr = localStorage.getItem("nouato_farm_plots");
+      const savedPlotsStr = typeof window !== "undefined" ? localStorage.getItem("nouato_farm_plots") : null;
       if (savedPlotsStr) {
         try {
           localPlots = JSON.parse(savedPlotsStr);
         } catch (e) {}
+      }
+
+      // 3. 各受講生の割当タスク全数・完了数・進行中タスク (student_tasks) を動的集計
+      let studentTaskMap: Record<
+        string,
+        {
+          total: number;
+          completed: number;
+          activeTask: { title: string; description?: string; target_crop?: string; exp?: number } | null;
+        }
+      > = {};
+
+      try {
+        const { data: stData } = await supabase.from("student_tasks").select("*, tasks(*)");
+        if (stData && stData.length > 0) {
+          stData.forEach((st: any) => {
+            if (!st.student_id) return;
+            if (!studentTaskMap[st.student_id]) {
+              studentTaskMap[st.student_id] = { total: 0, completed: 0, activeTask: null };
+            }
+            studentTaskMap[st.student_id].total += 1;
+            if (st.status === "completed") {
+              studentTaskMap[st.student_id].completed += 1;
+            } else if (!studentTaskMap[st.student_id].activeTask) {
+              const tInfo = st.tasks || st;
+              studentTaskMap[st.student_id].activeTask = {
+                title: tInfo.title || "個別割当タスク",
+                description: tInfo.description || "",
+                target_crop: tInfo.target_crop || "野菜",
+                exp: tInfo.exp || 30,
+              };
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("fetchStudents student_tasks lookup:", err);
+      }
+
+      // 4. 各受講生の最新日誌・写真ノート (journals) を取得
+      let lastJournalMap: Record<string, { content?: string; photo_url?: string; created_at?: string }> = {};
+      try {
+        const { data: jData } = await supabase
+          .from("journals")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (jData && jData.length > 0) {
+          jData.forEach((j: any) => {
+            if (j.student_id && !lastJournalMap[j.student_id]) {
+              lastJournalMap[j.student_id] = {
+                content: j.content || j.memo || "",
+                photo_url: j.photo_url || j.image_url || null,
+                created_at: j.created_at ? new Date(j.created_at).toLocaleDateString("ja-JP") : "最近",
+              };
+            }
+          });
+        }
+      } catch (e) {
+        console.warn("fetchStudents journals lookup:", e);
       }
 
       const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
@@ -137,7 +264,6 @@ export default function TeacherStudentsView() {
           let plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName];
           
           if (!plotName || plotName === "割当確認中") {
-            // ローカル区画定義から探索
             for (const p of localPlots) {
               const assigned = p.assignedUser || p.user_name || p.assigned_user || "";
               const pName = p.name || p.title || "";
@@ -151,7 +277,6 @@ export default function TeacherStudentsView() {
             }
           }
 
-          // 割り当てデータがあるユーザー（「竹下翔」様等）にのみ区画名、未割り当ては正確に未割り当てと表示
           if (!plotName || plotName === "割当確認中") {
             if (studentName.includes("竹下")) {
               plotName = "区画 2 - 竹下翔";
@@ -160,17 +285,48 @@ export default function TeacherStudentsView() {
             }
           }
 
+          // 出題全数 (完了 + 未完了) と完了タスク数の計算
+          const tInfo = studentTaskMap[u.id];
+          let dbTotal = tInfo ? tInfo.total : 0;
+          let completedTasks = tInfo ? tInfo.completed : 0;
+          let activeTask = tInfo ? tInfo.activeTask : null;
+
+          // 生徒画面標準出題数 (デフォルト基本課題3件: トマト、土作り、ジャガイモ) とDB割当を合わせた出題全数
+          let totalTasks = Math.max(3, dbTotal);
+
+          // 進行中課題の動的設定
+          if (!activeTask) {
+            activeTask = {
+              title: "トマトのわき芽かき＆支柱誘引",
+              description: "主枝と葉の付け根から出てくる小さなわき芽を手で折り取る・主枝が倒れないよう紐で固定します。",
+              target_crop: "トマト",
+              exp: 50,
+            };
+          }
+
+          // 比率 (%): 出題全数に対する完了タスクの割合 (例: 1/3完了 -> 33%)
+          const calcProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+          let stepText = "受講開始";
+          if (calcProgress >= 100 && totalTasks > 0) stepText = "全課題完了 🏆";
+          else if (calcProgress >= 60) stepText = "応用作業中 🌱";
+          else if (calcProgress >= 20 || completedTasks > 0) stepText = "基礎作業中 🌿";
+
           return {
             id: u.id,
             name: studentName,
             avatar: studentName.slice(0, 2),
             avatarBg: colors[idx % colors.length],
             plot: plotName,
-            step: "受講中",
-            progress: 65,
+            step: stepText,
+            progress: calcProgress,
+            completedCount: completedTasks,
+            totalTaskCount: totalTasks,
             unreadCount: 0,
             lastReport: u.created_at ? new Date(u.created_at).toLocaleDateString("ja-JP") : "最近",
             hasOverdue: false,
+            activeTask,
+            lastJournal: lastJournalMap[u.id] || null,
           };
         });
         setStudents(formatted);
@@ -188,6 +344,29 @@ export default function TeacherStudentsView() {
 
   useEffect(() => {
     fetchStudents();
+
+    const handleSync = () => {
+      fetchStudents();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_sync_event", handleSync);
+      window.addEventListener("storage", handleSync);
+    }
+
+    const stRealtime = supabase
+      .channel("student_tasks_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => fetchStudents())
+      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => fetchStudents())
+      .subscribe();
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_sync_event", handleSync);
+        window.removeEventListener("storage", handleSync);
+      }
+      supabase.removeChannel(stRealtime);
+    };
   }, []);
 
   const filteredStudents = students.filter((s) => {
@@ -216,6 +395,13 @@ export default function TeacherStudentsView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setShowBroadcastModal(true)}
+            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+          >
+            <span>📢 全員へ一括配信</span>
+          </button>
+
           <button
             onClick={() => setShowInviteModal(true)}
             className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
@@ -316,8 +502,10 @@ export default function TeacherStudentsView() {
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-gray-400">受講進捗</span>
-                      <span className="text-emerald-800 font-black">{student.progress}%</span>
+                      <span className="text-gray-400">受講進捗 (完了/出題全数)</span>
+                      <span className="text-emerald-800 font-black">
+                        {student.progress}% ({student.completedCount ?? 0}/{student.totalTaskCount ?? 0}件完了)
+                      </span>
                     </div>
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
@@ -440,6 +628,72 @@ export default function TeacherStudentsView() {
           student={selectedStudent}
           onClose={() => setSelectedStudent(null)}
         />
+      )}
+
+      {/* 📢 受講生全員へ一括配信 Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-gray-200 relative">
+            <button
+              onClick={() => setShowBroadcastModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+            >
+              ✕
+            </button>
+
+            <div>
+              <h3 className="text-lg font-black text-amber-950 flex items-center gap-2">
+                <span>📢 受講生全員へ一括配信</span>
+              </h3>
+              <p className="text-xs text-gray-500 font-bold mt-1">
+                登録中の受講生全員のアプリ画面（上部お知らせバナー ＆ Talk）へ一括でメッセージ・連絡事項を届けることができます。
+              </p>
+            </div>
+
+            <form onSubmit={handleSendBroadcastAll} className="space-y-4 text-xs font-bold">
+              <div>
+                <label className="block text-gray-700 mb-1">配信タイトル (件名) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例: 【重要】明日の現場実習の集合場所・準備物について"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">配信本文メッセージ *</label>
+                <textarea
+                  required
+                  rows={5}
+                  placeholder="受講生全員に伝えたい内容を入力してください..."
+                  value={broadcastBody}
+                  onChange={(e) => setBroadcastBody(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-medium text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowBroadcastModal(false)}
+                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingBroadcast}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-md transition"
+                >
+                  {sendingBroadcast ? "配信中..." : "受講生全員へ一括配信する 🚀"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -31,6 +31,7 @@ export default function EventCalendar({
   const [currentYear, setCurrentYear] = useState(todayYear);
   const [currentMonth, setCurrentMonth] = useState(todayMonth);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateFormatted);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // 月変更操作
   const handlePrevMonth = () => {
@@ -80,9 +81,24 @@ export default function EventCalendar({
           <h3 className="text-xl font-black text-gray-900 tracking-tight">
             📅 {currentYear}年 {currentMonth}月
           </h3>
-          <span className="bg-blue-100 text-blue-900 font-extrabold text-xs px-2.5 py-0.5 rounded-full border border-blue-200">
-            Googleカレンダー風 View
-          </span>
+          <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                viewMode === "grid" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"
+              }`}
+            >
+              📅 月表示
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-2.5 py-1 rounded-lg transition ${
+                viewMode === "list" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"
+              }`}
+            >
+              📜 一覧
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -104,7 +120,7 @@ export default function EventCalendar({
             }}
             className="px-3.5 py-1.5 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition"
           >
-            今月に戻る
+            今月
           </button>
           <button
             onClick={handleNextMonth}
@@ -115,41 +131,42 @@ export default function EventCalendar({
         </div>
       </div>
 
-      {/* 2. 7列 カレンダーグリッド */}
-      <div className="app-bg-card rounded-3xl border app-border shadow-sm overflow-hidden p-4 space-y-2">
-        {/* 曜日ヘッダー */}
-        <div className="grid grid-cols-7 text-center font-bold text-xs py-2 border-b border-gray-100">
-          <span className="text-red-500">日</span>
-          <span className="text-gray-700">月</span>
-          <span className="text-gray-700">火</span>
-          <span className="text-gray-700">水</span>
-          <span className="text-gray-700">木</span>
-          <span className="text-gray-700">金</span>
-          <span className="text-blue-600">土</span>
-        </div>
+      {/* 2. 7列 カレンダーグリッド (viewMode === 'grid') */}
+      {viewMode === "grid" ? (
+        <div className="app-bg-card rounded-3xl border app-border shadow-sm overflow-hidden p-3 sm:p-4 space-y-2">
+          {/* 曜日ヘッダー */}
+          <div className="grid grid-cols-7 text-center font-bold text-xs py-2 border-b border-gray-100">
+            <span className="text-red-500">日</span>
+            <span className="text-gray-700">月</span>
+            <span className="text-gray-700">火</span>
+            <span className="text-gray-700">水</span>
+            <span className="text-gray-700">木</span>
+            <span className="text-gray-700">金</span>
+            <span className="text-blue-600">土</span>
+          </div>
 
-        {/* グリッドセル */}
-        <div className="grid grid-cols-7 gap-1">
-          {calendarCells.map((cell, idx) => {
-            if (!cell.day) {
-              return <div key={`empty_${idx}`} className="h-20 sm:h-24 bg-gray-50/50 rounded-2xl"></div>;
-            }
+          {/* グリッドセル */}
+          <div className="grid grid-cols-7 gap-1">
+            {calendarCells.map((cell, idx) => {
+              if (!cell.day) {
+                return <div key={`empty_${idx}`} className="h-14 sm:h-24 bg-gray-50/50 rounded-2xl"></div>;
+              }
 
-            const dayEvents = events.filter((e) => e.date === cell.dateStr);
-            const isSelected = selectedDateStr === cell.dateStr;
-            const isSunday = (idx % 7) === 0;
-            const isSaturday = (idx % 7) === 6;
+              const dayEvents = events.filter((e) => e.date === cell.dateStr);
+              const isSelected = selectedDateStr === cell.dateStr;
+              const isSunday = (idx % 7) === 0;
+              const isSaturday = (idx % 7) === 6;
 
-            return (
-              <div
-                key={cell.dateStr}
-                onClick={() => setSelectedDateStr(cell.dateStr)}
-                className={`h-20 sm:h-24 p-1.5 rounded-2xl border transition cursor-pointer flex flex-col justify-between overflow-hidden ${
-                  isSelected
-                    ? "border-2 border-emerald-600 bg-emerald-50/60 shadow-md ring-2 ring-emerald-300"
-                    : "border-gray-200 hover:border-gray-400 bg-white"
-                }`}
-              >
+              return (
+                <div
+                  key={cell.dateStr}
+                  onClick={() => setSelectedDateStr(cell.dateStr)}
+                  className={`h-14 sm:h-24 p-1 sm:p-1.5 rounded-2xl border transition cursor-pointer flex flex-col justify-between overflow-hidden ${
+                    isSelected
+                      ? "border-2 border-emerald-600 bg-emerald-50/60 shadow-md ring-2 ring-emerald-300"
+                      : "border-gray-200 hover:border-gray-400 bg-white"
+                  }`}
+                >
                 <div className="flex items-center justify-between">
                   <span
                     className={`font-black text-xs ${
@@ -180,6 +197,39 @@ export default function EventCalendar({
           })}
         </div>
       </div>
+      ) : (
+        /* 📜 リスト (アジェンダ) 表示 */
+        <div className="app-bg-card rounded-3xl border app-border shadow-sm p-4 space-y-3">
+          <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-1.5 border-b pb-2">
+            <span>📜</span>
+            <span>{currentYear}年 {currentMonth}月の予定・イベント一覧 ({events.length}件)</span>
+          </h4>
+          {events.length === 0 ? (
+            <p className="text-center py-6 text-xs text-gray-400 font-bold">今月予定されているイベントはありません。</p>
+          ) : (
+            <div className="space-y-2">
+              {events.map((ev) => (
+                <div
+                  key={ev.id}
+                  onClick={() => setSelectedDateStr(ev.date)}
+                  className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between text-xs ${
+                    selectedDateStr === ev.date ? "bg-emerald-50 border-emerald-500 font-bold" : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-black">
+                      📅 {ev.date} ({ev.time})
+                    </span>
+                    <h5 className="font-extrabold text-gray-900 text-sm mt-1">{ev.title}</h5>
+                    <p className="text-gray-500 text-[11px]">📍 {ev.location}</p>
+                  </div>
+                  <span className="text-emerald-800 text-[11px] font-bold">詳細 →</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 3. 選択した日付のイベントカード表示 ＆ アクション */}
       <div className="app-bg-card rounded-3xl p-6 border app-border shadow-sm space-y-4">

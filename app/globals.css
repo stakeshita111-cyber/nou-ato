@@ -183,8 +183,10 @@ select:focus {
 }
 
 .app-accent-btn {
-  background-color: var(--accent-main) !important;
+  background-color: var(--color-primary, var(--accent-main)) !important;
   color: #ffffff !important;
+  border-radius: var(--border-radius-button, 12px);
+  padding: var(--button-padding, 8px 16px);
 }
 
 .app-accent-btn:hover {

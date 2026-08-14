@@ -58,6 +58,28 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
   useEffect(() => {
     fetchTasks();
+
+    const handleTaskUpdated = () => {
+      fetchTasks();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_tasks_updated", handleTaskUpdated);
+      window.addEventListener("nouato_sync_event", handleTaskUpdated);
+    }
+
+    const realtimeChannel = supabase
+      .channel("tasks_realtime_channel")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => fetchTasks())
+      .subscribe();
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_tasks_updated", handleTaskUpdated);
+        window.removeEventListener("nouato_sync_event", handleTaskUpdated);
+      }
+      supabase.removeChannel(realtimeChannel);
+    };
   }, []);
 
   // タスクの追加（Create: 作成された Task を返却）

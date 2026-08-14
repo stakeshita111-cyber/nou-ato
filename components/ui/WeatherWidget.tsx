@@ -99,6 +99,7 @@ export default function WeatherWidget() {
   const [loading, setLoading] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
 
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
@@ -771,8 +772,19 @@ export default function WeatherWidget() {
 
     return (
       <div className="w-full flex flex-col space-y-2 pt-0.5">
-        {/* 【上部】折れ線グラフ ＋ 【右側】縦並び凡例 */}
-        <div className="w-full flex flex-col md:flex-row items-stretch gap-3">
+        {/* スマホ画面用 アコーディオン開閉トグルボタン */}
+        <div className="md:hidden flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowMobileDetails(!showMobileDetails)}
+            className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-[11px] rounded-xl border border-emerald-200 transition flex items-center space-x-1"
+          >
+            <span>{showMobileDetails ? "▲ 詳細グラフを閉じる" : "▼ 24時間詳細グラフを開く"}</span>
+          </button>
+        </div>
+
+        {/* 【上部】折れ線グラフ ＋ 【右側】縦並び凡例 (スマホでは showMobileDetails 時のみ展開) */}
+        <div className={`w-full flex-col md:flex-row items-stretch gap-3 ${showMobileDetails ? "flex" : "hidden md:flex"}`}>
           {/* 折れ線グラフキャンバス */}
           <div className="flex-1 overflow-x-auto no-scrollbar">
             <svg

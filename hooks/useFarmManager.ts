@@ -142,10 +142,17 @@ export function useFarmManager() {
             }
           }
 
+          // 割り当てられた生徒(student_id)に紐づく記録のみバインド（新人の場合は白紙状態）
           const bedsWithStatus = bedsList.map((bed) => {
-            const latest = formattedRecords.find(
-              (rec) => rec.bed_id === bed.id
-            );
+            const plotStudentId = dp.student_id;
+            let latest: CropRecord | undefined = undefined;
+
+            if (plotStudentId) {
+              latest = formattedRecords.find(
+                (rec: any) => rec.bed_id === bed.id && (rec.student_id === plotStudentId || rec.user_id === plotStudentId)
+              );
+            }
+
             if (latest) {
               return {
                 ...bed,
@@ -154,7 +161,12 @@ export function useFarmManager() {
                 latest_record: latest,
               };
             }
-            return bed;
+            return {
+              ...bed,
+              is_updated: false,
+              updated_at: undefined,
+              latest_record: undefined,
+            };
           });
 
           // ID・番号によるベッドの重複を厳格に排除
@@ -532,11 +544,33 @@ export function useFarmManager() {
   const assignStudentToPlot = async (plotId: string, studentId: string, studentName: string) => {
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId) {
+        // ベッド情報の更新: 新ユーザー用に一旦白紙化・該当記録のみバインド
+        const resetBeds = plot.beds.map((b) => {
+          const userRec = records.find(
+            (r: any) => r.bed_id === b.id && (r.student_id === studentId || r.user_id === studentId)
+          );
+          if (userRec) {
+            return {
+              ...b,
+              is_updated: true,
+              updated_at: userRec.date,
+              latest_record: userRec,
+            };
+          }
+          return {
+            ...b,
+            is_updated: false,
+            updated_at: undefined,
+            latest_record: undefined,
+          };
+        });
+
         return {
           ...plot,
           student_id: studentId,
           student_name: studentName,
           name: `${plot.code} - ${studentName}`,
+          beds: resetBeds,
         };
       }
       return plot;
@@ -564,7 +598,12 @@ export function useFarmManager() {
           student_id: undefined,
           student_name: undefined,
           name: `区画 ${plot.code}`,
-          beds: plot.beds.map((b) => ({ ...b, is_updated: false })),
+          beds: plot.beds.map((b) => ({
+            ...b,
+            is_updated: false,
+            updated_at: undefined,
+            latest_record: undefined,
+          })),
         };
       }
       return plot;

@@ -22,6 +22,7 @@ export default function StudentQuestsPage() {
     user,
     tasks,
     journals,
+    broadcasts = [],
     newJournal,
     setNewJournal,
     selectedTask,
@@ -143,11 +144,30 @@ export default function StudentQuestsPage() {
         </div>
       </header>
 
-      {/* メインコンテンツ */}
-      <main className="w-full max-w-md p-4 space-y-5 flex-1">
+      {/* メインコンテンツ (スマホ形式ナビと重ならない pb-28) */}
+      <main className="w-full max-w-md p-4 space-y-5 flex-1 pb-28">
         {/* Quests タブ */}
         {activeTab === "quests" && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-5 animate-fade-in">
+            {/* 📢 講師からの全体一括配信・連絡カード */}
+            {broadcasts && broadcasts.length > 0 && (
+              <div className="bg-amber-500 text-amber-950 p-4 rounded-3xl shadow-md border-2 border-amber-400 space-y-2 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                    📢 講師からの全体一括配信
+                  </span>
+                  <span className="text-[10px] font-bold opacity-80">
+                    {broadcasts[0].created_at ? new Date(broadcasts[0].created_at).toLocaleDateString("ja-JP") : "最新"}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-sm text-gray-900 leading-snug">{broadcasts[0].title}</h3>
+                <p className="text-xs text-gray-900 font-medium whitespace-pre-wrap leading-relaxed bg-amber-400/50 p-3 rounded-2xl border border-amber-600/30">
+                  {broadcasts[0].content}
+                </p>
+              </div>
+            )}
+
             {/* 農園ピンポイント天気予報 ＆ 気象アドバイスウィジェット */}
             <WeatherWidget />
 
