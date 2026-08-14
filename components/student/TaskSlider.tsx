@@ -155,7 +155,10 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
 
                 {onUncomplete && (
                   <button
-                    onClick={() => onUncomplete(ct.id)}
+                    onClick={() => {
+                      onUncomplete(ct.id);
+                      setShowCompletedList(false);
+                    }}
                     className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs rounded-lg transition flex items-center space-x-1"
                   >
                     <span>↩️ 未完了に戻す</span>
