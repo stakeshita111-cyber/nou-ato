@@ -51,107 +51,62 @@ export default function TeacherSettingsView() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in text-gray-800 pb-16 font-sans relative">
+    <div className="max-w-4xl mx-auto space-y-6 text-gray-800 pb-24 pt-[180px] font-sans relative">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* 画面ヘッダー */}
-      <div className="flex items-center justify-between bg-white p-6 rounded-3xl border border-gray-200 shadow-xs">
-        <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-            <span>⚙️</span>
-            <span>画面・表示カスタマイズ設定一覧</span>
-          </h2>
-          <p className="text-xs text-gray-500 mt-1 font-bold">
-            下記の選択肢ボタンを1タップするだけで全画面に即時反映・保存されます。
-          </p>
-        </div>
-      </div>
-
-      {/* 🌟 画面追従スライド・フローティング固定 (Sticky Top-4) ＆ リアルタイム統合プレビュー 🌟 */}
-      <div className="sticky top-4 z-40 transition-all duration-300 drop-shadow-xl">
-        <div className={`p-4 sm:p-5 rounded-3xl border shadow-xl backdrop-blur-md transition-all ${
-          outdoorHighContrast ? "bg-amber-50/95 border-amber-400 ring-2 ring-amber-300" : "bg-white/95 border-emerald-400/90 ring-1 ring-emerald-200"
-        }`}>
-          {/* プレビューカード・ヘッダー */}
-          <div className="flex items-center justify-between border-b border-gray-200/80 pb-2.5 mb-2.5">
-            <span className="font-black text-xs text-gray-900 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full animate-ping shrink-0" style={{ backgroundColor: settings.primaryColor }} />
-              <span>📍 リアルタイムプレビュー (スクロール時も画面固定)</span>
-            </span>
-            <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 px-3 py-1 rounded-full border border-emerald-300 shrink-0">
-              ✨ リアルタイム連動中
-            </span>
-          </div>
-
-          {/* 1つの統合プレビュー受講生・実践カード */}
+      {/* 🌟 メインカラム (サイドバーw-64を除外) と100%横位置・横幅が一致する常時フローティングプレビュー 🌟 */}
+      <div className="fixed top-[72px] left-0 md:left-64 right-0 z-40 flex justify-center px-4 sm:px-8 pointer-events-none">
+        <div className="max-w-4xl w-full pointer-events-auto">
           <div 
-            className="p-3.5 sm:p-4 rounded-2xl border border-gray-200/90 space-y-2.5 transition-all"
-            style={{ 
-              backgroundColor: '#fafafa',
-              fontFamily: getFontFamilyCss(settings.fontFamily)
-            }}
+            className={`p-3.5 sm:p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all space-y-2.5 ${
+              outdoorHighContrast ? "bg-amber-50/95 border-amber-400 ring-2 ring-amber-300" : "bg-white/95 border-emerald-300 ring-1 ring-emerald-200"
+            }`}
+            style={{ fontFamily: getFontFamilyCss(settings.fontFamily) }}
           >
-            {/* 上部: 受講生アバター & 割当区画 & 日付 */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center space-x-3">
+            {/* 上段: 受講生プロフ (メインカラー反映) ＆ 日付表記サンプル (日付表記形式反映) */}
+            <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
+              <div className="flex items-center space-x-2.5">
                 <div 
-                  className="w-9 h-9 rounded-xl font-black text-white flex items-center justify-center text-xs shadow-xs shrink-0"
+                  className="w-7 h-7 rounded-lg font-black text-white flex items-center justify-center text-[11px] shadow-2xs shrink-0"
                   style={{ backgroundColor: settings.primaryColor }}
                 >
                   竹下
                 </div>
-                <div>
-                  <span className="font-black text-xs sm:text-sm text-gray-900 block">竹下 翔 様</span>
-                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded">
-                    区画 2 - トマト・キュウリ
-                  </span>
-                </div>
+                <span className="font-bold text-xs text-gray-900">竹下 翔 様 (区画2)</span>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] text-gray-400 font-bold block">最終更新日</span>
-                <span className="text-xs font-black text-emerald-900">
-                  {formatDate(sampleDate, settings.dateFormat)}
-                </span>
-              </div>
+              <span className="text-[11px] font-bold text-emerald-950 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                📅 {formatDate(sampleDate, settings.dateFormat)}
+              </span>
             </div>
 
-            {/* 中部: 収穫量数値 & 実践ステータス表示 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
-              <div className="bg-white p-2.5 rounded-xl border border-gray-200/80 shadow-2xs">
-                <span className="text-[10px] text-gray-400 font-bold block">📊 本日の収穫量記録</span>
-                <span className="text-xs sm:text-sm font-black text-amber-700">
-                  ミニトマト: {formatNumber(sampleHarvest, settings.numberFormat, 'g')}
-                </span>
-              </div>
-              <div className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200/80 shadow-2xs">
-                <span className="text-[10px] text-emerald-900 font-black flex items-center gap-1 block">
-                  <span>🌱</span>
-                  <span>本日作業進捗</span>
-                </span>
-                <p className="text-xs font-black text-emerald-950 leading-snug">
-                  芽かき・水やり作業 完了 (順調)
-                </p>
-              </div>
-            </div>
-
-            {/* 下部: インタラクティブ・サンプルボタン ＆ フォント試聴テキスト */}
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-1.5 border-t border-gray-200/60">
-              <p className={`text-gray-900 transition-all ${
+            {/* 中段: タイポグラフィサンプル (文字サイズ・太さ・行間反映) ＆ 収穫量表記 (数値形式反映) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gray-50/90 p-2.5 rounded-xl border border-gray-200/80">
+              <p className={`text-gray-900 ${
                 settings.fontSize === 'small' ? 'text-xs' : settings.fontSize === 'large' ? 'text-base' : settings.fontSize === 'xlarge' ? 'text-lg font-black' : 'text-sm'
               } ${
                 settings.fontWeight === 'bold' ? 'font-black' : settings.fontWeight === 'medium' ? 'font-medium' : 'font-normal'
               } ${
                 settings.lineHeight === 'loose' ? 'leading-loose' : settings.lineHeight === 'relaxed' ? 'leading-relaxed' : 'leading-normal'
               }`}>
-                屋外作業テキスト視認性サンプル
+                文字サイズ・太さ・書体・行間 視認性確認テキスト
               </p>
 
+              <div className="text-xs font-black text-amber-800 shrink-0 bg-white px-2.5 py-1 rounded-lg border border-amber-200/80 shadow-2xs">
+                📊 収穫記録: {formatNumber(sampleHarvest, settings.numberFormat, 'g')}
+              </div>
+            </div>
+
+            {/* 下段: サンプルボタン (メインカラー・角丸形状・ボタンサイズ反映) */}
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[10px] text-gray-400 font-bold">
+                ✨ 下の設定ボタンを押すと各項目がプレビューにリアルタイム反映されます
+              </span>
               <button
                 type="button"
-                className={`text-white transition-all ${getBorderRadiusClass(settings.borderRadius)} ${getButtonPaddingClass(settings.buttonPadding)}`}
+                className={`text-white font-bold transition-all shadow-xs ${getBorderRadiusClass(settings.borderRadius)} ${getButtonPaddingClass(settings.buttonPadding)}`}
                 style={{ backgroundColor: settings.primaryColor }}
               >
-                ＋ 日誌・記録を追加
+                ＋ サンプルボタン (保存・追加)
               </button>
             </div>
 
@@ -365,23 +320,23 @@ export default function TeacherSettingsView() {
             </div>
           </div>
 
-          {/* 7. 手袋対応ボタンサイズ (物理サイズ巨大化) */}
+          {/* 7. ボタンサイズ */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">🖐️ 手袋対応ボタンサイズ</span>
-              <span className="text-[11px] text-gray-500 font-medium">泥の手袋での誤タップを防止します</span>
+              <span className="text-sm font-black text-gray-900 block">🔘 ボタンサイズ</span>
+              <span className="text-[11px] text-gray-500 font-medium">ボタンの表示サイズを変更します</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "通常 (スマート)", value: "normal" },
-                { label: "極大 (手袋対応・デカボタン)", value: "large" },
+                { label: "標準", value: "normal" },
+                { label: "大", value: "large" },
               ].map((p) => (
                 <button
                   key={p.value}
                   type="button"
                   onClick={() => {
                     updateSettings({ buttonPadding: p.value as ThemeSettings['buttonPadding'] });
-                    setToastMessage(`🖐️ ボタンサイズを「${p.label}」に変更しました`);
+                    setToastMessage(`🔘 ボタンサイズを「${p.label}」に変更しました`);
                     setShowToast(true);
                   }}
                   className={`border transition ${

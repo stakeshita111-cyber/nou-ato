@@ -108,6 +108,7 @@ export default function WeatherWidget() {
     y: number;
     hourData: HourlyPoint;
   } | null>(null);
+  const [showSourceTooltip, setShowSourceTooltip] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Array<{ name: string; lat: number; lon: number }>>([]);
@@ -632,10 +633,10 @@ export default function WeatherWidget() {
 
   const render24hLineChart = () => {
     const data = weather.hourly;
-    const width = 680;
-    const height = 180;
+    const width = 800; // グラフ横幅全幅表示
+    const height = 115; // 縦の長さを約半分に短縮 (PC1画面収容)
     const paddingLeft = 45;
-    const paddingRight = 20;
+    const paddingRight = 25;
 
     const temps = data.map((d) => [d.tempActual, d.tempPredicted]).flat();
     let minTemp = Math.min(...temps) - 2;
@@ -646,12 +647,18 @@ export default function WeatherWidget() {
     }
     const tempRange = maxTemp - minTemp;
     const midTemp = Math.round((minTemp + maxTemp) / 2);
-    const svgTotalHeight = 220;
+    const svgTotalHeight = 155; // 総高さ155px (半減)
+
+    const plotTop = 15;
+    const plotBottom = 115;
+    const plotHeight = plotBottom - plotTop;
+
+    const getYForTemp = (tempVal: number) => plotBottom - ((tempVal - minTemp) / tempRange) * plotHeight;
 
     const points = data.map((d, index) => {
       const x = paddingLeft + (index / (data.length - 1)) * (width - paddingLeft - paddingRight);
-      const yActual = height - 30 - ((d.tempActual - minTemp) / tempRange) * (height - 55);
-      const yPredicted = height - 30 - ((d.tempPredicted - minTemp) / tempRange) * (height - 55);
+      const yActual = getYForTemp(d.tempActual);
+      const yPredicted = getYForTemp(d.tempPredicted);
       return { x, yActual, yPredicted, tempActual: d.tempActual, tempPredicted: d.tempPredicted, time: d.time, isPast: d.isPast, isCurrent: d.isCurrent, rawData: d };
     });
 
@@ -679,404 +686,453 @@ export default function WeatherWidget() {
     const activeTemp = displayData ? (displayData.isPast ? displayData.tempActual : displayData.tempPredicted) : weather.today.tempMax;
     const activeWeather = displayData ? displayData.weather : "sunny";
 
-    // 1. 防除適期判定
-    const sprayingStatus = activeWind > 5 ? "散布不可" : activeWind >= 3 ? "風注意" : "散布最適";
-    const sprayingColor = activeWind > 5 ? "bg-red-800 text-white font-black border-red-900 shadow-xs" : activeWind >= 3 ? "bg-amber-500 text-gray-950 font-black border-amber-600 shadow-xs" : "bg-emerald-800 text-white font-black border-emerald-900 shadow-xs";
+    // ▼ 7つの時間単位指標 (Hourly Indicators) 計算 (英語表記排除・意思決定しやすい日本語)
+    // 1. 散布適性指数
+    const sprayStatusText = activeWind > 5 || activeRainProb >= 70 ? "散布中止(強風・雨)" : activeWind >= 3 ? "風注意(漂流注意)" : "散布に最適(微風)";
+    const sprayColorClass = activeWind > 5 || activeRainProb >= 70 ? "bg-red-600 text-white font-black border-red-700" : activeWind >= 3 ? "bg-amber-500 text-gray-950 font-black border-amber-600" : "bg-blue-600 text-white font-black border-blue-700";
 
-    // 2. 灌水適性
-    const irrigationStatus = activeRainSum >= 5 ? "水やり不要" : activeTemp >= 30 ? "たっぷり給水" : "標準水やり";
-    const irrigationColor = activeRainSum >= 5 ? "bg-cyan-700 text-white font-black border-cyan-800 shadow-xs" : activeTemp >= 30 ? "bg-amber-600 text-white font-black border-amber-700 shadow-xs" : "bg-blue-800 text-white font-black border-blue-900 shadow-xs";
+    // 2. 熱ストレス指数
+    const heatStatusText = activeTemp >= 32 ? "作業中止(極度高温)" : activeTemp >= 28 ? "水分補給(熱中症注意)" : "快適(作業適期)";
+    const heatColorClass = activeTemp >= 32 ? "bg-red-600 text-white font-black border-red-700 animate-pulse" : activeTemp >= 28 ? "bg-amber-500 text-gray-950 font-black border-amber-600" : "bg-blue-600 text-white font-black border-blue-700";
 
-    // 3. 光合成活性度
-    const photosynthesisStatus = activeWeather === "rainy" || activeWeather === "storm" ? "日照不足" : activeTemp >= 20 && activeTemp <= 29 ? "日照良好" : "標準日照";
-    const photosynthesisColor = activeWeather === "rainy" || activeWeather === "storm" ? "bg-gray-700 text-white font-black border-gray-800 shadow-xs" : activeTemp >= 20 && activeTemp <= 29 ? "bg-emerald-800 text-white font-black border-emerald-900 shadow-xs" : "bg-amber-600 text-white font-black border-amber-700 shadow-xs";
+    // 3. 光合成効率指数
+    const photoStatusText = activeWeather === "rainy" || activeWeather === "storm" ? "低下(日照不足)" : activeTemp >= 20 && activeTemp <= 30 && activeWeather === "sunny" ? "光合成活発(絶好)" : "標準(安定成長)";
+    const photoColorClass = activeWeather === "rainy" || activeWeather === "storm" ? "bg-red-600 text-white font-black border-red-700" : activeTemp >= 20 && activeTemp <= 30 && activeWeather === "sunny" ? "bg-blue-600 text-white font-black border-blue-700" : "bg-amber-500 text-gray-950 font-black border-amber-600";
 
-    // 4. 熱中症リスク
-    const heatAlertStatus = activeTemp >= 32 ? "厳重警戒" : activeTemp >= 28 ? "注意が必要" : "ほぼ安全";
-    const heatColor = activeTemp >= 32 ? "bg-red-700 text-white font-black border-red-800 shadow-xs animate-pulse" : activeTemp >= 28 ? "bg-amber-600 text-white font-black border-amber-700 shadow-xs" : "bg-emerald-800 text-white font-black border-emerald-900 shadow-xs";
+    // 4. 蒸散量
+    const evapTransStatusText = activeTemp < 15 || activeWeather === "rainy" ? "蒸散停滞(吸水鈍化)" : activeTemp >= 22 && activeWeather === "sunny" ? "蒸散盛ん(吸水良好)" : "標準蒸散";
+    const evapTransColorClass = activeTemp < 15 || activeWeather === "rainy" ? "bg-red-600 text-white font-black border-red-700" : activeTemp >= 22 && activeWeather === "sunny" ? "bg-blue-600 text-white font-black border-blue-700" : "bg-amber-500 text-gray-950 font-black border-amber-600";
+
+    // 5. 葉面乾燥指数
+    const leafWetStatusText = activeRainSum > 0 || activeRainProb >= 60 ? "高湿度(病害注視)" : activeRainProb >= 30 ? "やや湿潤(経過観察)" : "葉面乾燥(病原菌抑制)";
+    const leafWetColorClass = activeRainSum > 0 || activeRainProb >= 60 ? "bg-red-600 text-white font-black border-red-700" : activeRainProb >= 30 ? "bg-amber-500 text-gray-950 font-black border-amber-600" : "bg-blue-600 text-white font-black border-blue-700";
+
+    // 6. 病害発生リスク
+    const diseaseRiskStatusText = activeRainSum >= 5 || (activeRainProb >= 60 && activeTemp >= 25) ? "高リスク(即防除検討)" : activeRainProb >= 40 ? "湿気注意(予防観察)" : "低リスク(発生なし)";
+    const diseaseRiskColorClass = activeRainSum >= 5 || (activeRainProb >= 60 && activeTemp >= 25) ? "bg-red-600 text-white font-black border-red-700" : activeRainProb >= 40 ? "bg-amber-500 text-gray-950 font-black border-amber-600" : "bg-blue-600 text-white font-black border-blue-700";
+
+    // 7. ハウス環境制御指数
+    const greenhouseStatusText = activeTemp >= 32 || activeTemp < 12 ? "遮光・全開換気(高熱)" : activeTemp > 26 ? "天窓オープン(換気推奨)" : "換気要らず(快適温度)";
+    const greenhouseColorClass = activeTemp >= 32 || activeTemp < 12 ? "bg-red-600 text-white font-black border-red-700" : activeTemp > 26 ? "bg-amber-500 text-gray-950 font-black border-amber-600" : "bg-blue-600 text-white font-black border-blue-700";
+
+    // 閾値カラー帯 ＆ 破線ガイドライン描画ヘルパー (高さ縮小対応)
+    const renderThresholdIndicator = (tempVal: number, label: string, colorHex: string, isHigh: boolean) => {
+      const yPos = getYForTemp(tempVal);
+      if (yPos < plotTop + 2 || yPos > plotBottom - 2) return null;
+
+      const bandY = isHigh ? plotTop : yPos;
+      const bandH = isHigh ? yPos - plotTop : plotBottom - yPos;
+
+      return (
+        <g key={`thresh-${tempVal}`}>
+          {/* 背景カラー帯 */}
+          <rect
+            x={paddingLeft - 5}
+            y={bandY}
+            width={width - paddingLeft - paddingRight + 10}
+            height={bandH}
+            fill={colorHex}
+            fillOpacity="0.06"
+          />
+          {/* 閾値基準破線 */}
+          <line
+            x1={paddingLeft - 5}
+            y1={yPos}
+            x2={width - paddingRight + 5}
+            y2={yPos}
+            stroke={colorHex}
+            strokeWidth="1.2"
+            strokeDasharray="4 4"
+            opacity="0.8"
+          />
+          {/* 閾値テキストラベル */}
+          <rect
+            x={width - paddingRight - 85}
+            y={yPos - 7}
+            width="85"
+            height="15"
+            rx="3"
+            fill={colorHex}
+            fillOpacity="0.9"
+          />
+          <text
+            x={width - paddingRight - 42.5}
+            y={yPos + 3}
+            fill="#ffffff"
+            fontSize="9"
+            fontWeight="900"
+            textAnchor="middle"
+          >
+            {label} ({tempVal}°C)
+          </text>
+        </g>
+      );
+    };
 
     return (
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch pt-1">
-        {/* 【左側】折れ線グラフエリア (右カードと高さピッタリ隙間なし) */}
-        <div className="w-full lg:w-[60%] flex flex-col justify-between overflow-x-auto no-scrollbar">
-          {/* 凡例表示 (過去実績と過去予測・未来予報を視覚的に明確識別) */}
-          <div className="flex items-center space-x-4 text-[11px] font-bold px-1 mb-1.5 flex-wrap gap-y-1">
-            <span className="text-blue-900 flex items-center gap-1.5">
-              <span className="w-4 h-1.5 bg-[#0284c7] rounded-full inline-block"></span>
-              過去の実績 (青実線)
-            </span>
-            <span className="text-slate-600 flex items-center gap-1.5">
-              <span className="w-4 h-1 border-b-2 border-dashed border-slate-500 inline-block"></span>
-              過去の予測 (グレー点線)
-            </span>
-            <span className="text-amber-800 flex items-center gap-1.5">
-              <span className="w-4 h-1 border-b-2 border-dashed border-amber-600 inline-block"></span>
-              未来の予報 (橙破線)
-            </span>
-          </div>
+      <div className="w-full flex flex-col space-y-2 pt-0.5">
+        {/* 【上部】折れ線グラフ ＋ 【右側】縦並び凡例 */}
+        <div className="w-full flex flex-col md:flex-row items-stretch gap-3">
+          {/* 折れ線グラフキャンバス */}
+          <div className="flex-1 overflow-x-auto no-scrollbar">
+            <svg
+              viewBox={`0 0 ${width} ${svgTotalHeight}`}
+              className="w-full h-full min-h-[155px] max-h-[160px] overflow-visible select-none min-w-[550px]"
+              onMouseLeave={() => setHoveredPointInfo(null)}
+            >
+              {/* 過去実績エリア (薄青塗り) ＆ 未来予報エリア (薄オレンジ塗り) */}
+              {currentP && (
+                <>
+                  <rect x={paddingLeft - 5} y={plotTop} width={Math.max(0, currentP.x - (paddingLeft - 5))} height={plotHeight} fill="#0284c7" fillOpacity="0.04" />
+                  <rect x={currentP.x} y={plotTop} width={Math.max(0, width - paddingRight + 5 - currentP.x)} height={plotHeight} fill="#ea580c" fillOpacity="0.04" />
+                </>
+              )}
 
-          {/* SVGキャンバス: 高さを右側カードに隙間なくフィット拡大 (height 220) */}
-          <svg
-            viewBox={`0 0 ${width} ${svgTotalHeight}`}
-            className="w-full h-full min-h-[240px] overflow-visible select-none min-w-[500px]"
-            onMouseLeave={() => setHoveredPointInfo(null)}
-          >
-            {/* 過去実績エリア (薄青塗り) ＆ 未来予報エリア (薄オレンジ塗り) */}
-            {currentP && (
-              <>
-                <rect x={paddingLeft - 5} y="15" width={Math.max(0, currentP.x - (paddingLeft - 5))} height="171" fill="#0284c7" fillOpacity="0.05" />
-                <rect x={currentP.x} y="15" width={Math.max(0, width - paddingRight + 5 - currentP.x)} height="171" fill="#ea580c" fillOpacity="0.05" />
-              </>
-            )}
+              {/* 農業温度閾値ガイド帯 (35℃ 酷暑 / 30℃ 真夏日 / 10℃ 低温 / 5℃ 霜害) */}
+              {renderThresholdIndicator(35, "酷暑警戒", "#dc2626", true)}
+              {renderThresholdIndicator(30, "真夏日ライン", "#ea580c", true)}
+              {renderThresholdIndicator(10, "低温注意", "#0284c7", false)}
+              {renderThresholdIndicator(5, "霜害警戒", "#1d4ed8", false)}
 
-            {/* 背景ガイドライン (横軸) */}
-            <line x1={paddingLeft - 5} y1="20" x2={width - paddingRight + 5} y2="20" stroke="#e2e8f0" strokeDasharray="4" />
-            <line x1={paddingLeft - 5} y1="90" x2={width - paddingRight + 5} y2="90" stroke="#e2e8f0" strokeDasharray="4" />
-            <line x1={paddingLeft - 5} y1="160" x2={width - paddingRight + 5} y2="160" stroke="#e2e8f0" strokeDasharray="4" />
-            
-            {/* 縦軸 (Y軸) と目盛りラベル */}
-            <line x1={paddingLeft - 5} y1="15" x2={paddingLeft - 5} y2="186" stroke="#cbd5e1" strokeWidth="1.5" />
-            <text x={paddingLeft - 8} y="24" fill="#475569" fontSize="11" fontWeight="bold" textAnchor="end">{maxTemp}°C</text>
-            <text x={paddingLeft - 8} y="94" fill="#64748b" fontSize="10" fontWeight="bold" textAnchor="end">{midTemp}°C</text>
-            <text x={paddingLeft - 8} y="164" fill="#475569" fontSize="11" fontWeight="bold" textAnchor="end">{minTemp}°C</text>
+              {/* 背景ガイドライン (横軸) */}
+              <line x1={paddingLeft - 5} y1={plotTop} x2={width - paddingRight + 5} y2={plotTop} stroke="#e2e8f0" strokeDasharray="3" />
+              <line x1={paddingLeft - 5} y1={(plotTop + plotBottom) / 2} x2={width - paddingRight + 5} y2={(plotTop + plotBottom) / 2} stroke="#e2e8f0" strokeDasharray="3" />
+              <line x1={paddingLeft - 5} y1={plotBottom} x2={width - paddingRight + 5} y2={plotBottom} stroke="#e2e8f0" strokeDasharray="3" />
+              
+              {/* 縦軸 (Y軸) と目盛りラベル */}
+              <line x1={paddingLeft - 5} y1={plotTop - 3} x2={paddingLeft - 5} y2={plotBottom + 1} stroke="#cbd5e1" strokeWidth="1.2" />
+              <text x={paddingLeft - 8} y={plotTop + 3} fill="#475569" fontSize="9.5" fontWeight="bold" textAnchor="end">{maxTemp}°C</text>
+              <text x={paddingLeft - 8} y={(plotTop + plotBottom) / 2 + 3} fill="#64748b" fontSize="9" fontWeight="bold" textAnchor="end">{midTemp}°C</text>
+              <text x={paddingLeft - 8} y={plotBottom + 3} fill="#475569" fontSize="9.5" fontWeight="bold" textAnchor="end">{minTemp}°C</text>
 
-            {/* 時間軸区切り線 */}
-            <line x1={paddingLeft - 5} y1="186" x2={width - paddingRight + 5} y2="186" stroke="#cbd5e1" strokeWidth="1.5" />
+              {/* 時間軸区切り線 */}
+              <line x1={paddingLeft - 5} y1={plotBottom + 1} x2={width - paddingRight + 5} y2={plotBottom + 1} stroke="#cbd5e1" strokeWidth="1.2" />
 
-            {/* マウスオーバー選択時の垂直ガイドライン */}
-            {hoveredPointInfo && (
-              <line
-                x1={hoveredPointInfo.x}
-                y1="5"
-                x2={hoveredPointInfo.x}
-                y2="215"
-                stroke="#0284c7"
-                strokeWidth="1.5"
-                strokeDasharray="2 2"
-                opacity="0.8"
-              />
-            )}
-
-            {/* 現在時刻の縦バー ＆ NOWマーカー */}
-            {currentP && (
-              <g>
+              {/* マウスオーバー選択時の垂直ガイドライン */}
+              {hoveredPointInfo && (
                 <line
-                  x1={currentP.x}
-                  y1="5"
-                  x2={currentP.x}
-                  y2="215"
-                  stroke="#ef4444"
-                  strokeWidth="2"
-                  strokeDasharray="3 2"
+                  x1={hoveredPointInfo.x}
+                  y1={plotTop - 3}
+                  x2={hoveredPointInfo.x}
+                  y2={plotBottom + 18}
+                  stroke="#0284c7"
+                  strokeWidth="1.2"
+                  strokeDasharray="2 2"
+                  opacity="0.8"
                 />
-                <text
-                  x={currentP.x}
-                  y="12"
-                  fill="#ef4444"
-                  fontSize="10"
-                  fontWeight="900"
-                  textAnchor="middle"
-                >
-                  NOW
-                </text>
-              </g>
-            )}
+              )}
 
-            {/* 1. 過去の予測 (グレー点線) */}
-            {actualPoints.length > 1 && (
-              <polyline
-                fill="none"
-                stroke="#64748b"
-                strokeWidth="2.5"
-                strokeDasharray="3 3"
-                opacity="0.85"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={pastPredictedPolyline}
-              />
-            )}
-
-            {/* 2. 過去の実績 (青色実線) */}
-            {actualPoints.length > 1 && (
-              <polyline
-                fill="none"
-                stroke="#0284c7"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={actualPolyline}
-              />
-            )}
-
-            {/* 3. 未来の予報 (橙色破線) */}
-            {futurePoints.length > 1 && (
-              <polyline
-                fill="none"
-                stroke="#ea580c"
-                strokeWidth="3"
-                strokeDasharray="6 3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={futurePolyline}
-              />
-            )}
-
-            {/* 各ドット・気温数値 ＆ 横軸時間ラベル (全座標同軸ズレゼロ) */}
-            {points.map((p, idx) => {
-              const prevX = idx > 0 ? points[idx - 1].x : paddingLeft - 10;
-              const nextX = idx < points.length - 1 ? points[idx + 1].x : width - paddingRight + 10;
-              const leftBound = idx === 0 ? paddingLeft - 10 : (p.x + prevX) / 2;
-              const rightBound = idx === points.length - 1 ? width - paddingRight + 10 : (p.x + nextX) / 2;
-              const rectWidth = rightBound - leftBound;
-              const isHovered = hoveredPointInfo?.x === p.x;
-
-              return (
-                <g key={idx}>
-                  {/* 過去予測の小ドット（実績と差がある場合のみ描画） */}
-                  {p.isPast && p.tempActual !== p.tempPredicted && (
-                    <circle
-                      cx={p.x}
-                      cy={p.yPredicted}
-                      r={3}
-                      fill="#94a3b8"
-                      stroke="#ffffff"
-                      strokeWidth={1}
-                    />
-                  )}
-
-                  {/* 1. 気温メインドット */}
-                  <circle
-                    cx={p.x}
-                    cy={p.isPast ? p.yActual : p.yPredicted}
-                    r={isHovered ? 8.5 : p.isCurrent ? 7 : 4.5}
-                    fill={isHovered ? "#0284c7" : p.isCurrent ? "#ef4444" : p.isPast ? "#0284c7" : "#d97706"}
-                    stroke={isHovered ? "#ffffff" : p.isCurrent ? "#ffffff" : "#ffffff"}
-                    strokeWidth={isHovered ? 3.5 : p.isCurrent ? 3 : 1.5}
+              {/* 現在時刻の縦バー ＆ NOWマーカー */}
+              {currentP && (
+                <g>
+                  <line
+                    x1={currentP.x}
+                    y1={plotTop - 3}
+                    x2={currentP.x}
+                    y2={plotBottom + 18}
+                    stroke="#ef4444"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 2"
                   />
-
-                  {/* 2. ドット上の気温テキスト */}
                   <text
-                    x={p.x}
-                    y={(p.isPast ? p.yActual : p.yPredicted) - 9}
-                    fill={isHovered ? "#0284c7" : p.isCurrent ? "#dc2626" : p.isPast ? "#0369a1" : "#b45309"}
-                    fontSize={isHovered || p.isCurrent ? "12" : "11"}
+                    x={currentP.x}
+                    y={plotTop - 5}
+                    fill="#ef4444"
+                    fontSize="9"
                     fontWeight="900"
                     textAnchor="middle"
                   >
-                    {p.isPast ? p.tempActual : p.tempPredicted}°
+                    現在
                   </text>
-
-                  {/* 3. 現在時刻またはホバー時のハイライト枠 */}
-                  {(p.isCurrent || isHovered) && (
-                    <rect
-                      x={p.x - 13}
-                      y="193"
-                      width="26"
-                      height="20"
-                      rx="5"
-                      fill={isHovered ? "#0284c7" : "#ef4444"}
-                      fillOpacity="0.2"
-                      stroke={isHovered ? "#0284c7" : "#ef4444"}
-                      strokeWidth="1.2"
-                    />
-                  )}
-
-                  {/* 4. 完全同座標で揃えられた下部時間ラベル (04〜19) */}
-                  <text
-                    x={p.x}
-                    y="207"
-                    fill={isHovered ? "#0284c7" : p.isCurrent ? "#dc2626" : p.isPast ? "#0369a1" : "#047857"}
-                    fontSize="11"
-                    fontWeight={isHovered || p.isCurrent ? "900" : "700"}
-                    textAnchor="middle"
-                  >
-                    {p.time}
-                  </text>
-
-                  {/* 5. 隙間のない広範囲ヒット領域 (列全体をスキマなくカバー) */}
-                  <rect
-                    x={leftBound}
-                    y="0"
-                    width={rectWidth}
-                    height={svgTotalHeight}
-                    fill="transparent"
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredPointInfo({ x: p.x, y: p.isPast ? p.yActual : p.yPredicted, hourData: p.rawData })}
-                  />
                 </g>
-              );
-            })}
-          </svg>
+              )}
+
+              {/* 1. 過去の予測 (グレー点線) */}
+              {actualPoints.length > 1 && (
+                <polyline
+                  fill="none"
+                  stroke="#64748b"
+                  strokeWidth="2"
+                  strokeDasharray="2 4"
+                  opacity="0.85"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={pastPredictedPolyline}
+                />
+              )}
+
+              {/* 2. 過去の実績 (青色実線) */}
+              {actualPoints.length > 1 && (
+                <polyline
+                  fill="none"
+                  stroke="#0284c7"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={actualPolyline}
+                />
+              )}
+
+              {/* 3. 未来の予報 (橙色破線) */}
+              {futurePoints.length > 1 && (
+                <polyline
+                  fill="none"
+                  stroke="#ea580c"
+                  strokeWidth="2.8"
+                  strokeDasharray="7 5"
+                  strokeLinecap="butt"
+                  strokeLinejoin="miter"
+                  points={futurePolyline}
+                />
+              )}
+
+              {/* 各ドット・気温数値 ＆ 横軸時間ラベル (縮小サイズ最適化) */}
+              {points.map((p, idx) => {
+                const prevX = idx > 0 ? points[idx - 1].x : paddingLeft - 10;
+                const nextX = idx < points.length - 1 ? points[idx + 1].x : width - paddingRight + 10;
+                const leftBound = idx === 0 ? paddingLeft - 10 : (p.x + prevX) / 2;
+                const rightBound = idx === points.length - 1 ? width - paddingRight + 10 : (p.x + nextX) / 2;
+                const rectWidth = rightBound - leftBound;
+                const isHovered = hoveredPointInfo?.x === p.x;
+
+                return (
+                  <g key={idx}>
+                    {/* 過去予測の小ドット */}
+                    {p.isPast && p.tempActual !== p.tempPredicted && (
+                      <circle
+                        cx={p.x}
+                        cy={p.yPredicted}
+                        r={2.5}
+                        fill="#94a3b8"
+                        stroke="#ffffff"
+                        strokeWidth={0.8}
+                      />
+                    )}
+
+                    {/* 1. 気温メインドット */}
+                    <circle
+                      cx={p.x}
+                      cy={p.isPast ? p.yActual : p.yPredicted}
+                      r={isHovered ? 6.5 : p.isCurrent ? 5.5 : 3.5}
+                      fill={isHovered ? "#0284c7" : p.isCurrent ? "#ef4444" : p.isPast ? "#0284c7" : "#d97706"}
+                      stroke="#ffffff"
+                      strokeWidth={isHovered ? 2.5 : p.isCurrent ? 2 : 1}
+                    />
+
+                    {/* 2. ドット上の気温テキスト */}
+                    <text
+                      x={p.x}
+                      y={(p.isPast ? p.yActual : p.yPredicted) - 6}
+                      fill={isHovered ? "#0284c7" : p.isCurrent ? "#dc2626" : p.isPast ? "#0369a1" : "#b45309"}
+                      fontSize={isHovered || p.isCurrent ? "10.5" : "9.5"}
+                      fontWeight="900"
+                      textAnchor="middle"
+                    >
+                      {p.isPast ? p.tempActual : p.tempPredicted}°
+                    </text>
+
+                    {/* 3. 現在時刻またはホバー時のハイライト枠 */}
+                    {(p.isCurrent || isHovered) && (
+                      <rect
+                        x={p.x - 11}
+                        y={plotBottom + 4}
+                        width="22"
+                        height="16"
+                        rx="4"
+                        fill={isHovered ? "#0284c7" : "#ef4444"}
+                        fillOpacity="0.2"
+                        stroke={isHovered ? "#0284c7" : "#ef4444"}
+                        strokeWidth="1"
+                      />
+                    )}
+
+                    {/* 4. 下部時間ラベル (00〜23) */}
+                    <text
+                      x={p.x}
+                      y={plotBottom + 16}
+                      fill={isHovered ? "#0284c7" : p.isCurrent ? "#dc2626" : p.isPast ? "#0369a1" : "#047857"}
+                      fontSize="9.5"
+                      fontWeight={isHovered || p.isCurrent ? "900" : "700"}
+                      textAnchor="middle"
+                    >
+                      {p.time}
+                    </text>
+
+                    {/* 5. 広範囲ヒット領域 */}
+                    <rect
+                      x={leftBound}
+                      y="0"
+                      width={rectWidth}
+                      height={svgTotalHeight}
+                      fill="transparent"
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHoveredPointInfo({ x: p.x, y: p.isPast ? p.yActual : p.yPredicted, hourData: p.rawData })}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* 【右側 縦並び凡例エリア】(ユーザー要望: 24時間気温の凡例はグラフ右側に縦に並べてほしい) */}
+          <div className="w-full md:w-36 shrink-0 bg-gray-50/90 p-2.5 rounded-xl border border-gray-200/90 flex flex-row md:flex-col justify-around md:justify-center space-y-0 md:space-y-2 text-[10.5px] font-bold">
+            <span className="text-gray-400 text-[9.5px] font-bold block border-b border-gray-200 pb-1 hidden md:block">
+              📈 24時間 凡例
+            </span>
+            <span className="text-blue-900 flex items-center gap-1.5">
+              <span className="w-3.5 h-1.5 bg-[#0284c7] rounded-full inline-block shrink-0"></span>
+              <span>過去の実績 <span className="text-[9px] text-gray-500 font-normal block md:inline">(青実線)</span></span>
+            </span>
+            <span className="text-slate-600 flex items-center gap-1.5">
+              <span className="w-3.5 h-1 border-b-2 border-dashed border-slate-500 inline-block shrink-0"></span>
+              <span>過去の予測 <span className="text-[9px] text-gray-500 font-normal block md:inline">(グレー点線)</span></span>
+            </span>
+            <span className="text-amber-800 flex items-center gap-1.5">
+              <span className="w-3.5 h-1 border-b-2 border-dashed border-amber-600 inline-block shrink-0"></span>
+              <span>未来の予報 <span className="text-[9px] text-gray-500 font-normal block md:inline">(橙破線)</span></span>
+            </span>
+          </div>
         </div>
 
-        {/* 【右側】全気象情報・農業指標が集約された統合情報カード */}
-        <div className="w-full lg:w-[40%] bg-gray-50/90 rounded-2xl p-4 border border-gray-200 space-y-3 shadow-xs flex flex-col justify-between">
-          <div className="space-y-3">
-            {/* ヘッダー: 時刻情報 ＆ 現在/選択状態 */}
-            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-              <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
-                <span>⏱️</span>
-                <span>{displayData ? `${displayData.time}:00 の気象詳細サマリー` : "気象サマリー"}</span>
-              </span>
-              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${hoveredPointInfo ? "bg-emerald-100 text-emerald-900 border-emerald-300" : "bg-red-100 text-red-800 border-red-200"}`}>
-                {hoveredPointInfo ? `選択中 (${displayData?.time})` : `現在時刻 (${currentP?.time || "10"})`}
-              </span>
-            </div>
+        {/* 出典情報 ＆ マウスオーバー詳細ポップオーバー */}
+        <div className="pt-0.5 border-t border-gray-200/80 flex items-center justify-between text-[10px] text-gray-500 font-medium relative">
+          <div 
+            className="flex items-center gap-1 cursor-pointer hover:text-emerald-800 transition group"
+            onMouseEnter={() => setShowSourceTooltip(true)}
+            onMouseLeave={() => setShowSourceTooltip(false)}
+          >
+            <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[9px] shrink-0 border border-emerald-300">
+              ℹ️
+            </span>
+            <span className="font-bold underline decoration-dashed underline-offset-2 text-gray-600 group-hover:text-emerald-800 text-[10px]">
+              データ出典: Open-Meteo & 気象庁推計 (ホバー詳細)
+            </span>
 
-            {/* メイン天気 ＆ 気温 ＆ 降水 ＆ 風速集約 */}
-            <div className="flex items-center space-x-3 bg-white p-3 rounded-xl border border-gray-200 shadow-xs">
-              <span className="text-4xl shrink-0">
-                {displayData ? getWeatherIcon(displayData.weather) : "☀️"}
-              </span>
-              <div className="flex-1 space-y-1">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-base font-black text-gray-900">
+            {/* マウスオーバー詳細ポップオーバー */}
+            {showSourceTooltip && (
+              <div className="absolute left-0 bottom-6 z-50 w-72 p-3 bg-gray-900/95 text-white rounded-2xl shadow-2xl backdrop-blur-md border border-gray-700 space-y-1 text-[10px] font-normal leading-relaxed animate-fade-in pointer-events-none">
+                <div className="font-black text-amber-400 border-b border-gray-700 pb-0.5 flex items-center gap-1 text-[11px]">
+                  <span>🌐</span>
+                  <span>気象データ出典 ＆ 農業解析仕様</span>
+                </div>
+                <p>・<strong className="text-emerald-300">データソース</strong>: Open-Meteo Weather API</p>
+                <p>・<strong className="text-emerald-300">地域解析</strong>: 気象庁アメダス 1kmメッシュ推計データ</p>
+                <p>・<strong className="text-emerald-300">同期仕様</strong>: 過去24時間実績 / 今後24時間予測 リアルタイム</p>
+              </div>
+            )}
+          </div>
+
+          <span className="text-[9.5px] text-gray-400 font-bold hidden sm:inline-block">
+            ※1時間毎最新同期中
+          </span>
+        </div>
+
+        {/* 【下部】時間単位気象サマリー (気象詳細サマリー2行分 ＆ 農業判断指標4列2行配置) */}
+        <div className="w-full bg-gray-50/95 rounded-2xl p-2.5 sm:p-3 border border-gray-200 shadow-2xs space-y-2 mt-1">
+          {/* ヘッダー */}
+          <div className="flex items-center justify-between border-b border-gray-200/80 pb-1.5">
+            <span className="text-xs font-black text-emerald-950 flex items-center gap-1">
+              <span>⏱️</span>
+              <span>{displayData ? `${displayData.time}:00 の気象詳細サマリー` : "気象サマリー"}</span>
+            </span>
+            <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border ${hoveredPointInfo ? "bg-blue-100 text-blue-900 border-blue-300" : "bg-red-100 text-red-800 border-red-200"}`}>
+              {hoveredPointInfo ? `選択中 (${displayData?.time}:00)` : `現在時刻 (${currentP?.time || "09"}:00)`}
+            </span>
+          </div>
+
+          {/* 2行分相当の左下天気カード ＋ 4列2行整列の7農業指標 */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 items-stretch">
+            {/* 【左下 2行分の大きさ】コンパクト天気カード */}
+            <div className="lg:col-span-1 bg-white p-2 rounded-xl border border-gray-200 shadow-2xs flex flex-col justify-between space-y-1">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                <span className="text-xl">
+                  {displayData ? getWeatherIcon(displayData.weather) : "☀️"}
+                </span>
+                <div className="text-right">
+                  <span className="text-xs font-black text-gray-900 inline-block mr-1">
                     {displayData ? getWeatherText(displayData.weather) : "晴れ"}
                   </span>
-                  <span className="text-lg font-black text-amber-600">
+                  <span className="text-sm font-black text-amber-600 inline-block">
                     {displayData ? (displayData.isPast ? displayData.tempActual : displayData.tempPredicted) : 25}°C
                   </span>
                 </div>
-                <div className="flex justify-between text-[11px] font-bold text-gray-600 pt-0.5">
-                  <span className="text-blue-800">☔ 降水 {displayData?.rainProb ?? 0}% ({displayData?.rain ?? 0}mm)</span>
-                  <span className="text-emerald-800">💨 風速 {displayData?.wind ?? 0}m/s</span>
+              </div>
+
+              <div className="space-y-1 text-[10px] font-bold text-gray-700">
+                <div className="flex items-center justify-between bg-blue-50/70 p-1 rounded-lg border border-blue-100 text-blue-900">
+                  <span>☔ 降水</span>
+                  <span className="font-black">{displayData?.rainProb ?? 0}% ({displayData?.rain ?? 0}mm)</span>
                 </div>
+                <div className="flex items-center justify-between bg-emerald-50/70 p-1 rounded-lg border border-emerald-100 text-emerald-900">
+                  <span>💨 風速</span>
+                  <span className="font-black">{displayData?.wind ?? 0} m/s</span>
+                </div>
+              </div>
+
+              <div className="text-[8.5px] text-gray-400 font-bold bg-gray-50 p-0.5 rounded text-center border border-gray-200">
+                ⏱️ {displayData ? displayData.time : "09"}:00 データ
               </div>
             </div>
 
-            {/* 農業指標リアルタイムサマリー (防除・灌水・光合成・熱中症) */}
-            <div className="space-y-1.5 pt-1">
+            {/* 【右側 4列2行整列】時間単位 農業判断指標 (7項目 4列2行配置) */}
+            <div className="lg:col-span-3 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-emerald-950 block">📊 農業作業指標サマリー:</span>
-                <span className="text-[9px] text-gray-500 font-bold">💡 マウスオーバーで解説表示</span>
+                <span className="text-[10px] font-black text-emerald-950 block">📊 時間単位 農業判断指標 (4列2行配置):</span>
+                <span className="text-[9px] text-gray-500 font-bold">青=安全 / 黄=注意 / 赤=警戒</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {/* 1. 🚜 防除 */}
-                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${sprayingColor}`}>
-                  <span className="text-[11px]">🚜 防除</span>
-                  <span className="font-black text-xs px-2 py-0.5 bg-black/20 rounded-md tracking-wide">{sprayingStatus}</span>
-
-                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
-                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
-                    <div className="font-black text-cyan-300 border-b border-white/10 pb-1 flex justify-between items-center">
-                      <span>🚜 防除作業適期判定</span>
-                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
-                      <p className="text-gray-200 pl-1">時間風速 \(v\) (m/s) に基づく農薬漂流(ドリフト)リスク判定</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
-                      <p className="text-cyan-200 pl-1">Open-Meteo 高精度気象データ / 気象庁アメダス風速</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
-                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
-                        <li>🟢 <strong className="text-emerald-300">散布最適</strong>: 風速 &lt; 3m/s (漂流極少・理想)</li>
-                        <li>🟡 <strong className="text-amber-300">風注意</strong>: 風速 3〜5m/s (飛散注意)</li>
-                        <li>🔴 <strong className="text-red-400">散布不可</strong>: 風速 &gt; 5m/s (漂流障害防止・中止)</li>
-                      </ul>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                {/* 1. 🎯 散布適性 */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${sprayColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">🎯 散布適性</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{sprayStatusText}</span>
                 </div>
 
-                {/* 2. 💧 灌水 */}
-                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${irrigationColor}`}>
-                  <span className="text-[11px]">💧 灌水</span>
-                  <span className="font-black text-xs px-2 py-0.5 bg-black/20 rounded-md tracking-wide">{irrigationStatus}</span>
-
-                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
-                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
-                    <div className="font-black text-cyan-300 border-b border-white/10 pb-1 flex justify-between items-center">
-                      <span>💧 灌水・水やり適正判定</span>
-                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
-                      <p className="text-gray-200 pl-1">時間気温 \(T\) (°C) および 時間降水量 \(P\) (mm) の判定複合条件</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
-                      <p className="text-cyan-200 pl-1">気象庁局地気温 ＋ 高解像度降水ナウキャスト</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
-                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
-                        <li>🟡 <strong className="text-amber-300">給水必須</strong>: 気温 &ge; 30°C (乾燥萎れ防止)</li>
-                        <li>🔵 <strong className="text-cyan-300">水やり不要</strong>: 降水 &ge; 5mm (自然雨充分)</li>
-                        <li>🟦 <strong className="text-blue-300">標準給水</strong>: 安定環境 (定時点量水やり)</li>
-                      </ul>
-                    </div>
-                  </div>
+                {/* 2. 🌡️ 熱ストレス */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${heatColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">🌡️ 熱ストレス</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{heatStatusText}</span>
                 </div>
 
-                {/* 3. ☀️ 光合成 */}
-                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${photosynthesisColor}`}>
-                  <span className="text-[11px]">☀️ 光合成</span>
-                  <span className="font-black text-xs px-2 py-0.5 bg-black/20 rounded-md tracking-wide">{photosynthesisStatus}</span>
-
-                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
-                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
-                    <div className="font-black text-amber-300 border-b border-white/10 pb-1 flex justify-between items-center">
-                      <span>☀️ 光合成・成長速度指標</span>
-                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
-                      <p className="text-gray-200 pl-1">雲量・日照量 ＋ 作物最適温度域(20°C〜30°C)適合度</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
-                      <p className="text-cyan-200 pl-1">有効光量子束密度(PPFD)推定モデル ＋ 全天日射量</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
-                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
-                        <li>🟡 <strong className="text-amber-300">絶好</strong>: 晴天 ＋ 20〜30°C (糖分蓄積最大)</li>
-                        <li>🌤️ <strong className="text-emerald-300">良好</strong>: 薄曇り (光合成量十分)</li>
-                        <li>🌧️ <strong className="text-gray-400">日照不足</strong>: 曇雨天 (光量不足で鈍化)</li>
-                      </ul>
-                    </div>
-                  </div>
+                {/* 3. ☀️ 光合成効率 */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${photoColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">☀️ 光合成効率</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{photoStatusText}</span>
                 </div>
 
-                {/* 4. 🌡️ 熱中症 */}
-                <div className={`group relative p-2.5 rounded-xl border flex items-center justify-between font-bold cursor-help transition-all ${heatColor}`}>
-                  <span className="text-[11px]">🌡️ 熱中症</span>
-                  <span className="font-black text-xs px-2 py-0.5 bg-black/20 rounded-md tracking-wide">{heatAlertStatus}</span>
+                {/* 4. 💧 蒸散量 */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${evapTransColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">💧 蒸散量</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{evapTransStatusText}</span>
+                </div>
 
-                  {/* マウスオーバー解説ツールチップ (上部最前面表示) */}
-                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900/98 text-white p-3 rounded-2xl border border-cyan-400/60 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-[100] text-[10px] space-y-1.5 backdrop-blur-md">
-                    <div className="font-black text-red-400 border-b border-white/10 pb-1 flex justify-between items-center">
-                      <span>🌡️ 熱中症警戒レベル (WBGT)</span>
-                      <span className="text-[9px] text-gray-400">ホバー詳細</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">🧮 計算式・判別判定:</span>
-                      <p className="text-gray-200 pl-1">湿球黒球温度(WBGT)近似式: 外気温度 \(T\) (°C) と日射量</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📡 データの出どころ:</span>
-                      <p className="text-cyan-200 pl-1">環境省熱中症予防情報 ＋ 局地リアルタイム気温</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-300 font-bold block">📊 判定水準:</span>
-                      <ul className="space-y-0.5 text-[9.5px] pl-1 text-gray-300">
-                        <li>🟢 <strong className="text-emerald-300">熱中症安全</strong>: 気温 &lt; 28°C (通常作業可能)</li>
-                        <li>🟡 <strong className="text-amber-300">暑さ注意</strong>: 気温 28〜32°C (水分補給と休憩)</li>
-                        <li>🔴 <strong className="text-red-400">厳重警戒</strong>: 気温 &ge; 32°C (過度作業自粛)</li>
-                      </ul>
-                    </div>
-                  </div>
+                {/* 5. 🍃 葉面乾燥 */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${leafWetColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">🍃 葉面乾燥</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{leafWetStatusText}</span>
+                </div>
+
+                {/* 6. 🦠 病害リスク */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${diseaseRiskColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">🦠 病害リスク</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{diseaseRiskStatusText}</span>
+                </div>
+
+                {/* 7. 🏡 ハウス環境 */}
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${greenhouseColorClass}`}>
+                  <span className="text-[9.5px] flex items-center gap-1">🏡 ハウス環境</span>
+                  <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{greenhouseStatusText}</span>
+                </div>
+
+                {/* 8. 動的連動ガイドメッセージ (8つ目のセルとして4列目に収容) */}
+                <div className="bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-200 text-[9px] font-bold text-emerald-950 flex items-center gap-1">
+                  <span className="text-xs shrink-0">💡</span>
+                  <span className="leading-tight">
+                    ホバーで選択時間の全指標が動的更新
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="text-[10px] text-gray-400 font-bold bg-white/5 p-2 rounded-xl border border-white/10 text-center">
-            💡 グラフ上をホバーすると、該当時間の気象・指導指標が右側に反映されます
           </div>
         </div>
       </div>
@@ -1104,56 +1160,57 @@ export default function WeatherWidget() {
         </button>
       </div>
 
-      {/* 2. メイン気象サマリー ＆ モード切替タブ ＆ 生徒一括配信 */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 relative z-10">
-        <div className="flex items-center space-x-3">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-3xl sm:text-4xl shadow-xs shrink-0">
-            {loading ? <span className="animate-spin text-2xl">🌀</span> : getWeatherIcon(weather.today.weather)}
+      {/* 2. メイン気象サマリー ＆ モード切替タブ ＆ 生徒一括配信 (横一列コンパクト配列) */}
+      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 relative z-10 text-xs">
+        {/* 天気アイコン＋気温＋降水＋風速＋日照プログレス (全て横一列に格納) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-2xl shadow-2xs shrink-0">
+            {loading ? <span className="animate-spin text-lg">🌀</span> : getWeatherIcon(weather.today.weather)}
           </div>
 
-          <div>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <span className="text-xl sm:text-2xl font-black text-gray-900">{getWeatherText(weather.today.weather)}</span>
-              <span className="text-base sm:text-lg font-black text-amber-600">{weather.today.tempMax}°C</span>
-              <span className="text-xs text-emerald-800 font-bold">/ {weather.today.tempMin}°C</span>
-              
-              <span className="text-xs font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200">
-                ☔ 降水 {weather.today.rainProb}% ({weather.today.rainSum}mm)
-              </span>
-              <span className="text-xs font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
-                💨 風速 {weather.today.windSpeed}m/s
-              </span>
-            </div>
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <span className="text-base font-black text-gray-900">{getWeatherText(weather.today.weather)}</span>
+            <span className="text-base font-black text-amber-600">{weather.today.tempMax}°C</span>
+            <span className="text-xs text-emerald-800 font-bold">/ {weather.today.tempMin}°C</span>
+            
+            <span className="text-[11px] font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200">
+              ☔ 降水 {weather.today.rainProb}% ({weather.today.rainSum}mm)
+            </span>
+            <span className="text-[11px] font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
+              💨 風速 {weather.today.windSpeed}m/s
+            </span>
+          </div>
 
-            <div className="mt-1 flex items-center space-x-2 text-xs">
-              <span className="text-[11px] font-black text-amber-800">{weather.today.sunlightText}</span>
-              <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden p-0.5 inline-block border border-gray-200">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all"
-                  style={{ width: `${weather.today.sunlightPercent}%` }}
-                ></div>
-              </div>
+          {/* 日照プログレス (横一列に同軸配置) */}
+          <div className="flex items-center space-x-1.5 text-xs border-l border-gray-200 pl-2 ml-0.5">
+            <span className="text-[11px] font-black text-amber-800 shrink-0">{weather.today.sunlightText}</span>
+            <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden p-0.5 inline-block border border-gray-200 shrink-0">
+              <div
+                className="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all"
+                style={{ width: `${weather.today.sunlightPercent}%` }}
+              ></div>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {/* タブ切替 ＆ 一括配信ボタン (右側にピッタリ配置) */}
+        <div className="flex items-center gap-2 shrink-0">
           <div className="bg-gray-100 p-1 rounded-2xl flex space-x-1 text-xs font-bold border border-gray-200">
             <button
               onClick={() => setActiveTab("24h")}
-              className={`px-2.5 py-1.5 rounded-xl transition ${activeTab === "24h" ? "bg-white text-emerald-950 font-black shadow-xs" : "text-gray-600 hover:text-gray-900"}`}
+              className={`px-2.5 py-1 rounded-xl transition ${activeTab === "24h" ? "bg-white text-emerald-950 font-black shadow-xs" : "text-gray-600 hover:text-gray-900"}`}
             >
               ⏱️ 24時間
             </button>
             <button
               onClick={() => setActiveTab("daily")}
-              className={`px-2.5 py-1.5 rounded-xl transition ${activeTab === "daily" ? "bg-white text-emerald-950 font-black shadow-xs" : "text-gray-600 hover:text-gray-900"}`}
+              className={`px-2.5 py-1 rounded-xl transition ${activeTab === "daily" ? "bg-white text-emerald-950 font-black shadow-xs" : "text-gray-600 hover:text-gray-900"}`}
             >
               📅 週間天気
             </button>
             <button
               onClick={() => setActiveTab("level")}
-              className={`px-2.5 py-1.5 rounded-xl transition ${activeTab === "level" ? "bg-white text-emerald-950 font-black shadow-xs" : "text-gray-600 hover:text-gray-900"}`}
+              className={`px-2.5 py-1 rounded-xl transition ${activeTab === "level" ? "bg-white text-emerald-950 font-black shadow-xs" : "text-gray-600 hover:text-gray-900"}`}
             >
               📊 農業指標
             </button>
@@ -1161,7 +1218,7 @@ export default function WeatherWidget() {
 
           <button
             onClick={() => setIsBroadcastModalOpen(true)}
-            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-xs transition transform active:scale-95 flex items-center space-x-1"
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-xs transition transform active:scale-95 flex items-center space-x-1"
             title="受講生へ気象注意報・本日の一括アドバイスを配信"
           >
             <span>📢 一括配信</span>
@@ -1209,93 +1266,133 @@ export default function WeatherWidget() {
 
       {activeTab === "level" && (
         <div className="space-y-3 pt-2 relative z-10 animate-fade-in border-t border-gray-100 pt-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            
-            <div
-              className="bg-gray-50 p-2.5 rounded-2xl border border-gray-200 space-y-1 relative group cursor-help transition hover:bg-gray-100"
-              title={weather.indices.spraying.detailedTooltip}
-            >
-              <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-emerald-900 flex items-center gap-1">🚜 防除</span>
-                <span className="font-black text-gray-900">{weather.indices.spraying.shortLabel}</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden p-0.5">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${weather.indices.spraying.colorClass}`}
-                  style={{ width: `${weather.indices.spraying.levelPercent}%` }}
-                ></div>
-              </div>
+          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-2">
+            <span className="text-xs font-black text-emerald-950 block">
+              📊 日単位 農業意思決定指標 (5大重要指標):
+            </span>
+            <span className="text-[10px] font-bold text-gray-500">
+              判定水準: <span className="text-blue-600 font-black">青＝安全・最適</span> | <span className="text-amber-600 font-black">黄＝注意・経過観察</span> | <span className="text-red-600 font-black">赤＝警戒・即対策</span>
+            </span>
+          </div>
 
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-[11px] p-2.5 rounded-xl shadow-2xl border border-emerald-400 z-30 font-bold leading-snug pointer-events-none animate-fade-in">
-                💡 {weather.indices.spraying.detailedTooltip}
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+            {/* 1. 🌿 光合成指数 */}
+            {(() => {
+              const isSafe = weather.today.tempMax >= 20 && weather.today.tempMax <= 30 && weather.today.weather === "sunny";
+              const isWarning = weather.today.weather === "rainy" || weather.today.weather === "storm";
+              const label = isWarning ? "光合成低下(日照不足)" : isSafe ? "光合成最大(栄養蓄積絶好)" : "標準光合成(安定成長)";
+              const badgeClass = isWarning ? "bg-red-600 text-white" : isSafe ? "bg-blue-600 text-white" : "bg-amber-500 text-gray-950";
+              return (
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 relative group cursor-help transition hover:bg-gray-100">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-emerald-950 flex items-center gap-1.5 font-black">🌿 光合成指数</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badgeClass}`}>{label}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-medium leading-tight">
+                    日照量と適正温度(20~30℃)から本日の作物栄養蓄積能力を評価
+                  </p>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 bg-gray-900 text-white text-[10px] p-3 rounded-xl shadow-2xl border border-emerald-400 z-30 font-bold leading-relaxed pointer-events-none animate-fade-in">
+                    💡 晴天かつ20〜30℃で糖分蓄積が最大化。日照不足時は加温・養液管理調整を推奨。
+                  </div>
+                </div>
+              );
+            })()}
 
-            <div
-              className="bg-gray-50 p-2.5 rounded-2xl border border-gray-200 space-y-1 relative group cursor-help transition hover:bg-gray-100"
-              title={weather.indices.irrigation.detailedTooltip}
-            >
-              <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-blue-800 flex items-center gap-1">💧 灌水</span>
-                <span className="font-black text-gray-900">{weather.indices.irrigation.shortLabel}</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden p-0.5">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${weather.indices.irrigation.colorClass}`}
-                  style={{ width: `${weather.indices.irrigation.levelPercent}%` }}
-                ></div>
-              </div>
+            {/* 2. 💧 灌水必要度指数 */}
+            {(() => {
+              const isSafe = weather.today.rainSum >= 8;
+              const isWarning = weather.today.tempMax >= 30 && weather.today.rainSum < 2;
+              const label = isWarning ? "たっぷり給水(高温乾燥)" : isSafe ? "水やり不要(十分な降雨)" : "標準水やり(朝夕給水)";
+              const badgeClass = isWarning ? "bg-red-600 text-white" : isSafe ? "bg-blue-600 text-white" : "bg-amber-500 text-gray-950";
+              return (
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 relative group cursor-help transition hover:bg-gray-100">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-blue-950 flex items-center gap-1.5 font-black">💧 灌水必要度指数</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badgeClass}`}>{label}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-medium leading-tight">
+                    本日の予想降水量と蒸発散量から最適な水やり量を自動判定
+                  </p>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 bg-gray-900 text-white text-[10px] p-3 rounded-xl shadow-2xl border border-blue-400 z-30 font-bold leading-relaxed pointer-events-none animate-fade-in">
+                    💡 気温30℃超＋少雨時は土壌乾燥に注意。根腐れ防止のため早朝または夕方の灌水を推奨。
+                  </div>
+                </div>
+              );
+            })()}
 
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-[11px] p-2.5 rounded-xl shadow-2xl border border-blue-400 z-30 font-bold leading-snug pointer-events-none animate-fade-in">
-                💡 {weather.indices.irrigation.detailedTooltip}
-              </div>
-            </div>
+            {/* 3. 💦 蒸散ストレス指数 */}
+            {(() => {
+              const isWarning = weather.today.tempMax >= 32;
+              const isCaution = weather.today.tempMax >= 28;
+              const label = isWarning ? "萎れ警戒(即散水検討)" : isCaution ? "水ストレス注意" : "蒸散正常(吸水良好)";
+              const badgeClass = isWarning ? "bg-red-600 text-white" : isCaution ? "bg-amber-500 text-gray-950" : "bg-blue-600 text-white";
+              return (
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 relative group cursor-help transition hover:bg-gray-100">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-cyan-950 flex items-center gap-1.5 font-black">💦 蒸散ストレス</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badgeClass}`}>{label}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-medium leading-tight">
+                    作物の水分蒸散スピードと根からの吸水バランスの過剰ストレスを検知
+                  </p>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 bg-gray-900 text-white text-[10px] p-3 rounded-xl shadow-2xl border border-cyan-400 z-30 font-bold leading-relaxed pointer-events-none animate-fade-in">
+                    💡 蒸散過多時は葉の気孔が閉じて成長が停止します。葉面散布や日よけシートでストレス緩和。
+                  </div>
+                </div>
+              );
+            })()}
 
-            <div
-              className="bg-gray-50 p-2.5 rounded-2xl border border-gray-200 space-y-1 relative group cursor-help transition hover:bg-gray-100"
-              title={weather.indices.sunlight.detailedTooltip}
-            >
-              <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-amber-800 flex items-center gap-1">☀️ 光合成</span>
-                <span className="font-black text-gray-900">{weather.indices.sunlight.shortLabel}</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden p-0.5">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${weather.indices.sunlight.colorClass}`}
-                  style={{ width: `${weather.indices.sunlight.levelPercent}%` }}
-                ></div>
-              </div>
+            {/* 4. 🛡️ 防除適性指数 */}
+            {(() => {
+              const isWarning = weather.today.windSpeed > 5 || weather.today.rainSum >= 10;
+              const isCaution = weather.today.windSpeed >= 3;
+              const label = isWarning ? "終日散布不可(強風・雨)" : isCaution ? "時間帯を選んで散布" : "終日散布可能(穏やかな風)";
+              const badgeClass = isWarning ? "bg-red-600 text-white" : isCaution ? "bg-amber-500 text-gray-950" : "bg-blue-600 text-white";
+              return (
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 relative group cursor-help transition hover:bg-gray-100">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-emerald-950 flex items-center gap-1.5 font-black">🛡️ 防除適性指数</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badgeClass}`}>{label}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-medium leading-tight">
+                    1日の平均風速・雨量から農薬漂流(ドリフト)・流亡リスクを総合評価
+                  </p>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 bg-gray-900 text-white text-[10px] p-3 rounded-xl shadow-2xl border border-amber-400 z-30 font-bold leading-relaxed pointer-events-none animate-fade-in">
+                    💡 風速3m/s未満の早朝時間帯がベスト。風速5m/s超または降雨時は薬害・流亡のため散布厳禁。
+                  </div>
+                </div>
+              );
+            })()}
 
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-[11px] p-2.5 rounded-xl shadow-2xl border border-amber-400 z-30 font-bold leading-snug pointer-events-none animate-fade-in">
-                💡 {weather.indices.sunlight.detailedTooltip}
-              </div>
-            </div>
-
-            <div
-              className="bg-gray-50 p-2.5 rounded-2xl border border-gray-200 space-y-1 relative group cursor-help transition hover:bg-gray-100"
-              title={weather.indices.heatAlert.detailedTooltip}
-            >
-              <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-red-700 flex items-center gap-1">🌡️ 熱中症</span>
-                <span className="font-black text-gray-900">{weather.indices.heatAlert.shortLabel}</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden p-0.5">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${weather.indices.heatAlert.colorClass}`}
-                  style={{ width: `${weather.indices.heatAlert.levelPercent}%` }}
-                ></div>
-              </div>
-
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 bg-slate-950 text-amber-200 text-[11px] p-2.5 rounded-xl shadow-2xl border border-amber-400/50 z-30 font-bold leading-snug pointer-events-none animate-fade-in">
-                💡 {weather.indices.heatAlert.detailedTooltip}
-              </div>
-            </div>
+            {/* 5. ☀️ 熱ストレス指数 */}
+            {(() => {
+              const isWarning = weather.today.tempMax >= 32;
+              const isCaution = weather.today.tempMax >= 28;
+              const label = isWarning ? "日中屋外作業禁止(厳重警戒)" : isCaution ? "定時休憩・水分補給" : "現場作業安全(快適)";
+              const badgeClass = isWarning ? "bg-red-600 text-white animate-pulse" : isCaution ? "bg-amber-500 text-gray-950" : "bg-blue-600 text-white";
+              return (
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2 relative group cursor-help transition hover:bg-gray-100">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-red-950 flex items-center gap-1.5 font-black">☀️ 熱ストレス指数</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badgeClass}`}>{label}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-medium leading-tight">
+                    作業者の熱中症リスク(WBGT相当)および作物の高温障害発生危険度
+                  </p>
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 bg-slate-950 text-white text-[10px] p-3 rounded-xl shadow-2xl border border-red-500 z-30 font-bold leading-relaxed pointer-events-none animate-fade-in">
+                    💡 気温32℃以上は熱中症・高温障害の危険度が極めて高まります。10〜15時の屋外農作業を避けてください。
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
 
-          <div className="bg-white/10 px-3 py-2 rounded-2xl border border-white/15 text-xs flex items-center space-x-2">
+          <div className="bg-emerald-50/80 px-3 py-2 rounded-xl border border-emerald-200 text-xs flex items-center space-x-2 text-emerald-950">
             <span className="text-base">💡</span>
-            <span className="font-extrabold text-white leading-tight">{weather.adviceShort}</span>
+            <span className="font-extrabold leading-tight">
+              【農作業アドバイス】本日の主要指標に基づき、適切な防除・給水・作業計画を立てましょう。
+            </span>
           </div>
         </div>
       )}
