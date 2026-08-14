@@ -974,22 +974,22 @@ export default function WeatherWidget() {
             </svg>
           </div>
 
-          {/* 【右側 縦並び凡例エリア】(ユーザー要望: 24時間気温の凡例はグラフ右側に縦に並べてほしい) */}
-          <div className="w-full md:w-36 shrink-0 bg-gray-50/90 p-2.5 rounded-xl border border-gray-200/90 flex flex-row md:flex-col justify-around md:justify-center space-y-0 md:space-y-2 text-[10.5px] font-bold">
-            <span className="text-gray-400 text-[9.5px] font-bold block border-b border-gray-200 pb-1 hidden md:block">
-              📈 24時間 凡例
+          {/* 【右側 縦並び凡例エリア】(余分な空白排除・コンパクト化) */}
+          <div className="w-auto shrink-0 bg-gray-50/90 px-2.5 py-1.5 rounded-xl border border-gray-200/90 flex flex-row md:flex-col justify-center space-x-3 md:space-x-0 space-y-0 md:space-y-1 text-[10px] font-bold self-center">
+            <span className="text-gray-400 text-[9px] font-bold block border-b border-gray-200 pb-0.5 hidden md:block">
+              📈 凡例
             </span>
-            <span className="text-blue-900 flex items-center gap-1.5">
-              <span className="w-3.5 h-1.5 bg-[#0284c7] rounded-full inline-block shrink-0"></span>
-              <span>過去の実績 <span className="text-[9px] text-gray-500 font-normal block md:inline">(青実線)</span></span>
+            <span className="text-blue-900 flex items-center gap-1">
+              <span className="w-3 h-1 bg-[#0284c7] rounded-full inline-block shrink-0"></span>
+              <span>過去の実績</span>
             </span>
-            <span className="text-slate-600 flex items-center gap-1.5">
-              <span className="w-3.5 h-1 border-b-2 border-dashed border-slate-500 inline-block shrink-0"></span>
-              <span>過去の予測 <span className="text-[9px] text-gray-500 font-normal block md:inline">(グレー点線)</span></span>
+            <span className="text-slate-600 flex items-center gap-1">
+              <span className="w-3 h-1 border-b border-dashed border-slate-500 inline-block shrink-0"></span>
+              <span>過去の予測</span>
             </span>
-            <span className="text-amber-800 flex items-center gap-1.5">
-              <span className="w-3.5 h-1 border-b-2 border-dashed border-amber-600 inline-block shrink-0"></span>
-              <span>未来の予報 <span className="text-[9px] text-gray-500 font-normal block md:inline">(橙破線)</span></span>
+            <span className="text-amber-800 flex items-center gap-1">
+              <span className="w-3 h-1 border-b border-dashed border-amber-600 inline-block shrink-0"></span>
+              <span>未来の予報</span>
             </span>
           </div>
         </div>
@@ -1027,19 +1027,8 @@ export default function WeatherWidget() {
           </span>
         </div>
 
-        {/* 【下部】時間単位気象サマリー (気象詳細サマリー2行分 ＆ 農業判断指標4列2行配置) */}
+        {/* 【下部】気象サマリー ＆ 農業判断指標 (不要メッセージ排除・スッキリ配置) */}
         <div className="w-full bg-gray-50/95 rounded-2xl p-2.5 sm:p-3 border border-gray-200 shadow-2xs space-y-2 mt-1">
-          {/* ヘッダー */}
-          <div className="flex items-center justify-between border-b border-gray-200/80 pb-1.5">
-            <span className="text-xs font-black text-emerald-950 flex items-center gap-1">
-              <span>⏱️</span>
-              <span>{displayData ? `${displayData.time}:00 の気象詳細サマリー` : "気象サマリー"}</span>
-            </span>
-            <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border ${hoveredPointInfo ? "bg-blue-100 text-blue-900 border-blue-300" : "bg-red-100 text-red-800 border-red-200"}`}>
-              {hoveredPointInfo ? `選択中 (${displayData?.time}:00)` : `現在時刻 (${currentP?.time || "09"}:00)`}
-            </span>
-          </div>
-
           {/* 2行分相当の左下天気カード ＋ 4列2行整列の7農業指標 */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 items-stretch">
             {/* 【左下 2行分の大きさ】コンパクト天気カード */}
@@ -1068,68 +1057,84 @@ export default function WeatherWidget() {
                   <span className="font-black">{displayData?.wind ?? 0} m/s</span>
                 </div>
               </div>
-
-              <div className="text-[8.5px] text-gray-400 font-bold bg-gray-50 p-0.5 rounded text-center border border-gray-200">
-                ⏱️ {displayData ? displayData.time : "09"}:00 データ
-              </div>
             </div>
 
             {/* 【右側 4列2行整列】時間単位 農業判断指標 (7項目 4列2行配置) */}
             <div className="lg:col-span-3 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-emerald-950 block">📊 時間単位 農業判断指標 (4列2行配置):</span>
+              <div className="flex items-center justify-between border-b border-gray-200/80 pb-0.5">
+                <span className="text-[10px] font-black text-emerald-950 block">📊 農業判断指標:</span>
                 <span className="text-[9px] text-gray-500 font-bold">青=安全 / 黄=注意 / 赤=警戒</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
                 {/* 1. 🎯 散布適性 */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${sprayColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${sprayColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">🎯 散布適性</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{sprayStatusText}</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-blue-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">🎯 散布適性指数</div>
+                    農薬・液肥の散布適性。風速や降雨時の薬剤漂流(ドリフト)や流亡を予防し、安全で効果的な防除タイミングを判定します。
+                  </div>
                 </div>
 
                 {/* 2. 🌡️ 熱ストレス */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${heatColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${heatColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">🌡️ 熱ストレス</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{heatStatusText}</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-amber-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">🌡️ 熱ストレス指数</div>
+                    作業者の熱中症警戒度。気温と風速・降水量から危険度を測定し、水分補給・定時休憩・作業中止を支援します。
+                  </div>
                 </div>
 
                 {/* 3. ☀️ 光合成効率 */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${photoColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${photoColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">☀️ 光合成効率</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{photoStatusText}</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-emerald-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">☀️ 光合成効率指数</div>
+                    作物の光合成活性度。適正な気温(20〜30℃)と日照条件から、栄養蓄積と生長に最適な時間帯を判定します。
+                  </div>
                 </div>
 
                 {/* 4. 💧 蒸散量 */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${evapTransColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${evapTransColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">💧 蒸散量</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{evapTransStatusText}</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-cyan-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">💧 蒸散量指数</div>
+                    作物の水分蒸散スピード。根からの吸水量バランスと連動し、水ストレス防止や液肥吸収率を判定します。
+                  </div>
                 </div>
 
                 {/* 5. 🍃 葉面乾燥 */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${leafWetColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${leafWetColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">🍃 葉面乾燥</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{leafWetStatusText}</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-teal-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">🍃 葉面乾燥指数</div>
+                    葉面の濡れ時間と乾燥スピード。結露や降雨後の乾燥を追跡し、糸状菌や細菌病の発生を防ぎます。
+                  </div>
                 </div>
 
                 {/* 6. 🦠 病害リスク */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${diseaseRiskColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${diseaseRiskColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">🦠 病害リスク</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{diseaseRiskStatusText}</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-purple-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">🦠 病害発生リスク</div>
+                    病原菌の増殖警戒度。高湿度と適温が重なる病害発生の好適条件を検知し、予防防除の要否を判定します。
+                  </div>
                 </div>
 
                 {/* 7. 🏡 ハウス環境 */}
-                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all ${greenhouseColorClass}`}>
+                <div className={`p-1.5 rounded-lg border flex flex-col justify-between font-bold space-y-0.5 transition-all relative group cursor-help ${greenhouseColorClass}`}>
                   <span className="text-[9.5px] flex items-center gap-1">🏡 ハウス環境</span>
                   <span className="font-black text-[9.5px] px-1 py-0.5 bg-black/25 rounded tracking-tight text-center">{greenhouseStatusText}</span>
-                </div>
-
-                {/* 8. 動的連動ガイドメッセージ (8つ目のセルとして4列目に収容) */}
-                <div className="bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-200 text-[9px] font-bold text-emerald-950 flex items-center gap-1">
-                  <span className="text-xs shrink-0">💡</span>
-                  <span className="leading-tight">
-                    ホバーで選択時間の全指標が動的更新
-                  </span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-52 p-2 bg-gray-900/95 text-white text-[10px] rounded-xl shadow-2xl border border-emerald-400 z-50 font-normal leading-relaxed pointer-events-none animate-fade-in">
+                    <div className="font-black text-amber-300 border-b border-gray-700 pb-0.5 mb-1 text-[10.5px]">🏡 ハウス環境制御</div>
+                    施設園芸の環境制御指標。高熱や過湿時の天窓オープン・遮光ネット・換気扇稼働タイミングを提示します。
+                  </div>
                 </div>
               </div>
             </div>
