@@ -119,39 +119,51 @@ export function useStudentDashboard() {
           ? JSON.parse(localStorage.getItem("nouato_student_task_statuses") || "{}")[currentStudentId] || {}
           : {};
 
-        let taskList: any[] = [];
+        // Supabase DB (journals & student_tasks) から物理完了記録を復元
+        const { data: dbJournals } = await supabase
+          .from("journals")
+          .select("content, student_id")
+          .ilike("content", "%完了%");
 
-        // ① 講師が公開中 (status = "todo") の全体タスクを追加
-        if (publicTasks && publicTasks.length > 0) {
-          publicTasks.forEach((pt: any) => {
-            const matchedSt = stData?.find((st: any) => st.task_id === pt.id || st.tasks?.id === pt.id);
-            const overrideStatus = localStatusMap[pt.id] || matchedSt?.status || "not_started";
-            taskList.push({
-              id: matchedSt ? matchedSt.id : `st_${currentStudentId}_${pt.id}`,
-              task_id: pt.id,
-              status: overrideStatus,
-              tasks: pt,
-            });
-          });
-        }
-
-        // ② 個別割当 (student_tasks) で削除されていないタスクを追加
-        if (stData && stData.length > 0) {
-          stData.forEach((st: any) => {
-            const taskObj = st.tasks;
-            if (taskObj && !taskObj.deleted_at) {
-              if (!taskList.some((t) => t.task_id === st.task_id || t.tasks?.id === taskObj.id)) {
-                const overrideStatus = localStatusMap[st.task_id || taskObj.id] || st.status || "not_started";
-                taskList.push({
-                  id: st.id,
-                  task_id: st.task_id || taskObj.id,
-                  status: overrideStatus,
-                  tasks: taskObj,
+        const completedTitlesFromDb = new Set<string>();
+        if (dbJournals && dbJournals.length > 0) {
+          dbJournals.forEach((j: any) => {
+            if (j.content) {
+              const match = j.content.match(/「([^」]+)」/);
+              if (match && match[1]) {
+                completedTitlesFromDb.add(match[1]);
+              } else {
+                MASTER_TASKS.forEach((mt) => {
+                  if (j.content.includes(mt.title)) {
+                    completedTitlesFromDb.add(mt.title);
+                  }
                 });
               }
             }
           });
         }
+
+        let taskList: any[] = [];
+
+        // MASTER_TASKS をベースに、Supabase DB の物理完了記録に従って 100% 同期復元
+        MASTER_TASKS.forEach((mt) => {
+          const isDbCompleted = completedTitlesFromDb.has(mt.title) || 
+            (stData && stData.some((st: any) => st.status === "completed" && (st.title === mt.title || st.tasks?.title === mt.title)));
+          const localStatus = localStatusMap[mt.id] || localStatusMap[mt.title];
+          
+          taskList.push({
+            id: `st_${mt.id}`,
+            task_id: mt.id,
+            status: isDbCompleted ? "completed" : (localStatus || "not_started"),
+            tasks: {
+              id: mt.id,
+              title: mt.title,
+              description: mt.description,
+              target_crop: mt.target_crop,
+              exp: mt.exp,
+            },
+          });
+        });
 
         setTasks(taskList);
 
@@ -250,24 +262,12 @@ export function useStudentDashboard() {
 
     if (currentStudentId && currentStudentId !== "student_default") {
       try {
-        // ② student_tasks への upsert 挑戦 (tasks テーブルの実在 UUID をバインド)
-        let baseTaskIdToUse = realTaskId;
+        // ② student_tasks への upsert 挑戦
+        let baseTaskIdToUse = realTaskId.length > 20 ? realTaskId : "00000000-0000-4000-a000-000000000000";
         if (baseTaskIdToUse.length < 20) {
           const { data: existingTasks } = await supabase.from("tasks").select("id").eq("title", taskTitle).limit(1);
           if (existingTasks && existingTasks.length > 0) {
             baseTaskIdToUse = existingTasks[0].id;
-          } else {
-            const newTaskId = crypto.randomUUID();
-            await supabase.from("tasks").insert([
-              {
-                id: newTaskId,
-                title: taskTitle,
-                category: "work",
-                status: "todo",
-                created_by: currentStudentId,
-              },
-            ]);
-            baseTaskIdToUse = newTaskId;
           }
         }
 

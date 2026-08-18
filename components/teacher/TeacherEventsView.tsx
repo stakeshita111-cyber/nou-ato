@@ -59,9 +59,9 @@ export default function TeacherEventsView() {
     <div className="space-y-6 animate-fade-in">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-gray-900">📅 カレンダー予約 ＆ イベント管理</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900">📅 カレンダー予約 ＆ イベント管理</h2>
           <p className="text-xs text-gray-500 mt-1">
             Googleカレンダー風ビューでイベントを管理し、登録したイベントは生徒受講画面とリアルタイム共有されます。
           </p>
@@ -69,7 +69,7 @@ export default function TeacherEventsView() {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-5 py-3 app-accent-btn font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5"
+          className="px-5 py-3 app-accent-btn font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 shrink-0"
         >
           <span className="text-base leading-none">＋</span>
           <span>新しいイベントをカレンダーに登録</span>

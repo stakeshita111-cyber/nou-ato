@@ -23,6 +23,7 @@ export default function TeacherDashboardPage() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // 講師ロール（role === 'teacher'）権限の厳格チェック
   useEffect(() => {
@@ -97,7 +98,12 @@ export default function TeacherDashboardPage() {
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* 1. 左サイドバー */}
-      <TeacherSidebar activeMenu={activeMenu} onMenuClick={setActiveMenu} />
+      <TeacherSidebar
+        activeMenu={activeMenu}
+        onMenuClick={setActiveMenu}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+      />
 
       {/* 2. メインエリア */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
@@ -123,6 +129,7 @@ export default function TeacherDashboardPage() {
               : "画面設定"
           }
           onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
         {/* ページコンテンツ */}

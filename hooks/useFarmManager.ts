@@ -40,6 +40,72 @@ export function checkBoundingBoxOverlap(
   );
 }
 
+// 🌟【新設計】全マス100%独立構造・セルアドレス(code: A1, B2, D1, D2...)基準の絶対固定マップ生成関数 🌟
+export const buildFixedPlots = (
+  activeFarmId: string,
+  existingPlots: FarmPlot[] = [],
+  cols: number = 6,
+  rows: number = 8
+): FarmPlot[] => {
+  const fixedPlots: FarmPlot[] = [];
+
+  for (let r = 0; r < rows; r++) {
+    const rowNum = r + 1;
+    for (let c = 0; c < cols; c++) {
+      const colLetter = String.fromCharCode(65 + c); // A, B, C...
+      const cellAddress = `${colLetter}${rowNum}`; // A1, B1, D1, D2...
+      const idx = r * cols + c;
+
+      const existing = existingPlots.find((p) => p.code === cellAddress);
+      const uniquePlotId = `plot_cell_${cellAddress}`;
+
+      if (existing && !existing.id.startsWith("plot_placeholder_")) {
+        const isVacantStatus = existing.is_vacant ?? false;
+
+        fixedPlots.push({
+          ...existing,
+          id: uniquePlotId,
+          grid_index: idx,
+          code: cellAddress,
+          is_vacant: isVacantStatus,
+          beds: existing.beds?.length
+            ? existing.beds.map((b, bIdx) => ({
+                ...b,
+                id: `bed_${cellAddress}_${bIdx + 1}`,
+                plot_id: uniquePlotId,
+                bed_number: b.bed_number || bIdx + 1,
+              }))
+            : [
+                { id: `bed_${cellAddress}_1`, plot_id: uniquePlotId, bed_number: 1, is_updated: false },
+                { id: `bed_${cellAddress}_2`, plot_id: uniquePlotId, bed_number: 2, is_updated: false },
+                { id: `bed_${cellAddress}_3`, plot_id: uniquePlotId, bed_number: 3, is_updated: false },
+                { id: `bed_${cellAddress}_4`, plot_id: uniquePlotId, bed_number: 4, is_updated: false },
+              ],
+        });
+      } else {
+        // デフォルト作成・再追加時: 必ず「未割り当て (4畝 / 生徒なし / is_vacant: false)」のクリーン状態！
+        fixedPlots.push({
+          id: uniquePlotId,
+          farm_id: activeFarmId,
+          name: `区画 ${cellAddress}`,
+          code: cellAddress,
+          grid_index: idx,
+          is_vacant: false,
+          position: { x: c * 120, y: r * 120 },
+          beds: [
+            { id: `bed_${cellAddress}_1`, plot_id: uniquePlotId, bed_number: 1, is_updated: false },
+            { id: `bed_${cellAddress}_2`, plot_id: uniquePlotId, bed_number: 2, is_updated: false },
+            { id: `bed_${cellAddress}_3`, plot_id: uniquePlotId, bed_number: 3, is_updated: false },
+            { id: `bed_${cellAddress}_4`, plot_id: uniquePlotId, bed_number: 4, is_updated: false },
+          ],
+        });
+      }
+    }
+  }
+
+  return fixedPlots;
+};
+
 export function useFarmManager() {
   const [farms, setFarms] = useState<Farm[]>(INITIAL_FARMS_LIST);
   const [activeFarmId, setActiveFarmId] = useState<string>("farm_1");
@@ -51,8 +117,8 @@ export function useFarmManager() {
 
   const reloadAllFromSupabase = useCallback(async () => {
     try {
-      let usersList: any[] = [];
       // 1. 生徒ユーザー一覧
+      let usersList: any[] = [];
       const { data: usersData } = await supabase
         .from("users")
         .select("id, display_name, role")
@@ -91,7 +157,13 @@ export function useFarmManager() {
       }
       setRecords(formattedRecords);
 
-      // 3. 区画 & 畝ベッド
+      // 3. 農場一覧
+      const { data: dbFarms } = await supabase.from("farms").select("*");
+      if (dbFarms && dbFarms.length > 0) {
+        setFarms(dbFarms);
+      }
+
+      // 4. 区画 & 畝ベッド
       const { data: dbPlots } = await supabase.from("farm_plots").select("*");
       const { data: dbBeds } = await supabase.from("farm_beds").select("*");
 
@@ -105,105 +177,106 @@ export function useFarmManager() {
         }
       }
 
-      if (dbPlots && dbPlots.length > 0) {
-        const mergedPlots: FarmPlot[] = dbPlots.map((dp: any, idx: number) => {
-          // 厳格な区画ID判定: b.id.startsWith(dp.id) だと "plot_10_bed_1" が "plot_1" に誤マッチするため `${dp.id}_bed_` で厳密化
-          const matchingBeds = (dbBeds || []).filter((b: any) => {
-            if (b.plot_id && b.plot_id === dp.id) return true;
-            if (b.id) {
-              if (b.id === dp.id) return true;
-              if (b.id.startsWith(`${dp.id}_bed_`)) return true;
-            }
-            return false;
-          });
+      let loadedBasePlots: FarmPlot[] = [];
+      if (savedPlots.length > 0) {
+        loadedBasePlots = savedPlots;
+      } else if (dbPlots && dbPlots.length > 0) {
+        loadedBasePlots = dbPlots.map((dp: any) => ({
+          id: dp.id,
+          farm_id: dp.farm_id || activeFarmId,
+          name: dp.name,
+          code: dp.code,
+          student_id: dp.student_id,
+          student_name: dp.student_name,
+          grid_index: dp.grid_index,
+          is_vacant: dp.is_vacant ?? false,
+          position: dp.position || { x: 0, y: 0 },
+          beds: [],
+        }));
+      }
 
-          const col = idx % 3;
-          const row = Math.floor(idx / 3);
-          const savedP = savedPlots.find((sp) => sp.id === dp.id || sp.code === dp.code);
+      // 🌟 セルアドレス (code) 絶対位置マップを構築 (6列×8行=48マス) 🌟
+      const finalFixedPlots = buildFixedPlots(activeFarmId, loadedBasePlots, 6, 8);
 
-          let bedsList: FarmBed[] = [];
-          if (matchingBeds.length > 0) {
-            bedsList = matchingBeds.map((mb: any, bIdx: number) => ({
-              id: mb.id,
-              plot_id: dp.id,
-              bed_number: parseInt(mb.bed_number) || bIdx + 1,
-              is_updated: false,
-            }));
-          } else if (savedP && Array.isArray(savedP.beds)) {
-            bedsList = savedP.beds;
-          } else {
-            for (let i = 1; i <= 4; i++) {
-              bedsList.push({
-                id: `${dp.id}_bed_${i}`,
-                plot_id: dp.id,
-                bed_number: i,
-                is_updated: false,
-              });
+      // ベッドと記録バインド
+      const plotsWithRecords = finalFixedPlots.map((plot) => {
+        const matchingBeds = (dbBeds || []).filter((b: any) => b.plot_id === plot.id || b.id?.startsWith(`${plot.id}_bed_`));
+        let bedList = plot.beds;
+        if (matchingBeds.length > 0) {
+          bedList = matchingBeds.map((mb: any, bIdx: number) => ({
+            id: mb.id,
+            plot_id: plot.id,
+            bed_number: parseInt(mb.bed_number) || bIdx + 1,
+            is_updated: false,
+          }));
+        }
+
+        const bedsWithStatus = bedList.map((bed) => {
+          const plotStudentId = plot.student_id;
+          let latest: CropRecord | undefined = undefined;
+
+          if (plotStudentId) {
+            const studentRecs = formattedRecords.filter((r) => r.bed_id === bed.id);
+            if (studentRecs.length > 0) {
+              latest = studentRecs.sort(
+                (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              )[0];
             }
           }
 
-          // 割り当てられた生徒(student_id)に紐づく記録のみバインド（新人の場合は白紙状態）
-          const bedsWithStatus = bedsList.map((bed) => {
-            const plotStudentId = dp.student_id;
-            let latest: CropRecord | undefined = undefined;
-
-            if (plotStudentId) {
-              latest = formattedRecords.find(
-                (rec: any) => rec.bed_id === bed.id && (rec.student_id === plotStudentId || rec.user_id === plotStudentId)
-              );
-            }
-
-            if (latest) {
-              return {
-                ...bed,
-                is_updated: true,
-                updated_at: latest.date,
-                latest_record: latest,
-              };
-            }
-            return {
-              ...bed,
-              is_updated: false,
-              updated_at: undefined,
-              latest_record: undefined,
-            };
-          });
-
-          // ID・番号によるベッドの重複を厳格に排除
-          const uniqueBedsMap = new Map<string, FarmBed>();
-          bedsWithStatus.forEach((bed, bIdx) => {
-            const key = bed.id || `${dp.id}_bed_${bed.bed_number || bIdx + 1}`;
-            if (!uniqueBedsMap.has(key)) {
-              uniqueBedsMap.set(key, { ...bed, id: key });
-            }
-          });
-          const deduplicatedBeds = Array.from(uniqueBedsMap.values()).map((b, bIdx) => ({
-            ...b,
-            bed_number: bIdx + 1,
-          }));
-
-          const foundStudent = (usersList || []).find((u: any) => u.id === dp.student_id);
-          const studentName = dp.student_id ? (foundStudent?.display_name || "受講生") : undefined;
-
           return {
-            id: dp.id,
-            farm_id: dp.farm_id || "farm_1",
-            name: dp.student_id ? `区画 ${dp.code || idx + 1} (${studentName})` : dp.name || `区画 ${dp.code || idx + 1}`,
-            code: dp.code || String(idx + 1),
-            student_id: dp.student_id || undefined,
-            student_name: dp.student_id ? studentName : undefined,
-            position: savedP?.position || { x: 40 + col * 330, y: 40 + row * 400 },
-            beds: deduplicatedBeds,
+            ...bed,
+            is_updated: !!latest,
+            latest_record: latest,
           };
         });
 
-        setPlots(mergedPlots);
-        localStorage.setItem("nouato_farm_plots", JSON.stringify(mergedPlots));
-      }
+        return {
+          ...plot,
+          beds: bedsWithStatus,
+        };
+      });
+
+      setPlots(plotsWithRecords);
+      localStorage.setItem("nouato_farm_plots", JSON.stringify(plotsWithRecords));
     } catch (e) {
       console.error("reloadAllFromSupabase error:", e);
     }
-  }, []);
+  }, [activeFarmId]);
+
+  // 🌟 D&D位置移動結果を Supabase DB および localStorage へ永続保存する関数 🌟
+  const savePlotsGridIndicesToSupabase = async (updatedPlots: FarmPlot[]) => {
+    setPlots(updatedPlots);
+    try {
+      localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    // Supabase DB への保存/同期
+    try {
+      for (let i = 0; i < updatedPlots.length; i++) {
+        const plot = updatedPlots[i];
+        if (!plot || plot.id.startsWith("plot_placeholder_")) continue;
+
+        await supabase
+          .from("farm_plots")
+          .upsert({
+            id: plot.id,
+            name: plot.name,
+            code: plot.code,
+            student_id: plot.student_id || null,
+          });
+      }
+    } catch (err) {
+      console.error("savePlotsGridIndicesToSupabase error:", err);
+    }
+
+    notifyBroadcast();
+  };
 
   const notifyBroadcast = useCallback(() => {
     if (broadcastRef.current) {
@@ -337,18 +410,19 @@ export function useFarmManager() {
     notifyBroadcast();
   };
 
-  // 🌟【新機能 1】講師画面: 畝(ベッド)の追加 🌟
+  // 🌟【修復】講師画面: 畝(ベッド)の最下部追加 (絶対ユニークID発行) 🌟
   const addBedToPlot = async (plotId: string) => {
     const targetPlot = plots.find((p) => p.id === plotId);
     if (!targetPlot) return;
 
-    const nextBedNum = targetPlot.beds.length + 1;
-    const newBedId = `${plotId}_bed_${nextBedNum}`;
+    const uniqueHash = Math.random().toString(36).substring(2, 7);
+    const uniqueBedNum = Date.now();
+    const newBedId = `${plotId}_bed_${uniqueBedNum}_${uniqueHash}`;
 
     const newBed: FarmBed = {
       id: newBedId,
       plot_id: plotId,
-      bed_number: nextBedNum,
+      bed_number: targetPlot.beds.length + 1,
       is_updated: false,
     };
 
@@ -356,7 +430,7 @@ export function useFarmManager() {
       if (plot.id === plotId) {
         return {
           ...plot,
-          beds: [...plot.beds, newBed],
+          beds: [...plot.beds, newBed], // 必ず最下部(末尾)に追加！
         };
       }
       return plot;
@@ -369,7 +443,7 @@ export function useFarmManager() {
       await supabase.from("farm_beds").upsert({
         id: newBedId,
         plot_id: plotId,
-        bed_number: String(nextBedNum),
+        bed_number: String(targetPlot.beds.length + 1),
         dimensions: "2.0m × 0.7m (1.4㎡)",
       });
     } catch (e) {
@@ -379,18 +453,14 @@ export function useFarmManager() {
     notifyBroadcast();
   };
 
-  // 🌟【新機能 2】講師画面: 畝(ベッド)の削除 (特定ベッドIDを安全削除) 🌟
+  // 🌟【修復】講師画面: 畝(ベッド)の完全削除 (復活防護) 🌟
   const deleteBedFromPlot = async (plotId: string, bedId: string) => {
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId) {
         const remainingBeds = plot.beds.filter((b) => b.id !== bedId);
-        const renumberedBeds = remainingBeds.map((b, idx) => ({
-          ...b,
-          bed_number: idx + 1,
-        }));
         return {
           ...plot,
-          beds: renumberedBeds,
+          beds: remainingBeds,
         };
       }
       return plot;
@@ -406,6 +476,28 @@ export function useFarmManager() {
       console.error(e);
     }
 
+    notifyBroadcast();
+  };
+
+  // 🌟【新機能】講師画面: 畝(ベッド)のつまんで上下移動・並び替え 🌟
+  const reorderBedsInPlot = (plotId: string, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    const nextPlots = plots.map((plot) => {
+      if (plot.id === plotId) {
+        const reordered = [...plot.beds];
+        const [movedBed] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, movedBed);
+        return {
+          ...plot,
+          beds: reordered,
+        };
+      }
+      return plot;
+    });
+
+    setPlots(nextPlots);
+    localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
     notifyBroadcast();
   };
 
@@ -454,6 +546,31 @@ export function useFarmManager() {
     const nextPlots = plots.map((p) =>
       p.id === plotId ? { ...p, beds: nextBeds } : p
     );
+
+    setPlots(nextPlots);
+    localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
+    notifyBroadcast();
+  };
+  // 🌟【新機能 2.6】未割り当ての全区画の畝数を一括変更する関数 🌟
+  const updateAllUnassignedBedsCount = (newCount: number) => {
+    const nextPlots = plots.map((plot) => {
+      if (!plot.student_id) {
+        const newBeds: FarmBed[] = [];
+        for (let i = 1; i <= newCount; i++) {
+          newBeds.push({
+            id: `${plot.id}_bed_${i}`,
+            plot_id: plot.id,
+            bed_number: i,
+            is_updated: false,
+          });
+        }
+        return {
+          ...plot,
+          beds: newBeds,
+        };
+      }
+      return plot;
+    });
 
     setPlots(nextPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
@@ -516,24 +633,31 @@ export function useFarmManager() {
     return newPlot;
   };
 
-  // 🌟 講師画面: 区画(プロット)自体の削除機能 🌟
+  // 🌟 講師画面: 区画(プロット)自体の削除・空き地化機能 (並び替えゼロ) 🌟
   const deletePlot = async (plotId: string) => {
     const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId || p.name.includes(plotId));
-    const plotIdToDelete = targetPlot?.id || plotId;
+    if (!targetPlot) return;
 
-    if (!confirm(`「${targetPlot?.name || "この区画"}」を本当に削除しますか？`)) return;
+    if (!confirm(`「${targetPlot.name || "この区画"}」を本当に削除（空き地化）しますか？`)) return;
 
-    const nextPlots = plots.filter((p) => p.id !== plotIdToDelete && p.code !== targetPlot?.code);
+    // 配列の並び順・要素は崩さず、対象マスのプロットのみ is_vacant: true (空き地) に変更！
+    const nextPlots = plots.map((p) => {
+      if (p.id === targetPlot.id || p.code === targetPlot.code) {
+        return {
+          ...p,
+          is_vacant: true,
+          student_id: undefined,
+          student_name: undefined,
+        };
+      }
+      return p;
+    });
+
     setPlots(nextPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
 
     try {
-      await supabase.from("crop_records").delete().eq("bed_id", plotIdToDelete);
-      await supabase.from("farm_beds").delete().eq("plot_id", plotIdToDelete);
-      await supabase.from("farm_plots").delete().eq("id", plotIdToDelete);
-      if (targetPlot?.code) {
-        await supabase.from("farm_plots").delete().eq("code", targetPlot.code);
-      }
+      await supabase.from("farm_plots").update({ student_id: null, student_name: null, is_vacant: true }).eq("id", targetPlot.id);
     } catch (e) {
       console.error("deletePlot error:", e);
     }
@@ -542,9 +666,21 @@ export function useFarmManager() {
   };
 
   const assignStudentToPlot = async (plotId: string, studentId: string, studentName: string) => {
+    const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId);
+    const targetCode = targetPlot?.code || plotId;
+
     const nextPlots = plots.map((plot) => {
-      if (plot.id === plotId) {
-        // ベッド情報の更新: 新ユーザー用に一旦白紙化・該当記録のみバインド
+      // 1. 他区画に同一生徒がすでに割り当てられている場合は解除 (二重割り当て・同時配置を完全排他!)
+      if (plot.student_id === studentId && plot.code !== targetCode && plot.id !== plotId) {
+        return {
+          ...plot,
+          student_id: undefined,
+          student_name: undefined,
+        };
+      }
+
+      // 2. 対象区画への割り当て
+      if (plot.id === plotId || plot.code === targetCode) {
         const resetBeds = plot.beds.map((b) => {
           const userRec = records.find(
             (r: any) => r.bed_id === b.id && (r.student_id === studentId || r.user_id === studentId)
@@ -569,7 +705,7 @@ export function useFarmManager() {
           ...plot,
           student_id: studentId,
           student_name: studentName,
-          name: `${plot.code} - ${studentName}`,
+          is_vacant: false,
           beds: resetBeds,
         };
       }
@@ -591,12 +727,16 @@ export function useFarmManager() {
   };
 
   const unassignStudentFromPlot = async (plotId: string) => {
+    const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId);
+    const targetCode = targetPlot?.code || plotId;
+
     const nextPlots = plots.map((plot) => {
-      if (plot.id === plotId) {
+      if (plot.id === plotId || plot.code === targetCode) {
         return {
           ...plot,
           student_id: undefined,
           student_name: undefined,
+          is_vacant: true, // 🌟 裏で自動的に空き地 (is_vacant: true) に変更！ 🌟
           name: `区画 ${plot.code}`,
           beds: plot.beds.map((b) => ({
             ...b,
@@ -608,14 +748,15 @@ export function useFarmManager() {
       }
       return plot;
     });
+
     setPlots(nextPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
 
     try {
       await supabase
         .from("farm_plots")
-        .update({ student_id: null })
-        .eq("id", plotId);
+        .update({ student_id: null, is_vacant: true })
+        .eq("code", targetCode);
     } catch (e) {
       console.error(e);
     }
@@ -717,6 +858,8 @@ export function useFarmManager() {
       return newFarm;
     },
     plots,
+    setPlots,
+    savePlotsGridIndicesToSupabase,
     currentFarmPlots,
     records,
     supabaseStudents,
@@ -726,7 +869,9 @@ export function useFarmManager() {
     deletePlot,
     addBedToPlot,
     deleteBedFromPlot,
+    reorderBedsInPlot,
     updatePlotBedsCount,
+    updateAllUnassignedBedsCount,
     assignStudentToPlot,
     unassignStudentFromPlot,
     addCropRecord,

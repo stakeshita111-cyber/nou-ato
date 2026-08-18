@@ -406,15 +406,67 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
               </div>
 
               <div>
+                <label className="block text-gray-700 mb-1">栽培している作物 (野菜アイコン) *</label>
+                <select
+                  value={currentBed?.crop_name || "トマト 🍅"}
+                  onChange={(e) => {
+                    const chosenCrop = e.target.value;
+                    if (currentBed) {
+                      currentBed.crop_name = chosenCrop;
+                      setToastMessage(`✨ 畝 #${currentBed.bed_number} の作物を「${chosenCrop}」に設定しました！`);
+                      setShowToast(true);
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new Event("nouato_sync_event"));
+                      }
+                    }
+                  }}
+                  className="w-full p-2.5 rounded-xl border border-emerald-400 bg-white font-black text-xs text-emerald-950"
+                >
+                  <option value="トマト 🍅">トマト 🍅</option>
+                  <option value="ナス 🍆">ナス 🍆</option>
+                  <option value="キュウリ 🥒">キュウリ 🥒</option>
+                  <option value="イチゴ 🍓">イチゴ 🍓</option>
+                  <option value="枝豆 🫛">枝豆 🫛</option>
+                  <option value="ダイコン 🥢">ダイコン 🥢</option>
+                  <option value="スイカ 🍉">スイカ 🍉</option>
+                  <option value="サツマイモ 🍠">サツマイモ 🍠</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-gray-700 mb-1">観察ノート・感想 *</label>
                 <textarea
                   required
-                  rows={4}
+                  rows={3}
                   placeholder="本日の観察結果や作業の気づきを入力してください..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-medium text-xs leading-relaxed"
                 />
+              </div>
+
+              {/* 🌟 講師への相談・質問 ❗ フラグ 🌟 */}
+              <div className="bg-amber-50 p-3 rounded-2xl border border-amber-300 space-y-2">
+                <label className="flex items-center space-x-2 font-black text-amber-950 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notes.includes("❗ [相談]")}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (!notes.includes("❗ [相談]")) {
+                          setNotes("❗ [相談] " + notes);
+                        }
+                      } else {
+                        setNotes(notes.replace("❗ [相談] ", "").replace("❗ [相談]", ""));
+                      }
+                    }}
+                    className="w-4 h-4 text-amber-600 rounded"
+                  />
+                  <span>❗ 講師に相談・質問を通知する (要アドバイス)</span>
+                </label>
+                <p className="text-[10px] text-amber-800 font-bold">
+                  チェックを入れると講師画面のあなたの区画に「❗」バッジが表示され、講師がすぐに相談を確認できます。
+                </p>
               </div>
 
               <div className="flex justify-end space-x-2 pt-3 border-t">

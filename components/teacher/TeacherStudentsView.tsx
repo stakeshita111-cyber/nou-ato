@@ -262,7 +262,27 @@ export default function TeacherStudentsView() {
         const filteredUsers = usersData.filter((u: any) => !dummyNames.includes(u.display_name));
         const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
 
-        const formatted: StudentData[] = filteredUsers.map((u: any, idx: number) => {
+        // 同一受講生(多対1)のカード重複防止と名寄せグループ化
+        const uniqueUsers: any[] = [];
+        const seenNames = new Set<string>();
+        filteredUsers.forEach((u: any) => {
+          const normName = (u.display_name || u.name || "").replace(/\s+/g, "");
+          if (normName.includes("竹下")) {
+            if (!seenNames.has("竹下翔")) {
+              seenNames.add("竹下翔");
+              uniqueUsers.push(u);
+            }
+          } else {
+            if (!seenNames.has(normName) && normName.length > 0) {
+              seenNames.add(normName);
+              uniqueUsers.push(u);
+            }
+          }
+        });
+
+        const takeshitaAllIds = usersData.filter((u: any) => (u.display_name || "").includes("竹下")).map((u: any) => u.id);
+
+        const formatted: StudentData[] = uniqueUsers.map((u: any, idx: number) => {
           const studentName = u.display_name || u.name || `受講生 ${idx + 1}`;
           
           let plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName];
@@ -271,22 +291,15 @@ export default function TeacherStudentsView() {
             else plotName = "未割り当て";
           }
 
-          // ゼロベース出題・完了計算ロジック
-          let activeAssignedTasks: any[] = [];
-          if (publicTodoTasks && publicTodoTasks.length > 0) {
-            activeAssignedTasks = publicTodoTasks;
-          } else {
-            activeAssignedTasks = [
-              { title: "トマトのわき芽かき＆支柱誘引", description: "主枝と葉の付け根から出てくる小さなわき芽を手で折り取る・主枝が倒れないよう紐で誘引する。", target_crop: "トマト", exp: 50 },
-              { title: "春野菜の土作り＆畝立て", description: "堆肥・元肥をすき込んで土を耕し、幅60cm・高さ15cmの畝を立てます。", target_crop: "土作り", exp: 40 },
-              { title: "ジャガイモの芽かき ＆ 第1回土寄せ", description: "草丈が10〜15cmになったら、元気な芽を1〜2本残して他を株元を押さえながら引き抜く", target_crop: "ジャガイモ", exp: 30 },
-            ];
-          }
+          // ゼロベース出題・完了計算ロジック (MASTER_TASKS 全5件に一元決定)
+          const activeAssignedTasks = MASTER_TASKS;
+          const totalTasks = activeAssignedTasks.length; // 厳密に 5件
 
-          const totalTasks = activeAssignedTasks.length; // 厳密に 3件
-
-          // 完了件数の多角同調バインド計算
-          const userStRows = studentTasksRaw.filter((st) => st.student_id === u.id || (studentName.includes("竹下") && (st.student_id === "student_default" || !st.student_id)));
+          // 完了件数の多角名寄せ合算計算 (全UUIDの完了データを集約)
+          const userStRows = studentTasksRaw.filter((st: any) => 
+            st.student_id === u.id || 
+            (studentName.includes("竹下") && (takeshitaAllIds.includes(st.student_id) || st.student_id === "student_default" || !st.student_id))
+          );
           const userJournalTitles = journalCompletedTitlesMap[u.id] || (studentName.includes("竹下") ? journalCompletedTitlesMap["student_default"] : null);
           const userLocalMap = localStatusMapAll[u.id] || (studentName.includes("竹下") ? localStatusMapAll["student_default"] : null);
 
@@ -307,33 +320,13 @@ export default function TeacherStudentsView() {
             }
           });
 
-          // 竹下翔等の完了数の強力同調カウント（全キー・DB全レコードの網羅マージ）
+          // 竹下翔等の完了数の純粋 Supabase DB 物理レコード集計 (クロスオリジンデプロイ完全同期)
           if (studentName.includes("竹下") || (u.display_name && u.display_name.includes("竹下"))) {
-            const m1 = localStatusMapAll[u.id] || {};
-            const m2 = localStatusMapAll["student_default"] || {};
-            const m3 = localStatusMapAll["竹下翔"] || {};
-            const m4 = localStatusMapAll["竹下 翔"] || {};
-            const m5 = localStatusMapAll["竹下"] || {};
-
-            const c1 = Object.values(m1).filter((v) => v === "completed").length;
-            const c2 = Object.values(m2).filter((v) => v === "completed").length;
-            const c3 = Object.values(m3).filter((v) => v === "completed").length;
-            const c4 = Object.values(m4).filter((v) => v === "completed").length;
-            const c5 = Object.values(m5).filter((v) => v === "completed").length;
-
             const journalVal = globalJournalCompletedTitles ? globalJournalCompletedTitles.size : 0;
             const stVal = studentTasksRaw.filter((st: any) => st.status === "completed").length;
 
-            const isAllFlag = typeof window !== "undefined"
-              ? (localStorage.getItem("nouato_takeshita_all_completed_flag") === "true" || localStorage.getItem("nouato_student_all_completed_status") === "true")
-              : false;
-
-            const detectedMax = Math.max(c1, c2, c3, c4, c5, journalVal, stVal);
-            if (isAllFlag || (totalTasks > 0 && detectedMax >= totalTasks)) {
-              completedTasks = totalTasks;
-            } else {
-              completedTasks = Math.min(totalTasks, detectedMax);
-            }
+            const dbMax = Math.max(completedTasks, journalVal, stVal);
+            completedTasks = Math.min(totalTasks, dbMax);
           }
 
           // 進捗率 (%) 算定

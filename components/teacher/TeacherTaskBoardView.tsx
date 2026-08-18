@@ -127,13 +127,13 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <PageHeader
           title="教材・学習タスクの流れを整理する"
           subtitle="教材の準備から公開まで、ドラッグ＆ドロップで管理できます。"
         />
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowAssignModal(true)}
             className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1"

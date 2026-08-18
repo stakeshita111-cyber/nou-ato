@@ -11,6 +11,8 @@ export type CropRecord = {
   work_types: WorkType[];
   notes: string;
   harvest_amount?: string;
+  is_question?: boolean;
+  question_text?: string;
   created_at: string;
 };
 
@@ -18,6 +20,7 @@ export type FarmBed = {
   id: string;
   plot_id: string;
   bed_number: number;
+  crop_name?: string;
   is_updated: boolean;
   updated_at?: string;
   latest_record?: CropRecord;
@@ -30,6 +33,8 @@ export type FarmPlot = {
   code: string;
   student_id?: string;
   student_name?: string;
+  grid_index?: number;
+  is_vacant?: boolean;
   position: { x: number; y: number };
   beds: FarmBed[];
 };

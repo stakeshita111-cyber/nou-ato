@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 interface TeacherHeaderProps {
   title?: string;
   onSearch?: (query: string) => void;
+  onToggleMobileMenu?: () => void;
 }
 
 interface NotificationItem {
@@ -16,7 +17,7 @@ interface NotificationItem {
   type: "report" | "question";
 }
 
-export default function TeacherHeader({ title = "ダッシュボード", onSearch }: TeacherHeaderProps) {
+export default function TeacherHeader({ title = "ダッシュボード", onSearch, onToggleMobileMenu }: TeacherHeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 
@@ -107,8 +108,22 @@ export default function TeacherHeader({ title = "ダッシュボード", onSearc
   };
 
   return (
-    <header className="h-16 app-bg-card border-b app-border px-6 sm:px-8 flex items-center justify-between sticky top-0 z-20 transition-colors duration-300">
-      <h2 className="text-base sm:text-lg font-black text-gray-900 tracking-tight">{title}</h2>
+    <header className="h-16 app-bg-card border-b app-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20 transition-colors duration-300">
+      <div className="flex items-center space-x-3">
+        {/* モバイル用ハンバーガーボタン */}
+        {onToggleMobileMenu && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="md:hidden p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+            title="メニューを開く"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
+        <h2 className="text-sm sm:text-lg font-black text-gray-900 tracking-tight truncate max-w-[180px] sm:max-w-xs">{title}</h2>
+      </div>
 
       <div className="flex items-center space-x-3 sm:space-x-4 relative">
         {/* 検索入力欄 */}

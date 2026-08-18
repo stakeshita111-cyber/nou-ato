@@ -36,4 +36,22 @@ export const MASTER_TASKS: TaskItem[] = [
     category: "work",
     status: "not_started",
   },
+  {
+    id: "task_4",
+    title: "夏野菜の定植＆株元への追肥",
+    description: "苗を植え穴に定植し、株元に肥料を元肥として適量施用します。",
+    target_crop: "夏野菜全般",
+    exp: 40,
+    category: "work",
+    status: "not_started",
+  },
+  {
+    id: "task_5",
+    title: "畑のタップリ水やり ＆ 雑草の除草作業",
+    description: "株元を中心にしっかり水を与え、畝間や株元の雑草を手で丁寧に抜きます。",
+    target_crop: "管理全般",
+    exp: 20,
+    category: "work",
+    status: "not_started",
+  },
 ];
