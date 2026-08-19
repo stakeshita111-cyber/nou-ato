@@ -53,7 +53,7 @@ export default function TaskDetailModel({
         growth_stage: "果実肥大",
         height_cm: 75,
         work_types: [t.title],
-        notes: reportMemo.trim() || `タスク「${t.title}」を完了報告しました。`,
+        notes: reportMemo.trim(),
         harvest_amount: photoPreview ? "📷 現場写真あり" : undefined,
       });
     }

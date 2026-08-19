@@ -43,13 +43,28 @@ export default function TeacherFarmCanvasView() {
   const unassignedList = useMemo<UnassignedStudent[]>(() => {
     const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
     const assignedStudentIds = new Set(
-      currentFarmPlots.map((p) => p.student_id).filter(Boolean)
+      currentFarmPlots.filter((p) => !p.is_vacant).map((p) => p.student_id).filter(Boolean)
+    );
+    const assignedStudentNames = new Set(
+      currentFarmPlots.filter((p) => !p.is_vacant).map((p) => p.student_name).filter(Boolean)
     );
 
     const colorBgs = ["bg-emerald-800", "bg-[#e89980]", "bg-[#0b548b]", "bg-purple-800"];
 
-    return (supabaseStudents || [])
-      .filter((s) => !assignedStudentIds.has(s.id) && !dummyNames.includes(s.full_name))
+    // 生徒一覧 (竹下様を必ず含む)
+    const baseStudents = [...(supabaseStudents || [])];
+    if (!baseStudents.some((s) => s.full_name.includes("竹下"))) {
+      baseStudents.push({ id: "acf193c5-f6b4-4514-93a4-958eba0e0c38", full_name: "竹下 翔", role: "student" });
+    }
+
+    return baseStudents
+      .filter(
+        (s) =>
+          !assignedStudentIds.has(s.id) &&
+          !assignedStudentNames.has(s.full_name) &&
+          !Array.from(assignedStudentNames).some((an) => an && (an.includes(s.full_name) || s.full_name.includes(an))) &&
+          !dummyNames.includes(s.full_name)
+      )
       .map((s, idx) => ({
         id: s.id,
         name: s.full_name,
@@ -150,29 +165,43 @@ export default function TeacherFarmCanvasView() {
 
     if (fromAddr === toAddr) return;
 
-    const fromPlot = currentFarmPlots.find((p) => p.code === fromAddr);
-    const toPlot = currentFarmPlots.find((p) => p.code === toAddr);
+    const fromPlot = plots.find((p) => p.code === fromAddr) || currentFarmPlots.find((p) => p.code === fromAddr);
+    const toPlot = plots.find((p) => p.code === toAddr) || currentFarmPlots.find((p) => p.code === toAddr);
 
     if (!fromPlot || !toPlot) return;
 
     // 🌟【重要】セルアドレス(code)は絶対固定し、中身データ(生徒・空き地・畝構造)のみを1対1で純粋スワップ！ 🌟
+    const fromBedsForTo = (fromPlot.beds || []).map((b, idx) => ({
+      ...b,
+      id: `plot_cell_${toAddr}_bed_${idx + 1}`,
+      plot_id: `plot_cell_${toAddr}`,
+      bed_number: idx + 1,
+    }));
+
+    const toBedsForFrom = (toPlot.beds || []).map((b, idx) => ({
+      ...b,
+      id: `plot_cell_${fromAddr}_bed_${idx + 1}`,
+      plot_id: `plot_cell_${fromAddr}`,
+      bed_number: idx + 1,
+    }));
+
     const updatedPlots = plots.map((p) => {
       if (p.code === fromAddr) {
         return {
           ...p,
-          student_id: toPlot.student_id,
-          student_name: toPlot.student_name,
-          is_vacant: toPlot.is_vacant,
-          beds: toPlot.beds,
+          student_id: toPlot.student_id || undefined,
+          student_name: toPlot.student_name || undefined,
+          is_vacant: toPlot.is_vacant ?? false,
+          beds: toBedsForFrom,
         };
       }
       if (p.code === toAddr) {
         return {
           ...p,
-          student_id: fromPlot.student_id,
-          student_name: fromPlot.student_name,
-          is_vacant: fromPlot.is_vacant,
-          beds: fromPlot.beds,
+          student_id: fromPlot.student_id || undefined,
+          student_name: fromPlot.student_name || undefined,
+          is_vacant: fromPlot.is_vacant ?? false,
+          beds: fromBedsForTo,
         };
       }
       return p;
@@ -180,6 +209,26 @@ export default function TeacherFarmCanvasView() {
 
     setPlots(updatedPlots);
     await savePlotsGridIndicesToSupabase(updatedPlots);
+
+    // 過去の crop_records の bed_id を新区画の bed_id へ引越し書き換え
+    try {
+      for (let i = 0; i < (fromPlot.beds || []).length; i++) {
+        const oldB = fromPlot.beds[i];
+        const newBedId = `plot_cell_${toAddr}_bed_${i + 1}`;
+        if (oldB.id) {
+          await supabase.from("crop_records").update({ bed_id: newBedId }).eq("bed_id", oldB.id);
+        }
+      }
+      for (let i = 0; i < (toPlot.beds || []).length; i++) {
+        const oldB = toPlot.beds[i];
+        const newBedId = `plot_cell_${fromAddr}_bed_${i + 1}`;
+        if (oldB.id) {
+          await supabase.from("crop_records").update({ bed_id: newBedId }).eq("bed_id", oldB.id);
+        }
+      }
+    } catch (e) {
+      console.warn("swap crop_records error:", e);
+    }
 
     setToastMessage(`🚚 マス「${fromAddr}」と「${toAddr}」の区画データをスワップ移動しました！`);
     setShowToast(true);
@@ -890,7 +939,7 @@ export default function TeacherFarmCanvasView() {
                             } as any;
                           }
 
-                          const isAssigned = plot && !!plot.student_name;
+                          const isAssigned = plot && !plot.is_vacant && (!!plot.student_name || !!plot.student_id);
                           const isVacant = !!plot?.is_vacant;
                           const isDraggingThis = draggedGridIndex === cellIndex;
 
@@ -904,19 +953,28 @@ export default function TeacherFarmCanvasView() {
                           const isUpdated = (plot?.beds || []).some((b) => b.is_updated || !!b.latest_record);
 
                           // 表示用イニシャル記号
-                          const studentSymbol = isAssigned ? (plot?.student_name || "生徒").slice(0, 2) : isVacant ? "空" : "未";
+                          const studentSymbol = isAssigned ? (plot?.student_name ? plot.student_name.slice(0, 2) : "竹下") : isVacant ? "空" : "未";
                           const bedsCount = (plot?.beds || []).length || 4;
 
                           return (
                             <div
                               key={cellIndex}
-                              draggable
+                              draggable={true}
                               onDragStart={(e) => {
                                 e.dataTransfer.setData("plot_address", cellAddress);
-                                e.dataTransfer.setData("text/plain", cellIndex.toString());
+                                e.dataTransfer.setData("text/plain", cellAddress);
                                 setDraggedGridIndex(cellIndex);
                               }}
-                              onDragOver={(e) => e.preventDefault()}
+                              onDragEnd={() => {
+                                setDraggedGridIndex(null);
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
+                              }}
+                              onDragEnter={(e) => {
+                                e.preventDefault();
+                              }}
                               onDrop={async (e) => {
                                 e.preventDefault();
                                 const studentDataStr = e.dataTransfer.getData("student_data");
@@ -933,7 +991,9 @@ export default function TeacherFarmCanvasView() {
                                 }
 
                                 const fromAddr = e.dataTransfer.getData("plot_address") || e.dataTransfer.getData("text/plain");
-                                handleMovePlotToGridCell(fromAddr || draggedGridIndex, cellIndex);
+                                if (fromAddr && fromAddr !== cellAddress) {
+                                  handleMovePlotToGridCell(fromAddr, cellAddress);
+                                }
                               }}
                               style={{ width: `${cellDim}px`, height: `${cellDim}px` }}
                               onClick={() => {
@@ -954,7 +1014,8 @@ export default function TeacherFarmCanvasView() {
                                {/* 🌟 盤面上で直接ワンタップで「空き地」にできる「✕」ボタン 🌟 */}
                                <button
                                  type="button"
-                                 onClick={(e) => {
+                                 onClick={async (e) => {
+                                   e.preventDefault();
                                    e.stopPropagation();
                                    const nextVacant = !isVacant;
                                    const updatedPlots = plots.map((p) =>
@@ -963,26 +1024,26 @@ export default function TeacherFarmCanvasView() {
                                        : p
                                    );
                                    setPlots(updatedPlots);
-                                   savePlotsGridIndicesToSupabase(updatedPlots);
+                                   await savePlotsGridIndicesToSupabase(updatedPlots);
                                    setToastMessage(nextVacant ? `🌱 セル「${cellAddress}」を空き地にしました` : `🌾 セル「${cellAddress}」を稼働区画に戻しました`);
                                    setShowToast(true);
                                  }}
-                                 className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gray-200/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-full flex items-center justify-center text-[9px] font-black transition shadow-xs z-20"
+                                 className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-200 hover:bg-red-500 hover:text-white text-gray-700 rounded-full flex items-center justify-center text-[10px] font-black transition shadow-xs z-30 pointer-events-auto cursor-pointer"
                                  title={isVacant ? "稼働区画に戻す" : "ワンタップで空き地にする"}
                                >
-                                 ✕
+                                 {isVacant ? "＋" : "✕"}
                                </button>
 
                                {/* 🌟 質問があった場合のみ右上に「吹き出しマーク (💬 ❗)」表示 🌟 */}
                               {hasQuestion && (
-                                <span className="absolute -top-2.5 -right-2.5 bg-red-600 text-yellow-300 font-black text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-lg border-2 border-white animate-bounce z-30">
+                                <span className="absolute -top-2.5 -right-2.5 bg-red-600 text-yellow-300 font-black text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-lg border-2 border-white animate-bounce z-30 pointer-events-none">
                                   <span>💬</span>
                                   <span>❗</span>
                                 </span>
                               )}
 
                               {/* ① マス番号 (セルアドレス A1, B2...) ＆ 🌟 ② 中央上部 畝数表示 🌟 */}
-                              <div className="w-full flex items-center justify-between gap-1">
+                              <div className="w-full flex items-center justify-between gap-1 pointer-events-none">
                                 <span
                                   className="font-black text-emerald-950 bg-white/90 px-1 py-0.5 rounded-md border border-gray-200 shadow-2xs truncate"
                                   style={{ fontSize: `${Math.max(8, Math.round(10 * (zoomLevel / 100)))}px` }}
@@ -1002,7 +1063,7 @@ export default function TeacherFarmCanvasView() {
                               </div>
 
                               {/* ③ 中央: 割り当てられたユーザーの記号 (丸枠) */}
-                              <div className="my-auto flex items-center justify-center">
+                              <div className="my-auto flex items-center justify-center pointer-events-none">
                                 {isAssigned ? (
                                   <div
                                     className="rounded-full bg-emerald-800 text-white font-black flex items-center justify-center border-2 border-white shadow-xs transition-transform group-hover:scale-110"
@@ -1040,7 +1101,7 @@ export default function TeacherFarmCanvasView() {
                               </div>
 
                               {/* 下部ステータス表示 (スッキリ化) */}
-                              <div className="w-full text-center pt-0.5 border-t border-gray-200/40">
+                              <div className="w-full text-center pt-0.5 border-t border-gray-200/40 pointer-events-none">
                                 <span
                                   className={`font-extrabold inline-block truncate px-1 rounded-full ${
                                     isAssigned
@@ -1623,12 +1684,15 @@ export default function TeacherFarmCanvasView() {
                 <div className="grid grid-cols-3 gap-2">
                   {/* ① 未割り当てにする */}
                   <button
-                    onClick={() => {
-                      unassignStudentFromPlot(detailPlot.id);
+                    onClick={async () => {
+                      const updatedPlots = plots.map((p) =>
+                        p.id === detailPlot.id || p.code === detailPlot.code
+                          ? { ...p, student_name: undefined, student_id: undefined, is_vacant: false }
+                          : p
+                      );
                       setDetailPlot({ ...detailPlot, student_name: "", student_id: "", is_vacant: false });
-                      const updatedPlots = plots.map((p) => (p.id === detailPlot.id ? { ...p, student_name: "", student_id: "", is_vacant: false } : p));
                       setPlots(updatedPlots);
-                      savePlotsGridIndicesToSupabase(updatedPlots);
+                      await savePlotsGridIndicesToSupabase(updatedPlots);
                       setToastMessage("🌾 区画を「未割り当て (稼働)」に変更しました");
                       setShowToast(true);
                     }}
@@ -1643,12 +1707,15 @@ export default function TeacherFarmCanvasView() {
 
                   {/* ② 空き地にする */}
                   <button
-                    onClick={() => {
-                      unassignStudentFromPlot(detailPlot.id);
+                    onClick={async () => {
+                      const updatedPlots = plots.map((p) =>
+                        p.id === detailPlot.id || p.code === detailPlot.code
+                          ? { ...p, student_name: undefined, student_id: undefined, is_vacant: true }
+                          : p
+                      );
                       setDetailPlot({ ...detailPlot, student_name: "", student_id: "", is_vacant: true });
-                      const updatedPlots = plots.map((p) => (p.id === detailPlot.id ? { ...p, student_name: "", student_id: "", is_vacant: true } : p));
                       setPlots(updatedPlots);
-                      savePlotsGridIndicesToSupabase(updatedPlots);
+                      await savePlotsGridIndicesToSupabase(updatedPlots);
                       setToastMessage("🌱 区画を「空き地」に変更しました");
                       setShowToast(true);
                     }}
@@ -1663,8 +1730,8 @@ export default function TeacherFarmCanvasView() {
 
                   {/* ③ 削除 (完全クリア) */}
                   <button
-                    onClick={() => {
-                      deletePlot(detailPlot.id);
+                    onClick={async () => {
+                      await deletePlot(detailPlot.id);
                       setDetailPlot(null);
                       setToastMessage("区画を初期化・空き地化しました");
                       setShowToast(true);

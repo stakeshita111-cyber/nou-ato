@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect, useRef } from "react";
 
 interface TeacherSidebarProps {
   activeMenu: string;
   onMenuClick: (menu: string) => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
+  onOpenMobilePreview?: () => void;
 }
 
 export default function TeacherSidebar({
@@ -14,7 +16,30 @@ export default function TeacherSidebar({
   onMenuClick,
   isOpenMobile = false,
   onCloseMobile,
+  onOpenMobilePreview,
 }: TeacherSidebarProps) {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [teacherName, setTeacherName] = useState("テスト講師");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedName = localStorage.getItem("nouato_owner_name") || "テスト講師";
+      setTeacherName(savedName);
+    }
+  }, []);
+
+  // ポップアップメニュー外クリック検知閉じる
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleItemClick = (menu: string) => {
     onMenuClick(menu);
     if (onCloseMobile) onCloseMobile();
@@ -39,14 +64,18 @@ export default function TeacherSidebar({
       >
         <div>
           {/* ブランドロゴ ＆ モバイル閉じるボタン */}
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div className="p-5 border-b border-emerald-100/60 flex items-center justify-between bg-gradient-to-r from-emerald-50/40 via-white to-transparent">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl app-accent-btn font-bold flex items-center justify-center text-sm shadow-md">
-                AE
+              <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-md border border-emerald-200 shrink-0 bg-emerald-50 flex items-center justify-center">
+                <img
+                  src="/nouato_logo.jpg"
+                  alt="農跡(のうあと) ロゴ"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
-                <h1 className="font-bold text-gray-900 leading-tight text-sm">Agri-Education</h1>
-                <p className="text-[11px] text-gray-500 font-medium">講師ポータル</p>
+                <h1 className="font-black text-emerald-950 leading-tight text-base tracking-tight">農跡<span className="text-xs font-bold text-emerald-700 ml-1">(のうあと)</span></h1>
+                <p className="text-[10px] text-emerald-700 font-bold bg-emerald-100/80 px-1.5 py-0.5 rounded-md inline-block mt-0.5">講師ポータル</p>
               </div>
             </div>
             {/* スマホ用閉じるボタン */}
@@ -180,24 +209,91 @@ export default function TeacherSidebar({
           </nav>
         </div>
 
-        {/* サイドバー下部 ログアウト/リンク */}
-        <div className="p-4 border-t border-gray-100 space-y-2">
-          <Link
-            href="/student/quests"
-            className="flex items-center space-x-2 text-xs font-semibold app-text-main hover:underline p-2 rounded-lg transition"
-          >
-            <span>📱 生徒画面ビューを開く</span>
-          </Link>
+        {/* 🌟 サイドバー左下 ログインユーザープロファイル (人型マーク ＆ ポップアップメニュー) 🌟 */}
+        <div className="p-3 border-t border-emerald-100/60 relative" ref={menuRef}>
+          {/* 上展開ポップアップメニュー */}
+          {isUserMenuOpen && (
+            <div className="absolute bottom-full left-3 right-3 mb-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-emerald-200 p-2 space-y-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              {/* ポップアップヘッダー */}
+              <div className="px-3 py-2 border-b border-gray-100 mb-1">
+                <p className="text-xs font-black text-emerald-950 truncate">{teacherName}</p>
+                <p className="text-[10px] text-gray-500 font-medium truncate">農園主 / 講師アカウント</p>
+              </div>
 
-          <Link
-            href="/login"
-            className="flex items-center space-x-2 text-xs font-semibold text-gray-500 hover:text-gray-800 p-2 rounded-lg transition"
+              {/* 1. 👀 生徒画面の確認 */}
+              <Link
+                href="/student"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsUserMenuOpen(false)}
+                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-black text-emerald-900 hover:bg-emerald-50 transition duration-150"
+              >
+                <span className="text-sm">👀</span>
+                <span>生徒画面の確認</span>
+                <span className="ml-auto text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">別窓</span>
+              </Link>
+
+              {/* 2. 📱 スマホビュー表示 (プレビューモーダル) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  if (onOpenMobilePreview) onOpenMobilePreview();
+                }}
+                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-black text-teal-900 hover:bg-teal-50 transition duration-150 text-left"
+              >
+                <span className="text-sm">📱</span>
+                <span>スマホビュー表示</span>
+                <span className="ml-auto text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded-full font-bold">プレビュー</span>
+              </button>
+
+              {/* 3. 🚪 ログアウト */}
+              <Link
+                href="/login"
+                onClick={() => setIsUserMenuOpen(false)}
+                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition duration-150"
+              >
+                <span className="text-sm">🚪</span>
+                <span>ログアウト</span>
+              </Link>
+            </div>
+          )}
+
+          {/* ログイン人型アバターカード (クリックでポップアップ展開) */}
+          <button
+            type="button"
+            onClick={() => setIsUserMenuOpen((prev) => !prev)}
+            className={`w-full flex items-center justify-between p-2.5 rounded-2xl transition duration-200 border text-left ${
+              isUserMenuOpen
+                ? "bg-emerald-50 border-emerald-300 shadow-sm"
+                : "bg-white/80 hover:bg-emerald-50/60 border-emerald-100/80 hover:border-emerald-200"
+            }`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <div className="flex items-center space-x-2.5 min-w-0">
+              {/* 人型アバターマーク 👤 */}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0 ring-2 ring-emerald-100">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black text-gray-900 truncate leading-tight">{teacherName}</p>
+                <p className="text-[10px] text-emerald-600 font-bold truncate">ログイン中</p>
+              </div>
+            </div>
+
+            {/* 展開矢印アイコン */}
+            <svg
+              className={`w-4 h-4 text-emerald-700 transition-transform duration-200 shrink-0 ml-1 ${
+                isUserMenuOpen ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
             </svg>
-            <span>ログアウト / 権限切替</span>
-          </Link>
+          </button>
         </div>
       </aside>
     </>

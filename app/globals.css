@@ -201,3 +201,15 @@ select:focus {
 .app-border {
   border-color: var(--border-main) !important;
 }
+
+/* 🌟 右から左へ無限に流れるスムーズアニメーション (.animate-marquee) 🌟 */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 25s linear infinite;
+}

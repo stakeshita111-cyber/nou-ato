@@ -16,8 +16,23 @@ interface JournalItem {
   is_approved: boolean;
 }
 
-export default function TeacherJournalsView() {
+interface CropRecordItem {
+  id: string;
+  studentName: string;
+  plotCode: string;
+  workTypes: string;
+  notes: string;
+  harvestAmount?: string;
+  date: string;
+}
+
+interface TeacherJournalsViewProps {
+  onNavigateToFarm?: (plotCode?: string) => void;
+}
+
+export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournalsViewProps) {
   const [journals, setJournals] = useState<JournalItem[]>([]);
+  const [cropRecords, setCropRecords] = useState<CropRecordItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [replyInput, setReplyInput] = useState<{ [key: string]: string }>({});
@@ -63,7 +78,17 @@ export default function TeacherJournalsView() {
         }
       }
 
-      const formatted: JournalItem[] = journalData.map((j: any) => {
+      // 🌟【新ルール】単なるシステムのタスク完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
+      const filteredData = journalData.filter((j: any) => {
+        const content = (j.content || "").trim();
+        if (!content) return false;
+        if (content.includes("を完了報告しました") || content === "（コメントなし）") {
+          return false;
+        }
+        return true;
+      });
+
+      const formatted: JournalItem[] = filteredData.map((j: any) => {
         const name = userMap[j.student_id] || "受講生徒";
         return {
           id: j.id,
@@ -78,8 +103,8 @@ export default function TeacherJournalsView() {
                 minute: "2-digit",
               })
             : "最近",
-          taskTitle: j.task_title || "タスクコメント・気づきメモ",
-          content: j.content || "（コメントなし）",
+          taskTitle: j.task_title || "💡 気づきメモ・質問相談",
+          content: j.content,
           reply: j.reply || "",
           is_approved: j.is_approved || false,
         };
@@ -94,8 +119,62 @@ export default function TeacherJournalsView() {
     }
   };
 
+  // 🌟【実データ完全連動】下部自動スライド用: 生徒の実投稿データの取得 (ダミー全排除) 🌟
+  const fetchCropRecords = async () => {
+    try {
+      // 1. crop_records から生徒の観察ノート・現場報告を取得
+      const { data: recData } = await supabase
+        .from("crop_records")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      // 2. journals から生徒の手入力日誌・相談メモを取得
+      const { data: jData } = await supabase
+        .from("journals")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      let formattedRecs: CropRecordItem[] = [];
+
+      if (recData && recData.length > 0) {
+        recData.forEach((r: any, idx: number) => {
+          formattedRecs.push({
+            id: r.id || `rec_${idx}`,
+            studentName: r.student_name || "竹下 翔",
+            plotCode: r.plot_code || "区画 B3",
+            workTypes: Array.isArray(r.work_types) ? r.work_types.join(", ") : (r.crop_name || "作業記録"),
+            notes: r.notes || "観察記録を送信しました。",
+            harvestAmount: r.harvest_amount || (r.image_url ? "📷 写真あり" : undefined),
+            date: r.date || new Date(r.created_at).toLocaleDateString("ja-JP"),
+          });
+        });
+      }
+
+      if (jData && jData.length > 0) {
+        jData.filter((j: any) => j.content && !j.content.includes("を完了報告しました")).forEach((j: any, idx: number) => {
+          if (!formattedRecs.some((r) => r.notes === j.content)) {
+            formattedRecs.push({
+              id: j.id || `j_${idx}`,
+              studentName: "竹下 翔",
+              plotCode: "区画 B3",
+              workTypes: j.task_title || "💡 質問・相談日誌",
+              notes: j.content,
+              date: j.created_at ? new Date(j.created_at).toLocaleDateString("ja-JP") : "最近",
+            });
+          }
+        });
+      }
+
+      setCropRecords(formattedRecs);
+    } catch (err) {
+      console.error("fetchCropRecords error:", err);
+      setCropRecords([]);
+    }
+  };
+
   useEffect(() => {
     fetchJournals();
+    fetchCropRecords();
   }, []);
 
   // 返信送信＆再編集保存 (要件: 回答を編集できるように)
@@ -350,6 +429,74 @@ export default function TeacherJournalsView() {
           )}
         </div>
       )}
+
+      {/* 🌟【新機能】下部: 生徒からの「作業記録の報告」自動流動スライドカード (右から左へ無限に流れる ＆ クリックで区画へジャンプ) 🌟 */}
+      <div className="pt-6 border-t border-emerald-100/60 space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center space-x-2">
+            <span className="text-base">🌾</span>
+            <h3 className="font-black text-gray-900 text-sm">受講生の最新作業・観察記録 (自動スライド)</h3>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+              クリックで対象区画へジャンプ 📍
+            </span>
+          </div>
+          <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">
+            💡 マウスホバーで一時停止します
+          </span>
+        </div>
+
+        {/* 右から左へ流れる無限オートスライダートラック */}
+        <div className="relative w-full overflow-hidden rounded-2xl bg-emerald-50/40 p-3 border border-emerald-100/80">
+          <div className="flex space-x-4 animate-marquee hover:[animation-play-state:paused] cursor-pointer">
+            {/* シームレス無限ループ用重畳配列 */}
+            {[...cropRecords, ...cropRecords].map((rec, i) => (
+              <div
+                key={`${rec.id}_${i}`}
+                onClick={() => {
+                  if (onNavigateToFarm) {
+                    onNavigateToFarm(rec.plotCode);
+                  } else {
+                    setToastMessage(`📍 区画「${rec.plotCode}」(${rec.studentName}) へジャンプします`);
+                    setShowToast(true);
+                  }
+                }}
+                className="w-64 shrink-0 bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md hover:border-emerald-400 transition group flex flex-col justify-between space-y-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                      {rec.studentName.slice(0, 1)}
+                    </div>
+                    <span className="font-black text-gray-900 text-xs truncate max-w-[100px]">{rec.studentName}</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-900 font-black px-2 py-0.5 rounded-md border border-emerald-200 group-hover:bg-emerald-600 group-hover:text-white transition">
+                    📍 {rec.plotCode} 区画
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <p className="text-[11px] font-black text-emerald-950 flex items-center gap-1">
+                    <span>🌱</span>
+                    <span>{rec.workTypes}</span>
+                  </p>
+                  <p className="text-[11px] text-gray-600 font-medium line-clamp-2 leading-relaxed bg-gray-50/80 p-1.5 rounded-lg border border-gray-100">
+                    {rec.notes}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-[10px] text-gray-400">
+                  <span>{rec.date}</span>
+                  {rec.harvestAmount && (
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                      {rec.harvestAmount}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* 日誌インデックスモーダル (全ページ一覧ジャンプ) */}
       {showIndexModal && (

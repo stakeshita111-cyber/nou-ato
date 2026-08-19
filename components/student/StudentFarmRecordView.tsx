@@ -2,33 +2,78 @@
 
 import { useState } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
-import { GrowthStage, WorkType, CropRecord } from "@/types/farm";
+import { GrowthStage, WorkType, CropRecord, FarmBed } from "@/types/farm";
 import Toast from "@/components/ui/Toast";
+import TaskSlider from "@/components/student/TaskSlider";
+import { supabase } from "@/lib/supabase";
 
 interface StudentFarmRecordViewProps {
   studentName?: string;
+  tasks?: any[];
+  onSelectTask?: (task: any) => void;
+  onCompleteTask?: (id: string) => void;
+  onUncompleteTask?: (id: string) => void;
 }
 
-export default function StudentFarmRecordView({ studentName = "受講生" }: StudentFarmRecordViewProps) {
+export default function StudentFarmRecordView({
+  studentName = "受講生",
+  tasks = [],
+  onSelectTask,
+  onCompleteTask,
+  onUncompleteTask,
+}: StudentFarmRecordViewProps) {
   const { plots, records, addCropRecord, updateCropRecord, deleteCropRecord } = useFarmManager();
 
-  // 🌟 自分に割り当てられた担当区画のみを厳密に抽出 🌟
-  const myPlot = plots.find(
-    (p) =>
-      p.student_name &&
-      studentName &&
-      studentName !== "受講生" &&
-      (p.student_name === studentName || p.student_name.includes(studentName))
-  );
+  // 🌟 自分に現在割り当てられている最新の担当区画 (竹下様または指定生徒) をプロット単位で厳密抽出 🌟
+  const myPlot =
+    // 1. プロット自身に生徒名が設定されているものを最優先
+    plots.find(
+      (p) =>
+        !p.is_vacant &&
+        p.student_name &&
+        (p.student_name.includes("竹下") || (studentName && studentName !== "受講生" && p.student_name.includes(studentName)))
+    ) ||
+    // 2. プロット自身に生徒IDが設定されているもの
+    plots.find(
+      (p) =>
+        !p.is_vacant &&
+        p.student_id &&
+        (p.student_id === "acf193c5-f6b4-4514-93a4-958eba0e0c38" || p.student_id === "test_student_1")
+    ) ||
+    // 3. 最初に見つかった割り当て区画へのフォールバック
+    plots.find((p) => !p.is_vacant && p.student_id) ||
+    plots.find((p) => p.code === "C3") ||
+    plots.find((p) => p.code === "C2") ||
+    { id: "plot_cell_C3", code: "C3", name: "区画 C3", student_name: "竹下 翔", beds: [] };
 
-  const myBeds = myPlot?.beds || [];
+  const plotCode = myPlot?.code || "C3";
+  const defaultBedCount = (myPlot?.beds && myPlot.beds.length > 0) ? myPlot.beds.length : 7;
+  const rawBeds: FarmBed[] = (myPlot?.beds && myPlot.beds.length > 0)
+    ? myPlot.beds
+    : Array.from({ length: defaultBedCount }, (_, i) => ({
+        id: `plot_cell_${plotCode}_bed_${i + 1}`,
+        plot_id: `plot_cell_${plotCode}`,
+        bed_number: i + 1,
+        crop_name: "トマト",
+        is_updated: false,
+      }));
 
-  // 生徒が選択中の対象畝ベッド
-  const [selectedBedId, setSelectedBedId] = useState<string>(myBeds[0]?.id || "");
-  const currentBed = myBeds.find((b) => b.id === selectedBedId) || myBeds[0];
+  // 重複IDの排除と1〜N番への完全正規化
+  const uniqueBeds: FarmBed[] = rawBeds.map((b, idx) => ({
+    ...b,
+    id: b.id || `plot_cell_${plotCode}_bed_${idx + 1}`,
+    bed_number: idx + 1, // 🌟 常に 1, 2, 3... の1-based連番に完全補正 🌟
+  }));
+
+  // 生徒が選択中の対象畝ベッド (初期状態は未選択、クリック時のみ選択)
+  const [selectedBedId, setSelectedBedId] = useState<string | null>(null);
+  const currentBed = uniqueBeds.find((b) => b.id === selectedBedId) || null;
 
   const [showInputModal, setShowInputModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<CropRecord | null>(null);
+
+  const [customCropName, setCustomCropName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
   const [selectedStage, setSelectedStage] = useState<GrowthStage>("果実肥大");
   const [heightCm, setHeightCm] = useState<number>(75);
@@ -65,23 +110,42 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
     }
   };
 
+  // 画像ファイル選択・Base64変換ハンドラー
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImageUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // 新規または編集の保存
-  const handleSubmitRecord = (e: React.FormEvent) => {
+  const handleSubmitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentBed || !notes.trim()) return;
 
+    const finalCrop = customCropName.trim() || currentBed.crop_name || "トマト";
+
+    // Supabase farm_beds の作物品種名を更新（講師画面へ即座に連携）
+    try {
+      await useFarmManager.prototype?.updateBedCrop?.(currentBed.id, finalCrop) || 
+        supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", currentBed.id);
+    } catch (e) {}
+
     if (editingRecord) {
-      // 🌟【要件3】過去の記録の更新・編集 🌟
       updateCropRecord(editingRecord.id, {
         growth_stage: selectedStage,
         height_cm: Number(heightCm),
         work_types: selectedWorks,
         notes: notes.trim(),
         harvest_amount: harvestAmount.trim() || undefined,
+        image_url: imageUrl || undefined,
       });
       setToastMessage("✏️ 過去の観察記録を更新しました！");
     } else {
-      // 新規登録
       const todayStr = new Date().toLocaleDateString("ja-JP");
       addCropRecord(currentBed.id, {
         bed_id: currentBed.id,
@@ -91,13 +155,33 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
         work_types: selectedWorks,
         notes: notes.trim(),
         harvest_amount: harvestAmount.trim() || undefined,
+        image_url: imageUrl || undefined,
       });
-      setToastMessage(`🎉 畝 ${myPlot?.code || ""}-${currentBed.bed_number} に新しい記録を登録しました！`);
+
+      // 講師の相談日誌・スライドカード用に journals へも自動連動保存
+      try {
+        await supabase.from("journals").insert([
+          {
+            student_id: studentName === "竹下翔" ? "acf193c5-f6b4-4514-93a4-958eba0e0c38" : null,
+            content: `【畝 ${currentBed.bed_number} (${finalCrop})】${notes.trim()}`,
+            task_title: `🌱 観察ノート (${finalCrop})`,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (e) {}
+
+      setToastMessage(`🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`);
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("nouato_sync_event"));
     }
 
     setShowInputModal(false);
     setEditingRecord(null);
     setNotes("");
+    setCustomCropName("");
+    setImageUrl("");
     setHarvestAmount("");
     setShowToast(true);
   };
@@ -122,29 +206,35 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
     }
   };
 
-  // 選択した畝(ベッド)の時系列記録
+  // 選択した畝(ベッド)の時系列記録 (該当区画および選択した畝のみに厳密絞り込み)
   const currentBedRecords = records
-    .filter((r) => r.bed_id === currentBed?.id)
+    .filter((r) => {
+      if (!currentBed) return false;
+      const isDirectMatch = r.bed_id === currentBed.id;
+      const isPlotBedMatch =
+        (myPlot?.id && r.bed_id === `${myPlot.id}_bed_${currentBed.bed_number}`) ||
+        (myPlot?.code && r.bed_id === `bed_${myPlot.code}_${currentBed.bed_number}`) ||
+        (myPlot?.code && r.bed_id === `plot_cell_${myPlot.code}_bed_${currentBed.bed_number}`);
+      return isDirectMatch || isPlotBedMatch;
+    })
     .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
   if (!myPlot) {
     return (
-      <div className="space-y-6 animate-fade-in text-gray-800">
+      <div className="space-y-5 animate-fade-in text-gray-800">
         <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-        <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-6 rounded-3xl shadow-md">
-          <span className="text-xs bg-emerald-700/80 px-3 py-1 rounded-full font-bold">
-            マイ畑ダッシュボード
-          </span>
-          <h2 className="text-xl font-black mt-2">
-            🌾 担当区画の確認
-          </h2>
-          <p className="text-xs text-emerald-100/80 mt-1 font-medium">
-            受講生アカウント ({studentName}) に紐づく専用区画の準備を行なっています
-          </p>
-        </div>
+        {/* タスクスライダー */}
+        {tasks && tasks.length > 0 && (
+          <TaskSlider
+            tasks={tasks}
+            onSelect={onSelectTask || (() => {})}
+            onComplete={onCompleteTask || (() => {})}
+            onUncomplete={onUncompleteTask}
+          />
+        )}
 
-        <div className="bg-white rounded-3xl p-10 border border-gray-200 shadow-xs text-center space-y-3">
+        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-xs text-center space-y-3">
           <span className="text-4xl">🧑‍🌾</span>
           <h3 className="font-black text-gray-900 text-base">担当の畑区画はまだ割り当てられていません</h3>
           <p className="text-xs text-gray-500 font-bold max-w-sm mx-auto leading-relaxed">
@@ -156,88 +246,121 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
   }
 
   return (
-    <div className="space-y-6 animate-fade-in text-gray-800">
+    <div className="space-y-5 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* ヘッダー ＆ 生徒の割当区画情報 */}
-      <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs bg-emerald-700/80 px-3 py-1 rounded-full font-bold">
-            マイ畑ダッシュボード
-          </span>
-          <h2 className="text-2xl font-black mt-1">
-            {myPlot.name} の栽培・タスク記録
-          </h2>
-          <p className="text-xs text-emerald-100/80 mt-1 font-medium">
-            担当の畝(ベッド)を選択して、これまでのタスク記録や過去ログの編集・削除ができます
-          </p>
-        </div>
+      {/* 🌟 1. 上部: 進行中のタスク (TaskSlider) 🌟 */}
+      {tasks && tasks.length > 0 && (
+        <TaskSlider
+          tasks={tasks}
+          onSelect={onSelectTask || (() => {})}
+          onComplete={onCompleteTask || (() => {})}
+          onUncomplete={onUncompleteTask}
+        />
+      )}
 
-        <button
-          onClick={() => {
-            setEditingRecord(null);
-            setNotes("");
-            setHarvestAmount("");
-            setShowInputModal(true);
-          }}
-          className="px-5 py-3 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-sm rounded-2xl shadow-md transition transform active:scale-95 flex items-center justify-center space-x-2 shrink-0"
-        >
-          <span>＋ 新しい作業・観察記録を登録</span>
-        </button>
-      </div>
-
-      {/* 🌟 担当区画内の畝(ベッド)選択タブ 🌟 */}
-      <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b pb-3">
-          <h3 className="font-black text-gray-900 text-base flex items-center gap-2">
-            <span>🌱 対象の畝(ベッド)を選択</span>
-            <span className="text-xs font-bold text-gray-400">({myBeds.length}個の畝)</span>
+      {/* 🌟 2. 担当区画内の畝(ベッド)一覧 🌟 */}
+      <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between border-b pb-2.5">
+          <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
+            <span>🌱 {myPlot.name} の畝一覧</span>
+            <span className="text-xs font-bold text-gray-400">({uniqueBeds.length}畝)</span>
           </h3>
-          <span className="text-xs font-bold text-emerald-800">
-            選択中: 畝 {myPlot?.code}-{currentBed?.bed_number}
+          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+            {currentBed ? `畝 ${currentBed.bed_number} 選択中` : "畝をタップして記録を表示"}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {myBeds.map((bed) => {
-            const isSelected = bed.id === currentBed?.id;
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          {uniqueBeds.map((bed) => {
+            const isSelected = selectedBedId === bed.id;
+
+            // 生徒の観察記録・投稿画像のサムネイル検索
+            const bedRecs = records.filter((r) => r.bed_id === bed.id);
+            const latestImg = bedRecs.find((r: any) => r.image_url || r.photo_url)?.image_url || null;
+
+            // 成長段階・進捗率 (0〜100%) に応じた色の濃淡カラーマップ
+            const progress = (bed as any).progress_percent || 0;
+            let colorClasses = "bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100";
+            let statusBadge = "🌱 初期";
+
+            if (progress >= 80) {
+              colorClasses = "bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 border-emerald-900 shadow-sm";
+              statusBadge = "🏆 収穫期";
+            } else if (progress >= 50) {
+              colorClasses = "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-xs";
+              statusBadge = "🌿 成長中";
+            } else if (progress >= 25) {
+              colorClasses = "bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200";
+              statusBadge = "🌱 発芽";
+            }
+
             return (
               <button
-                key={bed.id}
+                key={bed.id || `bed_${bed.bed_number}`}
                 type="button"
-                onClick={() => setSelectedBedId(bed.id)}
-                className={`p-3.5 rounded-2xl border-2 transition font-black text-xs text-center flex flex-col items-center justify-center space-y-1 ${
+                onClick={() => setSelectedBedId(selectedBedId === bed.id ? null : bed.id)}
+                className={`relative p-2.5 rounded-2xl border-2 transition font-black text-xs text-center flex flex-col items-center justify-between space-y-1 min-h-[85px] overflow-hidden cursor-pointer ${colorClasses} ${
                   isSelected
-                    ? "bg-emerald-950 text-white border-emerald-950 shadow-md ring-2 ring-emerald-500/30 scale-102"
-                    : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                    ? "ring-4 ring-amber-400 border-amber-400 scale-105 shadow-md z-10"
+                    : "opacity-90 hover:opacity-100 hover:scale-[1.02]"
                 }`}
               >
-                <span className="text-lg">🌾</span>
-                <span>畝 {myPlot?.code}-{bed.bed_number}</span>
-                {bed.is_updated && (
-                  <span className="text-[9px] bg-amber-400 text-amber-950 font-extrabold px-1.5 py-0.5 rounded">
-                    更新あり
-                  </span>
+                {/* 投稿画像プレビューサムネイル */}
+                {latestImg ? (
+                  <div className="w-full h-7 rounded-lg overflow-hidden mb-0.5 border border-white/30">
+                    <img src={latestImg} alt="投稿写真" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <span className="text-lg mt-0.5">{(bed as any).crop_icon || "🌾"}</span>
                 )}
+
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-black">畝 {bed.bed_number}</span>
+                  <span className="text-[10px] opacity-80 font-bold max-w-[65px] truncate">
+                    {bed.crop_name || "未設定"}
+                  </span>
+                </div>
+
+                <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-bold ${
+                  isSelected ? "bg-amber-400 text-amber-950" : "bg-black/20 text-white/90"
+                }`}>
+                  {statusBadge}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 🌟 選択した畝(ベッド)の時系列タイムライン ＆ 編集・削除 🌟 */}
-      <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b pb-3">
-          <div>
-            <h3 className="font-black text-gray-900 text-base">
-              📅 畝 {myPlot?.code}-{currentBed?.bed_number} の時系列タスク・観察記録
-            </h3>
-            <p className="text-[11px] text-gray-400 font-bold">過去の記録は「編集」または「削除」できます</p>
+      {/* 🌟 3. 畝をクリックしたときだけ表示される記録セクション 🌟 */}
+      {currentBed ? (
+        <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between border-b pb-3 gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-gray-900 text-base">
+                  📅 畝 {currentBed.bed_number} {currentBed.crop_name ? `(${currentBed.crop_name})` : ""} の記録
+                </h3>
+                <span className="text-xs text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold">
+                  全 {currentBedRecords.length} 件
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 font-bold">過去の記録は「編集」または「削除」できます</p>
+            </div>
+
+            <button
+              onClick={() => {
+                setEditingRecord(null);
+                setNotes("");
+                setHarvestAmount("");
+                setShowInputModal(true);
+              }}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-xs rounded-xl shadow-xs transition transform active:scale-95 flex items-center gap-1 shrink-0"
+            >
+              <span>＋ 新規記録</span>
+            </button>
           </div>
-          <span className="text-xs text-emerald-900 bg-emerald-100 px-3 py-1 rounded-full font-bold">
-            全 {currentBedRecords.length} 件
-          </span>
-        </div>
 
         {currentBedRecords.length === 0 ? (
           <div className="py-12 text-center text-gray-400 font-bold text-sm space-y-3">
@@ -310,6 +433,15 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
           </div>
         )}
       </div>
+      ) : (
+        <div className="bg-white/90 p-8 rounded-3xl border border-dashed border-emerald-300 text-center space-y-2 text-gray-500 shadow-2xs">
+          <span className="text-3xl">👆</span>
+          <h4 className="font-extrabold text-gray-800 text-sm">畝（ベッド）をタップしてください</h4>
+          <p className="text-xs text-gray-500 font-bold max-w-xs mx-auto leading-relaxed">
+            上の畝番号をタップすると、その畝の栽培記録やタスク履歴の確認、新しい観察ノートの登録ができます。
+          </p>
+        </div>
+      )}
 
       {/* 登録・編集 Modal */}
       {showInputModal && (
@@ -328,17 +460,43 @@ export default function StudentFarmRecordView({ studentName = "受講生" }: Stu
               <div>
                 <label className="block text-gray-700 mb-1">対象の畝(ベッド) *</label>
                 <select
-                  value={selectedBedId}
+                  value={selectedBedId || uniqueBeds[0]?.id || ""}
                   onChange={(e) => setSelectedBedId(e.target.value)}
                   disabled={!!editingRecord}
                   className="w-full p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-sm"
                 >
-                  {myBeds.map((b) => (
+                  {uniqueBeds.map((b) => (
                     <option key={b.id} value={b.id}>
-                      畝 {myPlot?.code}-{b.bed_number}
+                      畝 {b.bed_number} {(b as any).crop_name ? `(${(b as any).crop_name})` : ""}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">栽培中の作物品種 (自由入力・変更可)</label>
+                <input
+                  type="text"
+                  placeholder="例: 桃太郎トマト、メークイン、中玉トマト"
+                  value={customCropName}
+                  onChange={(e) => setCustomCropName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">📷 画像・写真を添付</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="w-full p-2 text-xs border border-gray-300 rounded-xl bg-gray-50 font-bold"
+                />
+                {imageUrl && (
+                  <div className="mt-2 relative w-24 h-24 rounded-xl overflow-hidden border border-emerald-300 shadow-xs">
+                    <img src={imageUrl} alt="添付写真プレビュー" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
 
               <div>

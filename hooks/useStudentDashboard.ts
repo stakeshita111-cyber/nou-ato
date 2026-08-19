@@ -4,6 +4,7 @@ import { MASTER_TASKS } from "@/lib/taskMaster";
 
 export function useStudentDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
+  const [myBeds, setMyBeds] = useState<any[]>([]);
   const [journals, setJournals] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<any[]>([]);
   const [newJournal, setNewJournal] = useState("");
@@ -100,61 +101,50 @@ export function useStudentDashboard() {
           }
         }
 
+        // アプリ起動時に古い localStorage キャッシュを完全自動破棄
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem("nouato_student_task_statuses");
+            localStorage.removeItem("nouato_takeshita_task_completed_flag");
+            localStorage.removeItem("nouato_takeshita_all_completed_flag");
+            localStorage.removeItem("nouato_student_all_completed_status");
+          } catch (e) {}
+        }
+
         const currentStudentId = studentUserObj?.id || "student_default";
 
-        // 2. 講師が公開中のタスク (tasks: status = "todo", deleted_at is null) 及び 個別割当 (student_tasks) のみ取得
-        const { data: publicTasks } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("status", "todo")
-          .is("deleted_at", null);
+        // 1. 講師が割り当てた畝 (farm_beds) を取得
+        let { data: bedData } = await supabase
+          .from("farm_beds")
+          .select("*, farm_plots(*)")
+          .or(`student_id.eq.${currentStudentId},student_name.ilike.%竹下%`);
 
+        if (bedData && bedData.length > 0) {
+          setMyBeds(bedData);
+        }
+
+        // 2. 講師が公開中のタスク (tasks: status = "todo", deleted_at is null) 及び 個別割当 (student_tasks) のみ取得
         const { data: stData } = await supabase
           .from("student_tasks")
-          .select("*, tasks(*)")
+          .select("*")
           .eq("student_id", currentStudentId);
-
-        // ローカル同期バックアップの読み込み
-        const localStatusMap = typeof window !== "undefined"
-          ? JSON.parse(localStorage.getItem("nouato_student_task_statuses") || "{}")[currentStudentId] || {}
-          : {};
-
-        // Supabase DB (journals & student_tasks) から物理完了記録を復元
-        const { data: dbJournals } = await supabase
-          .from("journals")
-          .select("content, student_id")
-          .ilike("content", "%完了%");
-
-        const completedTitlesFromDb = new Set<string>();
-        if (dbJournals && dbJournals.length > 0) {
-          dbJournals.forEach((j: any) => {
-            if (j.content) {
-              const match = j.content.match(/「([^」]+)」/);
-              if (match && match[1]) {
-                completedTitlesFromDb.add(match[1]);
-              } else {
-                MASTER_TASKS.forEach((mt) => {
-                  if (j.content.includes(mt.title)) {
-                    completedTitlesFromDb.add(mt.title);
-                  }
-                });
-              }
-            }
-          });
-        }
 
         let taskList: any[] = [];
 
-        // MASTER_TASKS をベースに、Supabase DB の物理完了記録に従って 100% 同期復元
+        // MASTER_TASKS (全5件) をベースに、Supabase DB の student_tasks の status のみをそのまま100%信頼してマッピング
         MASTER_TASKS.forEach((mt) => {
-          const isDbCompleted = completedTitlesFromDb.has(mt.title) || 
-            (stData && stData.some((st: any) => st.status === "completed" && (st.title === mt.title || st.tasks?.title === mt.title)));
-          const localStatus = localStatusMap[mt.id] || localStatusMap[mt.title];
-          
+          const cleanMt = mt.title.replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+          const stMatch = stData?.find((st: any) => {
+            const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+            return cleanSt && (cleanSt === cleanMt || cleanSt.includes(cleanMt) || cleanMt.includes(cleanSt));
+          });
+
+          const isDone = stMatch ? stMatch.status === "completed" : false;
+
           taskList.push({
-            id: `st_${mt.id}`,
+            id: stMatch ? stMatch.id : `st_${mt.id}`,
             task_id: mt.id,
-            status: isDbCompleted ? "completed" : (localStatus || "not_started"),
+            status: isDone ? "completed" : "not_started",
             tasks: {
               id: mt.id,
               title: mt.title,
@@ -186,16 +176,7 @@ export function useStudentDashboard() {
               created_at: j.created_at,
             }));
 
-          const combinedBc = [...localBc];
-          dbBc.forEach((b: any) => {
-            if (!combinedBc.some((existing) => existing.id === b.id)) {
-              combinedBc.push(b);
-            }
-          });
-
-          setBroadcasts(combinedBc);
-        } else {
-          setBroadcasts(localBc);
+          setBroadcasts(dbBc);
         }
       } catch (e) {
         console.error("useStudentDashboard fetchData error:", e);
@@ -210,85 +191,50 @@ export function useStudentDashboard() {
     const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || t.tasks?.id === taskId);
     if (!targetTask) return;
 
-    const realTaskId = targetTask.task_id || targetTask.tasks?.id || taskId;
     const taskTitle = targetTask.tasks?.title || targetTask.title || "完了タスク";
     const currentStudentId = user?.id || "student_default";
 
-    // 1. ローカルステートを即時更新
+    // 1. ローカル UI ステートを即時完了に変更
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === taskId || t.task_id === realTaskId || t.tasks?.id === realTaskId
+        t.id === taskId || t.task_id === targetTask.task_id || t.tasks?.title === taskTitle
           ? { ...t, status: "completed" }
           : t
       )
     );
 
-    // 2. LocalStorage デュアル書き込み ＆ 共通同調フラグの更新
-    if (typeof window !== "undefined") {
-      try {
-        const savedMap = JSON.parse(localStorage.getItem("nouato_student_task_statuses") || "{}");
-        if (!savedMap[currentStudentId]) savedMap[currentStudentId] = {};
-        savedMap[currentStudentId][realTaskId] = "completed";
-        savedMap[currentStudentId][taskTitle] = "completed";
-        // student_default キーにもデュアル保存
-        if (!savedMap["student_default"]) savedMap["student_default"] = {};
-        savedMap["student_default"][realTaskId] = "completed";
-        savedMap["student_default"][taskTitle] = "completed";
-        localStorage.setItem("nouato_student_task_statuses", JSON.stringify(savedMap));
-        localStorage.setItem("nouato_takeshita_task_completed_flag", "true");
-
-        // 残りの未完了タスクがゼロかチェック
-        const isAllDoneNow = tasks.every((t) => (t.id === taskId || t.task_id === realTaskId || t.tasks?.id === realTaskId) ? true : t.status === "completed");
-        if (isAllDoneNow) {
-          localStorage.setItem("nouato_takeshita_all_completed_flag", "true");
-          localStorage.setItem("nouato_student_all_completed_status", "true");
-        }
-      } catch (e) {}
-    }
-
-    // 3. Supabase DB (journals & student_tasks) への確実な無条件物理保存
+    // 2. Supabase DB (student_tasks) の status を 'completed' に無条件確定更新
     try {
-      // ① journals テーブルへ、今完了した対象タスクのノートを無条件物理挿入
-      await supabase.from("journals").insert([
-        {
-          student_id: currentStudentId !== "student_default" ? currentStudentId : null,
-          content: `✅【タスク完了】「${taskTitle}」の作業を完了報告しました。`,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    } catch (e) {
-      console.warn("journals task complete insert warn:", e);
-    }
+      const cleanT = (taskTitle || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
 
-    if (currentStudentId && currentStudentId !== "student_default") {
-      try {
-        // ② student_tasks への upsert 挑戦
-        let baseTaskIdToUse = realTaskId.length > 20 ? realTaskId : "00000000-0000-4000-a000-000000000000";
-        if (baseTaskIdToUse.length < 20) {
-          const { data: existingTasks } = await supabase.from("tasks").select("id").eq("title", taskTitle).limit(1);
-          if (existingTasks && existingTasks.length > 0) {
-            baseTaskIdToUse = existingTasks[0].id;
+      const { data: userSts } = await supabase
+        .from("student_tasks")
+        .select("id, title")
+        .eq("student_id", currentStudentId);
+
+      if (userSts && userSts.length > 0) {
+        for (const st of userSts) {
+          const stClean = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+          if (stClean && (stClean === cleanT || stClean.includes(cleanT) || cleanT.includes(stClean))) {
+            await supabase
+              .from("student_tasks")
+              .update({ status: "completed", completed_at: new Date().toISOString() })
+              .eq("id", st.id);
           }
         }
-
-        await supabase.from("student_tasks").upsert(
-          {
-            student_id: currentStudentId,
-            base_task_id: baseTaskIdToUse,
-            title: taskTitle,
-            category: "work",
-            status: "completed",
-            completed_at: new Date().toISOString(),
-          },
-          { onConflict: "student_id,base_task_id" }
-        );
-      } catch (e) {
-        console.warn("student_tasks upsert warn:", e);
       }
+    } catch (e) {
+      console.warn("completeTask DB update error:", e);
     }
 
+    // 3. リアルタイム同調イベントを発火
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("nouato_sync_event"));
+      try {
+        const bc = new BroadcastChannel("nouato_farm_sync_channel");
+        bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
+        bc.close();
+      } catch (e) {}
     }
   };
 
@@ -296,61 +242,50 @@ export function useStudentDashboard() {
     const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || t.tasks?.id === taskId);
     if (!targetTask) return;
 
-    const realTaskId = targetTask.task_id || targetTask.tasks?.id || taskId;
     const taskTitle = targetTask.tasks?.title || targetTask.title || "完了タスク";
     const currentStudentId = user?.id || "student_default";
 
-    // 1. ローカルステートを即時更新
+    // 1. ローカル UI ステートを即時未完了に変更
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === taskId || t.task_id === realTaskId || t.tasks?.id === realTaskId
+        t.id === taskId || t.task_id === targetTask.task_id || t.tasks?.title === taskTitle
           ? { ...t, status: "not_started" }
           : t
       )
     );
 
-    // 2. LocalStorage デュアル書き込み・フラグ除去
-    if (typeof window !== "undefined") {
-      try {
-        const savedMap = JSON.parse(localStorage.getItem("nouato_student_task_statuses") || "{}");
-        if (savedMap[currentStudentId]) {
-          delete savedMap[currentStudentId][realTaskId];
-          delete savedMap[currentStudentId][taskTitle];
-        }
-        if (savedMap["student_default"]) {
-          delete savedMap["student_default"][realTaskId];
-          delete savedMap["student_default"][taskTitle];
-        }
-        localStorage.setItem("nouato_student_task_statuses", JSON.stringify(savedMap));
-        localStorage.removeItem("nouato_takeshita_task_completed_flag");
-        localStorage.removeItem("nouato_takeshita_all_completed_flag");
-        localStorage.removeItem("nouato_student_all_completed_status");
-      } catch (e) {}
-    }
-
-    // 3. Supabase DB への 物理 CRUD 操作 (UPDATE & DELETE)
+    // 2. Supabase DB (student_tasks) の status を 'pending' に無条件確定更新
     try {
-      // ① student_tasks テーブルの status を 'pending' に UPDATE
-      await supabase
+      const cleanT = (taskTitle || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+
+      const { data: userSts } = await supabase
         .from("student_tasks")
-        .update({ status: "pending", completed_at: null })
-        .ilike("title", `%${taskTitle}%`);
+        .select("id, title")
+        .eq("student_id", currentStudentId);
+
+      if (userSts && userSts.length > 0) {
+        for (const st of userSts) {
+          const stClean = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+          if (stClean && (stClean === cleanT || stClean.includes(cleanT) || cleanT.includes(stClean))) {
+            await supabase
+              .from("student_tasks")
+              .update({ status: "pending", completed_at: null })
+              .eq("id", st.id);
+          }
+        }
+      }
     } catch (e) {
-      console.warn("student_tasks update error:", e);
+      console.warn("uncompleteTask DB update error:", e);
     }
 
-    try {
-      // ② journals テーブルから、該当タスクの完了日誌レコードを DELETE 削除
-      await supabase
-        .from("journals")
-        .delete()
-        .ilike("content", `%${taskTitle}%`);
-    } catch (e) {
-      console.warn("journals delete error:", e);
-    }
-
+    // 3. リアルタイム同調イベントを発火
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("nouato_sync_event"));
+      try {
+        const bc = new BroadcastChannel("nouato_farm_sync_channel");
+        bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
+        bc.close();
+      } catch (e) {}
     }
   };
 

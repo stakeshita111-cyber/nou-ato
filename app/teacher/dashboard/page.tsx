@@ -15,6 +15,8 @@ import TeacherEventsView from "@/components/teacher/TeacherEventsView";
 import TeacherTemplatesView from "@/components/teacher/TeacherTemplatesView";
 import TeacherFarmCanvasView from "@/components/teacher/TeacherFarmCanvasView";
 
+import MobilePhonePreviewModal from "@/components/common/MobilePhonePreviewModal";
+
 export default function TeacherDashboardPage() {
   const router = useRouter();
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -24,6 +26,7 @@ export default function TeacherDashboardPage() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showMobilePreviewModal, setShowMobilePreviewModal] = useState(false);
 
   // 講師ロール（role === 'teacher'）権限の厳格チェック
   useEffect(() => {
@@ -97,12 +100,20 @@ export default function TeacherDashboardPage() {
     <div className="min-h-screen app-bg-main flex app-text-main font-sans transition-colors duration-300">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
+      {/* 📱 超美麗スマホ実機プレビューモーダル 📱 */}
+      <MobilePhonePreviewModal
+        isOpen={showMobilePreviewModal}
+        onClose={() => setShowMobilePreviewModal(false)}
+        initialUrl="/teacher/dashboard"
+      />
+
       {/* 1. 左サイドバー */}
       <TeacherSidebar
         activeMenu={activeMenu}
         onMenuClick={setActiveMenu}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onOpenMobilePreview={() => setShowMobilePreviewModal(true)}
       />
 
       {/* 2. メインエリア */}
@@ -156,7 +167,9 @@ export default function TeacherDashboardPage() {
 
           {activeMenu === "templates" && <TeacherTemplatesView />}
 
-          {activeMenu === "journals" && <TeacherJournalsView />}
+          {activeMenu === "journals" && (
+            <TeacherJournalsView onNavigateToFarm={() => setActiveMenu("farm")} />
+          )}
 
           {activeMenu === "payments" && <TeacherPaymentsView />}
 

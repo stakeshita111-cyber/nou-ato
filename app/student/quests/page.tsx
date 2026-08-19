@@ -36,7 +36,7 @@ export default function StudentQuestsPage() {
 
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
-  const [activeTab, setActiveTab] = useState("quests");
+  const [activeTab, setActiveTab] = useState("myfarm");
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   // ログイン中のアカウント表示名
@@ -146,8 +146,19 @@ export default function StudentQuestsPage() {
 
       {/* メインコンテンツ (スマホ形式ナビと重ならない pb-28) */}
       <main className="w-full max-w-md p-4 space-y-5 flex-1 pb-28">
-        {/* Quests タブ */}
-        {activeTab === "quests" && (
+        {/* 🌟 1. 畑 タブ (旧マイ畑記録: 担当区画の畝管理 ＆ タスクスライダー) 🌟 */}
+        {activeTab === "myfarm" && (
+          <StudentFarmRecordView
+            studentName={userAccountName}
+            tasks={tasks}
+            onSelectTask={setSelectedTask}
+            onCompleteTask={handleCompleteTask}
+            onUncompleteTask={handleUncompleteTask}
+          />
+        )}
+
+        {/* 🌟 2. 天気 タブ (旧Quests: 天気予報ウィジェット ＆ 気づきメモ・講師日誌) 🌟 */}
+        {activeTab === "weather" && (
           <div className="space-y-5 animate-fade-in">
             {/* 📢 講師からの全体一括配信・連絡カード */}
             {broadcasts && broadcasts.length > 0 && (
@@ -171,14 +182,6 @@ export default function StudentQuestsPage() {
             {/* 農園ピンポイント天気予報 ＆ 気象アドバイスウィジェット */}
             <WeatherWidget />
 
-            {/* タスクスライダー */}
-            <TaskSlider
-              tasks={tasks}
-              onSelect={setSelectedTask}
-              onComplete={handleCompleteTask}
-              onUncomplete={handleUncompleteTask}
-            />
-
             {/* 気づきメモ・講師への報告 */}
             <div className="space-y-2 pt-2 border-t border-gray-200">
               <h3 className="font-bold text-gray-900 text-sm">📝 気づきメモ・講師への報告</h3>
@@ -189,11 +192,6 @@ export default function StudentQuestsPage() {
               />
             </div>
           </div>
-        )}
-
-        {/* 🌟 マイ畑記録 タブ (要件: 指定区画の畑ごとの野菜記録管理) 🌟 */}
-        {activeTab === "myfarm" && (
-          <StudentFarmRecordView studentName={userAccountName} />
         )}
 
         {/* Events (カレンダー予約) タブ */}
@@ -217,7 +215,7 @@ export default function StudentQuestsPage() {
 
         {/* Talk タブ */}
         {activeTab === "talk" && (
-          <StudentTalkView journals={journals} />
+          <StudentTalkView journals={journals} studentName={userAccountName} />
         )}
 
         {/* Feed タブ */}
@@ -253,31 +251,31 @@ export default function StudentQuestsPage() {
         />
       )}
 
-      {/* フッターナビゲーション */}
+      {/* フッターナビゲーション (左から: 畑, 天気, カレンダー, Talk, Feed) */}
       <footer className="w-full max-w-md bg-white border-t border-gray-200 fixed bottom-0 z-20 px-2 py-2 flex items-center justify-around shadow-lg">
-        <button
-          onClick={() => setActiveTab("quests")}
-          className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
-            activeTab === "quests" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          <span className="text-[10px] font-bold mt-0.5">Quests</span>
-        </button>
-
-        {/* 🌟 マイ畑記録ボタン 🌟 */}
+        {/* 🌟 1. 畑 (元マイ畑記録) 🌟 */}
         <button
           onClick={() => setActiveTab("myfarm")}
-          className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
+          className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
             activeTab === "myfarm" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
           }`}
         >
           <span className="text-base leading-none">🌾</span>
-          <span className="text-[10px] font-bold mt-0.5">マイ畑記録</span>
+          <span className="text-[10px] font-bold mt-0.5">畑</span>
         </button>
 
+        {/* 🌟 2. 天気 (元Quests) 🌟 */}
+        <button
+          onClick={() => setActiveTab("weather")}
+          className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
+            activeTab === "weather" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          <span className="text-base leading-none">☀️</span>
+          <span className="text-[10px] font-bold mt-0.5">天気</span>
+        </button>
+
+        {/* 3. カレンダー */}
         <button
           onClick={() => setActiveTab("events")}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
@@ -288,6 +286,7 @@ export default function StudentQuestsPage() {
           <span className="text-[10px] font-bold mt-0.5">カレンダー</span>
         </button>
 
+        {/* 4. Talk */}
         <button
           onClick={() => setActiveTab("talk")}
           className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${
@@ -301,6 +300,7 @@ export default function StudentQuestsPage() {
           <span className="text-[10px] font-bold mt-0.5">Talk</span>
         </button>
 
+        {/* 5. Feed (成長) */}
         <button
           onClick={() => setActiveTab("feed")}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${

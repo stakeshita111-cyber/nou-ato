@@ -269,7 +269,7 @@ function InviteContent() {
               </p>
             ) : (
               <p className="text-[11px] text-gray-200 opacity-90 font-medium mt-0.5">
-                NOU-ATO - Agricultural Education
+                農跡(のうあと) - 体験農業支援ポータル
               </p>
             )}
           </div>

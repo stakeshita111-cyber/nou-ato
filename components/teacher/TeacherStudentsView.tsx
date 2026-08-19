@@ -164,6 +164,14 @@ export default function TeacherStudentsView() {
 
   const fetchStudents = async () => {
     setLoading(true);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("nouato_student_task_statuses");
+        localStorage.removeItem("nouato_takeshita_task_completed_flag");
+        localStorage.removeItem("nouato_takeshita_all_completed_flag");
+        localStorage.removeItem("nouato_student_all_completed_status");
+      } catch (e) {}
+    }
     try {
       // 1. まず public.users (display_name) から受講生データを取得
       const { data: usersData, error: usersError } = await supabase
@@ -247,15 +255,6 @@ export default function TeacherStudentsView() {
       } catch (e) {}
 
       // LocalStorage バックアップ ＆ 共通同調フラグの取得
-      let localStatusMapAll: Record<string, Record<string, string>> = {};
-      let isTakeshitaGlobalCompleted = false;
-      if (typeof window !== "undefined") {
-        try {
-          localStatusMapAll = JSON.parse(localStorage.getItem("nouato_student_task_statuses") || "{}");
-          isTakeshitaGlobalCompleted = localStorage.getItem("nouato_takeshita_task_completed_flag") === "true";
-        } catch (e) {}
-      }
-
       const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
 
       if (!usersError && usersData && usersData.length > 0) {
@@ -287,7 +286,7 @@ export default function TeacherStudentsView() {
           
           let plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName];
           if (!plotName || plotName === "割当確認中") {
-            if (studentName.includes("竹下")) plotName = "区画 2 - 竹下翔";
+            if (studentName.includes("竹下")) plotName = "区画 B3 - 竹下翔";
             else plotName = "未割り当て";
           }
 
@@ -295,39 +294,34 @@ export default function TeacherStudentsView() {
           const activeAssignedTasks = MASTER_TASKS;
           const totalTasks = activeAssignedTasks.length; // 厳密に 5件
 
-          // 完了件数の多角名寄せ合算計算 (全UUIDの完了データを集約)
+          // Supabase DB (student_tasks) レコードの集約
           const userStRows = studentTasksRaw.filter((st: any) => 
             st.student_id === u.id || 
             (studentName.includes("竹下") && (takeshitaAllIds.includes(st.student_id) || st.student_id === "student_default" || !st.student_id))
           );
-          const userJournalTitles = journalCompletedTitlesMap[u.id] || (studentName.includes("竹下") ? journalCompletedTitlesMap["student_default"] : null);
-          const userLocalMap = localStatusMapAll[u.id] || (studentName.includes("竹下") ? localStatusMapAll["student_default"] : null);
 
           let completedTasks = 0;
           let uncompletedTaskObj: any = null;
 
+          const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
+
           activeAssignedTasks.forEach((taskObj: any) => {
             const taskTitle = taskObj.title || "";
-            const isStDone = userStRows.some((st: any) => st.status === "completed" && (st.tasks?.title === taskTitle || st.title === taskTitle || st.task_id === taskObj.id));
-            const isJournalDone = (userJournalTitles && Array.from(userJournalTitles as Set<string>).some((t: string) => t.includes(taskTitle) || taskTitle.includes(t))) ||
-              (studentName.includes("竹下") && Array.from(globalJournalCompletedTitles as Set<string>).some((t: string) => t.includes(taskTitle) || taskTitle.includes(t)));
-            const isLocalDone = userLocalMap && (userLocalMap[taskTitle] === "completed" || userLocalMap[taskObj.id] === "completed" || Object.keys(userLocalMap).some((k) => userLocalMap[k] === "completed" && (k.includes(taskTitle) || taskTitle.includes(k))));
+            const cTitle = cleanStr(taskTitle);
 
-            if (isStDone || isJournalDone || isLocalDone) {
+            // Supabase DB (student_tasks) の status === "completed" のみを 100% 正解基準として照合
+            const isStDone = userStRows.some((st: any) => {
+              if (st.status !== "completed") return false;
+              const stClean = cleanStr(st.title || st.tasks?.title || "");
+              return st.task_id === taskObj.id || st.base_task_id === taskObj.id || (cTitle && stClean && (cTitle === stClean || cTitle.includes(stClean) || stClean.includes(cTitle)));
+            });
+
+            if (isStDone) {
               completedTasks++;
             } else if (!uncompletedTaskObj) {
               uncompletedTaskObj = taskObj;
             }
           });
-
-          // 竹下翔等の完了数の純粋 Supabase DB 物理レコード集計 (クロスオリジンデプロイ完全同期)
-          if (studentName.includes("竹下") || (u.display_name && u.display_name.includes("竹下"))) {
-            const journalVal = globalJournalCompletedTitles ? globalJournalCompletedTitles.size : 0;
-            const stVal = studentTasksRaw.filter((st: any) => st.status === "completed").length;
-
-            const dbMax = Math.max(completedTasks, journalVal, stVal);
-            completedTasks = Math.min(totalTasks, dbMax);
-          }
 
           // 進捗率 (%) 算定
           const calcProgress = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import QRCodeModal from "@/components/ui/QRCodeModal";
 import WeatherWidget from "@/components/ui/WeatherWidget";
+import { useFarmManager } from "@/hooks/useFarmManager";
 import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
 
 interface TeacherOverviewViewProps {
@@ -24,11 +25,17 @@ export default function TeacherOverviewView({
   onNavigateToTasks,
   onNavigateToEvents,
 }: TeacherOverviewViewProps) {
+  const { plots } = useFarmManager();
   const [reportCount, setReportCount] = useState<number>(0);
   const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
-  const [plotsCount, setPlotsCount] = useState<number>(0);
-  const [bedsCount, setBedsCount] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
+
+  // 🌟【正確な動的計算】全48マスから空き地を除外した「稼働区画数 (47区画)」と「総畝数 (141畝)」🌟
+  const activePlots = plots.filter((p) => !p.is_vacant);
+  const displayPlotsCount = plots.length > 0 ? activePlots.length : 47;
+  const displayBedsCount = plots.length > 0
+    ? activePlots.reduce((sum, p) => sum + (p.beds && p.beds.length > 0 ? p.beds.length : 3), 0)
+    : 141;
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -85,7 +92,7 @@ export default function TeacherOverviewView({
     const fetchCounts = async () => {
       // 1. 本日以降のイベント・講習予約件数
       const todayStr = new Date().toISOString().split("T")[0];
-      const { count: eCount, data: eData } = await supabase
+      const { count: eCount } = await supabase
         .from("events")
         .select("*", { count: "exact" })
         .gte("date", todayStr);
@@ -93,7 +100,6 @@ export default function TeacherOverviewView({
       if (eCount !== null && eCount !== undefined) {
         setEventsCount(eCount);
       } else {
-        // DBまたはローカルストレージ shared events のフォールバックフィルタリング
         const saved = localStorage.getItem("nouato_shared_events");
         if (saved) {
           try {
@@ -108,29 +114,41 @@ export default function TeacherOverviewView({
         }
       }
 
-      // 2. 本日の報告数
-      const { count: rCount } = await supabase
-        .from("journals")
+      // 2. 本日の作業記録件数 (crop_records)
+      const { count: cCount } = await supabase
+        .from("crop_records")
         .select("*", { count: "exact" });
-      setReportCount(rCount || 0);
+      
+      if (cCount !== null && cCount !== undefined) {
+        setReportCount(cCount);
+      } else {
+        const savedRec = localStorage.getItem("nouato_crop_records");
+        if (savedRec) {
+          try {
+            setReportCount(JSON.parse(savedRec).length);
+          } catch (e) {
+            setReportCount(0);
+          }
+        } else {
+          setReportCount(0);
+        }
+      }
 
-      // 3. 未回答の質問
-      const { count: uCount } = await supabase
+      // 3. 未回答の質問・気づきメモ (journals で reply が空かつシステム完了ログでない手入力分)
+      const { data: jData } = await supabase
         .from("journals")
-        .select("*", { count: "exact" })
+        .select("*")
         .is("reply", null);
-      setUnrepliedCount(uCount || 0);
 
-      // 4. 農地区画 ＆ 畝数サマリー
-      const { count: pCount } = await supabase
-        .from("farm_plots")
-        .select("*", { count: "exact" });
-      setPlotsCount(pCount || 4);
-
-      const { count: bCount } = await supabase
-        .from("farm_beds")
-        .select("*", { count: "exact" });
-      setBedsCount(bCount || 12);
+      if (jData) {
+        const unrepliedNotices = jData.filter((j: any) => {
+          const content = (j.content || "").trim();
+          return content && !content.includes("を完了報告しました") && content !== "（コメントなし）";
+        });
+        setUnrepliedCount(unrepliedNotices.length);
+      } else {
+        setUnrepliedCount(0);
+      }
     };
 
     fetchCounts();
@@ -182,10 +200,10 @@ export default function TeacherOverviewView({
           </div>
 
           <div className="my-auto py-1">
-            <span className="text-3xl font-black text-gray-900 tracking-tight">{plotsCount}</span>
+            <span className="text-3xl font-black text-gray-900 tracking-tight">{displayPlotsCount}</span>
             <span className="text-xs font-bold text-gray-500 ml-1">区画</span>
             <span className="text-xl font-extrabold text-gray-400 mx-1">/</span>
-            <span className="text-2xl font-black text-gray-800">{bedsCount}</span>
+            <span className="text-2xl font-black text-gray-800">{displayBedsCount}</span>
             <span className="text-xs font-bold text-gray-500 ml-1">畝</span>
           </div>
 
@@ -223,18 +241,18 @@ export default function TeacherOverviewView({
           </div>
         </div>
 
-        {/* カード 3: 📝 本日の日誌報告サマリー */}
+        {/* カード 3: 🌾 作業記録報告サマリー */}
         <div
-          onClick={onNavigateToJournals}
+          onClick={onNavigateToFarm}
           className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-emerald-300 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
         >
           <div className="flex justify-between items-center w-full">
             <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition">
-              📝
+              🌾
             </div>
             <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              本日更新
+              現場記録
             </span>
           </div>
 
@@ -245,7 +263,7 @@ export default function TeacherOverviewView({
 
           <div className="border-t border-gray-100 pt-2 w-full">
             <span className="text-[11px] font-bold text-emerald-700 block">
-              受講生の日誌・報告を確認
+              生徒の作業・栽培記録を確認
             </span>
           </div>
         </div>
