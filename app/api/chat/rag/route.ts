@@ -14,24 +14,26 @@ export async function POST(request: Request) {
     // 1. Supabase RAG エンジンで回答を生成
     const { reply, referencedQa } = await generateRagAnswer(message.trim(), studentName);
 
-    // 2. Supabase の journals テーブルに会話履歴を保存
+    // 2. Supabase の journals テーブルに会話履歴を確実に保存 (実在カラムのみ)
     const supabase = await createClient();
-    const todayStr = new Date().toLocaleDateString("ja-JP");
 
     try {
-      await supabase.from("journals").insert([
+      const { error: insertErr } = await supabase.from("journals").insert([
         {
           student_id: studentId || "acf193c5-f6b4-4514-93a4-958eba0e0c38", // 竹下翔様またはログイン生徒
-          student_name: studentName,
           content: message.trim(),
           reply: reply,
-          task_title: "💬 トーク相談",
-          date: todayStr,
+          role: "student",
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       ]);
+
+      if (insertErr) {
+        console.error("journals insert error:", insertErr);
+      }
     } catch (dbErr) {
-      console.warn("journals insert error:", dbErr);
+      console.warn("journals insert exception:", dbErr);
     }
 
     return NextResponse.json({

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Toast from "@/components/ui/Toast";
+import { supabase } from "@/lib/supabase";
 
 interface MessageItem {
   id: string;
@@ -13,7 +14,7 @@ interface MessageItem {
 }
 
 interface StudentTalkViewProps {
-  journals: any[];
+  journals?: any[];
   studentName?: string;
 }
 
@@ -25,47 +26,65 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
   const [toastMessage, setToastMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. 初回レンダリング時: 過去の journals をチャットメッセージリストに変換・マージ
-  useEffect(() => {
-    const formatted: MessageItem[] = [];
+  // 1. 初回およびマウント時: Supabase DB および localStorage からチャット履歴を完全ロード
+  const loadChatHistory = async () => {
+    try {
+      // Supabase から最新の journals を取得
+      const { data: dbJournals } = await supabase
+        .from("journals")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-    // 日付順にソート (古い順)
-    const sortedJournals = [...journals].sort(
-      (a, b) => new Date(a.created_at || a.date).getTime() - new Date(b.created_at || b.date).getTime()
-    );
+      const targetList = dbJournals && dbJournals.length > 0 ? dbJournals : journals;
 
-    sortedJournals.forEach((j) => {
-      // 生徒の質問
-      if (j.content) {
-        formatted.push({
-          id: `q_${j.id}`,
-          sender: "student",
-          text: j.content,
-          timestamp: j.date || (j.created_at ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : "過去の質問"),
-        });
-      }
-      // 講師の回答
-      if (j.reply) {
-        formatted.push({
-          id: `a_${j.id}`,
-          sender: "teacher",
-          text: j.reply,
-          timestamp: j.date || (j.created_at ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : "回答済み"),
-        });
-      }
-    });
+      const formatted: MessageItem[] = [];
 
-    if (formatted.length === 0) {
+      // 最初のウェルカムメッセージ
       formatted.push({
         id: "welcome_msg",
         sender: "teacher",
-        text: `こんにちは、${studentName}さん！🌱\nNOU-ATOの講師AIアドバイザーです。\n\n野菜の育て方、土作り、病害虫の対処法など、気になることがあれば何でも気軽にチャットで聞いてくださいね！過去の講師の知見をもとにお答えします🧑‍🌾`,
+        text: `こんにちは、${studentName}さん！🌱\nNOU-ATOの講師AIアドバイザー（しるべえ）です。\n\n野菜の育て方や土作り、今日のお天気、日々のちょっとしたお話まで、何でも気軽にチャットしてくださいね🧑‍🌾`,
         timestamp: "現在",
       });
-    }
 
-    setMessages(formatted);
-  }, [journals, studentName]);
+      // 過去のやり取りをチャットメッセージに展開 (明らかなダミーデータは除外)
+      (targetList || []).forEach((j: any) => {
+        // ダミーテストデータの除外
+        if (j.content === "テスト" || j.content === "○○困ってます") return;
+
+        // 生徒の質問・発言
+        if (j.content) {
+          formatted.push({
+            id: `q_${j.id}`,
+            sender: "student",
+            text: j.content,
+            timestamp: j.created_at
+              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+              : (j.date || "過去のメッセージ"),
+          });
+        }
+        // 講師AIの回答
+        if (j.reply) {
+          formatted.push({
+            id: `a_${j.id}`,
+            sender: "teacher",
+            text: j.reply,
+            timestamp: j.created_at
+              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+              : (j.date || "回答済み"),
+          });
+        }
+      });
+
+      setMessages(formatted);
+    } catch (e) {
+      console.error("loadChatHistory error:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadChatHistory();
+  }, [studentName]);
 
   // 2. メッセージ追加時に自動で最下部へスクロール
   const scrollToBottom = () => {
@@ -76,7 +95,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
     scrollToBottom();
   }, [messages, isSending]);
 
-  // 3. メッセージ送信処理 (Supabase RAG 呼び出し)
+  // 3. メッセージ送信処理 (Supabase RAG 呼び出し ＆ DB永続化)
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const text = inputText.trim();
@@ -98,7 +117,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
     setIsSending(true);
 
     try {
-      // API /api/chat/rag を呼び出し
+      // API /api/chat/rag を呼び出し (RAGナレッジ検索 + 普段の会話生成)
       const res = await fetch("/api/chat/rag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,7 +156,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
         {
           id: `bot_err_${Date.now()}`,
           sender: "teacher",
-          text: `ごめんなさい、通信が不安定なようです💦\nメッセージは記録されましたので、講師が確認次第回答いたします！`,
+          text: `ごめんなさい、通信が不安定なようです💦\nメッセージは保存されましたので、講師が確認次第回答いたします！`,
           timestamp: timeStr,
         },
       ]);
@@ -167,7 +186,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             </div>
             <p className="text-[10px] text-emerald-200 font-semibold">
-              📚 過去の講習・Q&Aナレッジ常時連携中
+              📚 農園DBナレッジ(重み1.2) ＆ 普段の会話対応中
             </p>
           </div>
         </div>
@@ -208,7 +227,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
                   {/* 📚 参照した過去の講師Q&Aナレッジ (存在する場合のみ表示) */}
                   {!isMe && msg.referencedQa && msg.referencedQa.length > 0 && (
                     <div className="mt-2.5 pt-2 border-t border-gray-100 text-[10.5px] text-emerald-800 bg-emerald-50/80 p-2 rounded-xl">
-                      <span className="font-bold block mb-0.5">💡 参考にした過去の講師回答:</span>
+                      <span className="font-bold block mb-0.5">💡 参考にした過去の講師回答 (重み1.2):</span>
                       <p className="text-gray-600 font-normal italic">
                         「{msg.referencedQa[0].answer.length > 60 ? msg.referencedQa[0].answer.slice(0, 60) + "..." : msg.referencedQa[0].answer}」
                       </p>
@@ -245,7 +264,14 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
 
       {/* 🌟 3. クイック質問サジェストチップ 🌟 */}
       <div className="px-3 py-2 bg-gray-50 border-t border-gray-200/80 flex items-center space-x-1.5 overflow-x-auto text-[11px] font-bold text-gray-600 shrink-0 scrollbar-none">
-        <span className="text-[10px] text-gray-400 shrink-0">💡 定番質問:</span>
+        <span className="text-[10px] text-gray-400 shrink-0">💡 定番:</span>
+        <button
+          type="button"
+          onClick={() => handleQuickQuestion("こんにちは！今日の農作業のアドバイスはありますか？")}
+          className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-gray-200 rounded-full shrink-0 shadow-2xs transition active:scale-95"
+        >
+          👋 こんにちは
+        </button>
         <button
           type="button"
           onClick={() => handleQuickQuestion("トマトの葉が黄色くなってきました。どうすればいいですか？")}
@@ -267,13 +293,6 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
         >
           💧 水やりの頻度
         </button>
-        <button
-          type="button"
-          onClick={() => handleQuickQuestion("追肥のタイミングと量の目安を知りたいです")}
-          className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-gray-200 rounded-full shrink-0 shadow-2xs transition active:scale-95"
-        >
-          🌱 追肥の目安
-        </button>
       </div>
 
       {/* 🌟 4. 下部チャット入力バー 🌟 */}
@@ -282,7 +301,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="💬 栽培の質問や相談を入力..."
+          placeholder="💬 栽培の質問や普段の会話を入力..."
           disabled={isSending}
           className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-50 focus:bg-white border border-gray-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] transition placeholder-gray-400"
         />
