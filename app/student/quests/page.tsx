@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { useStudentDashboard } from "@/hooks/useStudentDashboard";
 import { useEvents } from "@/hooks/useEvents";
 import TaskSlider from "@/components/student/TaskSlider";
-import JournalInput from "@/components/student/JournalInput";
 import StudentTalkView from "@/components/student/StudentTalkView";
 import StudentSkillBoardView from "@/components/student/StudentSkillBoardView";
 import StudentFarmRecordView from "@/components/student/StudentFarmRecordView";
@@ -94,11 +93,13 @@ export default function StudentQuestsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8faf7] flex flex-col items-center justify-between font-sans text-gray-800 pb-20">
+    <div className={`bg-[#f8faf7] flex flex-col items-center justify-between font-sans text-gray-800 ${
+      activeTab === "talk" ? "h-[100dvh] h-screen overflow-hidden" : "min-h-screen pb-20"
+    }`}>
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* モックヘッダー */}
-      <header className="w-full max-w-md bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      <header className="w-full max-w-md bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs shrink-0">
         <Link href="/login" title="ログイン画面に戻る" className="text-gray-500 hover:text-gray-800 text-lg font-bold">
           ✕
         </Link>
@@ -144,9 +145,9 @@ export default function StudentQuestsPage() {
         </div>
       </header>
 
-      {/* メインコンテンツ (スマホ形式ナビと重ならない pb-28) */}
-      <main className="w-full max-w-md p-4 space-y-5 flex-1 pb-28">
-        {/* 🌟 1. 畑 タブ (旧マイ畑記録: 担当区画の畝管理 ＆ タスクスライダー) 🌟 */}
+      {/* メインコンテンツ */}
+      <main className={`w-full max-w-md ${activeTab === "talk" ? "p-2 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden" : "p-4 space-y-5 flex-1 pb-28"}`}>
+        {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
         {activeTab === "myfarm" && (
           <StudentFarmRecordView
             studentName={userAccountName}
@@ -154,10 +155,13 @@ export default function StudentQuestsPage() {
             onSelectTask={setSelectedTask}
             onCompleteTask={handleCompleteTask}
             onUncompleteTask={handleUncompleteTask}
+            newJournal={newJournal}
+            setNewJournal={setNewJournal}
+            onAddJournal={handleAddJournal}
           />
         )}
 
-        {/* 🌟 2. 天気 タブ (旧Quests: 天気予報ウィジェット ＆ 気づきメモ・講師日誌) 🌟 */}
+        {/* 🌟 2. 天気 タブ (天気予報ウィジェット ＆ 気象アドバイス) 🌟 */}
         {activeTab === "weather" && (
           <div className="space-y-5 animate-fade-in">
             {/* 📢 講師からの全体一括配信・連絡カード */}
@@ -181,16 +185,6 @@ export default function StudentQuestsPage() {
 
             {/* 農園ピンポイント天気予報 ＆ 気象アドバイスウィジェット */}
             <WeatherWidget />
-
-            {/* 気づきメモ・講師への報告 */}
-            <div className="space-y-2 pt-2 border-t border-gray-200">
-              <h3 className="font-bold text-gray-900 text-sm">📝 気づきメモ・講師への報告</h3>
-              <JournalInput
-                value={newJournal}
-                onChange={setNewJournal}
-                onSubmit={handleAddJournal}
-              />
-            </div>
           </div>
         )}
 
@@ -215,7 +209,9 @@ export default function StudentQuestsPage() {
 
         {/* Talk タブ */}
         {activeTab === "talk" && (
-          <StudentTalkView journals={journals} studentName={userAccountName} />
+          <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+            <StudentTalkView journals={journals} studentName={userAccountName} />
+          </div>
         )}
 
         {/* Feed タブ */}

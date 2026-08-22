@@ -13,6 +13,9 @@ interface StudentFarmRecordViewProps {
   onSelectTask?: (task: any) => void;
   onCompleteTask?: (id: string) => void;
   onUncompleteTask?: (id: string) => void;
+  newJournal?: string;
+  setNewJournal?: (val: string) => void;
+  onAddJournal?: () => void;
 }
 
 export default function StudentFarmRecordView({
@@ -21,6 +24,9 @@ export default function StudentFarmRecordView({
   onSelectTask,
   onCompleteTask,
   onUncompleteTask,
+  newJournal = "",
+  setNewJournal,
+  onAddJournal,
 }: StudentFarmRecordViewProps) {
   const { plots, records, addCropRecord, updateCropRecord, deleteCropRecord } = useFarmManager();
 
@@ -432,6 +438,37 @@ export default function StudentFarmRecordView({
             ))}
           </div>
         )}
+
+        {/* 🌟 畝観察ノートの下に移設した「気づきメモ・講師への報告」 🌟 */}
+        <div className="pt-4 border-t border-gray-200 space-y-2">
+          <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+            <span>📝 気づきメモ・講師への報告</span>
+            <span className="text-[11px] text-gray-400 font-normal">（畝 #{currentBed.bed_number} の状況も踏まえて講師へ送信）</span>
+          </h4>
+          <div className="space-y-2">
+            <textarea
+              value={newJournal || ""}
+              onChange={(e) => setNewJournal && setNewJournal(e.target.value)}
+              placeholder={`畝 ${currentBed.bed_number} (${currentBed.crop_name || "作物"}) についての気づきや相談、講師への日誌メモを入力...`}
+              rows={3}
+              className="w-full p-3 rounded-2xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs font-medium leading-relaxed"
+            />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onAddJournal}
+                disabled={!newJournal || !newJournal.trim()}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition shadow-xs flex items-center gap-1.5 ${
+                  newJournal && newJournal.trim()
+                    ? "bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                <span>✉️ 講師へメモを送信</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       ) : (
         <div className="bg-white/90 p-8 rounded-3xl border border-dashed border-emerald-300 text-center space-y-2 text-gray-500 shadow-2xs">

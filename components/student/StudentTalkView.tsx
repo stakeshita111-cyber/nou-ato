@@ -171,7 +171,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-145px)] max-h-[720px] bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in text-gray-800">
+    <div className="flex flex-col h-full min-h-0 w-full bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* 🌟 1. チャットヘッダー 🌟 */}
@@ -197,7 +197,7 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
       </div>
 
       {/* 🌟 2. チャットタイムライン (メッセージエリア) 🌟 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f8faf7]">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-[#f8faf7]">
         {messages.map((msg) => {
           const isMe = msg.sender === "student";
 
