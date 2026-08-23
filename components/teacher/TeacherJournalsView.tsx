@@ -99,8 +99,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const slideModeRef = useRef<"forward" | "paused" | "reverse">("forward");
   const [activeSlideStatus, setActiveSlideStatus] = useState<"forward" | "paused" | "reverse">("forward");
 
-  const fetchJournals = async () => {
-    setLoading(true);
+  const fetchJournals = async (isInitial: boolean = false) => {
+    if (isInitial) {
+      setLoading(true);
+    }
     try {
       const { data: journalData, error: journalError } = await supabase
         .from("journals")
@@ -173,7 +175,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       console.error("Journals error exception:", e);
       setJournals([]);
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
   };
 
@@ -352,27 +356,27 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   };
 
   useEffect(() => {
-    fetchJournals();
+    fetchJournals(true);
     fetchCropRecords();
 
-    // 🌟 1. 定期自動更新 (5秒ごとに最新投稿・写真を自動検知) 🌟
+    // 🌟 1. 定期自動更新 (10秒ごとに最新投稿・写真をバックグラウンド検知) 🌟
     const interval = setInterval(() => {
-      fetchJournals();
+      fetchJournals(false);
       fetchCropRecords();
-    }, 5000);
+    }, 10000);
 
     // 🌟 2. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("nouato_farm_sync_channel");
       bc.onmessage = () => {
-        fetchJournals();
+        fetchJournals(false);
         fetchCropRecords();
       };
     } catch (e) {}
 
     const handleSync = () => {
-      fetchJournals();
+      fetchJournals(false);
       fetchCropRecords();
     };
     if (typeof window !== "undefined") {

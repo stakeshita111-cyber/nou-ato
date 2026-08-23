@@ -207,14 +207,14 @@ export default function StudentQuestsPage() {
           </div>
         )}
 
-        {/* Talk タブ */}
+        {/* 4. 相談 タブ */}
         {activeTab === "talk" && (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
             <StudentTalkView journals={journals} studentName={userAccountName} />
           </div>
         )}
 
-        {/* Feed タブ */}
+        {/* 5. 成長 タブ */}
         {activeTab === "feed" && (
           <StudentSkillBoardView tasks={tasks} user={user} />
         )}
@@ -247,9 +247,9 @@ export default function StudentQuestsPage() {
         />
       )}
 
-      {/* フッターナビゲーション (左から: 畑, 天気, カレンダー, Talk, Feed) */}
+      {/* フッターナビゲーション (左から: 畑, 天気, カレンダー, 相談, 成長) */}
       <footer className="w-full max-w-md bg-white border-t border-gray-200 fixed bottom-0 z-20 px-2 py-2 flex items-center justify-around shadow-lg">
-        {/* 🌟 1. 畑 (元マイ畑記録) 🌟 */}
+        {/* 🌟 1. 畑 🌟 */}
         <button
           onClick={() => setActiveTab("myfarm")}
           className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
@@ -260,7 +260,7 @@ export default function StudentQuestsPage() {
           <span className="text-[10px] font-bold mt-0.5">畑</span>
         </button>
 
-        {/* 🌟 2. 天気 (元Quests) 🌟 */}
+        {/* 🌟 2. 天気 🌟 */}
         <button
           onClick={() => setActiveTab("weather")}
           className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
@@ -271,7 +271,7 @@ export default function StudentQuestsPage() {
           <span className="text-[10px] font-bold mt-0.5">天気</span>
         </button>
 
-        {/* 3. カレンダー */}
+        {/* 🌟 3. カレンダー 🌟 */}
         <button
           onClick={() => setActiveTab("events")}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
@@ -282,7 +282,7 @@ export default function StudentQuestsPage() {
           <span className="text-[10px] font-bold mt-0.5">カレンダー</span>
         </button>
 
-        {/* 4. Talk */}
+        {/* 🌟 4. 相談 🌟 */}
         <button
           onClick={() => setActiveTab("talk")}
           className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${
@@ -293,20 +293,18 @@ export default function StudentQuestsPage() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span className="text-[10px] font-bold mt-0.5">Talk</span>
+          <span className="text-[10px] font-bold mt-0.5">相談</span>
         </button>
 
-        {/* 5. Feed (成長) */}
+        {/* 🌟 5. 成長 🌟 */}
         <button
           onClick={() => setActiveTab("feed")}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
             activeTab === "feed" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
           }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          <span className="text-[10px] font-bold mt-0.5">Feed (成長)</span>
+          <span className="text-base leading-none">🌱</span>
+          <span className="text-[10px] font-bold mt-0.5">成長</span>
         </button>
       </footer>
     </div>
