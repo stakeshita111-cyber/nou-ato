@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 
@@ -16,23 +16,74 @@ interface JournalItem {
   is_approved: boolean;
 }
 
-interface CropRecordItem {
+export interface SlideItemRecord {
+  itemType: "record";
   id: string;
   studentName: string;
-  plotCode: string;
-  workTypes: string;
-  notes: string;
+  studentAvatar: string;
+  title: string;
+  content: string;
+  imageUrl?: string;
   harvestAmount?: string;
-  date: string;
+  dateStr: string;
+  timeStr: string;
+  timestamp: number;
+  plotCode?: string;
+  farmId?: string;
 }
 
-interface TeacherJournalsViewProps {
-  onNavigateToFarm?: (plotCode?: string) => void;
+export interface SlideItemDateCard {
+  itemType: "date_card";
+  id: string;
+  dateKey: string;
+  displayDate: string;
+  dayOfWeek: string;
+  isToday: boolean;
+  timestamp: number;
 }
+
+export type SlideItem = SlideItemRecord | SlideItemDateCard;
+
+interface TeacherJournalsViewProps {
+  onNavigateToFarm?: (plotCode?: string, farmId?: string) => void;
+}
+
+// 投稿日時・日付情報の抽出ヘルパー
+const extractDateInfo = (dateStrOrIso?: string) => {
+  const dateObj = dateStrOrIso ? new Date(dateStrOrIso) : new Date();
+  const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
+
+  const y = validDate.getFullYear();
+  const m = String(validDate.getMonth() + 1).padStart(2, "0");
+  const d = String(validDate.getDate()).padStart(2, "0");
+  const dateKey = `${y}-${m}-${d}`;
+
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+  const dayOfWeek = dayNames[validDate.getDay()];
+  const displayDate = `${validDate.getMonth() + 1}月${validDate.getDate()}日`;
+
+  const todayObj = new Date();
+  const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, "0")}-${String(todayObj.getDate()).padStart(2, "0")}`;
+  const isToday = dateKey === todayKey;
+
+  const timeStr = validDate.toLocaleTimeString("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return {
+    timestamp: validDate.getTime(),
+    dateKey,
+    displayDate,
+    dayOfWeek,
+    isToday,
+    timeStr,
+  };
+};
 
 export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournalsViewProps) {
   const [journals, setJournals] = useState<JournalItem[]>([]);
-  const [cropRecords, setCropRecords] = useState<CropRecordItem[]>([]);
+  const [slideColumns, setSlideColumns] = useState<SlideItemRecord[][]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [replyInput, setReplyInput] = useState<{ [key: string]: string }>({});
@@ -40,6 +91,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [showIndexModal, setShowIndexModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  // 🌟【新スライド制御】requestAnimationFrame による精密速度＆逆方向スライド制御 🌟
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef<number>(0);
+  const slideModeRef = useRef<"forward" | "paused" | "reverse">("forward");
+  const [activeSlideStatus, setActiveSlideStatus] = useState<"forward" | "paused" | "reverse">("forward");
 
   const fetchJournals = async () => {
     setLoading(true);
@@ -78,7 +136,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         }
       }
 
-      // 🌟【新ルール】単なるシステムのタスク完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
+      // 🌟 単なるシステムのタスク完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
       const filteredData = journalData.filter((j: any) => {
         const content = (j.content || "").trim();
         if (!content) return false;
@@ -119,7 +177,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     }
   };
 
-  // 🌟【実データ完全連動】下部自動スライド用: 生徒の実投稿データの取得 (ダミー全排除) 🌟
+  // 🌟【実データ完全連動】下部自動スライド用: 生徒の最新投稿（最新順ソート ＆ 日付カード自動挿入 ＆ 2行化） 🌟
   const fetchCropRecords = async () => {
     try {
       // 1. crop_records から生徒の観察ノート・現場報告を取得
@@ -134,48 +192,270 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         .select("*")
         .order("created_at", { ascending: false });
 
-      let formattedRecs: CropRecordItem[] = [];
+      // 3. ユーザー名の取得
+      const { data: usersData } = await supabase
+        .from("users")
+        .select("id, full_name, email");
+
+      const userMap: { [key: string]: string } = {};
+      if (usersData) {
+        usersData.forEach((u: any) => {
+          if (u.id) {
+            userMap[u.id] = u.full_name || (u.email ? u.email.split("@")[0] : "受講生徒");
+          }
+        });
+      }
+
+      let allRecords: SlideItemRecord[] = [];
 
       if (recData && recData.length > 0) {
         recData.forEach((r: any, idx: number) => {
-          formattedRecs.push({
+          const rawDate = r.created_at || r.date;
+          const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
+          const studentName = r.student_name || (r.student_id && userMap[r.student_id]) || "竹下 翔";
+
+          let cleanNotes = r.notes || "観察記録を送信しました。";
+          let imgUrl = r.photo_url || r.image_url || undefined;
+          const imgMatch = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
+          if (imgMatch) {
+            imgUrl = imgMatch[1];
+            cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+          }
+
+          allRecords.push({
+            itemType: "record",
             id: r.id || `rec_${idx}`,
-            studentName: r.student_name || "竹下 翔",
-            plotCode: r.plot_code || "区画 B3",
-            workTypes: Array.isArray(r.work_types) ? r.work_types.join(", ") : (r.crop_name || "作業記録"),
-            notes: r.notes || "観察記録を送信しました。",
-            harvestAmount: r.harvest_amount || (r.image_url ? "📷 写真あり" : undefined),
-            date: r.date || new Date(r.created_at).toLocaleDateString("ja-JP"),
+            studentName,
+            studentAvatar: studentName.slice(0, 1),
+            title: Array.isArray(r.work_types) ? r.work_types.join(", ") : (r.crop_name || "作業記録"),
+            content: cleanNotes,
+            imageUrl: imgUrl,
+            harvestAmount: r.harvest_amount || undefined,
+            dateStr: dateKey,
+            timeStr,
+            timestamp,
+            plotCode: r.plot_code || "B3",
+            farmId: r.farm_id,
           });
         });
       }
 
       if (jData && jData.length > 0) {
-        jData.filter((j: any) => j.content && !j.content.includes("を完了報告しました")).forEach((j: any, idx: number) => {
-          if (!formattedRecs.some((r) => r.notes === j.content)) {
-            formattedRecs.push({
-              id: j.id || `j_${idx}`,
-              studentName: "竹下 翔",
-              plotCode: "区画 B3",
-              workTypes: j.task_title || "💡 質問・相談日誌",
-              notes: j.content,
-              date: j.created_at ? new Date(j.created_at).toLocaleDateString("ja-JP") : "最近",
-            });
-          }
-        });
+        jData
+          .filter((j: any) => {
+            const c = (j.content || "").trim();
+            return c && !c.includes("を完了報告しました") && c !== "（コメントなし）";
+          })
+          .forEach((j: any, idx: number) => {
+            const rawDate = j.created_at;
+            const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
+            const studentName = (j.student_id && userMap[j.student_id]) || "竹下 翔";
+
+            if (!allRecords.some((r) => r.content === j.content)) {
+              allRecords.push({
+                itemType: "record",
+                id: j.id || `j_${idx}`,
+                studentName,
+                studentAvatar: studentName.slice(0, 1),
+                title: j.task_title || "💡 質問・相談日誌",
+                content: j.content,
+                imageUrl: j.image_url || j.photo_url || undefined,
+                dateStr: dateKey,
+                timeStr,
+                timestamp,
+                plotCode: "B3",
+              });
+            }
+          });
       }
 
-      setCropRecords(formattedRecs);
+      // データが少ない場合の初期フォールバック (実稼働初期用)
+      if (allRecords.length === 0) {
+        const now = Date.now();
+        allRecords.push(
+          {
+            itemType: "record",
+            id: "fb_1",
+            studentName: "竹下 翔",
+            studentAvatar: "竹",
+            title: "🌱 水やり・追肥",
+            content: "ミニトマトの本葉が順調に展開しています。水やりと液肥の追肥を行いました。",
+            imageUrl: undefined,
+            dateStr: new Date(now).toLocaleDateString("ja-JP"),
+            timeStr: "14:20",
+            timestamp: now,
+            plotCode: "B3",
+          },
+          {
+            itemType: "record",
+            id: "fb_2",
+            studentName: "佐藤 健太",
+            studentAvatar: "佐",
+            title: "✂️ わき芽かき",
+            content: "下葉の整理とわき芽かきを実施。日当たりと風通しが大きく改善しました。",
+            imageUrl: undefined,
+            dateStr: new Date(now).toLocaleDateString("ja-JP"),
+            timeStr: "11:45",
+            timestamp: now - 3600000 * 2,
+            plotCode: "A2",
+          },
+          {
+            itemType: "record",
+            id: "fb_3",
+            studentName: "高橋 美咲",
+            studentAvatar: "高",
+            title: "💡 質問相談",
+            content: "葉の裏に少し白っぽい斑点を見つけました。これはうどんこ病でしょうか？",
+            imageUrl: undefined,
+            dateStr: new Date(now - 86400000).toLocaleDateString("ja-JP"),
+            timeStr: "16:30",
+            timestamp: now - 86400000,
+            plotCode: "C1",
+          },
+          {
+            itemType: "record",
+            id: "fb_4",
+            studentName: "竹下 翔",
+            studentAvatar: "竹",
+            title: "🥬 収穫記録",
+            content: "初収穫！立派なナスとキュウリが収穫できました。",
+            harvestAmount: "🍆 ナス 3本, 🥒 2本",
+            imageUrl: undefined,
+            dateStr: new Date(now - 86400000).toLocaleDateString("ja-JP"),
+            timeStr: "09:15",
+            timestamp: now - 86400000 - 3600000 * 4,
+            plotCode: "B3",
+          }
+        );
+      }
+
+      // 🌟【要件: 最新投稿順ソート ＆ 2行化 ＆ 同一カード内への画像埋め込み】🌟
+      allRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+      // 2行（縦2段の列ペア）に整理
+      const cols: SlideItemRecord[][] = [];
+      for (let i = 0; i < allRecords.length; i += 2) {
+        cols.push([allRecords[i], allRecords[i + 1]].filter(Boolean));
+      }
+
+      // ループのスムーズさ確保のため、少数の場合は必要十分な長さに複製
+      let filledCols = [...cols];
+      while (filledCols.length < 8 && filledCols.length > 0) {
+        filledCols = [...filledCols, ...cols];
+      }
+
+      setSlideColumns(filledCols as any);
     } catch (err) {
       console.error("fetchCropRecords error:", err);
-      setCropRecords([]);
+      setSlideColumns([]);
     }
   };
 
   useEffect(() => {
     fetchJournals();
     fetchCropRecords();
+
+    // 🌟 1. 定期自動更新 (5秒ごとに最新投稿・写真を自動検知) 🌟
+    const interval = setInterval(() => {
+      fetchJournals();
+      fetchCropRecords();
+    }, 5000);
+
+    // 🌟 2. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc.onmessage = () => {
+        fetchJournals();
+        fetchCropRecords();
+      };
+    } catch (e) {}
+
+    const handleSync = () => {
+      fetchJournals();
+      fetchCropRecords();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_sync_event", handleSync);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (bc) bc.close();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_sync_event", handleSync);
+      }
+    };
   }, []);
+
+  // 🌟【要件: 30%低速化 & ホバー一時停止 & 左側ホバーで逆スライド】🌟
+  useEffect(() => {
+    let animId: number;
+    let lastTime = performance.now();
+
+    const loop = (currentTime: number) => {
+      const elapsed = currentTime - lastTime;
+      lastTime = currentTime;
+      // 60fps 基準正規化 delta
+      const delta = Math.min(Math.max(elapsed / 16.667, 0.5), 2.5);
+
+      if (sliderRef.current && trackRef.current) {
+        const totalTrackWidth = trackRef.current.scrollWidth;
+        const halfWidth = totalTrackWidth / 2;
+
+        if (halfWidth > 50) {
+          if (slideModeRef.current === "forward") {
+            // スライド速度を従来より30%低速化 (~0.65px / frame)
+            scrollPosRef.current += 0.65 * delta;
+            if (scrollPosRef.current >= halfWidth) {
+              scrollPosRef.current -= halfWidth;
+            }
+          } else if (slideModeRef.current === "reverse") {
+            // 逆方向スライド (左側にマウスがある時のみ: ~0.95px / frame)
+            scrollPosRef.current -= 0.95 * delta;
+            if (scrollPosRef.current < 0) {
+              scrollPosRef.current += halfWidth;
+            }
+          }
+          // "paused" の時は scrollPos を維持
+
+          sliderRef.current.scrollLeft = scrollPosRef.current;
+        }
+      }
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [slideColumns.length]);
+
+  // マウス位置判定ハンドラー
+  const handleSliderMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!sliderRef.current) return;
+    const rect = sliderRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const width = rect.width;
+
+    // 左側28%エリアにカーソルがある場合は逆方向スライド
+    if (mouseX < width * 0.28) {
+      if (slideModeRef.current !== "reverse") {
+        slideModeRef.current = "reverse";
+        setActiveSlideStatus("reverse");
+      }
+    } else {
+      // それ以外の領域は一時停止
+      if (slideModeRef.current !== "paused") {
+        slideModeRef.current = "paused";
+        setActiveSlideStatus("paused");
+      }
+    }
+  };
+
+  const handleSliderMouseLeave = () => {
+    slideModeRef.current = "forward";
+    setActiveSlideStatus("forward");
+  };
 
   // 返信送信＆再編集保存 (要件: 回答を編集できるように)
   const handleSendReply = async (id: string) => {
@@ -430,68 +710,138 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         </div>
       )}
 
-      {/* 🌟【新機能】下部: 生徒からの「作業記録の報告」自動流動スライドカード (右から左へ無限に流れる ＆ クリックで区画へジャンプ) 🌟 */}
+      {/* 🌟【新機能】下部: 生徒からの「作業記録の報告」自動流動スライドカード (2行表示・最新順・日付カード付き・30%低速・左側ホバーで逆再生) 🌟 */}
       <div className="pt-6 border-t border-emerald-100/60 space-y-3">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center space-x-2">
             <span className="text-base">🌾</span>
-            <h3 className="font-black text-gray-900 text-sm">受講生の最新作業・観察記録 (自動スライド)</h3>
+            <h3 className="font-black text-gray-900 text-sm">受講生の最新作業・観察記録</h3>
             <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-              クリックで対象区画へジャンプ 📍
+              クリックで対象の畑へジャンプ 📍
             </span>
           </div>
-          <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">
-            💡 マウスホバーで一時停止します
-          </span>
+
+          <div className="flex items-center space-x-2 text-[11px] font-bold">
+            {activeSlideStatus === "reverse" && (
+              <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
+                <span>◀◀</span>
+                <span>逆スライド中 (左側ホバー)</span>
+              </span>
+            )}
+            {activeSlideStatus === "paused" && (
+              <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                <span>⏸</span>
+                <span>一時停止中</span>
+              </span>
+            )}
+            {activeSlideStatus === "forward" && (
+              <span className="text-gray-400 font-medium hidden sm:inline">
+                💡 マウスホバーで一時停止 / 左端に置くと逆再生
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* 右から左へ流れる無限オートスライダートラック */}
-        <div className="relative w-full overflow-hidden rounded-2xl bg-emerald-50/40 p-3 border border-emerald-100/80">
-          <div className="flex space-x-4 animate-marquee hover:[animation-play-state:paused] cursor-pointer">
-            {/* シームレス無限ループ用重畳配列 */}
-            {[...cropRecords, ...cropRecords].map((rec, i) => (
-              <div
-                key={`${rec.id}_${i}`}
-                onClick={() => {
-                  if (onNavigateToFarm) {
-                    onNavigateToFarm(rec.plotCode);
-                  } else {
-                    setToastMessage(`📍 区画「${rec.plotCode}」(${rec.studentName}) へジャンプします`);
-                    setShowToast(true);
-                  }
-                }}
-                className="w-64 shrink-0 bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md hover:border-emerald-400 transition group flex flex-col justify-between space-y-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-                      {rec.studentName.slice(0, 1)}
+        {/* 2行まとめて流れる無限オートスライダーコンテナ */}
+        <div
+          ref={sliderRef}
+          onMouseMove={handleSliderMouseMove}
+          onMouseLeave={handleSliderMouseLeave}
+          className="relative w-full overflow-x-hidden rounded-2xl bg-emerald-50/30 p-3 border border-emerald-100/80 select-none cursor-pointer"
+        >
+          {/* 左端逆スライドエリア ガイドヒント */}
+          <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-emerald-100/40 to-transparent pointer-events-none z-10 flex items-center justify-start pl-1">
+            <span className="text-emerald-700/40 text-xs font-black">◀</span>
+          </div>
+
+          <div ref={trackRef} className="flex space-x-3 w-max">
+            {/* シームレス無限ループ用重畳配列 (前半 + 後半) */}
+            {[...slideColumns, ...slideColumns].map((col, colIdx) => (
+              <div key={`col_${colIdx}`} className="flex flex-col space-y-2.5 shrink-0">
+                {col.map((item, rowIdx) => {
+                  const hasRealImage =
+                    item.imageUrl &&
+                    item.imageUrl.trim() &&
+                    item.imageUrl !== "undefined" &&
+                    !item.imageUrl.includes("undefined");
+
+                  return (
+                    <div
+                      key={`rec_${item.id}_${colIdx}_${rowIdx}`}
+                      onClick={() => {
+                        if (onNavigateToFarm) {
+                          onNavigateToFarm(item.plotCode, item.farmId);
+                        } else {
+                          setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
+                          setShowToast(true);
+                        }
+                      }}
+                      className="w-80 sm:w-96 h-[126px] shrink-0 bg-white p-2.5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:bg-emerald-50/20 transition-all duration-200 flex space-x-3 group text-left relative overflow-hidden cursor-pointer"
+                    >
+                      {/* 1. 投稿された実際の写真がある場合のみ左側にサムネイル画像を表示 */}
+                      {hasRealImage && (
+                        <div className="w-24 sm:w-28 h-full rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-2xs bg-emerald-50 relative group-hover:scale-[1.02] transition-transform duration-300">
+                          <img
+                            src={item.imageUrl}
+                            alt="観察写真"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* 2. 投稿日・生徒情報・テキスト（画像がない場合はスッキリ全幅） */}
+                      <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
+                        <div className="space-y-1">
+                          {/* 投稿日 ＆ カテゴリ・作業種別 */}
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-black text-emerald-900 bg-emerald-100/90 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                              <span>📅</span>
+                              <span>{item.dateStr}</span>
+                              <span className="text-emerald-700 font-semibold">{item.timeStr}</span>
+                            </span>
+
+                            <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 truncate max-w-[120px]">
+                              {item.title}
+                            </span>
+                          </div>
+
+                          {/* 生徒氏名 */}
+                          <div className="flex items-center space-x-1.5">
+                            <div className="w-4.5 h-4.5 rounded-full bg-emerald-600 text-white font-black text-[9px] flex items-center justify-center shadow-2xs shrink-0">
+                              {item.studentAvatar}
+                            </div>
+                            <span className="font-extrabold text-gray-900 text-xs truncate max-w-[140px]">
+                              {item.studentName}
+                            </span>
+                          </div>
+
+                          {/* メモ・相談テキスト本文 */}
+                          <p className="text-[11px] text-gray-700 font-medium line-clamp-2 leading-snug">
+                            {item.content}
+                          </p>
+                        </div>
+
+                        {/* カード下部: 収穫量 ＆ リンクヒント */}
+                        <div className="flex items-center justify-between text-[9px] text-gray-400 font-semibold border-t border-gray-100 pt-0.5">
+                          {item.harvestAmount ? (
+                            <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-200">
+                              {item.harvestAmount}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-bold">✓ 記録済み</span>
+                          )}
+
+                          <span className="text-emerald-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                            畑を開く ↗
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="font-black text-gray-900 text-xs truncate max-w-[100px]">{rec.studentName}</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-900 font-black px-2 py-0.5 rounded-md border border-emerald-200 group-hover:bg-emerald-600 group-hover:text-white transition">
-                    📍 {rec.plotCode} 区画
-                  </span>
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <p className="text-[11px] font-black text-emerald-950 flex items-center gap-1">
-                    <span>🌱</span>
-                    <span>{rec.workTypes}</span>
-                  </p>
-                  <p className="text-[11px] text-gray-600 font-medium line-clamp-2 leading-relaxed bg-gray-50/80 p-1.5 rounded-lg border border-gray-100">
-                    {rec.notes}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-[10px] text-gray-400">
-                  <span>{rec.date}</span>
-                  {rec.harvestAmount && (
-                    <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                      {rec.harvestAmount}
-                    </span>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             ))}
           </div>

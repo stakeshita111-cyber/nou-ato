@@ -15,7 +15,12 @@ interface UnassignedStudent {
   colorBg: string;
 }
 
-export default function TeacherFarmCanvasView() {
+interface TeacherFarmCanvasViewProps {
+  initialPlotCode?: string;
+  initialFarmId?: string;
+}
+
+export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }: TeacherFarmCanvasViewProps = {}) {
   const {
     farms,
     setFarms,
@@ -139,6 +144,35 @@ export default function TeacherFarmCanvasView() {
 
   // クリック時詳細確認・編集 Modal / Drawer State
   const [detailPlot, setDetailPlot] = useState<FarmPlot | null>(null);
+  const handledInitialPlotRef = useRef<string | null>(null);
+
+  // 外部(日誌スライダー等)からの対象農場・区画ジャンプ連携
+  useEffect(() => {
+    if (initialFarmId && initialFarmId !== activeFarmId) {
+      setActiveFarmId(initialFarmId);
+    }
+  }, [initialFarmId, activeFarmId, setActiveFarmId]);
+
+  useEffect(() => {
+    if (
+      initialPlotCode &&
+      initialPlotCode !== handledInitialPlotRef.current &&
+      currentFarmPlots.length > 0
+    ) {
+      const cleanCode = initialPlotCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      const target = currentFarmPlots.find(
+        (p) =>
+          p.code === initialPlotCode ||
+          p.code === cleanCode ||
+          p.name?.includes(initialPlotCode) ||
+          (cleanCode && p.code?.includes(cleanCode))
+      );
+      if (target) {
+        handledInitialPlotRef.current = initialPlotCode;
+        setDetailPlot(target);
+      }
+    }
+  }, [initialPlotCode, currentFarmPlots]);
 
   // 🚚 D&D マス目への純粋スワップハンドラー (セルアドレス A1, B2 等の位置固定・中身データのみ1対1相互交換)
   const handleMovePlotToGridCell = async (fromInput: string | number | null, toInput: string | number) => {
@@ -1623,8 +1657,14 @@ export default function TeacherFarmCanvasView() {
 
       {/* 🌟 マス目クリック時: 区画詳細確認・編集モーダル (完全修復 ＆ 並び替え ＆ 上から1,2,3自動配番) 🌟 */}
       {detailPlot && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-gray-200 relative max-h-[90vh] overflow-y-auto">
+        <div
+          onClick={() => setDetailPlot(null)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-gray-200 relative max-h-[90vh] overflow-y-auto"
+          >
             {/* ① ヘッダー: 区画座標 (例: B-2) を大きく表示 */}
             <div className="flex justify-between items-center border-b pb-3">
               <div>
@@ -1907,19 +1947,35 @@ export default function TeacherFarmCanvasView() {
                         </div>
 
                         {/* タップ閲覧: 生徒の最新登録情報表示 */}
-                        {bed.latest_record && (
-                          <div className="bg-white p-3 rounded-xl border border-gray-200 text-xs text-gray-800 space-y-1 shadow-2xs">
-                            <div className="flex justify-between items-center text-gray-400 font-bold text-[10px]">
-                              <span>📅 最新記録投稿日: {bed.latest_record.date}</span>
-                              {bed.latest_record.harvest_amount ? (
-                                <span className="text-emerald-700 font-extrabold">収穫量: {bed.latest_record.harvest_amount}</span>
-                              ) : null}
+                        {bed.latest_record && (() => {
+                          let cleanNotes = bed.latest_record.notes || "";
+                          let imgUrl = bed.latest_record.image_url || bed.latest_record.photo_url;
+                          const match = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
+                          if (match) {
+                            imgUrl = match[1];
+                            cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+                          }
+                          return (
+                            <div className="bg-white p-3 rounded-xl border border-gray-200 text-xs text-gray-800 space-y-1 shadow-2xs">
+                              <div className="flex justify-between items-center text-gray-400 font-bold text-[10px]">
+                                <span>📅 最新記録投稿日: {bed.latest_record.date}</span>
+                                {bed.latest_record.harvest_amount ? (
+                                  <span className="text-emerald-700 font-extrabold">収穫量: {bed.latest_record.harvest_amount}</span>
+                                ) : null}
+                              </div>
+                              <div className="flex gap-2 items-start pt-1">
+                                {imgUrl && (
+                                  <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 border border-emerald-200 shadow-2xs">
+                                    <img src={imgUrl} alt="現場写真" className="w-full h-full object-cover" />
+                                  </div>
+                                )}
+                                <p className="font-semibold text-gray-900 leading-relaxed flex-1">
+                                  {cleanNotes}
+                                </p>
+                              </div>
                             </div>
-                            <p className="font-semibold text-gray-900 leading-relaxed pt-0.5">
-                              {bed.latest_record.notes}
-                            </p>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     );
                   })

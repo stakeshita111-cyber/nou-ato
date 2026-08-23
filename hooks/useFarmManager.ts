@@ -159,17 +159,28 @@ export function useFarmManager() {
 
       let formattedRecords: CropRecord[] = [];
       if (cropRecs && cropRecs.length > 0) {
-        formattedRecords = cropRecs.map((r: any) => ({
-          id: r.id,
-          bed_id: r.bed_id,
-          date: r.date || new Date(r.created_at).toLocaleDateString("ja-JP"),
-          growth_stage: r.growth_stage || "観察記録",
-          height_cm: r.height_cm,
-          work_types: Array.isArray(r.work_types) ? r.work_types : ["手入れ"],
-          notes: r.notes || "",
-          harvest_amount: r.harvest_amount,
-          created_at: r.created_at,
-        }));
+        formattedRecords = cropRecs.map((r: any) => {
+          let cleanNotes = r.notes || "";
+          let imgUrl = r.image_url || r.photo_url || undefined;
+          const imgMatch = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
+          if (imgMatch) {
+            imgUrl = imgMatch[1];
+            cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+          }
+          return {
+            id: r.id,
+            bed_id: r.bed_id,
+            date: r.date || new Date(r.created_at).toLocaleDateString("ja-JP"),
+            growth_stage: r.growth_stage || "観察記録",
+            height_cm: r.height_cm,
+            work_types: Array.isArray(r.work_types) ? r.work_types : ["手入れ"],
+            notes: cleanNotes,
+            harvest_amount: r.harvest_amount,
+            image_url: imgUrl,
+            photo_url: imgUrl,
+            created_at: r.created_at,
+          };
+        });
       }
       setRecords(formattedRecords);
 
@@ -980,6 +991,10 @@ export function useFarmManager() {
     setRecords(nextRecords);
     localStorage.setItem("nouato_crop_records", JSON.stringify(nextRecords));
 
+    const imgToSave = recordData.image_url || recordData.photo_url;
+    const finalNotes =
+      (recordData.notes || "") + (imgToSave ? `\n[IMG:${imgToSave}]` : "");
+
     try {
       await supabase.from("crop_records").insert({
         id: newRecordId,
@@ -989,7 +1004,7 @@ export function useFarmManager() {
         growth_stage: recordData.growth_stage,
         height_cm: recordData.height_cm,
         work_types: recordData.work_types,
-        notes: recordData.notes,
+        notes: finalNotes,
         harvest_amount: recordData.harvest_amount,
       });
 
@@ -998,7 +1013,7 @@ export function useFarmManager() {
         progress_percent: 100,
       });
     } catch (e) {
-      console.error(e);
+      console.error("crop_records insert error:", e);
     }
 
     notifyBroadcast();
@@ -1013,11 +1028,16 @@ export function useFarmManager() {
     setRecords(nextRecords);
     localStorage.setItem("nouato_crop_records", JSON.stringify(nextRecords));
 
+    const imgToSave = updatedData.image_url || updatedData.photo_url;
+    let baseNotes = updatedData.notes || "";
+    baseNotes = baseNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+    const finalNotes = baseNotes + (imgToSave ? `\n[IMG:${imgToSave}]` : "");
+
     try {
       await supabase
         .from("crop_records")
         .update({
-          notes: updatedData.notes,
+          notes: finalNotes,
           height_cm: updatedData.height_cm,
           growth_stage: updatedData.growth_stage,
           work_types: updatedData.work_types,
@@ -1025,7 +1045,7 @@ export function useFarmManager() {
         })
         .eq("id", recordId);
     } catch (e) {
-      console.error(e);
+      console.error("crop_records update error:", e);
     }
 
     notifyBroadcast();

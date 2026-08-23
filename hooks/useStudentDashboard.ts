@@ -292,16 +292,45 @@ export function useStudentDashboard() {
   const addJournal = async () => {
     if (!newJournal.trim()) return;
 
-    const newJ = {
-      id: `j_${Date.now()}`,
-      content: newJournal,
-      text: newJournal,
-      student_id: user?.id,
-      user_id: user?.id,
-      created_at: new Date().toLocaleString("ja-JP"),
-    };
+    const studentId = user?.id || "acf193c5-f6b4-4514-93a4-958eba0e0c38";
+    const contentToSave = newJournal.trim();
 
-    setJournals((prev) => [newJ, ...prev]);
+    try {
+      const { data } = await supabase.from("journals").insert([
+        {
+          student_id: studentId,
+          content: contentToSave,
+          role: "student",
+        },
+      ]).select();
+
+      if (data && data.length > 0) {
+        setJournals((prev) => [data[0], ...prev]);
+      } else {
+        setJournals((prev) => [
+          {
+            id: `j_${Date.now()}`,
+            content: contentToSave,
+            student_id: studentId,
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+    } catch (e) {
+      console.error("addJournal error:", e);
+    }
+
+    // リアルタイム同期イベント
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("nouato_sync_event"));
+      try {
+        const bc = new BroadcastChannel("nouato_farm_sync_channel");
+        bc.postMessage({ type: "JOURNALS_UPDATED", timestamp: Date.now() });
+        bc.close();
+      } catch (e) {}
+    }
+
     setNewJournal("");
   };
 

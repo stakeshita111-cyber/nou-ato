@@ -116,13 +116,40 @@ export default function StudentFarmRecordView({
     }
   };
 
-  // 画像ファイル選択・Base64変換ハンドラー
+  // 画像ファイル選択・自動リサイズ＆圧縮ハンドラー (スマホ写真の高画質軽量化)
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageUrl(reader.result as string);
+      reader.onload = (readerEvent) => {
+        const rawResult = readerEvent.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1000;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL("image/jpeg", 0.75);
+            setImageUrl(compressed);
+          } else {
+            setImageUrl(rawResult);
+          }
+        };
+        img.src = rawResult;
       };
       reader.readAsDataURL(file);
     }
@@ -168,13 +195,15 @@ export default function StudentFarmRecordView({
       try {
         await supabase.from("journals").insert([
           {
-            student_id: studentName === "竹下翔" ? "acf193c5-f6b4-4514-93a4-958eba0e0c38" : null,
+            student_id: (studentName?.includes("竹下") || studentName === "竹下翔" || studentName === "竹下 翔") ? "acf193c5-f6b4-4514-93a4-958eba0e0c38" : null,
             content: `【畝 ${currentBed.bed_number} (${finalCrop})】${notes.trim()}`,
-            task_title: `🌱 観察ノート (${finalCrop})`,
-            created_at: new Date().toISOString(),
+            image_url: imageUrl || null,
+            role: "student",
           },
         ]);
-      } catch (e) {}
+      } catch (e) {
+        console.error("journals insert error:", e);
+      }
 
       setToastMessage(`🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`);
     }

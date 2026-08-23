@@ -35,8 +35,35 @@ export default function TaskDetailModel({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
+      reader.onload = (readerEvent) => {
+        const rawResult = readerEvent.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1000;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL("image/jpeg", 0.75);
+            setPhotoPreview(compressed);
+          } else {
+            setPhotoPreview(rawResult);
+          }
+        };
+        img.src = rawResult;
       };
       reader.readAsDataURL(file);
     }
@@ -55,6 +82,8 @@ export default function TaskDetailModel({
         work_types: [t.title],
         notes: reportMemo.trim(),
         harvest_amount: photoPreview ? "📷 現場写真あり" : undefined,
+        image_url: photoPreview || undefined,
+        photo_url: photoPreview || undefined,
       });
     }
 

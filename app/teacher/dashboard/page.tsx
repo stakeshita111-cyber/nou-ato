@@ -27,6 +27,14 @@ export default function TeacherDashboardPage() {
   const [toastMessage, setToastMessage] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showMobilePreviewModal, setShowMobilePreviewModal] = useState(false);
+  const [targetPlotCode, setTargetPlotCode] = useState<string | undefined>(undefined);
+  const [targetFarmId, setTargetFarmId] = useState<string | undefined>(undefined);
+
+  const handleNavigateToFarm = (plotCode?: string, farmId?: string) => {
+    setTargetPlotCode(plotCode);
+    setTargetFarmId(farmId);
+    setActiveMenu("farm");
+  };
 
   // 講師ロール（role === 'teacher'）権限の厳格チェック
   useEffect(() => {
@@ -150,13 +158,18 @@ export default function TeacherDashboardPage() {
               onAddNewTaskClick={handleAddNewTask}
               onNavigateToStudents={() => setActiveMenu("dashboard")}
               onNavigateToJournals={() => setActiveMenu("journals")}
-              onNavigateToFarm={() => setActiveMenu("farm")}
+              onNavigateToFarm={() => handleNavigateToFarm()}
               onNavigateToTasks={() => setActiveMenu("tasks")}
               onNavigateToEvents={() => setActiveMenu("events")}
             />
           )}
 
-          {activeMenu === "farm" && <TeacherFarmCanvasView />}
+          {activeMenu === "farm" && (
+            <TeacherFarmCanvasView
+              initialPlotCode={targetPlotCode}
+              initialFarmId={targetFarmId}
+            />
+          )}
 
           {activeMenu === "tasks" && (
             <TeacherTaskBoardView
@@ -168,7 +181,7 @@ export default function TeacherDashboardPage() {
           {activeMenu === "templates" && <TeacherTemplatesView />}
 
           {activeMenu === "journals" && (
-            <TeacherJournalsView onNavigateToFarm={() => setActiveMenu("farm")} />
+            <TeacherJournalsView onNavigateToFarm={handleNavigateToFarm} />
           )}
 
           {activeMenu === "payments" && <TeacherPaymentsView />}
