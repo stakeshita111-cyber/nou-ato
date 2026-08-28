@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
+import { useThemeStore } from "@/store/useThemeStore";
 
 interface TeacherSidebarProps {
   activeMenu: string;
@@ -9,6 +10,7 @@ interface TeacherSidebarProps {
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
   onOpenMobilePreview?: () => void;
+  pendingApprovalCount?: number;
 }
 
 export default function TeacherSidebar({
@@ -17,7 +19,9 @@ export default function TeacherSidebar({
   isOpenMobile = false,
   onCloseMobile,
   onOpenMobilePreview,
+  pendingApprovalCount = 0,
 }: TeacherSidebarProps) {
+  const { settings } = useThemeStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [teacherName, setTeacherName] = useState("テスト講師");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -112,14 +116,22 @@ export default function TeacherSidebar({
             {/* 2. 畑・区画 */}
             <button
               onClick={() => handleItemClick("farm")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition ${
                 activeMenu === "farm"
                   ? "app-accent-light font-bold shadow-xs"
                   : "text-gray-600 hover:bg-gray-100/70"
               }`}
             >
-              <span className="text-base">🌾</span>
-              <span>畑・区画</span>
+              <div className="flex items-center space-x-3">
+                <span className="text-base">🌾</span>
+                <span>畑・区画</span>
+              </div>
+              {/* 🌟 LINE風 未読・要承認件数バッジ 🌟 */}
+              {pendingApprovalCount > 0 && (
+                <span className="bg-red-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-md flex items-center justify-center min-w-[20px]">
+                  {pendingApprovalCount}
+                </span>
+              )}
             </button>
 
             {/* 3. 教材 */}
@@ -179,17 +191,19 @@ export default function TeacherSidebar({
             </button>
 
             {/* 7. 売上 */}
-            <button
-              onClick={() => handleItemClick("payments")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
-                activeMenu === "payments"
-                  ? "app-accent-light font-bold shadow-xs"
-                  : "text-gray-600 hover:bg-gray-100/70"
-              }`}
-            >
-              <span className="text-base">💳</span>
-              <span>売上</span>
-            </button>
+            {settings.showPaymentsMenu !== false && (
+              <button
+                onClick={() => handleItemClick("payments")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+                  activeMenu === "payments"
+                    ? "app-accent-light font-bold shadow-xs"
+                    : "text-gray-600 hover:bg-gray-100/70"
+                }`}
+              >
+                <span className="text-base">💳</span>
+                <span>売上</span>
+              </button>
+            )}
 
             {/* 8. 画面設定 */}
             <button

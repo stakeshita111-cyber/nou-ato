@@ -5,6 +5,9 @@ import { useFarmManager } from "@/hooks/useFarmManager";
 import { FarmBed, FarmPlot } from "@/types/farm";
 import Toast from "@/components/ui/Toast";
 import { useTheme, ThemeColor, FontSize } from "@/context/ThemeContext";
+import BedApprovalNotificationBanner from "@/components/teacher/BedApprovalNotificationBanner";
+import BedApprovalModal from "@/components/farm/BedApprovalModal";
+import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
 import { supabase } from "@/lib/supabase";
 
 interface UnassignedStudent {
@@ -18,6 +21,7 @@ interface UnassignedStudent {
 interface TeacherFarmCanvasViewProps {
   initialPlotCode?: string;
   initialFarmId?: string;
+  initialApprovalBedId?: string;
 }
 
 export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }: TeacherFarmCanvasViewProps = {}) {
@@ -31,6 +35,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     setPlots,
     savePlotsGridIndicesToSupabase,
     currentFarmPlots,
+    records,
     supabaseStudents,
     snapToNonCollidingPosition,
     updatePlotPositionFree,
@@ -43,7 +48,106 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     updateAllUnassignedBedsCount,
     assignStudentToPlot,
     unassignStudentFromPlot,
+    confirmBedArchived,
+    approveAndAddNewBed,
+    rejectBedCompletion,
+    addNewBedForPlot,
+    unarchiveBed,
   } = useFarmManager();
+
+  const [showArchivedModal, setShowArchivedModal] = useState(false);
+  const [archivedModalTargetPlotId, setArchivedModalTargetPlotId] = useState<string | null>(null);
+
+  // 🌟【新機能】講師による生徒の観察記録タイムライン閲覧 State 🌟
+  const [selectedBedForRecords, setSelectedBedForRecords] = useState<FarmBed | null>(null);
+  const [approvalModalPlot, setApprovalModalPlot] = useState<FarmPlot | null>(null);
+  const [approvalModalBed, setApprovalModalBed] = useState<FarmBed | null>(null);
+  const [bedRecords, setBedRecords] = useState<any[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
+
+  const fetchBedRecords = async (
+    plotCode: string,
+    bedNumber: number,
+    bedId?: string,
+    studentName?: string,
+    latestRec?: any,
+    cropName?: string
+  ) => {
+    setIsLoadingRecords(true);
+    try {
+      // 🌟 新しく追加された畝（未確定 🌱）で、新規記録がない場合は過去ログを完全除外 🌟
+      if (cropName === "未確定 🌱" && !latestRec) {
+        setBedRecords([]);
+        return;
+      }
+
+      // 1. crop_records から取得
+      const { data: cData } = await supabase
+        .from("crop_records")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      // 2. journals から取得
+      const { data: jData } = await supabase
+        .from("journals")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      let combined: any[] = [];
+
+      if (cData && cData.length > 0) {
+        cData.forEach((r: any) => {
+          // bed_id の完全一致を最優先
+          const isBedIdMatch = bedId && (r.bed_id === bedId);
+          const matchCodeAndBed = (r.plot_code === plotCode) && (r.bed_id?.includes(`bed_${bedNumber}`) || r.bed_id?.endsWith(`_${bedNumber}`));
+
+          if (isBedIdMatch || matchCodeAndBed) {
+            combined.push({
+              id: r.id,
+              date: r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString("ja-JP") : "記録日"),
+              notes: r.notes || "観察記録",
+              photo_url: r.photo_url || r.image_url,
+              growth_stage: r.growth_stage || "作業記録",
+              height_cm: r.height_cm,
+              harvest_amount: r.harvest_amount,
+              work_types: r.work_types,
+              created_at: r.created_at,
+            });
+          }
+        });
+      }
+
+      if (jData && jData.length > 0) {
+        jData.forEach((j: any) => {
+          const content = j.content || "";
+          if (content && !content.includes("を完了報告しました") && content !== "（コメントなし）") {
+            const hasBedHint = content.includes(`畝 ${bedNumber}`) || content.includes(`畝#${bedNumber}`);
+            if (hasBedHint) {
+              combined.push({
+                id: j.id,
+                date: j.created_at ? new Date(j.created_at).toLocaleDateString("ja-JP") : "最近",
+                notes: content,
+                photo_url: j.image_url || j.photo_url,
+                growth_stage: j.task_title || "💡 質問・相談日誌",
+                created_at: j.created_at,
+              });
+            }
+          }
+        });
+      }
+
+      // latestRec があれば追加
+      if (latestRec && !combined.some(r => r.notes === latestRec.notes)) {
+        combined.unshift(latestRec);
+      }
+
+      setBedRecords(combined);
+    } catch (e) {
+      console.error("fetchBedRecords error:", e);
+    } finally {
+      setIsLoadingRecords(false);
+    }
+  };
 
   const unassignedList = useMemo<UnassignedStudent[]>(() => {
     const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
@@ -444,7 +548,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   const handleAddNewAreaFromModal = async () => {
     if (!newAreaNameInModal.trim()) return;
 
-    const createdFarm = addFarm(newAreaNameInModal.trim());
+    const createdFarm = await addFarm(newAreaNameInModal.trim());
     setNewAreaNameInModal("");
     setShowEditAreaModal(false);
     setToastMessage(`🎉 新しいエリア「${createdFarm.name}」を作成し、キャンバスを切り替えました！`);
@@ -648,11 +752,11 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     setShowToast(true);
   };
 
-  const handleCreateNewFarm = (e: React.FormEvent) => {
+  const handleCreateNewFarm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFarmNameInput.trim()) return;
 
-    const createdFarm = addFarm(newFarmNameInput.trim());
+    const createdFarm = await addFarm(newFarmNameInput.trim());
     setShowAddFarmModal(false);
     setNewFarmNameInput("");
 
@@ -734,9 +838,20 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     setShowFarmSettingsModal(true);
   };
 
+  const cellDim = Math.round(92 * (zoomLevel / 100));
+
   return (
     <div className="space-y-6 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
+
+      {/* 🌟 生徒からの収穫完了報告通知バナー 🌟 */}
+      <BedApprovalNotificationBanner
+        plots={plots}
+        onOpenApproval={(plot, bed) => {
+          setApprovalModalPlot(plot);
+          setApprovalModalBed(bed);
+        }}
+      />
 
       {/* 📊 Excelスタイル正方形グリッド コントロールツールバー 📊 */}
       <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
@@ -748,78 +863,22 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
             D&D Swap (マス目場所入れ替え対応)
           </span>
+
+          {/* 📦 全体アーカイブ確認ボタン */}
+          <button
+            onClick={() => {
+              setArchivedModalTargetPlotId(null);
+              setShowArchivedModal(true);
+            }}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-950 px-3 py-1.5 rounded-2xl border border-emerald-300 font-black transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <span>📦 全体の過去収穫ログ</span>
+          </button>
         </div>
 
-        {/* マス目（縦横グリッド数）動的変更 ＆ 盤面ズーム（拡大縮小・全体表示） ＆ 印刷 */}
+        {/* ズーム & グリッドサイズ & 畝数一括変更操作 */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* 🌟 盤面ズームコントローラー 🔍 🌟 */}
-          <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-2xl border border-gray-300">
-            <button
-              type="button"
-              title="全体の全マスを一元俯瞰 (50%)"
-              onClick={() => setZoomLevel(50)}
-              className={`px-2 py-1 rounded-xl text-[10px] font-black transition ${
-                zoomLevel === 50 ? "bg-emerald-800 text-white shadow-xs" : "text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              🔍 全体 50%
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoomLevel(75)}
-              className={`px-2 py-1 rounded-xl text-[10px] font-black transition ${
-                zoomLevel === 75 ? "bg-emerald-800 text-white shadow-xs" : "text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              75%
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoomLevel(100)}
-              className={`px-2 py-1 rounded-xl text-[10px] font-black transition ${
-                zoomLevel === 100 ? "bg-emerald-800 text-white shadow-xs" : "text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              100%
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoomLevel(125)}
-              className={`px-2 py-1 rounded-xl text-[10px] font-black transition ${
-                zoomLevel === 125 ? "bg-emerald-800 text-white shadow-xs" : "text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              125%
-            </button>
-            <button
-              type="button"
-              title="区画詳細を拡大表示 (150%)"
-              onClick={() => setZoomLevel(150)}
-              className={`px-2 py-1 rounded-xl text-[10px] font-black transition ${
-                zoomLevel === 150 ? "bg-emerald-800 text-white shadow-xs" : "text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              150% 拡大
-            </button>
-
-            <div className="flex items-center pl-1 space-x-1 border-l border-gray-300">
-              <button
-                type="button"
-                onClick={() => setZoomLevel((prev) => Math.max(40, prev - 10))}
-                className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs"
-              >
-                －
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoomLevel((prev) => Math.min(200, prev + 10))}
-                className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs"
-              >
-                ＋
-              </button>
-            </div>
-          </div>
-
+          {/* 🎯 盤面サイズ操作 (列 A-L × 行 1-12) */}
           <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-2xl border border-emerald-200 text-emerald-950">
             <span className="text-xs font-black">🎯 盤面サイズ:</span>
             <div className="flex items-center space-x-1">
@@ -851,7 +910,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
             </div>
           </div>
 
-          {/* 🌟 未割り当て区画の畝数一括設定コントローラー 🌟 */}
+          {/* 🌱 未割り当て区画の畝数一括設定コントローラー */}
           <div className="flex items-center space-x-1.5 bg-amber-50 px-3 py-1.5 rounded-2xl border border-amber-200 text-amber-950">
             <span className="text-xs font-black">🌱 未割当区画の畝数一括変更:</span>
             <select
@@ -863,8 +922,8 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                   setShowToast(true);
                 }
               }}
-              defaultValue="4"
-              className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-black text-amber-950 shadow-2xs"
+              defaultValue="7"
+              className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-black text-amber-900"
             >
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                 <option key={num} value={num}>{num} 畝</option>
@@ -872,1128 +931,395 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
             </select>
           </div>
 
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 rounded-xl transition flex items-center gap-1 shadow-xs"
-          >
-            <span>📸 盤面を出力/印刷</span>
-          </button>
+          {/* ズーム操作 */}
+          <div className="flex items-center space-x-1 bg-gray-50 px-2.5 py-1 rounded-2xl border border-gray-200">
+            <span className="text-[10px] text-gray-500 font-black">ズーム:</span>
+            <span className="text-xs font-black text-gray-800 w-9 text-center">{zoomLevel}%</span>
+            <button
+              type="button"
+              onClick={() => setZoomLevel((prev) => Math.max(40, prev - 10))}
+              className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs cursor-pointer"
+            >
+              －
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoomLevel((prev) => Math.min(200, prev + 10))}
+              className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs cursor-pointer"
+            >
+              ＋
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* メインレイアウトエリア: 左 Excelスタイル正方形グリッド + 右 未割り当て生徒リスト */}
-      <div className="flex flex-col lg:flex-row gap-5 items-start">
-        
-        {/* 左側: Excelスタイル 正方形グリッド盤面 (CSS Grid & aspect-square & D&D Swap) */}
+      {/* 🌟 2. メインのグリッド描画エリア 🌟 */}
+      <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm overflow-x-auto">
         <div
-          ref={canvasRef}
-          className="flex-1 w-full bg-[#e8e9e4] rounded-3xl p-4 sm:p-6 border border-gray-300 shadow-inner space-y-4 overflow-x-auto min-h-[650px]"
+          className="grid gap-2 select-none"
+          style={{
+            gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+            width: `${gridCols * (cellDim + 8)}px`,
+          }}
         >
-          {/* 盤面ヘッダーステータス */}
-          <div className="flex flex-wrap items-center justify-between border-b border-gray-300/80 pb-3 gap-2">
-            <div className="flex items-center space-x-2">
-              <span className="bg-emerald-900 text-white font-black text-xs px-3 py-1 rounded-full">
-                {farms.find((f) => f.id === activeFarmId)?.name || "メインエリア"}
-              </span>
-              <span className="text-xs text-gray-600 font-bold">
-                (Excel方式 {gridCols}列 × {gridRows}行 • 全 {gridCols * gridRows} マス)
-              </span>
-            </div>
+          {Array.from({ length: gridRows }).map((_, rIdx) =>
+            Array.from({ length: gridCols }).map((_, cIdx) => {
+              const cellAddress = `${String.fromCharCode(65 + cIdx)}${rIdx + 1}`;
+              const plot = plots.find((p) => p.code === cellAddress);
+              const isAssigned = plot && !plot.is_vacant && (!!plot.student_id || !!plot.student_name);
+              const isVacant = plot?.is_vacant;
+              const hasPendingApproval = (plot?.beds || []).some((b) => b.status === "completed_pending");
+              const isUpdated = (plot?.beds || []).some((b) => b.is_updated);
 
-            <div className="flex items-center space-x-3 text-xs font-bold bg-white px-3 py-1.5 rounded-2xl border border-gray-200 shadow-2xs">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-emerald-500"></span> 割り当て済み
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-white border border-gray-400"></span> 空き区画
-              </span>
-            </div>
-          </div>
-
-          {/* 📊 Excelスタイル 正方形グリッド盤面 (アスペクト比固定 ＆ ズーム連動動的セルサイズ ＆ 3要素スリム表示) 📊 */}
-          {(() => {
-            const cellDim = Math.round(110 * (zoomLevel / 100)); // 50%=>55px, 100%=>110px, 150%=>165px
-
-            return (
-              <div className="space-y-2 overflow-auto pb-4 max-w-full">
-                {/* 上部 Excel列ヘッダー (A列, B列, C列...) */}
-                <div className="flex items-center space-x-2 min-w-max">
-                  <div className="w-9 shrink-0 text-[11px] font-black text-gray-400 text-center">行\列</div>
-                  <div
-                    className="grid gap-2 sm:gap-3 shrink-0"
-                    style={{ gridTemplateColumns: `repeat(${gridCols}, ${cellDim}px)` }}
-                  >
-                    {Array.from({ length: gridCols }).map((_, cIdx) => (
-                      <div key={cIdx} className="py-1 bg-white/80 rounded-xl border border-gray-300 shadow-2xs text-center font-black text-xs text-gray-700">
-                        {String.fromCharCode(65 + cIdx)}列
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 各行 (1行, 2行, 3行...) */}
-                {Array.from({ length: gridRows }).map((_, rIdx) => {
-                  const rowNumber = rIdx + 1; // 1, 2, 3...
-
-                  return (
-                    <div key={rIdx} className="flex items-center space-x-2 min-w-max">
-                      {/* 左端 Excel行ヘッダー (1行, 2行...) */}
-                      <div
-                        className="w-9 shrink-0 font-black text-xs text-gray-700 text-center flex items-center justify-center bg-white/80 rounded-xl border border-gray-300 shadow-2xs"
-                        style={{ height: `${cellDim}px` }}
-                      >
-                        {rowNumber}
-                      </div>
-
-                      {/* 行内の真正方形マス目群 (ズーム連動 cellDim px) */}
-                      <div
-                        className="grid gap-2 sm:gap-3 shrink-0"
-                        style={{ gridTemplateColumns: `repeat(${gridCols}, ${cellDim}px)` }}
-                      >
-                        {Array.from({ length: gridCols }).map((_, cIdx) => {
-                          const cellIndex = rIdx * gridCols + cIdx;
-                          const colLetter = String.fromCharCode(65 + cIdx); // A, B, C...
-                          const cellAddress = `${colLetter}${rowNumber}`; // A1, B2, C3...
-
-                          // 🌟 1. セルアドレス (code: A1, B2, D1, D2...) 基準でプロットを絶対マッピング (p.code === cellAddress のみの単一完全一致で連動ゼロ化) 🌟
-                          let plot = currentFarmPlots.find((p) => p.code === cellAddress);
-                          if (!plot) {
-                            plot = {
-                              id: `plot_cell_${cellAddress}`,
-                              farm_id: activeFarmId,
-                              name: `区画 ${cellAddress}`,
-                              code: cellAddress,
-                              beds: [
-                                { id: `bed_${cellAddress}_1`, plot_id: `plot_cell_${cellAddress}`, bed_number: 1, is_updated: false },
-                                { id: `bed_${cellAddress}_2`, plot_id: `plot_cell_${cellAddress}`, bed_number: 2, is_updated: false },
-                                { id: `bed_${cellAddress}_3`, plot_id: `plot_cell_${cellAddress}`, bed_number: 3, is_updated: false },
-                                { id: `bed_${cellAddress}_4`, plot_id: `plot_cell_${cellAddress}`, bed_number: 4, is_updated: false },
-                              ],
-                              is_vacant: false,
-                            } as any;
-                          }
-
-                          const isAssigned = plot && !plot.is_vacant && (!!plot.student_name || !!plot.student_id);
-                          const isVacant = !!plot?.is_vacant;
-                          const isDraggingThis = draggedGridIndex === cellIndex;
-
-                          // 🌟 2. 質問があった場合のみ右上に吹き出しマーク 💬 ❗ 🌟
-                          const hasQuestion = (plot?.beds || []).some((b) => {
-                            const rec = b.latest_record;
-                            return rec?.is_question || rec?.notes?.includes("❗") || rec?.notes?.includes("相談") || rec?.notes?.includes("質問");
-                          });
-
-                          // 🌟 3. ベッド内容が更新されている区画の判定 (枠線点滅) 🌟
-                          const isUpdated = (plot?.beds || []).some((b) => b.is_updated || !!b.latest_record);
-
-                          // 表示用イニシャル記号
-                          const studentSymbol = isAssigned ? (plot?.student_name ? plot.student_name.slice(0, 2) : "竹下") : isVacant ? "空" : "未";
-                          const bedsCount = (plot?.beds || []).length || 4;
-
-                          return (
-                            <div
-                              key={cellIndex}
-                              draggable={true}
-                              onDragStart={(e) => {
-                                e.dataTransfer.setData("plot_address", cellAddress);
-                                e.dataTransfer.setData("text/plain", cellAddress);
-                                setDraggedGridIndex(cellIndex);
-                              }}
-                              onDragEnd={() => {
-                                setDraggedGridIndex(null);
-                              }}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = "move";
-                              }}
-                              onDragEnter={(e) => {
-                                e.preventDefault();
-                              }}
-                              onDrop={async (e) => {
-                                e.preventDefault();
-                                const studentDataStr = e.dataTransfer.getData("student_data");
-                                if (studentDataStr) {
-                                  try {
-                                    const student = JSON.parse(studentDataStr);
-                                    assignStudentToPlot(cellAddress, student.id, student.name);
-                                    setToastMessage(`✨ ${student.name} さんを「${cellAddress}」に割り当てました！`);
-                                    setShowToast(true);
-                                    return;
-                                  } catch (err) {
-                                    console.error("Student drop parse error:", err);
-                                  }
-                                }
-
-                                const fromAddr = e.dataTransfer.getData("plot_address") || e.dataTransfer.getData("text/plain");
-                                if (fromAddr && fromAddr !== cellAddress) {
-                                  handleMovePlotToGridCell(fromAddr, cellAddress);
-                                }
-                              }}
-                              style={{ width: `${cellDim}px`, height: `${cellDim}px` }}
-                              onClick={() => {
-                                if (plot) setDetailPlot(plot);
-                              }}
-                              className={`group relative aspect-square rounded-2xl p-1.5 border-2 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col justify-between items-center select-none shrink-0 ${
-                                isDraggingThis ? "opacity-40 ring-4 ring-emerald-400 scale-95" : ""
-                              } ${
-                                isUpdated ? "animate-pulse ring-4 ring-emerald-400 border-emerald-500 shadow-xl" : ""
-                              } ${
-                                isAssigned
-                                  ? "bg-emerald-50/90 border-emerald-400 hover:border-emerald-600 hover:scale-[1.04] shadow-sm ring-1 ring-emerald-200"
-                                  : isVacant
-                                  ? "bg-gray-100/60 border-dashed border-gray-300 opacity-60 hover:opacity-90 hover:border-gray-400"
-                                  : "bg-white/90 border-dashed border-emerald-300 hover:border-emerald-500 hover:scale-[1.04] hover:shadow-md"
-                              }`}
-                             >
-                               {/* 🌟 盤面上で直接ワンタップで「空き地」にできる「✕」ボタン 🌟 */}
-                               <button
-                                 type="button"
-                                 onClick={async (e) => {
-                                   e.preventDefault();
-                                   e.stopPropagation();
-                                   const nextVacant = !isVacant;
-                                   const updatedPlots = plots.map((p) =>
-                                     p.code === cellAddress || p.id === plot?.id
-                                       ? { ...p, is_vacant: nextVacant, student_id: undefined, student_name: undefined }
-                                       : p
-                                   );
-                                   setPlots(updatedPlots);
-                                   await savePlotsGridIndicesToSupabase(updatedPlots);
-                                   setToastMessage(nextVacant ? `🌱 セル「${cellAddress}」を空き地にしました` : `🌾 セル「${cellAddress}」を稼働区画に戻しました`);
-                                   setShowToast(true);
-                                 }}
-                                 className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-200 hover:bg-red-500 hover:text-white text-gray-700 rounded-full flex items-center justify-center text-[10px] font-black transition shadow-xs z-30 pointer-events-auto cursor-pointer"
-                                 title={isVacant ? "稼働区画に戻す" : "ワンタップで空き地にする"}
-                               >
-                                 {isVacant ? "＋" : "✕"}
-                               </button>
-
-                               {/* 🌟 質問があった場合のみ右上に「吹き出しマーク (💬 ❗)」表示 🌟 */}
-                              {hasQuestion && (
-                                <span className="absolute -top-2.5 -right-2.5 bg-red-600 text-yellow-300 font-black text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-lg border-2 border-white animate-bounce z-30 pointer-events-none">
-                                  <span>💬</span>
-                                  <span>❗</span>
-                                </span>
-                              )}
-
-                              {/* ① マス番号 (セルアドレス A1, B2...) ＆ 🌟 ② 中央上部 畝数表示 🌟 */}
-                              <div className="w-full flex items-center justify-between gap-1 pointer-events-none">
-                                <span
-                                  className="font-black text-emerald-950 bg-white/90 px-1 py-0.5 rounded-md border border-gray-200 shadow-2xs truncate"
-                                  style={{ fontSize: `${Math.max(8, Math.round(10 * (zoomLevel / 100)))}px` }}
-                                >
-                                  {cellAddress}
-                                </span>
-
-                                {/* 🌟 中央上部に移動した畝数表示 🌟 */}
-                                {!isVacant && (
-                                  <span
-                                    className="font-black text-emerald-900 bg-emerald-100/90 px-1 py-0.5 rounded-md border border-emerald-200 truncate"
-                                    style={{ fontSize: `${Math.max(7.5, Math.round(9.5 * (zoomLevel / 100)))}px` }}
-                                  >
-                                    {bedsCount}畝
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* ③ 中央: 割り当てられたユーザーの記号 (丸枠) */}
-                              <div className="my-auto flex items-center justify-center pointer-events-none">
-                                {isAssigned ? (
-                                  <div
-                                    className="rounded-full bg-emerald-800 text-white font-black flex items-center justify-center border-2 border-white shadow-xs transition-transform group-hover:scale-110"
-                                    style={{
-                                      width: `${Math.max(22, Math.round(36 * (zoomLevel / 100)))}px`,
-                                      height: `${Math.max(22, Math.round(36 * (zoomLevel / 100)))}px`,
-                                      fontSize: `${Math.max(9, Math.round(12 * (zoomLevel / 100)))}px`,
-                                    }}
-                                  >
-                                    {studentSymbol}
-                                  </div>
-                                ) : isVacant ? (
-                                  <div
-                                    className="rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center border border-gray-300"
-                                    style={{
-                                      width: `${Math.max(20, Math.round(32 * (zoomLevel / 100)))}px`,
-                                      height: `${Math.max(20, Math.round(32 * (zoomLevel / 100)))}px`,
-                                      fontSize: `${Math.max(8, Math.round(10 * (zoomLevel / 100)))}px`,
-                                    }}
-                                  >
-                                    空
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="rounded-full bg-amber-50 text-amber-700 font-bold flex items-center justify-center border border-amber-300"
-                                    style={{
-                                      width: `${Math.max(22, Math.round(36 * (zoomLevel / 100)))}px`,
-                                      height: `${Math.max(22, Math.round(36 * (zoomLevel / 100)))}px`,
-                                      fontSize: `${Math.max(8, Math.round(11 * (zoomLevel / 100)))}px`,
-                                    }}
-                                  >
-                                    未
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* 下部ステータス表示 (スッキリ化) */}
-                              <div className="w-full text-center pt-0.5 border-t border-gray-200/40 pointer-events-none">
-                                <span
-                                  className={`font-extrabold inline-block truncate px-1 rounded-full ${
-                                    isAssigned
-                                      ? "text-emerald-900 bg-emerald-100/60"
-                                      : isVacant
-                                      ? "text-gray-400 bg-gray-100"
-                                      : "text-amber-800 bg-amber-100/60"
-                                  }`}
-                                  style={{ fontSize: `${Math.max(7, Math.round(9 * (zoomLevel / 100)))}px` }}
-                                >
-                                  {isAssigned ? plot?.student_name : isVacant ? "空き地" : "未割当"}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          <div className="text-[11px] text-gray-500 font-bold text-right pt-2 border-t border-gray-300/60 z-10 flex justify-between items-center">
-            <span>💡 マス目タップで詳細設定</span>
-            <span>📍 グリッド位置管理</span>
-          </div>
-        </div>
-
-        {/* 右側: 未割り当ての生徒 スリムサイドバー (w-56) */}
-        <div className="w-full lg:w-56 bg-white rounded-3xl p-4 border border-gray-300 shadow-sm space-y-3 shrink-0 z-20">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-            <h3 className="font-black text-gray-900 text-xs">未割り当て生徒</h3>
-            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
-              {filteredStudents.length}名
-            </span>
-          </div>
-
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="🔍 名前検索..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full p-2 pl-2.5 rounded-xl border border-gray-300 text-[11px] font-bold bg-gray-50/80 focus:bg-white transition"
-            />
-          </div>
-
-          <div className="space-y-2 max-h-[500px] overflow-y-auto p-0.5">
-            {filteredStudents.length === 0 ? (
-              <div className="text-center py-6 text-[11px] text-gray-400 font-medium">
-                該当なし
-              </div>
-            ) : (
-              filteredStudents.map((student) => (
+              return (
                 <div
-                  key={student.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(
-                      "student_data",
-                      JSON.stringify({ id: student.id, name: student.name })
-                    );
-                    handleStudentDragStart(student);
+                  key={cellAddress}
+                  onClick={() => {
+                    if (plot) {
+                      const pendingBed = (plot.beds || []).find((b) => b.status === "completed_pending");
+                      if (pendingBed) {
+                        setApprovalModalPlot(plot);
+                        setApprovalModalBed(pendingBed);
+                      } else {
+                        setDetailPlot(plot);
+                      }
+                    }
                   }}
-                  className="bg-white p-2.5 rounded-xl border border-gray-200 shadow-2xs hover:shadow-md hover:border-emerald-400 transition cursor-grab active:cursor-grabbing flex items-center justify-between group"
+                  style={{ width: `${cellDim}px`, height: `${cellDim}px` }}
+                  className={`relative rounded-2xl p-2 border-2 transition cursor-pointer flex flex-col justify-between items-center shadow-xs ${
+                    hasPendingApproval
+                      ? "bg-amber-100/90 border-amber-500 ring-4 ring-amber-400 shadow-xl animate-pulse"
+                      : isUpdated
+                      ? "bg-emerald-100/80 border-emerald-500 ring-2 ring-emerald-400 shadow-md"
+                      : isAssigned
+                      ? "bg-emerald-50/90 border-emerald-400 hover:border-emerald-600 hover:shadow-md"
+                      : isVacant
+                      ? "bg-gray-100/60 border-dashed border-gray-300 opacity-60"
+                      : "bg-white border-dashed border-emerald-300 hover:border-emerald-500 hover:shadow-sm"
+                  }`}
                 >
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <div className={`w-7 h-7 rounded-full ${student.colorBg} text-white font-black text-[10px] flex items-center justify-center shadow-2xs shrink-0`}>
-                      {student.initials}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-extrabold text-gray-900 text-[11px] truncate">{student.name}</h4>
-                      <p className="text-[9px] text-gray-400 font-bold truncate">{student.grade}</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-      </div>
-
-      {/* モーダル群 (省略なし) */}
-      {showAddFarmModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-gray-900 text-base flex items-center gap-2">
-                <span>🌾 新しいエリアを作成</span>
-              </h3>
-              <button onClick={() => setShowAddFarmModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleCreateNewFarm} className="space-y-4 text-xs font-bold">
-              <div>
-                <label className="block text-gray-700 mb-1">エリアの名称 *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="例: 第2エリア (ハーブ・体験区画エリア)"
-                  value={newFarmNameInput}
-                  onChange={(e) => setNewFarmNameInput(e.target.value)}
-                  className="w-full p-3.5 rounded-2xl border border-gray-300 bg-gray-50 text-sm focus:bg-white transition font-bold"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowAddFarmModal(false)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow"
-                >
-                  エリアを作成してキャンバスを開く
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {confirmChangeStudentModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3 text-red-600">
-              <h3 className="font-black text-base flex items-center gap-1.5">
-                <span>⚠️ 担当ユーザーの変更確認</span>
-              </h3>
-              <button onClick={() => setConfirmChangeStudentModal(null)} className="text-gray-400 font-bold">✕</button>
-            </div>
-
-            <div className="space-y-3 text-xs font-bold text-gray-700 leading-relaxed">
-              <p>
-                「<b>区画 {confirmChangeStudentModal.plot.code}</b>」には現在、
-                <span className="text-emerald-800 font-black px-1.5 py-0.5 bg-emerald-50 rounded">
-                  {confirmChangeStudentModal.plot.student_name} さん
-                </span>
-                が割り当てられています。
-              </p>
-
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 text-amber-900 space-y-1 text-center">
-                <span className="block text-[10px] text-amber-700">新担当ユーザー</span>
-                <span className="text-base font-black">{confirmChangeStudentModal.newStudent.name} さん</span>
-              </div>
-
-              <p className="text-center font-black text-gray-900 pt-1">
-                本当に担当ユーザーを変更しますか？
-              </p>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setConfirmChangeStudentModal(null)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmChangeStudent}
-                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl shadow-md transition"
-                >
-                  はい、変更します
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedBed && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-gray-900 text-base">
-                🌱 畝 {selectedBed.bed_number} の生徒提出・観察結果
-              </h3>
-              <button onClick={() => setSelectedBed(null)} className="text-gray-400 font-bold text-lg">✕</button>
-            </div>
-
-            {selectedBed.is_updated ? (
-              <div className="space-y-3 text-xs font-bold">
-                <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-emerald-900 font-black text-sm">✨ 生徒が結果ログを登録しました</span>
-                    <span className="bg-emerald-200 text-emerald-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                      {selectedBed.latest_record?.growth_stage || "提出済"}
+                  {/* 要承認冠バッジ */}
+                  {hasPendingApproval && (
+                    <span className="absolute -top-2.5 -left-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-lg animate-bounce border border-white">
+                      🏆 要承認
                     </span>
-                  </div>
-                  <span className="text-[10px] text-gray-400 block">更新日時: {selectedBed.updated_at || "本日"}</span>
-                </div>
+                  )}
 
-                {selectedBed.latest_record && (
-                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 space-y-2 text-[11px]">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">草丈:</span>
-                      <span className="text-gray-800 font-black">{selectedBed.latest_record.height_cm || 75} cm</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">作業内容:</span>
-                      <span className="text-gray-800 font-black">
-                        {selectedBed.latest_record.work_types?.join(", ") || "水やり, 追肥"}
+                  {/* セルアドレス */}
+                  <div className="w-full flex items-center justify-between pointer-events-none">
+                    <span className="font-black text-emerald-950 bg-white/90 px-1 py-0.5 rounded border border-gray-200 text-[10px]">
+                      {cellAddress}
+                    </span>
+                    {!isVacant && (
+                      <span className="font-black text-emerald-900 bg-emerald-100/90 px-1 py-0.5 rounded text-[9px]">
+                        {(plot?.beds || []).filter(b => b.status !== "archived").length} 畝
                       </span>
-                    </div>
-
-                    {selectedBed.latest_record.harvest_amount && (
-                      <div className="flex justify-between text-amber-800 font-black">
-                        <span>収穫結果:</span>
-                        <span>{selectedBed.latest_record.harvest_amount}</span>
-                      </div>
                     )}
                   </div>
-                )}
 
-                <div className="space-y-1">
-                  <span className="text-gray-700">生徒の観察ノート・コメント:</span>
-                  <div className="bg-gray-50 p-3.5 rounded-xl border text-gray-800 font-medium leading-relaxed">
-                    {selectedBed.latest_record?.notes || "本日、水やりと追肥を行いました。順調に育っています！"}
+                  {/* 生徒名表示 */}
+                  <div className="text-center w-full pointer-events-none">
+                    {isAssigned ? (
+                      <span className="font-black text-xs text-gray-900 truncate block">
+                        🧑‍🌾 {plot.student_name}
+                      </span>
+                    ) : isVacant ? (
+                      <span className="text-[10px] text-gray-400 font-bold">空き地</span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-600 font-bold">未割当</span>
+                    )}
+                  </div>
+
+                  {/* フッター状態 */}
+                  <div className="w-full text-center pointer-events-none">
+                    {hasPendingApproval ? (
+                      <span className="text-[9px] text-amber-900 font-black bg-amber-200 px-1.5 py-0.2 rounded-full">
+                        収穫完了
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-gray-400">
+                        {isAssigned ? "稼働中" : ""}
+                      </span>
+                    )}
                   </div>
                 </div>
-
-                <div className="pt-2 flex justify-end">
-                  <button onClick={() => setSelectedBed(null)} className="px-5 py-2.5 app-accent-btn font-black text-xs rounded-xl shadow-xs">
-                    確認して閉じる
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-xs text-gray-500 font-bold space-y-3">
-                <p>この畝にはまだ生徒からの登録はありません。</p>
-                <button onClick={() => setSelectedBed(null)} className="px-5 py-2 bg-gray-100 rounded-xl font-bold">閉じる</button>
-              </div>
-            )}
-          </div>
+              );
+            })
+          )}
         </div>
-      )}
+      </div>
 
-      {selectedPlot && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-gray-900 text-base">{selectedPlot.name} の割当管理</h3>
-              <button onClick={() => setSelectedPlot(null)} className="text-gray-400 font-bold">✕</button>
-            </div>
-
-            <div className="space-y-3 text-xs font-bold">
-              <p>現在の担当: <b className="text-emerald-900">{selectedPlot.student_name} さん</b></p>
-              <div className="pt-3 flex justify-between border-t">
-                <button
-                  onClick={() => handleUnassignPlot(selectedPlot)}
-                  className="px-4 py-2 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"
-                >
-                  ↩️ 割当を解除する
-                </button>
-                <button onClick={() => setSelectedPlot(null)} className="px-5 py-2 app-accent-btn font-bold rounded-xl">
-                  閉じる
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingPlot && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-gray-900 text-base">✏️ 区画情報の編集 (区画コード ＆ 畝数)</h3>
-              <button onClick={() => setEditingPlot(null)} className="text-gray-400 font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleSaveEditPlot} className="space-y-4 text-xs font-bold">
-              <div>
-                <label className="block text-gray-700 mb-1">区画コード / 番号 *</label>
-                <input
-                  type="text"
-                  required
-                  value={editPlotCode}
-                  onChange={(e) => setEditPlotCode(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 mb-1">区画内の畝(ベッド)数 *</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={editBedCount}
-                  onChange={(e) => setEditBedCount(Number(e.target.value))}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setEditingPlot(null)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
-                >
-                  変更を保存
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 🌟 エリアの編集・管理 Modal 🌟 */}
-      {showEditAreaModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full">エリア加工・設定変更</span>
-                <h3 className="font-black text-gray-900 text-base mt-0.5">✏️ エリアの編集・管理</h3>
-              </div>
-              <button onClick={() => setShowEditAreaModal(false)} className="text-gray-400 font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleSaveEditArea} className="space-y-4 text-xs font-bold">
-              <div>
-                <label className="block text-gray-700 mb-1">現在の選択エリア名 *</label>
-                <input
-                  type="text"
-                  required
-                  value={editAreaNameInput}
-                  onChange={(e) => setEditAreaNameInput(e.target.value)}
-                  placeholder="例: 第1エリア (メイン区画エリア)"
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
-                />
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <button
-                  type="button"
-                  onClick={handleDeleteArea}
-                  className="px-3.5 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition flex items-center space-x-1"
-                >
-                  <span>🗑️ このエリアを削除</span>
-                </button>
-
-                <div className="flex space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditAreaModal(false)}
-                    className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
-                  >
-                    エリア名を確定保存
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            {/* 新エリアの追加展開オプション */}
-            <div className="pt-4 border-t border-gray-100 space-y-3">
-              <span className="text-[11px] text-gray-400 font-bold block">＋ 新しい管理エリアを新設追加</span>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newAreaNameInModal}
-                  onChange={(e) => setNewAreaNameInModal(e.target.value)}
-                  placeholder="例: 第2エリア (体験農園)"
-                  className="flex-1 p-2.5 rounded-xl border border-gray-300 text-xs font-bold"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddNewAreaFromModal}
-                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition"
-                >
-                  ＋ 追加作成
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddPlotModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-gray-900 text-base">＋ キャンバスに新しい区画を追加</h3>
-              <button onClick={() => setShowAddPlotModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleCreateNewPlot} className="space-y-4 text-xs font-bold">
-              <div>
-                <label className="block text-gray-700 mb-1">区画内の畝(ベッド)数</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="8"
-                  value={newBedCount}
-                  onChange={(e) => setNewBedCount(Number(e.target.value))}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 text-center"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-2 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowAddPlotModal(false)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
-                >
-                  区画を作成して追加
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showFarmSettingsModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-gray-200">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">農園情報・データベース更新</span>
-                <h3 className="font-black text-gray-900 text-base mt-0.5">🏫 農園・代表者情報</h3>
-              </div>
-              <button onClick={() => setShowFarmSettingsModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
-            </div>
-
-            <form onSubmit={handleSaveFarmSettings} className="space-y-4 text-xs font-bold">
-              <div>
-                <label className="block text-gray-700 mb-1">農園名 *</label>
-                <input
-                  type="text"
-                  required
-                  value={farmSettingsName}
-                  onChange={(e) => setFarmSettingsName(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-extrabold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 mb-1">代表者氏名 (右上アカウント名に反映) *</label>
-                <input
-                  type="text"
-                  required
-                  value={ownerNameInput}
-                  onChange={(e) => setOwnerNameInput(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-extrabold"
-                />
-                <p className="text-[11px] text-emerald-700 font-bold mt-1">✓ 保存すると右上のアカウントプロフィール名にも即座に反映されます</p>
-              </div>
-
-              <div>
-                <label className="block text-gray-700 mb-1">通知受信用メールアドレス</label>
-                <input
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-700 mb-1">📍 農園住所 / アドレス</label>
-                <input
-                  type="text"
-                  required
-                  value={farmAddressInput}
-                  onChange={(e) => setFarmAddressInput(e.target.value)}
-                  placeholder="例: 千葉県千葉市緑区あすみが丘 1-23"
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-sm font-bold"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowFarmSettingsModal(false)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 app-accent-btn font-bold rounded-xl shadow"
-                >
-                  設定を確定保存 (DB更新)
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 🌟 マス目クリック時: 区画詳細確認・編集モーダル (完全修復 ＆ 並び替え ＆ 上から1,2,3自動配番) 🌟 */}
+      {/* 🌟 3. 区画詳細モーダル (畝の追加・観察記録の確認) 🌟 */}
       {detailPlot && (
         <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800"
           onClick={() => setDetailPlot(null)}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800"
         >
           <div
+            className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-gray-100 p-6 space-y-5 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-gray-200 relative max-h-[90vh] overflow-y-auto"
           >
-            {/* ① ヘッダー: 区画座標 (例: B-2) を大きく表示 */}
-            <div className="flex justify-between items-center border-b pb-3">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between border-b pb-3">
               <div>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full">
-                  区画詳細 ＆ 栽培・受講生管理
-                </span>
-                <h3 className="font-black text-gray-900 text-2xl mt-1 flex items-center gap-2">
-                  <span>📍 区画 {detailPlot.code ? (detailPlot.code.includes("-") ? detailPlot.code : detailPlot.code.replace(/([A-Za-z]+)(\d+)/, "$1-$2")) : "B-2"}</span>
+                <h3 className="font-black text-lg text-emerald-950 flex items-center gap-2">
+                  <span>区画 {detailPlot.code} の詳細管理</span>
+                  {detailPlot.student_name && (
+                    <span className="text-xs bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full font-bold">
+                      🧑‍🌾 {detailPlot.student_name} さん
+                    </span>
+                  )}
                 </h3>
+                <p className="text-xs text-gray-500 font-bold">
+                  畝ごとの作物設定や観察記録の確認、新しい畝の追加ができます
+                </p>
               </div>
               <button
                 onClick={() => setDetailPlot(null)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center text-sm font-black transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* 🌟 1.5. ❗ 生徒からの相談・質問通知ハイライト 🌟 */}
-            {(() => {
-              const questionRecord = (detailPlot.beds || []).reduce<any>((found, b) => {
-                if (found) return found;
-                const rec = b.latest_record;
-                if (rec?.is_question || rec?.notes?.includes("❗") || rec?.notes?.includes("相談") || rec?.notes?.includes("質問")) {
-                  return { bedNumber: b.bed_number, record: rec };
-                }
-                return null;
-              }, null);
-
-              if (!questionRecord) return null;
-
-              return (
-                <div className="bg-red-50 p-3.5 rounded-2xl border-2 border-red-300 space-y-2 animate-fade-in shadow-xs">
-                  <div className="flex justify-between items-center text-red-900 font-black text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="bg-red-600 text-yellow-300 text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">
-                        ❗ 生徒からの相談・質問
-                      </span>
-                      <span>(畝 #{questionRecord.bedNumber})</span>
-                    </span>
-                    <span className="text-[10px] text-gray-500 font-normal">{questionRecord.record.date}</span>
-                  </div>
-
-                  <p className="text-xs text-red-950 font-bold bg-white p-2.5 rounded-xl border border-red-200 leading-relaxed shadow-2xs">
-                    💬 {questionRecord.record.notes}
-                  </p>
-                </div>
-              );
-            })()}
-
-            {/* 🌟 2. ワンタッチ ステータス変更 3連ボタン (未割り当て / 空き地 / 生徒割り当て) 🌟 */}
-            <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 space-y-3 text-xs font-bold">
-              <div className="flex flex-col space-y-2">
-                <span className="text-gray-600 font-bold">区画ステータス・生徒ワンタッチ変更:</span>
-                
-                {/* 3連切り替えボタン */}
-                <div className="grid grid-cols-3 gap-2">
-                  {/* ① 未割り当てにする */}
-                  <button
-                    onClick={async () => {
-                      const updatedPlots = plots.map((p) =>
-                        p.id === detailPlot.id || p.code === detailPlot.code
-                          ? { ...p, student_name: undefined, student_id: undefined, is_vacant: false }
-                          : p
-                      );
-                      setDetailPlot({ ...detailPlot, student_name: "", student_id: "", is_vacant: false });
-                      setPlots(updatedPlots);
-                      await savePlotsGridIndicesToSupabase(updatedPlots);
-                      setToastMessage("🌾 区画を「未割り当て (稼働)」に変更しました");
-                      setShowToast(true);
-                    }}
-                    className={`py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1 border shadow-2xs ${
-                      !detailPlot.student_name && !detailPlot.is_vacant
-                        ? "bg-amber-600 text-white border-amber-700 font-black shadow-md ring-2 ring-amber-300"
-                        : "bg-white text-gray-700 hover:bg-amber-50 border-gray-300"
-                    }`}
-                  >
-                    <span>🌾 未割り当て</span>
-                  </button>
-
-                  {/* ② 空き地にする */}
-                  <button
-                    onClick={async () => {
-                      const updatedPlots = plots.map((p) =>
-                        p.id === detailPlot.id || p.code === detailPlot.code
-                          ? { ...p, student_name: undefined, student_id: undefined, is_vacant: true }
-                          : p
-                      );
-                      setDetailPlot({ ...detailPlot, student_name: "", student_id: "", is_vacant: true });
-                      setPlots(updatedPlots);
-                      await savePlotsGridIndicesToSupabase(updatedPlots);
-                      setToastMessage("🌱 区画を「空き地」に変更しました");
-                      setShowToast(true);
-                    }}
-                    className={`py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1 border shadow-2xs ${
-                      detailPlot.is_vacant
-                        ? "bg-gray-600 text-white border-gray-700 font-black shadow-md ring-2 ring-gray-400"
-                        : "bg-white text-gray-700 hover:bg-gray-100 border-gray-300"
-                    }`}
-                  >
-                    <span>🌱 空き地</span>
-                  </button>
-
-                  {/* ③ 削除 (完全クリア) */}
-                  <button
-                    onClick={async () => {
-                      await deletePlot(detailPlot.id);
-                      setDetailPlot(null);
-                      setToastMessage("区画を初期化・空き地化しました");
-                      setShowToast(true);
-                    }}
-                    className="py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-red-200 bg-white text-red-700 hover:bg-red-50 shadow-2xs"
-                  >
-                    <span>🗑️ 割当リセット</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 生徒選択ドロップダウン (UUID ID表記を完全除去!) */}
-              <div className="flex items-center gap-2 pt-1 border-t border-emerald-200/60">
-                <label className="text-gray-600 font-bold shrink-0">🧑‍🌾 生徒割当:</label>
-                <select
-                  value={detailPlot.student_id || ""}
-                  onChange={(e) => {
-                    const stId = e.target.value;
-                    if (!stId) {
-                      unassignStudentFromPlot(detailPlot.id);
-                      setDetailPlot({ ...detailPlot, student_name: "", student_id: "", is_vacant: false });
-                      return;
-                    }
-                    const st = (supabaseStudents || []).find((s) => s.id === stId);
-                    if (st) {
-                      assignStudentToPlot(detailPlot.id, st.id, st.full_name);
-                      setDetailPlot({ ...detailPlot, student_name: st.full_name, student_id: st.id, is_vacant: false });
-                      setToastMessage(`✨ ${st.full_name} さんをこの区画に割り当てました！（過去記録がある場合は即時自動復元）`);
-                      setShowToast(true);
-                    }
-                  }}
-                  className="w-full p-2 rounded-xl border border-emerald-300 bg-white text-xs font-bold text-emerald-950"
-                >
-                  <option value="">生徒を選択して割り当てる...</option>
-                  {(supabaseStudents || []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      🧑‍🌾 {s.full_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* 🌟 3. ベッド（畝）一覧 & 最下部追加 & つまんで上下移動（並び替え） & 上から1,2,3自動配番 🌟 */}
-            <div className="space-y-3 text-xs font-bold">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="font-black text-gray-900 flex items-center gap-1.5 text-sm">
-                    <span>🌿 畝（ベッド）一覧</span>
-                    <span className="text-xs bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full">
-                      {(detailPlot.beds || []).length} 畝
-                    </span>
-                  </h4>
-                  <p className="text-[10px] text-gray-500 font-normal mt-0.5">
-                    💡 「≡」をつまんで上下にドラッグ＆ドロップで並び替えできます
-                  </p>
-                </div>
+            {/* 畝一覧 ＆ ＋畝を追加ボタン */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-black text-sm text-gray-900">
+                  🌿 稼働中の畝一覧 ({(detailPlot.beds || []).filter(b => b.status !== "archived").length} 畝)
+                </span>
                 <button
+                  type="button"
                   onClick={async () => {
-                    await addBedToPlot(detailPlot.id);
-                    // 最下部に追加反映
-                    const updatedPlot = plots.find((p) => p.id === detailPlot.id);
-                    if (updatedPlot) {
-                      setDetailPlot({ ...updatedPlot });
-                    } else {
-                      const nextBedNum = (detailPlot.beds || []).length + 1;
-                      const uniqueHash = Math.random().toString(36).substring(2, 7);
-                      const newBed: FarmBed = {
-                        id: `${detailPlot.id}_bed_${Date.now()}_${uniqueHash}`,
-                        plot_id: detailPlot.id,
-                        bed_number: nextBedNum,
-                        is_updated: false,
-                      };
-                      setDetailPlot({
-                        ...detailPlot,
-                        beds: [...(detailPlot.beds || []), newBed],
-                      });
+                    const newBed = await addBedToPlot(detailPlot.id);
+                    if (newBed) {
+                      setDetailPlot((prev) => prev ? {
+                        ...prev,
+                        beds: [...(prev.beds || []), newBed],
+                      } : prev);
                     }
-                    setToastMessage("✨ 新しい畝を最下部に追加しました");
+                    setToastMessage("✨ 新しい畝を追加しました！");
                     setShowToast(true);
                   }}
-                  className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-2xs transition flex items-center gap-1 shrink-0"
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-md transition transform active:scale-95 flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-400/40"
                 >
                   <span>＋ 畝を追加</span>
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {(detailPlot.beds || []).length === 0 ? (
-                  <div className="text-center py-6 text-gray-400 font-medium bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-                    畝が登録されていません。「＋ 畝を追加」ボタンで最下部に追加できます。
-                  </div>
-                ) : (
-                  (detailPlot.beds || []).map((bed, bIdx) => {
-                    // 生徒が登録した品種・最新記録
-                    const studentCrop = bed.crop_name || bed.latest_record?.notes?.match(/【(.*?)】/)?.[1];
-                    const hasRecord = !!bed.latest_record;
-                    const displayBedNumber = bIdx + 1; // 上から順に 1, 2, 3... 自動配番！
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {(detailPlot.beds || []).filter(b => b.status !== "archived").map((bed, bIdx) => {
+                  const displayNum = bed.bed_number || bIdx + 1;
+                  const isSelected = selectedBedForRecords?.id === bed.id;
 
-                    return (
-                      <div
-                        key={bed.id || bIdx}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("bed_drag_index", String(bIdx));
-                        }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const fromIdx = Number(e.dataTransfer.getData("bed_drag_index"));
-                          if (isNaN(fromIdx) || fromIdx === bIdx) return;
-                          
-                          reorderBedsInPlot(detailPlot.id, fromIdx, bIdx);
-
-                          const updatedBeds = [...(detailPlot.beds || [])];
-                          const [moved] = updatedBeds.splice(fromIdx, 1);
-                          updatedBeds.splice(bIdx, 0, moved);
-
-                          setDetailPlot({ ...detailPlot, beds: updatedBeds });
-                          setToastMessage(`✨ 畝を並び替えました (上から #${fromIdx + 1} ➔ #${bIdx + 1})`);
-                          setShowToast(true);
-                        }}
-                        className="p-3 bg-gray-50/90 hover:bg-emerald-50/60 rounded-2xl border border-gray-200 transition space-y-2 cursor-pointer group shadow-2xs"
-                        onClick={() => {
-                          if (hasRecord) {
-                            setToastMessage(`📖 畝 #${displayBedNumber} の生徒最新登録記録を表示中`);
-                            setShowToast(true);
-                          }
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            {/* ドラッグつまみハンドル ≡ */}
-                            <span
-                              className="text-gray-400 hover:text-emerald-700 font-black text-sm px-1 cursor-grab active:cursor-grabbing"
-                              title="つまんで上下に並び替え"
-                            >
-                              ≡
+                  return (
+                    <div
+                      key={bed.id || bIdx}
+                      className="p-3.5 rounded-2xl border border-gray-200 bg-gray-50/70 hover:bg-white hover:border-emerald-300 transition space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-xs bg-emerald-100 text-emerald-950 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                            畝 #{displayNum}
+                          </span>
+                          <span className="font-black text-xs text-gray-800">
+                            品種: {bed.crop_name || "未確定 🌱"}
+                          </span>
+                          {bed.status === "completed_pending" && (
+                            <span className="text-[10px] bg-amber-500 text-white font-black px-2 py-0.5 rounded-full animate-pulse">
+                              🏆 収穫完了（要承認）
                             </span>
-
-                            {/* 画面上の表示ナンバリング: 上から 1, 2, 3... */}
-                            <span className="font-black text-emerald-950 bg-white px-2.5 py-0.5 rounded-lg border border-gray-300 text-xs shadow-2xs">
-                              畝 #{displayBedNumber}
-                            </span>
-
-                            {/* 生徒が登録した品種 (初期設定なし) */}
-                            <span className={`font-bold px-2.5 py-0.5 rounded-full text-xs ${studentCrop ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-gray-100 text-gray-500 font-normal"}`}>
-                              品種: {studentCrop || "未登録 🌱"}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            {hasRecord && (
-                              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                                📖 生徒記録あり (タップで表示)
-                              </span>
-                            )}
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await deleteBedFromPlot(detailPlot.id, bed.id);
-                                // リアルタイム完全削除
-                                const updatedBeds = (detailPlot.beds || []).filter((b) => b.id !== bed.id);
-                                setDetailPlot({ ...detailPlot, beds: updatedBeds });
-                                setToastMessage(`畝 #${displayBedNumber} を削除しました`);
-                                setShowToast(true);
-                              }}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 text-xs font-bold px-2 py-1 rounded transition border border-red-200 bg-white"
-                            >
-                              削除
-                            </button>
-                          </div>
+                          )}
                         </div>
 
-                        {/* タップ閲覧: 生徒の最新登録情報表示 */}
-                        {bed.latest_record && (() => {
-                          let cleanNotes = bed.latest_record.notes || "";
-                          let imgUrl = bed.latest_record.image_url || bed.latest_record.photo_url;
-                          const match = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
-                          if (match) {
-                            imgUrl = match[1];
-                            cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
-                          }
-                          return (
-                            <div className="bg-white p-3 rounded-xl border border-gray-200 text-xs text-gray-800 space-y-1 shadow-2xs">
-                              <div className="flex justify-between items-center text-gray-400 font-bold text-[10px]">
-                                <span>📅 最新記録投稿日: {bed.latest_record.date}</span>
-                                {bed.latest_record.harvest_amount ? (
-                                  <span className="text-emerald-700 font-extrabold">収穫量: {bed.latest_record.harvest_amount}</span>
-                                ) : null}
-                              </div>
-                              <div className="flex gap-2 items-start pt-1">
-                                {imgUrl && (
-                                  <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 border border-emerald-200 shadow-2xs">
-                                    <img src={imgUrl} alt="現場写真" className="w-full h-full object-cover" />
-                                  </div>
-                                )}
-                                <p className="font-semibold text-gray-900 leading-relaxed flex-1">
-                                  {cleanNotes}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })()}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedBedForRecords(null);
+                              } else {
+                                setSelectedBedForRecords(bed);
+                                fetchBedRecords(detailPlot.code, displayNum, bed.id, detailPlot.student_name, bed.latest_record, bed.crop_name);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
+                          >
+                            {isSelected ? "▲ 記録を閉じる" : "📖 観察記録を見る"}
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })
-                )}
+
+                      {/* 観察記録タイムライン */}
+                      {isSelected && (
+                        <div className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-2 animate-fade-in text-xs">
+                          <span className="font-black text-emerald-950 block">
+                            📖 畝 #{displayNum} の生徒観察記録タイムライン ({bedRecords.length}件)
+                          </span>
+                          {isLoadingRecords ? (
+                            <p className="text-gray-400 py-2">読み込み中...</p>
+                          ) : bedRecords.length === 0 ? (
+                            <p className="text-gray-400 py-2">まだ記録はありません。</p>
+                          ) : (
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {bedRecords.map((r, rIdx) => {
+                                const rawNotes = r.notes || r.content || "";
+                                let cleanNotes = rawNotes;
+                                let imgUrl = r.photo_url || r.image_url;
+                                const imgMatch = rawNotes.match(/\[IMG:([\s\S]+?)\]/);
+                                if (imgMatch) {
+                                  imgUrl = imgMatch[1];
+                                  cleanNotes = rawNotes.replace(/\[IMG:[\s\S]+?\]/g, "").trim();
+                                }
+
+                                return (
+                                  <div
+                                    key={`${r.id || 'rec'}_${rIdx}`}
+                                    className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs space-y-2 hover:border-emerald-300 transition"
+                                  >
+                                    <div className="flex justify-between items-center text-[10px] text-gray-500 font-bold border-b border-gray-100 pb-1.5">
+                                      <span className="text-emerald-950 flex items-center gap-1 font-black">
+                                        <span>📅</span>
+                                        <span>{r.date}</span>
+                                      </span>
+                                      <div className="flex items-center gap-1.5">
+                                        {r.harvest_amount && (
+                                          <span className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-black">
+                                            収穫: {r.harvest_amount}
+                                          </span>
+                                        )}
+                                        {r.growth_stage && (
+                                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.2 rounded font-bold">
+                                            {r.growth_stage}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-3 items-start">
+                                      {imgUrl && (
+                                        <div
+                                          onClick={() => window.open(imgUrl, "_blank")}
+                                          className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-xs cursor-pointer hover:opacity-90 hover:scale-105 transition-transform bg-gray-100 flex items-center justify-center group relative"
+                                          title="クリックして拡大表示"
+                                        >
+                                          <img
+                                            src={imgUrl}
+                                            alt="観察記録写真"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              // 万が一画像リンク切れの場合
+                                              (e.target as HTMLElement).style.display = 'none';
+                                            }}
+                                          />
+                                          <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[8px] px-1 rounded font-bold opacity-0 group-hover:opacity-100 transition">
+                                            🔍
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      <div className="flex-1 space-y-1">
+                                        {r.work_types && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {(Array.isArray(r.work_types) ? r.work_types : [r.work_types]).map((wt: string, wIdx: number) => (
+                                              <span key={wIdx} className="text-[9px] bg-emerald-100 text-emerald-900 font-bold px-1.5 py-0.2 rounded">
+                                                {wt}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                        <p className="font-bold text-gray-800 text-xs leading-relaxed whitespace-pre-wrap">
+                                          {cleanNotes || "（写真のみ投稿）"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex justify-end pt-3 border-t">
+            {/* フッター */}
+            <div className="flex justify-between items-center pt-3 border-t">
               <button
-                onClick={() => setDetailPlot(null)}
-                className="px-6 py-2.5 app-accent-btn font-extrabold rounded-xl shadow-md text-xs"
+                type="button"
+                onClick={() => {
+                  setArchivedModalTargetPlotId(detailPlot.id);
+                  setShowArchivedModal(true);
+                }}
+                className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-black rounded-xl text-xs cursor-pointer shadow-2xs"
               >
-                完了 (画面を閉じる)
+                📦 この区画の過去の作物を見る
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDetailPlot(null)}
+                className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black rounded-xl text-xs shadow-md cursor-pointer"
+              >
+                完了 (閉じる)
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 🌟 過去の作物・アーカイブ閲覧モーダル 🌟 */}
+      <ArchivedCropsModal
+        isOpen={showArchivedModal}
+        onClose={() => {
+          setShowArchivedModal(false);
+          setArchivedModalTargetPlotId(null);
+        }}
+        archivedBeds={
+          archivedModalTargetPlotId
+            ? (plots.find((p) => p.id === archivedModalTargetPlotId)?.beds || []).filter((b) => b.status === "archived")
+            : plots.flatMap((p) => (p.beds || []).filter((b) => b.status === "archived"))
+        }
+        records={records}
+        isTeacher={true}
+        onUnarchive={(bedId) => {
+          const targetPlot = plots.find((p) => (p.beds || []).some((b) => b.id === bedId));
+          if (targetPlot) {
+            unarchiveBed(targetPlot.id, bedId);
+            setToastMessage("↺ アーカイブから畝を通常状態に復帰しました");
+            setShowToast(true);
+          }
+        }}
+      />
+
+      {/* 🌟 収穫完了確認＆承認・差し戻しモーダル 🌟 */}
+      <BedApprovalModal
+        isOpen={!!approvalModalPlot && !!approvalModalBed}
+        onClose={() => {
+          setApprovalModalPlot(null);
+          setApprovalModalBed(null);
+        }}
+        plot={approvalModalPlot}
+        bed={approvalModalBed}
+        onApprove={async (plotId, bedId) => {
+          await approveAndAddNewBed(plotId, bedId, "未確定 🌱", "2026年 秋冬");
+          setToastMessage("✅ 収穫完了を承認し、新しい畝を準備しました！");
+          setShowToast(true);
+          setApprovalModalPlot(null);
+          setApprovalModalBed(null);
+          setDetailPlot(null);
+        }}
+        onReject={async (plotId, bedId, reason) => {
+          await rejectBedCompletion(plotId, bedId, reason);
+          setToastMessage("↩️ 収穫完了報告を差し戻しました。生徒画面に通知されます。");
+          setShowToast(true);
+          setApprovalModalPlot(null);
+          setApprovalModalBed(null);
+        }}
+      />
     </div>
   );
 }

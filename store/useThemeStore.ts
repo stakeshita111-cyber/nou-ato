@@ -19,6 +19,10 @@ export interface ThemeSettings {
   // 4. アプリ固有の表示形式
   dateFormat: 'slash' | 'japanese'; // 「2026/08/11」 or 「8月11日(火)」
   numberFormat: 'raw' | 'comma' | 'unit'; // 「1500」 or 「1,500」 or 「1,500g」
+
+  // 5. 機能・画面表示ON/OFF設定
+  showPaymentsMenu: boolean;     // 講師画面: 売上画面メニューの表示ON/OFF
+  showStudentTalkTab: boolean;   // 生徒画面: 相談・質問タブの表示ON/OFF
 }
 
 interface ThemeState {
@@ -38,6 +42,8 @@ const defaultSettings: ThemeSettings = {
   buttonPadding: 'normal',
   dateFormat: 'japanese',
   numberFormat: 'unit',
+  showPaymentsMenu: true,
+  showStudentTalkTab: true,
 };
 
 export const useThemeStore = create<ThemeState>()(

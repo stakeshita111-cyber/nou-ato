@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useStudentDashboard } from "@/hooks/useStudentDashboard";
 import { useEvents } from "@/hooks/useEvents";
+import { useThemeStore } from "@/store/useThemeStore";
 import TaskSlider from "@/components/student/TaskSlider";
 import StudentTalkView from "@/components/student/StudentTalkView";
 import StudentSkillBoardView from "@/components/student/StudentSkillBoardView";
@@ -17,6 +18,7 @@ import EventCalendar from "@/components/ui/EventCalendar";
 
 export default function StudentQuestsPage() {
   const router = useRouter();
+  const { settings } = useThemeStore();
   const {
     user,
     tasks,
@@ -208,7 +210,7 @@ export default function StudentQuestsPage() {
         )}
 
         {/* 4. 相談 タブ */}
-        {activeTab === "talk" && (
+        {activeTab === "talk" && settings.showStudentTalkTab !== false && (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
             <StudentTalkView journals={journals} studentName={userAccountName} />
           </div>
@@ -282,19 +284,21 @@ export default function StudentQuestsPage() {
           <span className="text-[10px] font-bold mt-0.5">カレンダー</span>
         </button>
 
-        {/* 🌟 4. 相談 🌟 */}
-        <button
-          onClick={() => setActiveTab("talk")}
-          className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${
-            activeTab === "talk" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          <span className="text-[10px] font-bold mt-0.5">相談</span>
-        </button>
+        {/* 🌟 4. 相談 (ON時のみ表示) 🌟 */}
+        {settings.showStudentTalkTab !== false && (
+          <button
+            onClick={() => setActiveTab("talk")}
+            className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${
+              activeTab === "talk" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span className="text-[10px] font-bold mt-0.5">相談</span>
+          </button>
+        )}
 
         {/* 🌟 5. 成長 🌟 */}
         <button

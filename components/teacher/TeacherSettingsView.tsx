@@ -448,6 +448,86 @@ export default function TeacherSettingsView() {
             </div>
           </div>
 
+          {/* 11. 講師画面: 売上管理メニューの表示 */}
+          <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
+            <div>
+              <span className="text-sm font-black text-gray-900 block">💳 講師画面: 売上管理メニューの表示</span>
+              <span className="text-[11px] text-gray-500 font-medium">左サイドバーの「売上」メニューの表示・非表示を切り替えます</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettings({ showPaymentsMenu: true });
+                  setToastMessage("💳 売上管理メニューを「表示 (ON)」に設定しました");
+                  setShowToast(true);
+                }}
+                className={`px-3.5 py-2 rounded-xl border transition ${
+                  settings.showPaymentsMenu !== false
+                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                表示 (ON)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettings({ showPaymentsMenu: false });
+                  setToastMessage("💳 売上管理メニューを「非表示 (OFF)」に設定しました");
+                  setShowToast(true);
+                }}
+                className={`px-3.5 py-2 rounded-xl border transition ${
+                  settings.showPaymentsMenu === false
+                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                非表示 (OFF)
+              </button>
+            </div>
+          </div>
+
+          {/* 12. 生徒画面: 相談・質問機能の表示 */}
+          <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
+            <div>
+              <span className="text-sm font-black text-gray-900 block">💬 生徒画面: 相談・質問機能（Talk）の表示</span>
+              <span className="text-[11px] text-gray-500 font-medium">生徒画面下部ナビゲーションの「相談」タブの表示・非表示を切り替えます</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettings({ showStudentTalkTab: true });
+                  setToastMessage("💬 生徒の相談画面を「表示 (ON)」に設定しました");
+                  setShowToast(true);
+                }}
+                className={`px-3.5 py-2 rounded-xl border transition ${
+                  settings.showStudentTalkTab !== false
+                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                表示 (ON)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettings({ showStudentTalkTab: false });
+                  setToastMessage("💬 生徒の相談画面を「非表示 (OFF)」に設定しました");
+                  setShowToast(true);
+                }}
+                className={`px-3.5 py-2 rounded-xl border transition ${
+                  settings.showStudentTalkTab === false
+                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                非表示 (OFF)
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* 下部初期化ボタン */}

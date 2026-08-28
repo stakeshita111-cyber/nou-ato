@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
+import SlideSettingsModal, { SlideSettings } from "@/components/teacher/SlideSettingsModal";
 
 interface JournalItem {
   id: string;
@@ -91,6 +92,34 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [showIndexModal, setShowIndexModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  // 🌟【新機能】スライド表示設定 State (各生徒直近3回分・ソート順・速度) 🌟
+  const [slideSettings, setSlideSettings] = useState<SlideSettings>({
+    sortBy: "newest",
+    limitPerStudent: 3, // 各生徒 直近3回分 (デフォルト)
+    speed: "normal",
+  });
+  const [showSlideSettingsModal, setShowSlideSettingsModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nouato_slide_settings");
+      if (saved) {
+        try {
+          setSlideSettings(JSON.parse(saved));
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  const handleSaveSlideSettings = (newSettings: SlideSettings) => {
+    setSlideSettings(newSettings);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nouato_slide_settings", JSON.stringify(newSettings));
+    }
+    setToastMessage("⚙️ スライド表示設定を更新・適用しました！");
+    setShowToast(true);
+  };
 
   // 🌟【新スライド制御】requestAnimationFrame による精密速度＆逆方向スライド制御 🌟
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -181,8 +210,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     }
   };
 
-  // 🌟【実データ完全連動】下部自動スライド用: 生徒の最新投稿（最新順ソート ＆ 日付カード自動挿入 ＆ 2行化） 🌟
-  const fetchCropRecords = async () => {
+  // 🌟【実データ完全連動】下部自動スライド用: 生徒の最新投稿（各生徒直近3回分抽出 ＆ ソート並べ替え ＆ 2行化） 🌟
+  const fetchCropRecords = useCallback(async () => {
     try {
       // 1. crop_records から生徒の観察ノート・現場報告を取得
       const { data: recData } = await supabase
@@ -333,13 +362,66 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         );
       }
 
-      // 🌟【要件: 最新投稿順ソート ＆ 2行化 ＆ 同一カード内への画像埋め込み】🌟
-      allRecords.sort((a, b) => b.timestamp - a.timestamp);
+      // 🌟【要件: 各生徒の直近N回分のみに厳密制限 (デフォルト: 直近3回分)】🌟
+      const limit = slideSettings.limitPerStudent;
+      let filteredByStudentRecords: SlideItemRecord[] = [];
+
+      if (limit > 0) {
+        // 生徒ごとにグルーピング
+        const studentMap: { [name: string]: SlideItemRecord[] } = {};
+        allRecords.forEach((r) => {
+          if (!studentMap[r.studentName]) {
+            studentMap[r.studentName] = [];
+          }
+          studentMap[r.studentName].push(r);
+        });
+
+        // 各生徒の投稿をタイムスタンプ降順にして直近N件のみ抽出
+        Object.values(studentMap).forEach((list) => {
+          list.sort((a, b) => b.timestamp - a.timestamp);
+          filteredByStudentRecords.push(...list.slice(0, limit));
+        });
+      } else {
+        filteredByStudentRecords = [...allRecords];
+      }
+
+      // 🌟【要件: ソート・並べ替えの適用】🌟
+      const sortBy = slideSettings.sortBy;
+      filteredByStudentRecords.sort((a, b) => {
+        if (sortBy === "oldest") {
+          return a.timestamp - b.timestamp;
+        }
+        if (sortBy === "studentName") {
+          const nameCmp = a.studentName.localeCompare(b.studentName, "ja");
+          if (nameCmp !== 0) return nameCmp;
+          return b.timestamp - a.timestamp;
+        }
+        if (sortBy === "hasImage") {
+          const aImg = a.imageUrl ? 1 : 0;
+          const bImg = b.imageUrl ? 1 : 0;
+          if (bImg !== aImg) return bImg - aImg;
+          return b.timestamp - a.timestamp;
+        }
+        if (sortBy === "hasHarvest") {
+          const aH = a.harvestAmount ? 1 : 0;
+          const bH = b.harvestAmount ? 1 : 0;
+          if (bH !== aH) return bH - aH;
+          return b.timestamp - a.timestamp;
+        }
+        if (sortBy === "isQuestion") {
+          const aQ = a.title.includes("相談") || a.title.includes("質問") ? 1 : 0;
+          const bQ = b.title.includes("相談") || b.title.includes("質問") ? 1 : 0;
+          if (bQ !== aQ) return bQ - aQ;
+          return b.timestamp - a.timestamp;
+        }
+        // デフォルト: newest (最新順)
+        return b.timestamp - a.timestamp;
+      });
 
       // 2行（縦2段の列ペア）に整理
       const cols: SlideItemRecord[][] = [];
-      for (let i = 0; i < allRecords.length; i += 2) {
-        cols.push([allRecords[i], allRecords[i + 1]].filter(Boolean));
+      for (let i = 0; i < filteredByStudentRecords.length; i += 2) {
+        cols.push([filteredByStudentRecords[i], filteredByStudentRecords[i + 1]].filter(Boolean));
       }
 
       // ループのスムーズさ確保のため、少数の場合は必要十分な長さに複製
@@ -353,7 +435,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       console.error("fetchCropRecords error:", err);
       setSlideColumns([]);
     }
-  };
+  }, [slideSettings]);
 
   useEffect(() => {
     fetchJournals(true);
@@ -390,9 +472,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         window.removeEventListener("nouato_sync_event", handleSync);
       }
     };
-  }, []);
+  }, [fetchCropRecords]);
 
-  // 🌟【要件: 30%低速化 & ホバー一時停止 & 左側ホバーで逆スライド】🌟
+  // 🌟【要件: 30%低速化 & ホバー一時停止 & 左側ホバーで逆スライド & 設定連動】🌟
   useEffect(() => {
     let animId: number;
     let lastTime = performance.now();
@@ -407,16 +489,20 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         const totalTrackWidth = trackRef.current.scrollWidth;
         const halfWidth = totalTrackWidth / 2;
 
-        if (halfWidth > 50) {
+        let baseSpeed = 0.65;
+        if (slideSettings.speed === "slow") baseSpeed = 0.35;
+        if (slideSettings.speed === "fast") baseSpeed = 1.1;
+        if (slideSettings.speed === "paused") baseSpeed = 0;
+
+        if (halfWidth > 50 && baseSpeed > 0) {
           if (slideModeRef.current === "forward") {
-            // スライド速度を従来より30%低速化 (~0.65px / frame)
-            scrollPosRef.current += 0.65 * delta;
+            scrollPosRef.current += baseSpeed * delta;
             if (scrollPosRef.current >= halfWidth) {
               scrollPosRef.current -= halfWidth;
             }
           } else if (slideModeRef.current === "reverse") {
-            // 逆方向スライド (左側にマウスがある時のみ: ~0.95px / frame)
-            scrollPosRef.current -= 0.95 * delta;
+            // 逆方向スライド (左側にマウスがある時のみ)
+            scrollPosRef.current -= (baseSpeed * 1.5) * delta;
             if (scrollPosRef.current < 0) {
               scrollPosRef.current += halfWidth;
             }
@@ -432,7 +518,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, [slideColumns.length]);
+  }, [slideColumns.length, slideSettings.speed]);
 
   // マウス位置判定ハンドラー
   const handleSliderMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -716,7 +802,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       {/* 🌟【新機能】下部: 生徒からの「作業記録の報告」自動流動スライドカード (2行表示・最新順・日付カード付き・30%低速・左側ホバーで逆再生) 🌟 */}
       <div className="pt-6 border-t border-emerald-100/60 space-y-3">
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-wrap items-center justify-between px-1 gap-2">
           <div className="flex items-center space-x-2">
             <span className="text-base">🌾</span>
             <h3 className="font-black text-gray-900 text-sm">受講生の最新作業・観察記録</h3>
@@ -725,24 +811,49 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             </span>
           </div>
 
-          <div className="flex items-center space-x-2 text-[11px] font-bold">
-            {activeSlideStatus === "reverse" && (
-              <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
-                <span>◀◀</span>
-                <span>逆スライド中 (左側ホバー)</span>
+          <div className="flex items-center space-x-2">
+            {/* ⚙️ スライド表示設定ボタン */}
+            <button
+              type="button"
+              onClick={() => setShowSlideSettingsModal(true)}
+              className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-950 border border-emerald-300 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <span>⚙️ スライド設定</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">
+                {slideSettings.sortBy === "newest"
+                  ? "最新順"
+                  : slideSettings.sortBy === "studentName"
+                  ? "生徒順"
+                  : slideSettings.sortBy === "hasImage"
+                  ? "写真優先"
+                  : slideSettings.sortBy === "hasHarvest"
+                  ? "収穫優先"
+                  : slideSettings.sortBy === "isQuestion"
+                  ? "質問優先"
+                  : "古い順"}
+                {slideSettings.limitPerStudent > 0 ? ` (各生徒${slideSettings.limitPerStudent}件)` : " (全件)"}
               </span>
-            )}
-            {activeSlideStatus === "paused" && (
-              <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
-                <span>⏸</span>
-                <span>一時停止中</span>
-              </span>
-            )}
-            {activeSlideStatus === "forward" && (
-              <span className="text-gray-400 font-medium hidden sm:inline">
-                💡 マウスホバーで一時停止 / 左端に置くと逆再生
-              </span>
-            )}
+            </button>
+
+            <div className="hidden sm:flex items-center space-x-2 text-[11px] font-bold">
+              {activeSlideStatus === "reverse" && (
+                <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
+                  <span>◀◀</span>
+                  <span>逆スライド中 (左側ホバー)</span>
+                </span>
+              )}
+              {activeSlideStatus === "paused" && (
+                <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                  <span>⏸</span>
+                  <span>一時停止中</span>
+                </span>
+              )}
+              {activeSlideStatus === "forward" && (
+                <span className="text-gray-400 font-medium">
+                  💡 ホバーで停止 / 左端で逆再生
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -902,6 +1013,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           </div>
         </div>
       )}
+
+      {/* 🌟 スライド表示設定モーダル 🌟 */}
+      <SlideSettingsModal
+        isOpen={showSlideSettingsModal}
+        onClose={() => setShowSlideSettingsModal(false)}
+        settings={slideSettings}
+        onSaveSettings={handleSaveSlideSettings}
+      />
     </div>
   );
 }

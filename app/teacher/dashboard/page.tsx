@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFarmManager } from "@/hooks/useFarmManager";
 import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
@@ -19,6 +20,17 @@ import MobilePhonePreviewModal from "@/components/common/MobilePhonePreviewModal
 
 export default function TeacherDashboardPage() {
   const router = useRouter();
+  const { plots } = useFarmManager();
+
+  // 🌟 畑管理の未承認収穫完了報告（要承認）の総数を算出 (LINE風バッジ用) 🌟
+  let pendingApprovalCount = 0;
+  plots.forEach((p) => {
+    (p.beds || []).forEach((b) => {
+      if (b.status === "completed_pending") {
+        pendingApprovalCount++;
+      }
+    });
+  });
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [showTaskFormImmediate, setShowTaskFormImmediate] = useState(false);
@@ -29,11 +41,20 @@ export default function TeacherDashboardPage() {
   const [showMobilePreviewModal, setShowMobilePreviewModal] = useState(false);
   const [targetPlotCode, setTargetPlotCode] = useState<string | undefined>(undefined);
   const [targetFarmId, setTargetFarmId] = useState<string | undefined>(undefined);
+  const [targetApprovalBedId, setTargetApprovalBedId] = useState<string | undefined>(undefined);
 
   const handleNavigateToFarm = (plotCode?: string, farmId?: string) => {
     setTargetPlotCode(plotCode);
     setTargetFarmId(farmId);
     setActiveMenu("farm");
+  };
+
+  const handleOpenApprovalFromNotification = (plotCode: string, bedId?: string) => {
+    setTargetPlotCode(plotCode);
+    setTargetApprovalBedId(bedId);
+    setActiveMenu("farm");
+    setToastMessage(`🎯 区画 ${plotCode} の収穫完了確認画面へ移動しました`);
+    setShowToast(true);
   };
 
   // 講師ロール（role === 'teacher'）権限の厳格チェック
@@ -122,6 +143,7 @@ export default function TeacherDashboardPage() {
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
         onOpenMobilePreview={() => setShowMobilePreviewModal(true)}
+        pendingApprovalCount={pendingApprovalCount}
       />
 
       {/* 2. メインエリア */}
@@ -149,6 +171,7 @@ export default function TeacherDashboardPage() {
           }
           onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          
         />
 
         {/* ページコンテンツ */}
@@ -168,6 +191,7 @@ export default function TeacherDashboardPage() {
             <TeacherFarmCanvasView
               initialPlotCode={targetPlotCode}
               initialFarmId={targetFarmId}
+              initialApprovalBedId={targetApprovalBedId}
             />
           )}
 

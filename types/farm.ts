@@ -18,6 +18,8 @@ export type CropRecord = {
   created_at: string;
 };
 
+export type BedStatus = "active" | "completed_pending" | "archived";
+
 export type FarmBed = {
   id: string;
   plot_id: string;
@@ -30,6 +32,12 @@ export type FarmBed = {
   is_updated: boolean;
   updated_at?: string;
   latest_record?: CropRecord;
+  status?: BedStatus;
+  season?: string;
+  harvested_at?: string;
+  completion_notes?: string;
+  total_harvest?: string;
+  completion_image_url?: string;
 };
 
 export type FarmPlot = {
