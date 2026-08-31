@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { FarmPlot, FarmBed, CropRecord, Farm } from "@/types/farm";
+import { FarmPlot, FarmBed, CropRecord, Farm, BedStatus } from "@/types/farm";
 import { supabase } from "@/lib/supabase";
 
 export const INITIAL_FARMS_LIST: Farm[] = [
@@ -299,56 +299,71 @@ export function useFarmManager() {
         const isPlotAssigned = !plot.is_vacant && (!!plot.student_id || !!plot.student_name);
 
         // DB (farm_beds) から該当区画のベッドを取得
-        const dbBedMap = new Map<number, any>();
-        const dbBedNums: number[] = [];
+        const plotArchivedBeds: FarmBed[] = [];
+        const rawActiveBeds: any[] = [];
 
         (dbBeds || []).forEach((b: any) => {
-          if (b.plot_id === plot.id || b.id?.startsWith(`plot_cell_${plotCode}_bed_`)) {
-            const num = parseInt(b.bed_number);
-            if (!isNaN(num)) {
-              if (b.status !== "archived") {
-                dbBedNums.push(num);
-              }
-              dbBedMap.set(num, b);
-            }
+          const isBelong = b.plot_id === plot.id || b.id?.startsWith(`plot_cell_${plotCode}_bed_`);
+          if (!isBelong) return;
+
+          const isArchived = b.status === "archived" || b.id?.startsWith("archived_");
+          if (isArchived) {
+            plotArchivedBeds.push({
+              id: b.id,
+              plot_id: plot.id,
+              bed_number: parseInt(b.bed_number) || 1,
+              crop_name: b.crop_name || "過去の作物",
+              status: "archived",
+              season: b.season || "2026年 春夏",
+              harvested_at: b.harvested_at,
+              completion_notes: b.completion_notes,
+              total_harvest: b.total_harvest,
+              completion_image_url: b.completion_image_url,
+              student_id: b.student_id,
+              student_name: b.student_name,
+              is_updated: false,
+            });
+          } else {
+            rawActiveBeds.push(b);
           }
         });
 
-        // 🌟 DBに登録されている最大番号を正確に反映 (4本なら4本、7本なら7本、8本なら8本) 🌟
-        const bedCount = dbBedNums.length > 0 ? Math.max(...dbBedNums) : 7;
+        // 🌟 稼働中ベッドを bed_number 順に整列 🌟
+        rawActiveBeds.sort((a, b) => (parseInt(a.bed_number) || 0) - (parseInt(b.bed_number) || 0));
+
+        // 🌟 登録されているベッド数を正確に反映（最低4本） 🌟
+        const activeCount = rawActiveBeds.length > 0 ? Math.max(rawActiveBeds.length, 4) : 4;
         const bedList: FarmBed[] = [];
-        for (let bedNum = 1; bedNum <= bedCount; bedNum++) {
-          const dbB = dbBedMap.get(bedNum);
+
+        for (let bedNum = 1; bedNum <= activeCount; bedNum++) {
+          const dbB = rawActiveBeds[bedNum - 1];
           const bedId = `plot_cell_${plotCode}_bed_${bedNum}`;
           const pendingData = pendingApprovalMap.get(`${plotCode}_${bedNum}`);
 
-          let status: any = dbB?.status || "active";
-          let total_harvest = dbB?.total_harvest || undefined;
-          let completion_notes = dbB?.completion_notes || undefined;
-          let completion_image_url = dbB?.completion_image_url || undefined;
-          let season = dbB?.season || "2026年 春夏";
-
-          // 未承認完了報告があれば適用
+          let status: BedStatus = "active";
+          if (dbB?.status === "completed_pending" || dbB?.status === "rejected") {
+            status = dbB.status;
+          }
           if (pendingData) {
             status = "completed_pending";
-            if (pendingData.total_harvest) total_harvest = pendingData.total_harvest;
-            if (pendingData.completion_notes) completion_notes = pendingData.completion_notes;
-            if (pendingData.completion_image_url) completion_image_url = pendingData.completion_image_url;
           }
 
-          // 🌟 過去の全観察記録から「品種名」が明記された最も新しい入力を探索 🌟
+          let total_harvest = pendingData?.total_harvest || dbB?.total_harvest || undefined;
+          let completion_notes = pendingData?.completion_notes || dbB?.completion_notes || undefined;
+          let completion_image_url = pendingData?.completion_image_url || dbB?.completion_image_url || undefined;
+          let season = dbB?.season || "2026年 秋冬";
+
+          // 最新の観察記録を取得 (該当スロットIDまたは元のdbB.id)
           let latest: CropRecord | undefined = undefined;
           let extractedCrop: string | undefined = undefined;
 
           if (isPlotAssigned) {
             const bedAllRecs = formattedRecords
-              .filter((r) => r.bed_id === bedId || ((r as any).plot_code === plotCode && r.bed_id?.endsWith(`_${bedNum}`)))
+              .filter((r) => r.bed_id === bedId || (dbB?.id && r.bed_id === dbB.id))
               .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
             if (bedAllRecs.length > 0) {
               latest = bedAllRecs[0];
-
-              // 過去の記録を最新順に走査し、生徒が一度でも入力した品種名を確実に引き継ぐ
               for (const rec of bedAllRecs) {
                 const tagMatch = rec.notes?.match(/【(.*?)】/);
                 if (tagMatch && tagMatch[1]?.trim()) {
@@ -362,14 +377,9 @@ export function useFarmManager() {
             }
           }
 
-          // 🌟 生徒が品種を一度も登録していなければ「未確定 🌱」 🌟
-          let finalCropName = extractedCrop;
-          if (!finalCropName) {
-            if (dbB?.crop_name && dbB.crop_name !== "トマト" && dbB.crop_name !== "未定 🌱" && dbB.crop_name !== "未設定 🌱" && dbB.crop_name !== "未確定 🌱") {
-              finalCropName = dbB.crop_name;
-            } else {
-              finalCropName = "未確定 🌱";
-            }
+          let finalCropName = extractedCrop || dbB?.crop_name || "未確定 🌱";
+          if (finalCropName === "トマト" && !extractedCrop && (!dbB?.crop_name || dbB.crop_name === "トマト")) {
+            finalCropName = "未確定 🌱";
           }
 
           bedList.push({
@@ -393,7 +403,7 @@ export function useFarmManager() {
 
         return {
           ...plot,
-          beds: bedList,
+          beds: [...bedList, ...plotArchivedBeds],
         };
       });
 
@@ -469,20 +479,23 @@ export function useFarmManager() {
         if (!plot || plot.id.startsWith("plot_placeholder_")) continue;
         const isVac = Boolean(plot.is_vacant);
         if (plot.beds && plot.beds.length > 0) {
-          for (let bIdx = 0; bIdx < plot.beds.length; bIdx++) {
-            const b = plot.beds[bIdx];
+          // 稼働中ベッドのみを抽出して整然と upsert
+          const activeOnlyBeds = plot.beds.filter(b => b.status !== "archived" && !b.id?.startsWith("archived_"));
+          for (let bIdx = 0; bIdx < activeOnlyBeds.length; bIdx++) {
+            const b = activeOnlyBeds[bIdx];
             const bedNumber = String(b.bed_number || bIdx + 1);
-            const bedId = b.id || `${plot.id}_bed_${bedNumber}`;
+            const plotCode = plot.code || "C3";
+            const bedId = `plot_cell_${plotCode}_bed_${bedNumber}`;
             bedsToUpsert.push({
               id: bedId,
               plot_id: plot.id,
               bed_number: bedNumber,
-              crop_name: b.crop_name || "トマト",
+              crop_name: b.crop_name || "未確定 🌱",
               student_id: isVac ? null : (plot.student_id || null),
               student_name: isVac ? null : (plot.student_name || null),
               progress_percent: b.progress_percent || 0,
               status: b.status || "active",
-              season: b.season || "2026年 春夏",
+              season: b.season || "2026年 秋冬",
               harvested_at: b.harvested_at || null,
               completion_notes: b.completion_notes || null,
               total_harvest: b.total_harvest || null,
@@ -533,7 +546,13 @@ export function useFarmManager() {
     const realtimeChannel = supabase
       .channel(channelName)
       .on("postgres_changes", { event: "*", schema: "public", table: "crop_records" }, () => reloadAllFromSupabase())
+      .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => reloadAllFromSupabase())
+      .on("postgres_changes", { event: "*", schema: "public", table: "farm_plots" }, () => reloadAllFromSupabase())
+      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => reloadAllFromSupabase())
       .subscribe();
+
+    const handleCustomSync = () => reloadAllFromSupabase();
+    window.addEventListener("nouato_sync_event", handleCustomSync);
 
     const handleStorageSync = (e: StorageEvent) => {
       if (e.key === "nouato_farm_plots") {
@@ -548,6 +567,7 @@ export function useFarmManager() {
       }
       supabase.removeChannel(realtimeChannel);
       window.removeEventListener("storage", handleStorageSync);
+      window.removeEventListener("nouato_sync_event", handleCustomSync);
     };
   }, [reloadAllFromSupabase]);
 
@@ -697,14 +717,21 @@ export function useFarmManager() {
     return newBed;
   };
 
-  // 🌟【修復】講師画面: 畝(ベッド)の完全削除 (復活防護) 🌟
+  // 🌟【修復】講師画面: 畝(ベッド)の完全削除 (復活防護 & 連番保持) 🌟
   const deleteBedFromPlot = async (plotId: string, bedId: string) => {
+    let renumberedActiveBeds: FarmBed[] = [];
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId) {
         const remainingBeds = plot.beds.filter((b) => b.id !== bedId);
+        const activeBeds = remainingBeds.filter(b => b.status !== "archived").map((b, idx) => ({
+          ...b,
+          bed_number: idx + 1,
+        }));
+        const archivedBeds = remainingBeds.filter(b => b.status === "archived");
+        renumberedActiveBeds = activeBeds;
         return {
           ...plot,
-          beds: remainingBeds,
+          beds: [...activeBeds, ...archivedBeds],
         };
       }
       return plot;
@@ -716,6 +743,10 @@ export function useFarmManager() {
     try {
       await supabase.from("crop_records").delete().eq("bed_id", bedId);
       await supabase.from("farm_beds").delete().eq("id", bedId);
+      // 残った稼働中ベッドの bed_number を DB にも同期
+      for (const b of renumberedActiveBeds) {
+        await supabase.from("farm_beds").update({ bed_number: String(b.bed_number) }).eq("id", b.id);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -1303,11 +1334,17 @@ export function useFarmManager() {
   const approveAndAddNewBed = async (
     plotId: string,
     bedId: string,
-    newCropName: string = "未設定 🌱",
+    newCropName: string = "未確定 🌱",
     newSeason: string = "2026年 秋冬"
   ) => {
     let targetBedNumber = 1;
     let targetPlotCode = "C3";
+    let oldCropName = "野菜";
+    let oldHarvest = "";
+    let oldNotes = "";
+    let oldImg = "";
+    let oldSeason = "2026年 春夏";
+    const todayStr = new Date().toLocaleDateString("ja-JP");
 
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId || plot.code === plotId) {
@@ -1316,10 +1353,16 @@ export function useFarmManager() {
           const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
           if (bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId)) {
             targetBedNumber = bed.bed_number;
-            // 🌟 該当スロット（畝番号）をそのまま新しい畝（未設定 🌱）にリセット！配列数・番号は一切不変！ 🌟
+            oldCropName = bed.crop_name || "野菜";
+            oldHarvest = bed.total_harvest || "";
+            oldNotes = bed.completion_notes || "";
+            oldImg = bed.completion_image_url || "";
+            oldSeason = bed.season || "2026年 春夏";
+
+            // 🌟 該当スロットをまっさらな新畝（未確定 🌱）にリセット切り替え！ 🌟
             return {
               ...bed,
-              crop_name: newCropName,
+              crop_name: "未確定 🌱",
               status: "active" as const,
               season: newSeason,
               progress_percent: 0,
@@ -1341,11 +1384,42 @@ export function useFarmManager() {
 
     setPlots(nextPlots);
 
-    // DBの farm_beds 該当スロットを更新
+    // 1. 完了した作物をアーカイブ用レコードとして DB (farm_beds) に永続保存
+    const archiveId = `archived_bed_${targetPlotCode}_${targetBedNumber}_${Date.now()}`;
+    try {
+      await supabase.from("farm_beds").insert([
+        {
+          id: archiveId,
+          plot_id: plotId,
+          bed_number: String(targetBedNumber),
+          crop_name: oldCropName,
+          status: "archived",
+          season: oldSeason,
+          harvested_at: todayStr,
+          total_harvest: oldHarvest || null,
+          completion_notes: oldNotes || null,
+          completion_image_url: oldImg || null,
+          progress_percent: 100,
+        },
+      ]);
+
+      // 🌟 過去の観察記録 (crop_records) の bed_id をアーカイブIDへ引越し！ 🌟
+      // これにより、新しい畝はまっさらな 0 件になり、過去ログは「過去の作物を見る」で完全に保持される！
+      await supabase
+        .from("crop_records")
+        .update({ bed_id: archiveId })
+        .eq("bed_id", `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`);
+
+      console.log(`📦 完了作物と過去記録をアーカイブに完全移行しました: ${archiveId}`);
+    } catch (e) {
+      console.warn("archive bed insert notice:", e);
+    }
+
+    // 2. 該当スロット (plot_cell_...) をまっさらな新畝としてリセット更新
     const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`;
     try {
       await supabase.from("farm_beds").update({
-        crop_name: newCropName,
+        crop_name: "未確定 🌱",
         status: "active",
         season: newSeason,
         progress_percent: 0,
@@ -1354,9 +1428,11 @@ export function useFarmManager() {
         total_harvest: null,
         completion_image_url: null,
       }).eq("id", exactBedId);
-    } catch (e) {}
+    } catch (e) {
+      console.warn("farm_beds reset update error:", e);
+    }
 
-    // journals テーブルの該当完了報告を承認済みに更新
+    // 3. journals テーブルの該当完了報告日誌を承認済みに更新
     try {
       await supabase
         .from("journals")
@@ -1368,24 +1444,24 @@ export function useFarmManager() {
     notifyBroadcast();
   };
 
-  // 🌟【要件】講師による差し戻し: 該当スロットを active に戻す 🌟
   const rejectBedCompletion = async (plotId: string, bedId: string, rejectReason: string = "内容の再確認をお願いします") => {
     let targetPlotCode = "C3";
     let targetBedNum = 1;
+    let targetStudentName = "竹下 翔";
 
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId || plot.code === plotId) {
         targetPlotCode = plot.code;
+        targetStudentName = plot.student_name || "竹下 翔";
         const nextBeds = (plot.beds || []).map((bed) => {
           const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
           if (bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId)) {
             targetBedNum = bed.bed_number;
             return {
               ...bed,
-              status: "active" as const,
-              completion_notes: undefined,
-              total_harvest: undefined,
-              completion_image_url: undefined,
+              status: "rejected" as const,
+              reject_reason: rejectReason,
+              completion_notes: rejectReason,
             };
           }
           return bed;
@@ -1397,29 +1473,18 @@ export function useFarmManager() {
 
     setPlots(nextPlots);
 
-    // DBの farm_beds を更新
+    // DBの farm_beds を status: "rejected" に更新
     const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNum}`;
     try {
       await supabase.from("farm_beds").update({
-        status: "active",
-        completion_notes: null,
-        total_harvest: null,
-        completion_image_url: null,
+        status: "rejected",
+        completion_notes: rejectReason,
       }).eq("id", exactBedId);
-    } catch (e) {}
+    } catch (e) {
+      console.warn("farm_beds reject update error:", e);
+    }
 
-    // 生徒への差し戻し通知日誌を insert
-    try {
-      await supabase.from("journals").insert([
-        {
-          content: `【差し戻し通知】区画 ${targetPlotCode} / 畝 ${targetBedNum} の収穫完了報告が講師より差し戻されました。\n理由: ${rejectReason}`,
-          role: "teacher",
-          is_approved: true,
-        },
-      ]);
-    } catch (e) {}
-
-    // 該当の完了日誌を承認済みに更新してバナーから消す
+    // 該当の完了報告日誌を承認済みに更新して講師バナーから消す
     try {
       await supabase
         .from("journals")

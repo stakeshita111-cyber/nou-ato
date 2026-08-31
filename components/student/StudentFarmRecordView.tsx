@@ -75,18 +75,16 @@ export default function StudentFarmRecordView({
   const unarchivedBeds = rawBeds.filter((b) => b.status !== "archived");
   const archivedBeds = rawBeds.filter((b) => b.status === "archived");
 
-  // 🌟 2. 稼働中ベッドを上から常に 1〜N 番（講師画面と完全一致）に正規化 🌟
-  const activeBeds: FarmBed[] = unarchivedBeds.map((b, idx) => {
-    const bedNum = idx + 1;
-    const bedId = b.id || `plot_cell_${plotCode}_bed_${bedNum}`;
-    const isPending = b.status === "completed_pending";
-    return {
+  // 🌟 2. 稼働中ベッドを bed_number 順に整列（講師画面と完全一致） 🌟
+  const activeBeds: FarmBed[] = [...unarchivedBeds]
+    .sort((a, b) => (Number(a.bed_number) || 0) - (Number(b.bed_number) || 0))
+    .map((b, idx) => ({
       ...b,
-      id: bedId,
-      bed_number: bedNum, // 🌟 講師画面と100%同一の 1〜7 番 🌟
-      status: isPending ? ("completed_pending" as const) : (b.status || "active"),
-    };
-  });
+      id: b.id || `plot_cell_${plotCode}_bed_${b.bed_number || idx + 1}`,
+      bed_number: Number(b.bed_number) || idx + 1,
+      status: b.status || "active",
+      crop_name: b.crop_name || "未確定 🌱",
+    }));
 
   // 生徒が選択中の対象畝ベッド (初期状態は未選択、クリック時のみ選択)
   const [selectedBedId, setSelectedBedId] = useState<string | null>(null);
@@ -186,11 +184,9 @@ export default function StudentFarmRecordView({
     try {
       if (updateBedCrop) {
         await updateBedCrop(currentBed.id, finalCrop);
+      } else {
+        await supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", currentBed.id);
       }
-      await supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", currentBed.id);
-      // 区画コード_畝番号でも更新
-      const numFromId = currentBed.bed_number;
-      await supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", `plot_cell_${plotCode}_bed_${numFromId}`);
     } catch (e) {
       console.warn("farm_beds crop update notice:", e);
     }
@@ -274,12 +270,7 @@ export default function StudentFarmRecordView({
   const currentBedRecords = records
     .filter((r) => {
       if (!currentBed) return false;
-      const isDirectMatch = r.bed_id === currentBed.id;
-      const isPlotBedMatch =
-        (myPlot?.id && r.bed_id === `${myPlot.id}_bed_${currentBed.bed_number}`) ||
-        (myPlot?.code && r.bed_id === `bed_${myPlot.code}_${currentBed.bed_number}`) ||
-        (myPlot?.code && r.bed_id === `plot_cell_${myPlot.code}_bed_${currentBed.bed_number}`);
-      return isDirectMatch || isPlotBedMatch;
+      return r.bed_id === currentBed.id;
     })
     .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
@@ -364,6 +355,7 @@ export default function StudentFarmRecordView({
             {activeBeds.map((bed) => {
               const isSelected = selectedBedId === bed.id;
               const isPending = bed.status === "completed_pending";
+    const isRejected = bed.status === "rejected";
 
               // 生徒の観察記録・投稿画像のサムネイル検索
               const bedRecs = records.filter((r) => r.bed_id === bed.id);
@@ -426,6 +418,36 @@ export default function StudentFarmRecordView({
       </div>
 
       {/* 🌟 3. 畝をクリックしたときだけ表示される記録セクション 🌟 */}
+      {/* 🌟 講師からの差し戻し通知バナー 🌟 */}
+      {activeBeds.some(b => b.status === "rejected") && (
+        <div className="bg-rose-50 border-2 border-red-400 p-4 rounded-3xl shadow-sm text-xs text-red-950 space-y-2 animate-bounce-short">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚠️</span>
+            <h4 className="font-black text-sm text-red-900">
+              収穫完了報告が講師より差し戻されました
+            </h4>
+          </div>
+          {activeBeds.filter(b => b.status === "rejected").map(rb => (
+            <div key={rb.id} className="bg-white/90 p-3 rounded-2xl border border-red-200 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="font-black text-red-900 mr-2">【畝 #{rb.bed_number} ({rb.crop_name})】</span>
+                <span className="text-gray-700 font-bold">理由: {rb.reject_reason || rb.completion_notes || "内容の再確認をお願いします"}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBedId(rb.id);
+                  setShowCompletionModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs shadow-xs cursor-pointer"
+              >
+                📝 内容を修正して再提出
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {currentBed ? (
         <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs space-y-4 animate-fade-in">
           <div className="flex flex-wrap items-center justify-between border-b pb-3 gap-2">
@@ -440,6 +462,11 @@ export default function StudentFarmRecordView({
                 {currentBed.status === "completed_pending" && (
                   <span className="text-xs text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-full font-black animate-pulse">
                     ⏳ 収穫完了・講師確認待ち (記録ロック中)
+                  </span>
+                )}
+                {currentBed.status === "rejected" && (
+                  <span className="text-xs text-red-900 bg-red-200 px-2.5 py-0.5 rounded-full font-black animate-pulse">
+                    ⚠️ 差し戻し（要再提出）
                   </span>
                 )}
               </div>
@@ -466,6 +493,16 @@ export default function StudentFarmRecordView({
                 <div className="px-3 py-1.5 bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 flex items-center gap-1">
                   <span>🔒 承認待ち（入力不可）</span>
                 </div>
+              ) : currentBed.status === "rejected" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCompletionModal(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-black text-xs rounded-xl shadow-md transition transform active:scale-95 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>📝 修正して再提出する</span>
+                </button>
               ) : (
                 <button
                   onClick={() => {
@@ -492,6 +529,22 @@ export default function StudentFarmRecordView({
                   講師が確認・承認すると、この畝は過去ログ（「📦 過去の作物を見る」）に保存され、新しい畝が自動的に追加されます。承認までしばらくお待ちください。
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* 🌟 差し戻し理由バナー 🌟 */}
+          {currentBed.status === "rejected" && (
+            <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-300 text-xs text-red-950 font-bold space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <p className="font-black text-red-900 text-sm">講師からの差し戻しメッセージ</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-red-200 text-gray-800 font-bold">
+                {currentBed.reject_reason || currentBed.completion_notes || "内容の再確認をお願いします"}
+              </div>
+              <p className="text-[11px] text-red-700">
+                上記の内容をご確認の上、「📝 修正して再提出する」ボタンから修正内容を送信してください。
+              </p>
             </div>
           )}
 

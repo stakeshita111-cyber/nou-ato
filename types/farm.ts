@@ -18,7 +18,7 @@ export type CropRecord = {
   created_at: string;
 };
 
-export type BedStatus = "active" | "completed_pending" | "archived";
+export type BedStatus = "active" | "completed_pending" | "rejected" | "archived";
 
 export type FarmBed = {
   id: string;
@@ -38,6 +38,7 @@ export type FarmBed = {
   completion_notes?: string;
   total_harvest?: string;
   completion_image_url?: string;
+  reject_reason?: string;
 };
 
 export type FarmPlot = {

@@ -49,8 +49,11 @@ export default function StudentTalkView({ journals = [], studentName = "受講�
 
       // 過去のやり取りをチャットメッセージに展開 (明らかなダミーデータは除外)
       (targetList || []).forEach((j: any) => {
-        // ダミーテストデータの除外
-        if (j.content === "テスト" || j.content === "○○困ってます") return;
+        // 🌟 収穫完了報告やシステム管理通知、ダミーデータの除外 🌟
+        const c = (j.content || "").trim();
+        if (!c || c === "テスト" || c === "○○困ってます" || c.includes("【収穫完了報告】") || c.includes("【差し戻し通知】") || c.includes("を完了報告しました")) {
+          return;
+        }
 
         // 生徒の質問・発言
         if (j.content) {

@@ -143,7 +143,11 @@ export default function TeacherOverviewView({
       if (jData) {
         const unrepliedNotices = jData.filter((j: any) => {
           const content = (j.content || "").trim();
-          return content && !content.includes("を完了報告しました") && content !== "（コメントなし）";
+          return content && 
+            !content.includes("【収穫完了報告】") && 
+            !content.includes("【差し戻し通知】") && 
+            !content.includes("を完了報告しました") && 
+            content !== "（コメントなし）";
         });
         setUnrepliedCount(unrepliedNotices.length);
       } else {

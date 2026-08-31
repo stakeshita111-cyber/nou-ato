@@ -499,6 +499,28 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => {
                   updateSettings({ showStudentTalkTab: true });
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("nouato_show_student_talk_tab", "true");
+                    window.dispatchEvent(new CustomEvent("nouato_talk_tab_toggled", { detail: { show: true } }));
+                    window.dispatchEvent(new CustomEvent("nouato_settings_updated", { detail: { ...settings, showStudentTalkTab: true } }));
+                    try {
+                      const bc = new BroadcastChannel("nouato_settings_sync");
+                      bc.postMessage({ type: "TALK_TAB_TOGGLE", show: true });
+                      bc.postMessage({ type: "SETTINGS_UPDATED", settings: { ...settings, showStudentTalkTab: true } });
+                    } catch (e) {}
+                    // プレビュー用iframeへの直接postMessage送信
+                    document.querySelectorAll("iframe").forEach((iframe) => {
+                      try {
+                        iframe.contentWindow?.postMessage({ type: "TALK_TAB_TOGGLE", show: true }, "*");
+                      } catch (e) {}
+                    });
+                    // サーバー共有APIへの保存（全端末リアルタイム同期）
+                    fetch("/api/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ showStudentTalkTab: true }),
+                    }).catch(() => {});
+                  }
                   setToastMessage("💬 生徒の相談画面を「表示 (ON)」に設定しました");
                   setShowToast(true);
                 }}
@@ -514,6 +536,28 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => {
                   updateSettings({ showStudentTalkTab: false });
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("nouato_show_student_talk_tab", "false");
+                    window.dispatchEvent(new CustomEvent("nouato_talk_tab_toggled", { detail: { show: false } }));
+                    window.dispatchEvent(new CustomEvent("nouato_settings_updated", { detail: { ...settings, showStudentTalkTab: false } }));
+                    try {
+                      const bc = new BroadcastChannel("nouato_settings_sync");
+                      bc.postMessage({ type: "TALK_TAB_TOGGLE", show: false });
+                      bc.postMessage({ type: "SETTINGS_UPDATED", settings: { ...settings, showStudentTalkTab: false } });
+                    } catch (e) {}
+                    // プレビュー用iframeへの直接postMessage送信
+                    document.querySelectorAll("iframe").forEach((iframe) => {
+                      try {
+                        iframe.contentWindow?.postMessage({ type: "TALK_TAB_TOGGLE", show: false }, "*");
+                      } catch (e) {}
+                    });
+                    // サーバー共有APIへの保存（全端末リアルタイム同期）
+                    fetch("/api/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ showStudentTalkTab: false }),
+                    }).catch(() => {});
+                  }
                   setToastMessage("💬 生徒の相談画面を「非表示 (OFF)」に設定しました");
                   setShowToast(true);
                 }}

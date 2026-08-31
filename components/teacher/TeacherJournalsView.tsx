@@ -155,23 +155,28 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (studentIds.length > 0) {
         const { data: usersData } = await supabase
           .from("users")
-          .select("id, email")
+          .select("id, email, full_name")
           .in("id", studentIds);
 
         if (usersData) {
           usersData.forEach((u: any) => {
-            if (u.id && u.email) {
-              userMap[u.id] = u.email.split("@")[0];
+            if (u.id) {
+              userMap[u.id] = u.full_name || (u.email ? u.email.split("@")[0] : "竹下 翔");
             }
           });
         }
       }
 
-      // 🌟 単なるシステムのタスク完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
+      // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
       const filteredData = journalData.filter((j: any) => {
         const content = (j.content || "").trim();
         if (!content) return false;
-        if (content.includes("を完了報告しました") || content === "（コメントなし）") {
+        if (
+          content.includes("【収穫完了報告】") ||
+          content.includes("【差し戻し通知】") ||
+          content.includes("を完了報告しました") ||
+          content === "（コメントなし）"
+        ) {
           return false;
         }
         return true;
@@ -277,7 +282,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         jData
           .filter((j: any) => {
             const c = (j.content || "").trim();
-            return c && !c.includes("を完了報告しました") && c !== "（コメントなし）";
+            return c && 
+              !c.includes("【収穫完了報告】") && 
+              !c.includes("【差し戻し通知】") && 
+              !c.includes("を完了報告しました") && 
+              c !== "（コメントなし）";
           })
           .forEach((j: any, idx: number) => {
             const rawDate = j.created_at;

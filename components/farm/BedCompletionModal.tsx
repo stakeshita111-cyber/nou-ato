@@ -21,10 +21,10 @@ export default function BedCompletionModal({
   bed,
   onComplete,
 }: BedCompletionModalProps) {
-  const [totalHarvest, setTotalHarvest] = useState("");
-  const [completionNotes, setCompletionNotes] = useState("");
-  const [season, setSeason] = useState("2026年 春夏");
-  const [imageUrl, setImageUrl] = useState("");
+  const [totalHarvest, setTotalHarvest] = useState(bed?.total_harvest || "");
+  const [completionNotes, setCompletionNotes] = useState(bed?.completion_notes || "");
+  const [season, setSeason] = useState(bed?.season || "2026年 春夏");
+  const [imageUrl, setImageUrl] = useState(bed?.completion_image_url || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !bed) return null;
@@ -91,7 +91,7 @@ export default function BedCompletionModal({
             <span className="text-2xl">🏆</span>
             <div>
               <h3 className="font-black text-gray-900 text-base">
-                畝 {bed.bed_number} ({bed.crop_name || "作物"}) の収穫完了報告
+                {bed.status === "rejected" ? "⚠️ 収穫完了報告の修正・再提出" : `畝 ${bed.bed_number} (${bed.crop_name || "作物"}) の収穫完了報告`}
               </h3>
               <p className="text-xs text-gray-500 font-bold">
                 収穫のまとめを記録して講師へ完了報告を送ります

@@ -15,7 +15,12 @@ export default function JournalSlider({
       </h2>
       
       <div className="flex gap-4 overflow-x-auto pb-6 snap-x snap-mandatory">
-        {journals.map((journal) => (
+        {journals
+          .filter((journal) => {
+            const c = (journal.content || "").trim();
+            return c && !c.includes("【収穫完了報告】") && !c.includes("【差し戻し通知】") && !c.includes("を完了報告しました");
+          })
+          .map((journal) => (
           <div 
             key={journal.id} 
             className="min-w-[85%] md:min-w-[300px] snap-center shrink-0 p-5 border rounded-2xl shadow-sm bg-white"

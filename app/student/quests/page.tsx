@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -39,6 +39,132 @@ export default function StudentQuestsPage() {
   const [showToast, setShowToast] = useState(false);
   const [activeTab, setActiveTab] = useState("myfarm");
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  
+  // 🌟 クライアント初期化時に即座にLocalStorageから判定 🌟
+  const [talkTabEnabled, setTalkTabEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const direct = localStorage.getItem("nouato_show_student_talk_tab");
+      if (direct !== null) return direct !== "false";
+      const themeStore = localStorage.getItem("nou-ato-theme-settings");
+      if (themeStore) {
+        try {
+          const parsed = JSON.parse(themeStore);
+          if (parsed.state?.settings?.showStudentTalkTab !== undefined) {
+            return parsed.state.settings.showStudentTalkTab !== false;
+          }
+        } catch (e) {}
+      }
+    }
+    return true;
+  });
+
+  // 🌟 講師の設定変更（相談画面の表示・非表示など）をリアルタイムに受信・同期 🌟
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncVisibility = () => {
+      const direct = localStorage.getItem("nouato_show_student_talk_tab");
+      if (direct !== null) {
+        setTalkTabEnabled(direct !== "false");
+        return;
+      }
+      const themeStore = localStorage.getItem("nou-ato-theme-settings");
+      if (themeStore) {
+        try {
+          const parsed = JSON.parse(themeStore);
+          if (parsed.state?.settings?.showStudentTalkTab !== undefined) {
+            setTalkTabEnabled(parsed.state.settings.showStudentTalkTab !== false);
+            return;
+          }
+        } catch (e) {}
+      }
+      setTalkTabEnabled(useThemeStore.getState().settings.showStudentTalkTab !== false);
+    };
+
+    syncVisibility();
+
+    // サーバーAPIからも最新状態を取得
+    const fetchServerSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.showStudentTalkTab !== undefined) {
+            setTalkTabEnabled(data.showStudentTalkTab !== false);
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchServerSettings();
+    const pollInterval = setInterval(fetchServerSettings, 2000);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        bc = new BroadcastChannel("nouato_settings_sync");
+        bc.onmessage = (msg) => {
+          if (msg.data?.type === "TALK_TAB_TOGGLE" && msg.data?.show !== undefined) {
+            setTalkTabEnabled(msg.data.show !== false);
+          } else if (msg.data?.settings?.showStudentTalkTab !== undefined) {
+            useThemeStore.setState({ settings: msg.data.settings });
+            setTalkTabEnabled(msg.data.settings.showStudentTalkTab !== false);
+          }
+        };
+      } catch (e) {
+        console.warn("BroadcastChannel sync error:", e);
+      }
+    }
+
+    const handleCustom = (e: any) => {
+      if (e.detail?.showStudentTalkTab !== undefined) {
+        useThemeStore.setState({ settings: e.detail });
+        setTalkTabEnabled(e.detail.showStudentTalkTab !== false);
+      }
+    };
+
+    const handleTalkToggle = (e: any) => {
+      if (e.detail && e.detail.show !== undefined) {
+        setTalkTabEnabled(e.detail.show !== false);
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "nouato_show_student_talk_tab" || e.key === "nou-ato-theme-settings") {
+        syncVisibility();
+      }
+    };
+
+    // 親ウィンドウやiframeからのpostMessage受信
+    const handleWindowMessage = (e: MessageEvent) => {
+      if (e.data?.type === "TALK_TAB_TOGGLE" && e.data?.show !== undefined) {
+        setTalkTabEnabled(e.data.show !== false);
+      } else if (e.data?.settings?.showStudentTalkTab !== undefined) {
+        setTalkTabEnabled(e.data.settings.showStudentTalkTab !== false);
+      }
+    };
+
+    window.addEventListener("nouato_settings_updated", handleCustom);
+    window.addEventListener("nouato_talk_tab_toggled", handleTalkToggle);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("message", handleWindowMessage);
+
+    return () => {
+      clearInterval(pollInterval);
+      if (bc) bc.close();
+      window.removeEventListener("nouato_settings_updated", handleCustom);
+      window.removeEventListener("nouato_talk_tab_toggled", handleTalkToggle);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("message", handleWindowMessage);
+    };
+  }, []);
+
+  // 相談タブがOFFに設定されたら、畑タブに自動で戻す
+  useEffect(() => {
+    if (!talkTabEnabled && activeTab === "talk") {
+      setActiveTab("myfarm");
+    }
+  }, [talkTabEnabled, activeTab]);
 
   // ログイン中のアカウント表示名
   const userAccountName = user?.name
@@ -210,7 +336,7 @@ export default function StudentQuestsPage() {
         )}
 
         {/* 4. 相談 タブ */}
-        {activeTab === "talk" && settings.showStudentTalkTab !== false && (
+        {activeTab === "talk" && talkTabEnabled && (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
             <StudentTalkView journals={journals} studentName={userAccountName} />
           </div>
@@ -285,7 +411,7 @@ export default function StudentQuestsPage() {
         </button>
 
         {/* 🌟 4. 相談 (ON時のみ表示) 🌟 */}
-        {settings.showStudentTalkTab !== false && (
+        {talkTabEnabled && (
           <button
             onClick={() => setActiveTab("talk")}
             className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${

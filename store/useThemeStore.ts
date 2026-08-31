@@ -46,16 +46,80 @@ const defaultSettings: ThemeSettings = {
   showStudentTalkTab: true,
 };
 
+let syncChannel: BroadcastChannel | null = null;
+const getBroadcastChannel = () => {
+  if (typeof window === 'undefined') return null;
+  if (!syncChannel && typeof BroadcastChannel !== 'undefined') {
+    try {
+      syncChannel = new BroadcastChannel('nouato_settings_sync');
+      syncChannel.onmessage = (event) => {
+        if (event.data?.type === 'SETTINGS_UPDATED' && event.data?.settings) {
+          useThemeStore.setState({ settings: event.data.settings });
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel sync init warning:', e);
+    }
+  }
+  return syncChannel;
+};
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       settings: defaultSettings,
-      updateSettings: (newSettings) =>
-        set((state) => ({ settings: { ...state.settings, ...newSettings } })),
-      resetSettings: () => set({ settings: defaultSettings }),
+      updateSettings: (newSettings) => {
+        set((state) => {
+          const next = { ...state.settings, ...newSettings };
+          if (typeof window !== 'undefined') {
+            try {
+              if (newSettings.showStudentTalkTab !== undefined) {
+                localStorage.setItem('nouato_show_student_talk_tab', String(newSettings.showStudentTalkTab));
+              }
+              const bc = getBroadcastChannel();
+              if (bc) {
+                bc.postMessage({ type: 'SETTINGS_UPDATED', settings: next });
+              }
+            } catch (e) {}
+            window.dispatchEvent(new CustomEvent('nouato_settings_updated', { detail: next }));
+          }
+          return { settings: next };
+        });
+      },
+      resetSettings: () => {
+        set(() => {
+          const next = defaultSettings;
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('nouato_show_student_talk_tab', 'true');
+              const bc = getBroadcastChannel();
+              if (bc) {
+                bc.postMessage({ type: 'SETTINGS_UPDATED', settings: next });
+              }
+            } catch (e) {}
+            window.dispatchEvent(new CustomEvent('nouato_settings_updated', { detail: next }));
+          }
+          return { settings: next };
+        });
+      },
     }),
     {
       name: 'nou-ato-theme-settings',
     }
   )
 );
+
+// クライアント側でのクロスブラウザ・タブ間ストレージ変更監視
+if (typeof window !== 'undefined') {
+  getBroadcastChannel();
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'nou-ato-theme-settings' && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed.state?.settings) {
+          useThemeStore.setState({ settings: parsed.state.settings });
+        }
+      } catch (err) {}
+    }
+  });
+}
