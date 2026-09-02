@@ -156,7 +156,7 @@ export default function TeacherDashboardPage() {
               : activeMenu === "students"
               ? "受講生"
               : activeMenu === "farm"
-              ? "畑区画管理 (農地レイアウト)"
+              ? "畑区画管理"
               : activeMenu === "tasks"
               ? "教材管理"
               : activeMenu === "templates"

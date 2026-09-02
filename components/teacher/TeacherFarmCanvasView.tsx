@@ -48,6 +48,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     updateAllUnassignedBedsCount,
     assignStudentToPlot,
     unassignStudentFromPlot,
+    updatePlotStatus,
     confirmBedArchived,
     approveAndAddNewBed,
     rejectBedCompletion,
@@ -241,14 +242,52 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
   const [showGridlines, setShowGridlines] = useState<boolean>(true);
 
-  // 🌟 Excelスタイル正方形グリッド (6列×8行=全48マス) 🌟
-  const [gridCols, setGridCols] = useState<number>(6); // 6列 (A, B, C, D, E, F)
-  const [gridRows, setGridRows] = useState<number>(8); // 8行 (1, 2, 3... 8)
+  // 🌟 Excelスタイル正方形グリッド (初期値はlocalStorageまたはDBプロットから復元) 🌟
+  const [gridCols, setGridCols] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nouato_grid_dimensions");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.cols) return Number(parsed.cols);
+        }
+      } catch (e) {}
+    }
+    return 6;
+  });
+
+  const [gridRows, setGridRows] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nouato_grid_dimensions");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.rows) return Number(parsed.rows);
+        }
+      } catch (e) {}
+    }
+    return 8;
+  });
+
+  const [unassignedBedsCount, setUnassignedBedsCount] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nouato_unassigned_beds_count");
+        if (saved) return Number(saved) || 7;
+      } catch (e) {}
+    }
+    return 7;
+  });
+
   const [draggedGridIndex, setDraggedGridIndex] = useState<number | null>(null);
+  const [dragOverPlotCode, setDragOverPlotCode] = useState<string | null>(null);
+  const [draggedPlotCode, setDraggedPlotCode] = useState<string | null>(null);
 
   // クリック時詳細確認・編集 Modal / Drawer State
   const [detailPlot, setDetailPlot] = useState<FarmPlot | null>(null);
   const handledInitialPlotRef = useRef<string | null>(null);
+
+
 
   // 外部(日誌スライダー等)からの対象農場・区画ジャンプ連携
   useEffect(() => {
@@ -308,20 +347,32 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
     if (!fromPlot || !toPlot) return;
 
-    // 🌟【重要】セルアドレス(code)は絶対固定し、中身データ(生徒・空き地・畝構造)のみを1対1で純粋スワップ！ 🌟
-    const fromBedsForTo = (fromPlot.beds || []).map((b, idx) => ({
-      ...b,
-      id: `plot_cell_${toAddr}_bed_${idx + 1}`,
-      plot_id: `plot_cell_${toAddr}`,
-      bed_number: idx + 1,
-    }));
+    // 🌟【重要】区画番号(code)・マス目位置は絶対固定し、中身データセット(受講生・畝・作物・ステータス)を1対1で完全スワップ！ 🌟
+    const fromBedsForTo = (fromPlot.beds || []).map((b, idx) => {
+      const bedNum = b.bed_number || idx + 1;
+      const newId = b.status === "archived"
+        ? (b.id ? b.id.replace(new RegExp(`_${fromAddr}_`), `_${toAddr}_`).replace(new RegExp(`plot_cell_${fromAddr}`), `plot_cell_${toAddr}`) : `archived_bed_${toAddr}_${bedNum}_${Date.now()}`)
+        : `plot_cell_${toAddr}_bed_${bedNum}`;
+      return {
+        ...b,
+        id: newId,
+        plot_id: `plot_cell_${toAddr}`,
+        bed_number: bedNum,
+      };
+    });
 
-    const toBedsForFrom = (toPlot.beds || []).map((b, idx) => ({
-      ...b,
-      id: `plot_cell_${fromAddr}_bed_${idx + 1}`,
-      plot_id: `plot_cell_${fromAddr}`,
-      bed_number: idx + 1,
-    }));
+    const toBedsForFrom = (toPlot.beds || []).map((b, idx) => {
+      const bedNum = b.bed_number || idx + 1;
+      const newId = b.status === "archived"
+        ? (b.id ? b.id.replace(new RegExp(`_${toAddr}_`), `_${fromAddr}_`).replace(new RegExp(`plot_cell_${toAddr}`), `plot_cell_${fromAddr}`) : `archived_bed_${fromAddr}_${bedNum}_${Date.now()}`)
+        : `plot_cell_${fromAddr}_bed_${bedNum}`;
+      return {
+        ...b,
+        id: newId,
+        plot_id: `plot_cell_${fromAddr}`,
+        bed_number: bedNum,
+      };
+    });
 
     const updatedPlots = plots.map((p) => {
       if (p.code === fromAddr) {
@@ -329,6 +380,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           ...p,
           student_id: toPlot.student_id || undefined,
           student_name: toPlot.student_name || undefined,
+          name: toPlot.student_name ? `区画 ${fromAddr} - ${toPlot.student_name}` : `区画 ${fromAddr}`,
           is_vacant: toPlot.is_vacant ?? false,
           beds: toBedsForFrom,
         };
@@ -338,6 +390,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           ...p,
           student_id: fromPlot.student_id || undefined,
           student_name: fromPlot.student_name || undefined,
+          name: fromPlot.student_name ? `区画 ${toAddr} - ${fromPlot.student_name}` : `区画 ${toAddr}`,
           is_vacant: fromPlot.is_vacant ?? false,
           beds: fromBedsForTo,
         };
@@ -346,105 +399,240 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     });
 
     setPlots(updatedPlots);
+    localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
     await savePlotsGridIndicesToSupabase(updatedPlots);
 
-    // 過去の crop_records の bed_id を新区画の bed_id へ引越し書き換え
+    // 🌟 過去の crop_records の bed_id を一時退避経由で安全にスワップ書き換え (ID衝突ゼロ) 🌟
     try {
+      // 1. fromBeds の crop_records を一時退避
       for (let i = 0; i < (fromPlot.beds || []).length; i++) {
         const oldB = fromPlot.beds[i];
-        const newBedId = `plot_cell_${toAddr}_bed_${i + 1}`;
-        if (oldB.id) {
-          await supabase.from("crop_records").update({ bed_id: newBedId }).eq("bed_id", oldB.id);
+        if (oldB?.id) {
+          await supabase.from("crop_records").update({ bed_id: `temp_swap_${toAddr}_${i + 1}` }).eq("bed_id", oldB.id);
         }
       }
+      // 2. toBeds の crop_records を fromAddr の bed_id へ更新
       for (let i = 0; i < (toPlot.beds || []).length; i++) {
         const oldB = toPlot.beds[i];
-        const newBedId = `plot_cell_${fromAddr}_bed_${i + 1}`;
-        if (oldB.id) {
-          await supabase.from("crop_records").update({ bed_id: newBedId }).eq("bed_id", oldB.id);
+        const newBedId = toBedsForFrom[i]?.id;
+        if (oldB?.id && newBedId) {
+          await supabase.from("crop_records").update({ bed_id: newBedId, plot_code: fromAddr }).eq("bed_id", oldB.id);
+        }
+      }
+      // 3. 一時退避していた fromBeds の crop_records を toAddr の bed_id へ更新
+      for (let i = 0; i < (fromPlot.beds || []).length; i++) {
+        const tempId = `temp_swap_${toAddr}_${i + 1}`;
+        const newBedId = fromBedsForTo[i]?.id;
+        if (newBedId) {
+          await supabase.from("crop_records").update({ bed_id: newBedId, plot_code: toAddr }).eq("bed_id", tempId);
         }
       }
     } catch (e) {
       console.warn("swap crop_records error:", e);
     }
 
-    setToastMessage(`🚚 マス「${fromAddr}」と「${toAddr}」の区画データをスワップ移動しました！`);
+    setToastMessage(`🚚 マス「${fromAddr}」と「${toAddr}」の区画データを入れ替えました！`);
     setShowToast(true);
-    setDraggedGridIndex(null);
+    setDraggedPlotCode(null);
+    setDragOverPlotCode(null);
   };
 
   // 🌟 列数変更に伴うプロット状態 ＆ 未割り当て受講生リスト自動連動ハンドラー 🌟
   const handleGridColsChange = async (newCols: number) => {
     const oldCols = gridCols;
     setGridCols(newCols);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          "nouato_grid_dimensions",
+          JSON.stringify({ cols: newCols, rows: gridRows })
+        );
+      } catch (e) {}
+    }
 
-    const updatedPlots = plots.map((plot) => {
-      const colChar = plot.code.charAt(0);
-      const colIndex = colChar.charCodeAt(0) - 65;
+    const defaultBeds = unassignedBedsCount || 7;
 
-      if (colIndex >= newCols) {
-        // 🌟 1. 列を減らして非表示化された列のみ: 裏で空き地(is_vacant: true)にし、生徒割当を解除 (生徒は未割り当てリストへ即復帰!) 🌟
-        return {
-          ...plot,
-          is_vacant: true,
-          student_id: undefined,
-          student_name: undefined,
-        };
-      } else if (newCols > oldCols && colIndex >= oldCols && colIndex < newCols) {
-        // 🌟 2. 列を増やして「新しく(再表示)」追加された列のみ: ピカピカの未割り当て (is_vacant: false) に初期化 🌟
-        if (!plot.student_id) {
-          return {
-            ...plot,
+    // 1. 表示範囲 (A..newCols × 1..gridRows) のセルを構築
+    const updatedPlots: FarmPlot[] = [];
+    for (let r = 0; r < gridRows; r++) {
+      const rowNum = r + 1;
+      for (let c = 0; c < newCols; c++) {
+        const colLetter = String.fromCharCode(65 + c);
+        const cellAddress = `${colLetter}${rowNum}`;
+        const uniquePlotId = `plot_cell_${cellAddress}`;
+        const existing = plots.find((p) => p.code === cellAddress);
+
+        if (existing) {
+          // 既存区画:
+          // 🌟 再表示された区画は「未割り当て区画 (is_vacant: false)」に戻す！ 🌟
+          const beds = existing.beds?.length
+            ? existing.beds
+            : Array.from({ length: defaultBeds }).map((_, bIdx) => ({
+                id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
+                plot_id: uniquePlotId,
+                bed_number: bIdx + 1,
+                crop_name: "未確定 🌱",
+                is_updated: false,
+              }));
+
+          updatedPlots.push({
+            ...existing,
+            is_vacant: existing.student_id ? false : (newCols > oldCols && c >= oldCols ? false : existing.is_vacant ?? false),
+            beds,
+          });
+        } else {
+          // 新規マスを未割り当て区画として生成
+          const newBeds: FarmBed[] = Array.from({ length: defaultBeds }).map((_, bIdx) => ({
+            id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
+            plot_id: uniquePlotId,
+            bed_number: bIdx + 1,
+            crop_name: "未確定 🌱",
+            is_updated: false,
+          }));
+
+          updatedPlots.push({
+            id: uniquePlotId,
+            farm_id: activeFarmId,
+            name: `区画 ${cellAddress}`,
+            code: cellAddress,
+            grid_index: r * newCols + c,
             is_vacant: false,
-          };
+            position: { x: c * 120, y: r * 120 },
+            beds: newBeds,
+          });
         }
-        return plot;
-      } else {
-        // 🌟 3. 継続表示されている既存の列 (A〜E列など): 既存の空き地・割当・未割当状態を 100% そのまま保持！ 🌟
-        return plot;
+      }
+    }
+
+    // 2. 縮小によって表示範囲外（非表示）となった区画
+    // 🌟 非表示になった列は「空き地 (is_vacant: true)」とし、受講生がいたら割り当て解除して未割り当て一覧に戻す！ 🌟
+    let releasedStudentCount = 0;
+    plots.forEach((p) => {
+      if (!updatedPlots.some((up) => up.code === p.code)) {
+        if (p.student_id || p.student_name) {
+          releasedStudentCount++;
+        }
+        updatedPlots.push({
+          ...p,
+          is_vacant: true, // 🌟 非表示の区画は空き地とする
+          student_id: undefined, // 🌟 未割り当て受講生一覧へ自動復帰
+          student_name: undefined,
+          name: `区画 ${p.code}`,
+          beds: (p.beds || []).map((b) => ({
+            ...b,
+            student_id: undefined,
+            student_name: undefined,
+          })),
+        });
       }
     });
 
     setPlots(updatedPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
     await savePlotsGridIndicesToSupabase(updatedPlots);
-    setToastMessage(`🎯 盤面の列数を ${newCols} 列に変更し、非表示マスの受講生を未割り当てリストへ安全に戻しました！`);
+
+    if (releasedStudentCount > 0) {
+      setToastMessage(`🎯 盤面を ${newCols} 列に変更し、非表示になった受講生（${releasedStudentCount}名）を未割り当て一覧に戻しました`);
+    } else {
+      setToastMessage(`🎯 盤面の列数を ${newCols} 列に変更しました！`);
+    }
     setShowToast(true);
   };
 
   const handleGridRowsChange = async (newRows: number) => {
     const oldRows = gridRows;
     setGridRows(newRows);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          "nouato_grid_dimensions",
+          JSON.stringify({ cols: gridCols, rows: newRows })
+        );
+      } catch (e) {}
+    }
 
-    const updatedPlots = plots.map((plot) => {
-      const rowNum = parseInt(plot.code.slice(1), 10) || 1;
+    const defaultBeds = unassignedBedsCount || 7;
 
-      if (rowNum > newRows) {
-        // 🌟 1. 行を減らして非表示化された行のみ: 裏で「空き地 (is_vacant: true)」にし、生徒割当を解除 🌟
-        return {
-          ...plot,
+    const updatedPlots: FarmPlot[] = [];
+    for (let r = 0; r < newRows; r++) {
+      const rowNum = r + 1;
+      for (let c = 0; c < gridCols; c++) {
+        const colLetter = String.fromCharCode(65 + c);
+        const cellAddress = `${colLetter}${rowNum}`;
+        const uniquePlotId = `plot_cell_${cellAddress}`;
+        const existing = plots.find((p) => p.code === cellAddress);
+
+        if (existing) {
+          const beds = existing.beds?.length
+            ? existing.beds
+            : Array.from({ length: defaultBeds }).map((_, bIdx) => ({
+                id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
+                plot_id: uniquePlotId,
+                bed_number: bIdx + 1,
+                crop_name: "未確定 🌱",
+                is_updated: false,
+              }));
+
+          updatedPlots.push({
+            ...existing,
+            is_vacant: existing.student_id ? false : (newRows > oldRows && r >= oldRows ? false : existing.is_vacant ?? false),
+            beds,
+          });
+        } else {
+          const newBeds: FarmBed[] = Array.from({ length: defaultBeds }).map((_, bIdx) => ({
+            id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
+            plot_id: uniquePlotId,
+            bed_number: bIdx + 1,
+            crop_name: "未確定 🌱",
+            is_updated: false,
+          }));
+
+          updatedPlots.push({
+            id: uniquePlotId,
+            farm_id: activeFarmId,
+            name: `区画 ${cellAddress}`,
+            code: cellAddress,
+            grid_index: r * gridCols + c,
+            is_vacant: false,
+            position: { x: c * 120, y: r * 120 },
+            beds: newBeds,
+          });
+        }
+      }
+    }
+
+    // 縮小によって表示範囲外（非表示）となった区画: 空き地化 & 生徒解除
+    let releasedStudentCount = 0;
+    plots.forEach((p) => {
+      if (!updatedPlots.some((up) => up.code === p.code)) {
+        if (p.student_id || p.student_name) {
+          releasedStudentCount++;
+        }
+        updatedPlots.push({
+          ...p,
           is_vacant: true,
           student_id: undefined,
           student_name: undefined,
-        };
-      } else if (newRows > oldRows && rowNum > oldRows && rowNum <= newRows) {
-        // 🌟 2. 行を増やして「新しく(再表示)」追加された行のみ: ピカピカの未割り当て (is_vacant: false) に初期化 🌟
-        if (!plot.student_id) {
-          return {
-            ...plot,
-            is_vacant: false,
-          };
-        }
-        return plot;
-      } else {
-        // 🌟 3. 継続表示されている既存の行: 状態を 100% そのまま保持！ 🌟
-        return plot;
+          name: `区画 ${p.code}`,
+          beds: (p.beds || []).map((b) => ({
+            ...b,
+            student_id: undefined,
+            student_name: undefined,
+          })),
+        });
       }
     });
 
     setPlots(updatedPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
     await savePlotsGridIndicesToSupabase(updatedPlots);
+
+    if (releasedStudentCount > 0) {
+      setToastMessage(`🎯 盤面を ${newRows} 行に変更し、非表示になった受講生（${releasedStudentCount}名）を未割り当て一覧に戻しました`);
+    } else {
+      setToastMessage(`🎯 盤面の行数を ${newRows} 行に変更しました！`);
+    }
+    setShowToast(true);
   };
 
   useEffect(() => {
@@ -710,21 +898,23 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     setDraggingStudent(student);
   };
 
-  const handleDropStudentOnPlot = (plot: FarmPlot) => {
-    if (!draggingStudent) return;
+  const handleDropStudentOnPlot = (plot: FarmPlot, droppedStudent?: UnassignedStudent) => {
+    const studentToAssign = droppedStudent || draggingStudent;
+    if (!studentToAssign) return;
 
-    if (plot.student_name) {
+    if (plot.student_name && plot.student_name !== studentToAssign.name) {
       setConfirmChangeStudentModal({
         plot: plot,
-        newStudent: draggingStudent,
+        newStudent: studentToAssign,
       });
+      setDraggingStudent(null);
       return;
     }
 
-    assignStudentToPlot(plot.id, draggingStudent.id, draggingStudent.name);
+    assignStudentToPlot(plot.id, studentToAssign.id, studentToAssign.name);
     setDraggingStudent(null);
 
-    setToastMessage(`🎯 ${plot.code}区画に ${draggingStudent.name} さんを割り当てました！ (${plot.code} - ${draggingStudent.name})`);
+    setToastMessage(`🎯 ${plot.code}区画に ${studentToAssign.name} さんを割り当てました！`);
     setShowToast(true);
   };
 
@@ -853,34 +1043,12 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
         }}
       />
 
-      {/* 📊 Excelスタイル正方形グリッド コントロールツールバー 📊 */}
+      {/* 📊 グリッド コントロールツールバー 📊 */}
       <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
-        <div className="flex items-center space-x-2">
-          <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
-            <span>📊</span>
-            <span>農地区画 Excelグリッド管理</span>
-          </span>
-          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">
-            D&D Swap (マス目場所入れ替え対応)
-          </span>
-
-          {/* 📦 全体アーカイブ確認ボタン */}
-          <button
-            onClick={() => {
-              setArchivedModalTargetPlotId(null);
-              setShowArchivedModal(true);
-            }}
-            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-950 px-3 py-1.5 rounded-2xl border border-emerald-300 font-black transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <span>📦 全体の過去収穫ログ</span>
-          </button>
-        </div>
-
-        {/* ズーム & グリッドサイズ & 畝数一括変更操作 */}
+        {/* 🎯 畑サイズ操作 (列 A-L × 行 1-12) & 畝数一括変更 */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* 🎯 盤面サイズ操作 (列 A-L × 行 1-12) */}
           <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-2xl border border-emerald-200 text-emerald-950">
-            <span className="text-xs font-black">🎯 盤面サイズ:</span>
+            <span className="text-xs font-black">🌱 畑サイズ:</span>
             <div className="flex items-center space-x-1">
               <label className="text-[10px] text-gray-500 font-bold">列 (A-L):</label>
               <select
@@ -914,15 +1082,16 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           <div className="flex items-center space-x-1.5 bg-amber-50 px-3 py-1.5 rounded-2xl border border-amber-200 text-amber-950">
             <span className="text-xs font-black">🌱 未割当区画の畝数一括変更:</span>
             <select
+              value={unassignedBedsCount}
               onChange={(e) => {
                 const count = Number(e.target.value);
                 if (count > 0) {
+                  setUnassignedBedsCount(count);
                   updateAllUnassignedBedsCount(count);
                   setToastMessage(`✨ すべての未割り当て区画の畝数を一括で「${count} 畝」に変更しました！`);
                   setShowToast(true);
                 }
               }}
-              defaultValue="7"
               className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-black text-amber-900"
             >
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
@@ -930,27 +1099,91 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
               ))}
             </select>
           </div>
-
-          {/* ズーム操作 */}
-          <div className="flex items-center space-x-1 bg-gray-50 px-2.5 py-1 rounded-2xl border border-gray-200">
-            <span className="text-[10px] text-gray-500 font-black">ズーム:</span>
-            <span className="text-xs font-black text-gray-800 w-9 text-center">{zoomLevel}%</span>
-            <button
-              type="button"
-              onClick={() => setZoomLevel((prev) => Math.max(40, prev - 10))}
-              className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs cursor-pointer"
-            >
-              －
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoomLevel((prev) => Math.min(200, prev + 10))}
-              className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs cursor-pointer"
-            >
-              ＋
-            </button>
-          </div>
         </div>
+
+        {/* ズーム操作 */}
+        <div className="flex items-center space-x-1 bg-gray-50 px-2.5 py-1 rounded-2xl border border-gray-200">
+          <span className="text-[10px] text-gray-500 font-black">ズーム:</span>
+          <span className="text-xs font-black text-gray-800 w-9 text-center">{zoomLevel}%</span>
+          <button
+            type="button"
+            onClick={() => setZoomLevel((prev) => Math.max(40, prev - 10))}
+            className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs cursor-pointer"
+          >
+            －
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoomLevel((prev) => Math.min(200, prev + 10))}
+            className="w-6 h-6 rounded-lg bg-white text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center text-xs cursor-pointer"
+          >
+            ＋
+          </button>
+        </div>
+      </div>
+
+      {/* 🧑‍🌾 未割り当て受講生一覧 (D&Dで畑に配置) 🧑‍🌾 */}
+      <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+              <span>🧑‍🌾</span>
+              <span>未割り当て受講生</span>
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                {unassignedList.length} 名
+              </span>
+            </span>
+            <span className="text-[10px] text-gray-500 font-normal">
+              ※カードをマスにドラッグして割り当て。マス同士をドラッグ＆ドロップすると区画データを相互入れ替えできます
+            </span>
+          </div>
+          {unassignedList.length > 5 && (
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="受講生を検索..."
+              className="text-xs border border-gray-200 rounded-xl px-2.5 py-1 w-36 focus:outline-emerald-500"
+            />
+          )}
+        </div>
+
+        {filteredStudents.length > 0 ? (
+          <div className="flex flex-wrap gap-2 items-center">
+            {filteredStudents.map((student) => (
+              <div
+                key={student.id}
+                draggable={true}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/json", JSON.stringify(student));
+                  e.dataTransfer.effectAllowed = "copyMove";
+                  handleStudentDragStart(student);
+                }}
+                onDragEnd={() => setDraggingStudent(null)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-gray-200 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-xs transition cursor-grab active:cursor-grabbing select-none ${
+                  draggingStudent?.id === student.id ? "opacity-40 ring-2 ring-emerald-500" : ""
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white ${student.colorBg}`}
+                >
+                  {student.initials}
+                </div>
+                <span className="text-xs font-bold text-gray-800">{student.name}</span>
+                <span className="text-[9px] bg-white border border-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md font-bold">
+                  {student.grade}
+                </span>
+                <span className="text-[10px] text-gray-400">⠿</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-gray-400 py-1 font-medium">
+            {unassignedList.length === 0
+              ? "✨ すべての受講生が畑の区画に割り当てられています。"
+              : "検索条件に一致する受講生はいません。"}
+          </div>
+        )}
       </div>
 
       {/* 🌟 2. メインのグリッド描画エリア 🌟 */}
@@ -970,10 +1203,57 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
               const isVacant = plot?.is_vacant;
               const hasPendingApproval = (plot?.beds || []).some((b) => b.status === "completed_pending");
               const isUpdated = (plot?.beds || []).some((b) => b.is_updated);
+              const scaleRatio = Math.max(0.4, Math.min(1.0, zoomLevel / 100));
 
               return (
                 <div
                   key={cellAddress}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/plot-code", cellAddress);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDraggedPlotCode(cellAddress);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedPlotCode(null);
+                    setDragOverPlotCode(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = draggedPlotCode ? "move" : "copy";
+                  }}
+                  onDragEnter={() => {
+                    if (draggedPlotCode !== cellAddress) {
+                      setDragOverPlotCode(cellAddress);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverPlotCode === cellAddress) {
+                      setDragOverPlotCode(null);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const fromPlotCode = e.dataTransfer.getData("application/plot-code");
+                    setDragOverPlotCode(null);
+                    setDraggedPlotCode(null);
+
+                    // 1. 🌟 区画マス同士のスワップ移動（区画番号以外のデータセット一式を完全相互交換） 🌟
+                    if (fromPlotCode && fromPlotCode !== cellAddress) {
+                      await handleMovePlotToGridCell(fromPlotCode, cellAddress);
+                      return;
+                    }
+
+                    // 2. 🌟 未割り当て受講生の割り当て 🌟
+                    let droppedStudentData: UnassignedStudent | undefined = undefined;
+                    try {
+                      const dataStr = e.dataTransfer.getData("application/json");
+                      if (dataStr) droppedStudentData = JSON.parse(dataStr);
+                    } catch (err) {}
+                    if (plot) {
+                      handleDropStudentOnPlot(plot, droppedStudentData);
+                    }
+                  }}
                   onClick={() => {
                     if (plot) {
                       const pendingBed = (plot.beds || []).find((b) => b.status === "completed_pending");
@@ -985,10 +1265,20 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                       }
                     }
                   }}
-                  style={{ width: `${cellDim}px`, height: `${cellDim}px` }}
-                  className={`relative rounded-2xl p-2 border-2 transition cursor-pointer flex flex-col justify-between items-center shadow-xs ${
-                    hasPendingApproval
-                      ? "bg-amber-100/90 border-amber-500 ring-4 ring-amber-400 shadow-xl animate-pulse"
+                  style={{
+                    width: `${cellDim}px`,
+                    height: `${cellDim}px`,
+                    padding: `${Math.max(2, Math.round(6 * scaleRatio))}px`,
+                  }}
+                  className={`relative rounded-2xl border-2 transition cursor-grab active:cursor-grabbing flex flex-col justify-between items-center overflow-hidden shadow-xs ${
+                    draggedPlotCode === cellAddress
+                      ? "opacity-30 scale-95 border-dashed border-gray-400"
+                      : dragOverPlotCode === cellAddress
+                      ? draggedPlotCode
+                        ? "ring-4 ring-blue-500 bg-blue-50/90 scale-105 shadow-xl border-blue-500 z-10 animate-pulse"
+                        : "ring-4 ring-emerald-500 bg-emerald-100 scale-105 shadow-lg border-emerald-500 z-10"
+                      : hasPendingApproval
+                      ? "bg-rose-50/95 border-red-500 ring-4 ring-red-400/80 shadow-xl animate-pulse"
                       : isUpdated
                       ? "bg-emerald-100/80 border-emerald-500 ring-2 ring-emerald-400 shadow-md"
                       : isAssigned
@@ -998,46 +1288,74 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                       : "bg-white border-dashed border-emerald-300 hover:border-emerald-500 hover:shadow-sm"
                   }`}
                 >
-                  {/* 要承認冠バッジ */}
+                  {/* 要承認冠バッジ (赤系強調) */}
                   {hasPendingApproval && (
-                    <span className="absolute -top-2.5 -left-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-lg animate-bounce border border-white">
+                    <span
+                      style={{ fontSize: `${Math.max(7, Math.round(9 * scaleRatio))}px` }}
+                      className="absolute -top-2.5 -left-1.5 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black px-1.5 py-0.5 rounded-full shadow-lg animate-bounce border border-white whitespace-nowrap z-10"
+                    >
                       🏆 要承認
                     </span>
                   )}
 
-                  {/* セルアドレス */}
-                  <div className="w-full flex items-center justify-between pointer-events-none">
-                    <span className="font-black text-emerald-950 bg-white/90 px-1 py-0.5 rounded border border-gray-200 text-[10px]">
+                  {/* セルアドレス & 畝数 */}
+                  <div className="w-full flex items-center justify-between pointer-events-none gap-0.5 overflow-hidden">
+                    <span
+                      style={{ fontSize: `${Math.max(7, Math.round(10 * scaleRatio))}px` }}
+                      className="font-black text-emerald-950 bg-white/90 px-1 py-0.2 rounded border border-gray-200 truncate"
+                    >
                       {cellAddress}
                     </span>
                     {!isVacant && (
-                      <span className="font-black text-emerald-900 bg-emerald-100/90 px-1 py-0.5 rounded text-[9px]">
-                        {(plot?.beds || []).filter(b => b.status !== "archived").length} 畝
+                      <span
+                        style={{ fontSize: `${Math.max(7, Math.round(9 * scaleRatio))}px` }}
+                        className="font-black text-emerald-900 bg-emerald-100/90 px-1 py-0.2 rounded truncate whitespace-nowrap"
+                      >
+                        {(plot?.beds || []).filter((b) => b.status !== "archived").length} 畝
                       </span>
                     )}
                   </div>
 
                   {/* 生徒名表示 */}
-                  <div className="text-center w-full pointer-events-none">
+                  <div className="text-center w-full pointer-events-none overflow-hidden px-0.5">
                     {isAssigned ? (
-                      <span className="font-black text-xs text-gray-900 truncate block">
+                      <span
+                        style={{ fontSize: `${Math.max(8, Math.round(12 * scaleRatio))}px` }}
+                        className="font-black text-gray-900 truncate block leading-tight"
+                      >
                         🧑‍🌾 {plot.student_name}
                       </span>
                     ) : isVacant ? (
-                      <span className="text-[10px] text-gray-400 font-bold">空き地</span>
+                      <span
+                        style={{ fontSize: `${Math.max(7, Math.round(10 * scaleRatio))}px` }}
+                        className="text-gray-400 font-bold block truncate"
+                      >
+                        空き地
+                      </span>
                     ) : (
-                      <span className="text-[10px] text-emerald-600 font-bold">未割当</span>
+                      <span
+                        style={{ fontSize: `${Math.max(7, Math.round(10 * scaleRatio))}px` }}
+                        className="text-emerald-600 font-bold block truncate"
+                      >
+                        未割当
+                      </span>
                     )}
                   </div>
 
-                  {/* フッター状態 */}
-                  <div className="w-full text-center pointer-events-none">
+                  {/* フッター状態 (完了報告時は赤系強調) */}
+                  <div className="w-full text-center pointer-events-none overflow-hidden">
                     {hasPendingApproval ? (
-                      <span className="text-[9px] text-amber-900 font-black bg-amber-200 px-1.5 py-0.2 rounded-full">
+                      <span
+                        style={{ fontSize: `${Math.max(6, Math.round(9 * scaleRatio))}px` }}
+                        className="text-red-700 font-black bg-red-100 border border-red-300 px-1 py-0.2 rounded-full truncate block whitespace-nowrap"
+                      >
                         収穫完了
                       </span>
                     ) : (
-                      <span className="text-[9px] text-gray-400">
+                      <span
+                        style={{ fontSize: `${Math.max(6, Math.round(9 * scaleRatio))}px` }}
+                        className="text-gray-400 block truncate"
+                      >
                         {isAssigned ? "稼働中" : ""}
                       </span>
                     )}
@@ -1080,6 +1398,172 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
               >
                 ✕
               </button>
+            </div>
+
+            {/* 🌟 区画の利用状態管理 (空き地 ⇄ 未割当・空き区画 ⇄ ユーザー割り当て) 🌟 */}
+            <div className="bg-gray-50/90 p-4 rounded-3xl border border-gray-200 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+                  <span>⚙️</span>
+                  <span>区画の利用状態:</span>
+                </span>
+                <span
+                  className={`text-xs font-black px-3 py-1 rounded-full border shadow-2xs ${
+                    detailPlot.is_vacant
+                      ? "bg-gray-200 text-gray-700 border-gray-300"
+                      : detailPlot.student_id
+                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                      : "bg-teal-50 text-teal-800 border-teal-300"
+                  }`}
+                >
+                  {detailPlot.is_vacant
+                    ? "🚧 空き地 (管理外)"
+                    : detailPlot.student_id
+                    ? `🧑‍🌾 割当中 (${detailPlot.student_name})`
+                    : "🌱 未割当 (空き区画)"}
+                </span>
+              </div>
+
+              {/* 3つの状態トグルボタン */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* 1. 空き地 */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await updatePlotStatus(detailPlot.id, "vacant");
+                    setDetailPlot((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            is_vacant: true,
+                            student_id: undefined,
+                            student_name: undefined,
+                            name: `区画 ${prev.code}`,
+                          }
+                        : prev
+                    );
+                    setToastMessage(`🚧 区画 ${detailPlot.code} を「空き地（管理外）」に設定しました`);
+                    setShowToast(true);
+                  }}
+                  className={`py-2.5 px-3 rounded-2xl font-bold text-xs transition border cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                    detailPlot.is_vacant
+                      ? "bg-gray-800 text-white border-gray-900 shadow-md ring-2 ring-gray-400"
+                      : "bg-white text-gray-600 hover:bg-gray-100 border-gray-200"
+                  }`}
+                >
+                  <span className="text-base">🚧</span>
+                  <span className="font-black">空き地</span>
+                  <span className="text-[10px] opacity-75">管理対象外（カウント除外）</span>
+                </button>
+
+                {/* 2. 未割当 (空き区画) */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await updatePlotStatus(detailPlot.id, "unassigned");
+                    setDetailPlot((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            is_vacant: false,
+                            student_id: undefined,
+                            student_name: undefined,
+                            name: `区画 ${prev.code}`,
+                          }
+                        : prev
+                    );
+                    setToastMessage(`🌱 区画 ${detailPlot.code} を「未割当（空き区画）」に設定しました`);
+                    setShowToast(true);
+                  }}
+                  className={`py-2.5 px-3 rounded-2xl font-bold text-xs transition border cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                    !detailPlot.is_vacant && !detailPlot.student_id
+                      ? "bg-teal-600 text-white border-teal-700 shadow-md ring-2 ring-teal-400"
+                      : "bg-white text-gray-600 hover:bg-teal-50 border-gray-200"
+                  }`}
+                >
+                  <span className="text-base">🌱</span>
+                  <span className="font-black">未割当 (空き区画)</span>
+                  <span className="text-[10px] opacity-75">管理対象（受講生待ち）</span>
+                </button>
+
+                {/* 3. ユーザー割り当て */}
+                <div
+                  className={`p-2 rounded-2xl border flex flex-col justify-between gap-1.5 ${
+                    detailPlot.student_id
+                      ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300 shadow-sm"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[11px] font-black text-emerald-950 px-1">
+                    <span className="flex items-center gap-1">
+                      <span>🧑‍🌾</span>
+                      <span>受講生割り当て</span>
+                    </span>
+                    {detailPlot.student_id && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await unassignStudentFromPlot(detailPlot.id);
+                          setDetailPlot((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  is_vacant: false,
+                                  student_id: undefined,
+                                  student_name: undefined,
+                                  name: `区画 ${prev.code}`,
+                                }
+                              : prev
+                          );
+                          setToastMessage(
+                            `区画 ${detailPlot.code} の受講生割り当てを解除し、「空き区画」にしました`
+                          );
+                          setShowToast(true);
+                        }}
+                        className="text-[10px] text-red-600 hover:underline cursor-pointer font-bold"
+                      >
+                        解除
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={detailPlot.student_id || ""}
+                    onChange={async (e) => {
+                      const selectedId = e.target.value;
+                      if (!selectedId) return;
+                      const selectedStudent = supabaseStudents.find((s) => s.id === selectedId);
+                      if (selectedStudent) {
+                        await assignStudentToPlot(detailPlot.id, selectedStudent.id, selectedStudent.full_name);
+                        setDetailPlot((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                is_vacant: false,
+                                student_id: selectedStudent.id,
+                                student_name: selectedStudent.full_name,
+                                name: `区画 ${prev.code} - ${selectedStudent.full_name}`,
+                              }
+                            : prev
+                        );
+                        setToastMessage(
+                          `🎯 区画 ${detailPlot.code} に ${selectedStudent.full_name} さんを割り当てました！`
+                        );
+                        setShowToast(true);
+                      }
+                    }}
+                    className="w-full bg-white border border-gray-300 rounded-xl px-2 py-1 text-xs font-bold text-gray-800 cursor-pointer"
+                  >
+                    <option value="" disabled>
+                      受講生を選択して割当...
+                    </option>
+                    {supabaseStudents.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name} {detailPlot.student_id === s.id ? "(担当中)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
 
             {/* 畝一覧 ＆ ＋畝を追加ボタン */}
@@ -1320,6 +1804,68 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           setApprovalModalBed(null);
         }}
       />
+
+      {/* 🧑‍🌾 受講生交代の確認モーダル 🧑‍🌾 */}
+      {confirmChangeStudentModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800"
+          onClick={() => setConfirmChangeStudentModal(null)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🔄</span>
+              <div>
+                <h3 className="font-black text-base text-gray-900">
+                  担当受講生を変更しますか？
+                </h3>
+                <p className="text-xs text-gray-500 font-bold">
+                  区画 {confirmChangeStudentModal.plot.code} の担当者を変更します。
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 font-bold">現在の担当者:</span>
+                <span className="font-black text-gray-800">
+                  🧑‍🌾 {confirmChangeStudentModal.plot.student_name || "未割り当て"}
+                </span>
+              </div>
+              <div className="flex justify-center text-gray-400 font-black">↓</div>
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-700 font-bold">新しい担当者:</span>
+                <span className="font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">
+                  🧑‍🌾 {confirmChangeStudentModal.newStudent.name}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-gray-400">
+              ※ 現在の担当者（{confirmChangeStudentModal.plot.student_name}さん）は未割り当てリストへ戻ります。
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setConfirmChangeStudentModal(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmChangeStudent()}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow transition cursor-pointer"
+              >
+                変更する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
