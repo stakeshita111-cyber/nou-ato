@@ -93,6 +93,12 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // 🌟【100人規模対応】スマートフィルター State 🌟
+  const [filterTab, setFilterTab] = useState<"unreplied" | "all" | "ai_answered" | "approved">("unreplied");
+  const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [approveOnReply, setApproveOnReply] = useState<{ [key: string]: boolean }>({});
+
   // 🌟【新機能】スライド表示設定 State (各生徒直近3回分・ソート順・速度) 🌟
   const [slideSettings, setSlideSettings] = useState<SlideSettings>({
     sortBy: "newest",
@@ -213,6 +219,155 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         setLoading(false);
       }
     }
+  };
+
+  // 返信送信＆再編集保存 (返信と同時にナレッジ承認も保存可能)
+  const handleSendReply = async (id: string) => {
+    const text = replyInput[id];
+    if (!text?.trim()) return;
+
+    const shouldApprove = approveOnReply[id] || false;
+
+    const { error } = await supabase
+      .from("journals")
+      .update({
+        reply: text,
+        ...(shouldApprove ? { is_approved: true } : {}),
+      })
+      .eq("id", id);
+
+    if (error) {
+      setToastMessage("返信の保存に失敗しました: " + error.message);
+    } else {
+      setJournals(
+        journals.map((j) =>
+          j.id === id
+            ? { ...j, reply: text, ...(shouldApprove ? { is_approved: true } : {}) }
+            : j
+        )
+      );
+      setEditingReplyId(null);
+      setToastMessage(
+        shouldApprove
+          ? "💬 回答を送信し、★ AIナレッジとして承認保存しました！"
+          : "💬 生徒への回答メッセージを更新・保存しました！"
+      );
+    }
+    setShowToast(true);
+  };
+
+  // 返信の再編集モードを開く
+  const handleStartEditReply = (journal: JournalItem) => {
+    setEditingReplyId(journal.id);
+    setReplyInput({ ...replyInput, [journal.id]: journal.reply || "" });
+  };
+
+  // AIナレッジ化（承認）
+  const handleToggleApprove = async (id: string, currentApproved: boolean) => {
+    const nextApproved = !currentApproved;
+    const { error } = await supabase
+      .from("journals")
+      .update({ is_approved: nextApproved })
+      .eq("id", id);
+
+    if (error) {
+      setToastMessage("承認状態の更新に失敗しました: " + error.message);
+    } else {
+      setJournals(
+        journals.map((j) => (j.id === id ? { ...j, is_approved: nextApproved } : j))
+      );
+      setToastMessage(
+        nextApproved
+          ? "✨ AI知識として承認保存しました"
+          : "承認を取り消しました"
+      );
+    }
+    setShowToast(true);
+  };
+
+  // 🌟 日誌・相談ログの削除 (不要データやテストデータの完全クリーンアップ) 🌟
+  const handleDeleteJournal = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm("この日記（相談ログ）を削除してもよろしいですか？\n削除するとAIナレッジの参照データからも完全に除外されます。")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("journals").delete().eq("id", id);
+      if (error) {
+        setToastMessage("削除に失敗しました: " + error.message);
+      } else {
+        const nextList = journals.filter((j) => j.id !== id);
+        setJournals(nextList);
+        setToastMessage("🗑️ 日記データを削除しました");
+      }
+    } catch (err: any) {
+      setToastMessage("削除エラー: " + err.message);
+    }
+    setShowToast(true);
+  };
+
+  // 🌟 緊急度・要注意キーワード判定 🌟
+  const isUrgentJournal = (content: string) => {
+    const urgentKeywords = ["枯れ", "虫", "病", "腐", "黄", "異変", "倒れ", "食べられ", "斑点", "カビ", "元気がない", "しおれ", "害虫"];
+    return urgentKeywords.some((k) => content.includes(k));
+  };
+
+  // 🌟 生徒一覧（ドロップダウン用） 🌟
+  const studentList = Array.from(
+    new Set(journals.map((j) => JSON.stringify({ id: j.student_id, name: j.studentName })))
+  ).map((s) => JSON.parse(s));
+
+  // 🌟 フィルタリング適用後の日誌リスト 🌟
+  const filteredJournals = journals.filter((j) => {
+    // 1. タブフィルター
+    if (filterTab === "unreplied") {
+      if (j.reply && j.reply.trim().length > 0) return false;
+    } else if (filterTab === "ai_answered") {
+      if (!j.reply || j.reply.trim().length === 0) return false;
+    } else if (filterTab === "approved") {
+      if (!j.is_approved) return false;
+    }
+
+    // 2. 生徒フィルター
+    if (selectedStudentFilter !== "all" && j.student_id !== selectedStudentFilter) {
+      return false;
+    }
+
+    // 3. 検索クエリ
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchContent = j.content.toLowerCase().includes(q);
+      const matchReply = (j.reply || "").toLowerCase().includes(q);
+      const matchStudent = (j.studentName || "").toLowerCase().includes(q);
+      const matchTitle = (j.taskTitle || "").toLowerCase().includes(q);
+      if (!matchContent && !matchReply && !matchStudent && !matchTitle) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // 未返信件数のカウント（バッジ用）
+  const unrepliedCount = journals.filter((j) => !j.reply || !j.reply.trim()).length;
+  const approvedCount = journals.filter((j) => j.is_approved).length;
+
+  // ページめくり処理 (フィルタリング後のリストに連動)
+  const totalPages = filteredJournals.length;
+  const currentJournal = filteredJournals[currentPage] || filteredJournals[0];
+
+  // フィルター変更時にページ番号が範囲外にならないようリセット
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [filterTab, selectedStudentFilter, searchQuery]);
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) setCurrentPage(currentPage + 1);
   };
 
   // 🌟【実データ完全連動】下部自動スライド用: 生徒の最新投稿（各生徒直近3回分抽出 ＆ ソート並べ替え ＆ 2行化） 🌟
@@ -556,104 +711,165 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     setActiveSlideStatus("forward");
   };
 
-  // 返信送信＆再編集保存 (要件: 回答を編集できるように)
-  const handleSendReply = async (id: string) => {
-    const text = replyInput[id];
-    if (!text?.trim()) return;
 
-    const { error } = await supabase
-      .from("journals")
-      .update({ reply: text })
-      .eq("id", id);
-
-    if (error) {
-      setToastMessage("返信の保存に失敗しました: " + error.message);
-    } else {
-      setJournals(journals.map((j) => (j.id === id ? { ...j, reply: text } : j)));
-      setEditingReplyId(null);
-      setToastMessage("💬 生徒への回答メッセージを更新・保存しました！");
-    }
-    setShowToast(true);
-  };
-
-  // 返信の再編集モードを開く
-  const handleStartEditReply = (journal: JournalItem) => {
-    setEditingReplyId(journal.id);
-    setReplyInput({ ...replyInput, [journal.id]: journal.reply || "" });
-  };
-
-  // AIナレッジ化（承認）
-  const handleToggleApprove = async (id: string, currentApproved: boolean) => {
-    const nextApproved = !currentApproved;
-    const { error } = await supabase
-      .from("journals")
-      .update({ is_approved: nextApproved })
-      .eq("id", id);
-
-    if (error) {
-      setToastMessage("承認状態の更新に失敗しました: " + error.message);
-    } else {
-      setJournals(
-        journals.map((j) => (j.id === id ? { ...j, is_approved: nextApproved } : j))
-      );
-      setToastMessage(
-        nextApproved
-          ? "✨ AI知識として承認保存しました"
-          : "承認を取り消しました"
-      );
-    }
-    setShowToast(true);
-  };
-
-  // ページめくり処理
-  const totalPages = journals.length;
-  const currentJournal = journals[currentPage] || journals[0];
-
-  const handlePrevPage = () => {
-    if (currentPage > 0) setCurrentPage(currentPage - 1);
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages - 1) setCurrentPage(currentPage + 1);
-  };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      <div className="flex items-center justify-between">
+      {/* 🌟 1. ヘッダー ＆ スマート操作エリア 🌟 */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black text-gray-900">📖 交換日記帳・相談確認</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            本をめくるように1ページずつ確認し、回答の送信および再編集ができます。
+          <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+            <span>📖 交換日記帳・相談確認</span>
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            生徒100人規模でも要対応の相談を迷わず確認・返信・ナレッジ化できます。
           </p>
         </div>
 
         {totalPages > 0 && (
           <button
             onClick={() => setShowIndexModal(true)}
-            className="px-3.5 py-2 app-bg-card border app-border font-bold text-xs rounded-xl shadow-xs hover:bg-gray-100 transition flex items-center space-x-1.5"
+            className="self-start sm:self-auto px-3.5 py-2 app-bg-card border app-border font-bold text-xs rounded-xl shadow-xs hover:bg-gray-100 transition flex items-center space-x-1.5 cursor-pointer"
           >
-            <span>📜 全日記の一覧を見る ({totalPages}件)</span>
+            <span>📜 一覧で見る ({totalPages}件)</span>
           </button>
         )}
       </div>
 
+      {/* 🌟 2. 状態別スマートフィルタータブ (未返信・AI対応済み・承認ナレッジ・すべて) 🌟 */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200/90 text-xs font-bold">
+        {/* 🔴 未返信（要対応） */}
+        <button
+          type="button"
+          onClick={() => setFilterTab("unreplied")}
+          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+            filterTab === "unreplied"
+              ? "bg-white text-red-700 shadow-xs border border-gray-200"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <span>🔴 要対応 (未返信)</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+              unrepliedCount > 0 ? "bg-red-500 text-white animate-pulse" : "bg-gray-200 text-gray-600"
+            }`}
+          >
+            {unrepliedCount}
+          </span>
+        </button>
+
+        {/* 🟢 AI対応済み */}
+        <button
+          type="button"
+          onClick={() => setFilterTab("ai_answered")}
+          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+            filterTab === "ai_answered"
+              ? "bg-white text-emerald-800 shadow-xs border border-gray-200"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <span>🟢 回答・対応済み</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
+            {journals.length - unrepliedCount}
+          </span>
+        </button>
+
+        {/* 🌟 承認ナレッジ */}
+        <button
+          type="button"
+          onClick={() => setFilterTab("approved")}
+          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+            filterTab === "approved"
+              ? "bg-white text-amber-900 shadow-xs border border-gray-200"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <span>🌟 AI承認ナレッジ</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-900">
+            {approvedCount}
+          </span>
+        </button>
+
+        {/* 📜 すべて */}
+        <button
+          type="button"
+          onClick={() => setFilterTab("all")}
+          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+            filterTab === "all"
+              ? "bg-white text-gray-900 shadow-xs border border-gray-200"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <span>📜 すべて ({journals.length})</span>
+        </button>
+      </div>
+
+      {/* 🌟 3. 生徒ドロップダウン ＆ キーワード検索バー 🌟 */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-white p-3 rounded-2xl border border-gray-200 shadow-2xs">
+        {/* 生徒選択ドロップダウン */}
+        <div className="sm:col-span-4 flex items-center space-x-2">
+          <span className="text-xs font-black text-gray-500 shrink-0">👤 生徒:</span>
+          <select
+            value={selectedStudentFilter}
+            onChange={(e) => setSelectedStudentFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 transition"
+          >
+            <option value="all">全生徒 ({studentList.length}名)</option>
+            {studentList.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* キーワード検索入力 */}
+        <div className="sm:col-span-8 flex items-center space-x-2">
+          <span className="text-xs font-black text-gray-500 shrink-0">🔍 検索:</span>
+          <input
+            type="text"
+            placeholder="質問内容・キーワード (例: トマト, 虫, 水やり)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 transition placeholder-gray-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-1"
+            >
+              クリア
+            </button>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className="p-8 text-center text-xs text-gray-500">交換日記帳を開いています...</div>
-      ) : journals.length === 0 ? (
+      ) : totalPages === 0 ? (
+        /* 該当する日記が0件のときのスマート空状態 */
         <div className="app-bg-card rounded-3xl p-12 text-center border app-border space-y-3">
           <div className="w-12 h-12 app-accent-light rounded-2xl flex items-center justify-center mx-auto text-xl font-bold">
-            📖
+            {filterTab === "unreplied" ? "🎉" : "📖"}
           </div>
-          <h3 className="font-bold text-gray-800 text-sm">届いている交換日記はありません</h3>
+          <h3 className="font-bold text-gray-800 text-sm">
+            {filterTab === "unreplied"
+              ? "現在、未返信の日記・相談はありません！"
+              : filterTab === "approved"
+              ? "承認済みのAIナレッジはまだありません"
+              : "条件に一致する交換日記は見つかりませんでした"}
+          </h3>
           <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            生徒がタスク完了時や日誌機能からメッセージを送信すると、ここに1ページずつ綴られます。
+            {filterTab === "unreplied"
+              ? "生徒からの質問にはすべて回答済みです。お疲れ様でした✨"
+              : "上部のフィルター条件や検索キーワードを変更してお試しください。"}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {/* 1. ページナビゲーションコントローラー (めくり操作) */}
+          {/* 4. ページナビゲーションコントローラー (めくり操作) */}
           <div className="flex items-center justify-between app-bg-card p-3 rounded-2xl border app-border shadow-xs">
             <button
               onClick={handlePrevPage}
@@ -661,7 +877,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1 ${
                 currentPage === 0
                   ? "opacity-30 cursor-not-allowed bg-gray-100 text-gray-400"
-                  : "app-accent-btn shadow-xs active:scale-95"
+                  : "app-accent-btn shadow-xs active:scale-95 cursor-pointer"
               }`}
             >
               <span>◀ 前の日記</span>
@@ -669,10 +885,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
             <div className="text-center space-y-0.5">
               <span className="text-xs font-black text-gray-900">
-                日記帳 ページ {currentPage + 1} / {totalPages}
+                表示中: {currentPage + 1} / {totalPages} 件
               </span>
-              <div className="flex justify-center space-x-1">
-                {journals.map((_, idx) => (
+              <div className="flex justify-center space-x-1 max-w-[200px] overflow-hidden">
+                {filteredJournals.slice(0, 15).map((_, idx) => (
                   <span
                     key={idx}
                     onClick={() => setCurrentPage(idx)}
@@ -690,14 +906,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1 ${
                 currentPage === totalPages - 1
                   ? "opacity-30 cursor-not-allowed bg-gray-100 text-gray-400"
-                  : "app-accent-btn shadow-xs active:scale-95"
+                  : "app-accent-btn shadow-xs active:scale-95 cursor-pointer"
               }`}
             >
               <span>次の日記 ▶</span>
             </button>
           </div>
 
-          {/* 2. 日記帳スタイル メインカード (めくり表示) */}
+          {/* 5. 日記帳スタイル メインカード (めくり表示) */}
           {currentJournal && (
             <div className="app-bg-card rounded-3xl p-8 border-2 app-border shadow-xl space-y-6 relative overflow-hidden transition-all duration-300">
               {/* 日記本風ブック装飾 */}
@@ -705,17 +921,24 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
               <div className="pl-3 space-y-5">
                 {/* ヘッダー情報 */}
-                <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+                <div className="flex flex-wrap items-center justify-between border-b border-gray-200 pb-4 gap-2">
                   <div className="flex items-center space-x-3">
                     <div className="w-11 h-11 rounded-full app-accent-btn font-black flex items-center justify-center text-sm shadow-md">
                       {currentJournal.studentAvatar}
                     </div>
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-1">
                         <h3 className="font-extrabold text-gray-900 text-base">{currentJournal.studentName}</h3>
                         <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                           {currentJournal.taskTitle}
                         </span>
+                        {/* 🚨 緊急度・要注意キーワードバッジ */}
+                        {isUrgentJournal(currentJournal.content) && (
+                          <span className="text-[10px] font-black bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
+                            <span>🚨</span>
+                            <span>要確認 (病害虫・枯れ等の相談)</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
                         📅 記載日時: {currentJournal.created_at}
@@ -723,27 +946,37 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleToggleApprove(currentJournal.id, currentJournal.is_approved)}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition ${
-                      currentJournal.is_approved
-                        ? "bg-amber-100 text-amber-800 border border-amber-300"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                  >
-                    <span>{currentJournal.is_approved ? "★ AIナレッジ承認済み" : "☆ AI知識として承認"}</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleToggleApprove(currentJournal.id, currentJournal.is_approved)}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer ${
+                        currentJournal.is_approved
+                          ? "bg-amber-100 text-amber-800 border border-amber-300"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      <span>{currentJournal.is_approved ? "★ AIナレッジ承認済み" : "☆ AI知識として承認"}</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => handleDeleteJournal(currentJournal.id, e)}
+                      title="この日記・相談データを削除"
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition font-bold text-xs flex items-center justify-center border border-gray-200 hover:border-red-200 cursor-pointer"
+                    >
+                      <span>🗑️ 削除</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* 生徒の日誌・質問本文 */}
                 <div className="space-y-1.5">
                   <span className="text-[11px] font-extrabold text-gray-500 block">📝 生徒からの提出・質問ノート:</span>
-                  <div className="text-sm text-gray-800 leading-relaxed bg-amber-50/40 p-5 rounded-2xl border border-amber-100 shadow-inner font-medium">
+                  <div className="text-sm text-gray-800 leading-relaxed bg-amber-50/40 p-5 rounded-2xl border border-amber-100 shadow-inner font-medium whitespace-pre-wrap">
                     {currentJournal.content}
                   </div>
                 </div>
 
-                {/* 講師からの回答・返信＆編集エリア (要件: 回答を再編集できるように) */}
+                {/* 講師からの回答・返信＆編集エリア (返信と同時にナレッジ承認も可能) */}
                 <div className="border-t border-gray-100 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-sm app-text-main flex items-center space-x-1.5">
@@ -753,7 +986,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     {currentJournal.reply && editingReplyId !== currentJournal.id && (
                       <button
                         onClick={() => handleStartEditReply(currentJournal)}
-                        className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition flex items-center space-x-1"
+                        className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition flex items-center space-x-1 cursor-pointer"
                       >
                         <span>✏️ 回答を編集する</span>
                       </button>
@@ -762,12 +995,15 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
                   {currentJournal.reply && editingReplyId !== currentJournal.id ? (
                     <div className="app-accent-light p-4 rounded-2xl text-xs space-y-1.5 border app-border shadow-xs">
-                      <p className="text-gray-900 leading-relaxed font-medium text-sm">
+                      <p className="text-gray-900 leading-relaxed font-medium text-sm whitespace-pre-wrap">
                         {currentJournal.reply}
                       </p>
-                      <span className="text-[10px] text-gray-400 block text-right font-semibold">
-                        ✓ 返信完了（タップで再編集可能）
-                      </span>
+                      <div className="flex items-center justify-between pt-1 border-t border-emerald-100 text-[10px] text-gray-500">
+                        <span>
+                          {currentJournal.is_approved ? "🌟 農園AIナレッジとして参照中" : "💡 未承認（通常返信）"}
+                        </span>
+                        <span className="font-semibold">✓ 返信完了</span>
+                      </div>
                     </div>
                   ) : (
                     /* 返信入力 ＆ 再編集フォーム */
@@ -779,26 +1015,44 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         onChange={(e) =>
                           setReplyInput({ ...replyInput, [currentJournal.id]: e.target.value })
                         }
-                        className="w-full p-3 rounded-xl text-xs focus:outline-none transition resize-none font-medium"
+                        className="w-full p-3 rounded-xl text-xs focus:outline-none transition resize-none font-medium bg-white border border-gray-200 focus:ring-2 focus:ring-emerald-600"
                       />
 
-                      <div className="flex justify-end space-x-2">
-                        {editingReplyId === currentJournal.id && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        {/* ★ 返信と同時にAIナレッジとして承認するチェックボックス */}
+                        <label className="flex items-center space-x-2 text-xs font-bold text-amber-900 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={approveOnReply[currentJournal.id] || false}
+                            onChange={(e) =>
+                              setApproveOnReply({
+                                ...approveOnReply,
+                                [currentJournal.id]: e.target.checked,
+                              })
+                            }
+                            className="rounded text-amber-600 focus:ring-amber-500"
+                          />
+                          <span>🌟 この回答を農園AIナレッジとしても登録（承認）する</span>
+                        </label>
+
+                        <div className="flex justify-end space-x-2">
+                          {editingReplyId === currentJournal.id && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingReplyId(null)}
+                              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                            >
+                              キャンセル
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => setEditingReplyId(null)}
-                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition"
+                            onClick={() => handleSendReply(currentJournal.id)}
+                            className="px-5 py-2.5 app-accent-btn font-bold text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer"
                           >
-                            キャンセル
+                            {editingReplyId === currentJournal.id ? "回答を更新保存する" : "回答を送信する"}
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleSendReply(currentJournal.id)}
-                          className="px-5 py-2.5 app-accent-btn font-bold text-xs rounded-xl shadow-md transition active:scale-95"
-                        >
-                          {editingReplyId === currentJournal.id ? "回答を更新保存する" : "回答を送信する"}
-                        </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -809,7 +1063,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         </div>
       )}
 
-      {/* 🌟【新機能】下部: 生徒からの「作業記録の報告」自動流動スライドカード (2行表示・最新順・日付カード付き・30%低速・左側ホバーで逆再生) 🌟 */}
+      {/* 🌟 6. 下部: 生徒からの「作業記録の報告」自動流動スライドカード 🌟 */}
       <div className="pt-6 border-t border-emerald-100/60 space-y-3">
         <div className="flex flex-wrap items-center justify-between px-1 gap-2">
           <div className="flex items-center space-x-2">
@@ -821,7 +1075,6 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* ⚙️ スライド表示設定ボタン */}
             <button
               type="button"
               onClick={() => setShowSlideSettingsModal(true)}
@@ -848,7 +1101,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               {activeSlideStatus === "reverse" && (
                 <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
                   <span>◀◀</span>
-                  <span>逆スライド中 (左側ホバー)</span>
+                  <span>逆スライド中</span>
                 </span>
               )}
               {activeSlideStatus === "paused" && (
@@ -873,13 +1126,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           onMouseLeave={handleSliderMouseLeave}
           className="relative w-full overflow-x-hidden rounded-2xl bg-emerald-50/30 p-3 border border-emerald-100/80 select-none cursor-pointer"
         >
-          {/* 左端逆スライドエリア ガイドヒント */}
           <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-emerald-100/40 to-transparent pointer-events-none z-10 flex items-center justify-start pl-1">
             <span className="text-emerald-700/40 text-xs font-black">◀</span>
           </div>
 
           <div ref={trackRef} className="flex space-x-3 w-max">
-            {/* シームレス無限ループ用重畳配列 (前半 + 後半) */}
             {[...slideColumns, ...slideColumns].map((col, colIdx) => (
               <div key={`col_${colIdx}`} className="flex flex-col space-y-2.5 shrink-0">
                 {col.map((item, rowIdx) => {
@@ -902,7 +1153,6 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                       }}
                       className="w-80 sm:w-96 h-[126px] shrink-0 bg-white p-2.5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:bg-emerald-50/20 transition-all duration-200 flex space-x-3 group text-left relative overflow-hidden cursor-pointer"
                     >
-                      {/* 1. 投稿された実際の写真がある場合のみ左側にサムネイル画像を表示 */}
                       {hasRealImage && (
                         <div className="w-24 sm:w-28 h-full rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-2xs bg-emerald-50 relative group-hover:scale-[1.02] transition-transform duration-300">
                           <img
@@ -916,10 +1166,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         </div>
                       )}
 
-                      {/* 2. 投稿日・生徒情報・テキスト（画像がない場合はスッキリ全幅） */}
                       <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
                         <div className="space-y-1">
-                          {/* 投稿日 ＆ カテゴリ・作業種別 */}
                           <div className="flex items-center justify-between gap-1">
                             <span className="text-[10px] font-black text-emerald-900 bg-emerald-100/90 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
                               <span>📅</span>
@@ -932,7 +1180,6 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                             </span>
                           </div>
 
-                          {/* 生徒氏名 */}
                           <div className="flex items-center space-x-1.5">
                             <div className="w-4.5 h-4.5 rounded-full bg-emerald-600 text-white font-black text-[9px] flex items-center justify-center shadow-2xs shrink-0">
                               {item.studentAvatar}
@@ -942,13 +1189,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                             </span>
                           </div>
 
-                          {/* メモ・相談テキスト本文 */}
                           <p className="text-[11px] text-gray-700 font-medium line-clamp-2 leading-snug">
                             {item.content}
                           </p>
                         </div>
 
-                        {/* カード下部: 収穫量 ＆ リンクヒント */}
                         <div className="flex items-center justify-between text-[9px] text-gray-400 font-semibold border-t border-gray-100 pt-0.5">
                           {item.harvestAmount ? (
                             <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-200">
@@ -972,22 +1217,24 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         </div>
       </div>
 
-      {/* 日誌インデックスモーダル (全ページ一覧ジャンプ) */}
+      {/* 🌟 7. 日誌インデックスモーダル (フィルター適用後の一覧ジャンプ) 🌟 */}
       {showIndexModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
           <div className="app-bg-card rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[80vh] overflow-y-auto border app-border">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="font-black text-gray-900 text-sm">📜 全交換日記ページ一覧 ({totalPages}件)</h3>
+              <h3 className="font-black text-gray-900 text-sm">
+                📜 日記・相談一覧 ({filteredJournals.length}件)
+              </h3>
               <button
                 onClick={() => setShowIndexModal(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-sm"
+                className="text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <div className="space-y-2">
-              {journals.map((j, idx) => (
+              {filteredJournals.map((j, idx) => (
                 <div
                   key={j.id}
                   onClick={() => {
@@ -1000,22 +1247,37 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                       : "bg-white hover:bg-gray-50 border-gray-200"
                   }`}
                 >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-gray-900">ページ {idx + 1}: {j.studentName}</span>
+                  <div className="space-y-0.5 min-w-0 flex-1 mr-2">
+                    <div className="flex items-center space-x-2 flex-wrap gap-1">
+                      <span className="font-bold text-gray-900">{j.studentName}</span>
                       {j.reply ? (
                         <span className="text-[9px] bg-green-100 text-green-800 px-1.5 py-0.2 rounded font-bold">
                           回答済み
                         </span>
                       ) : (
-                        <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold">
-                          未回答
+                        <span className="text-[9px] bg-red-100 text-red-800 px-1.5 py-0.2 rounded font-black animate-pulse">
+                          🔴 未回答
+                        </span>
+                      )}
+                      {j.is_approved && (
+                        <span className="text-[9px] bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded font-bold">
+                          🌟 ナレッジ承認
                         </span>
                       )}
                     </div>
                     <p className="text-gray-500 line-clamp-1">{j.content}</p>
                   </div>
-                  <span className="text-[10px] text-gray-400">{j.created_at}</span>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <span className="text-[10px] text-gray-400">{j.created_at}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteJournal(j.id, e)}
+                      title="この日記を削除"
+                      className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition cursor-pointer"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

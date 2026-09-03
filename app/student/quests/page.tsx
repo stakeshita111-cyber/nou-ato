@@ -278,6 +278,7 @@ export default function StudentQuestsPage() {
         {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
         {activeTab === "myfarm" && (
           <StudentFarmRecordView
+            studentId={user?.id}
             studentName={userAccountName}
             tasks={tasks}
             onSelectTask={setSelectedTask}
@@ -338,7 +339,11 @@ export default function StudentQuestsPage() {
         {/* 4. 相談 タブ */}
         {activeTab === "talk" && talkTabEnabled && (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-            <StudentTalkView journals={journals} studentName={userAccountName} />
+            <StudentTalkView
+              journals={journals}
+              studentName={userAccountName}
+              studentId={user?.id}
+            />
           </div>
         )}
 
@@ -370,6 +375,8 @@ export default function StudentQuestsPage() {
       {selectedTask && (
         <TaskDetailModel
           task={selectedTask}
+          studentId={user?.id}
+          studentName={userAccountName}
           onClose={() => setSelectedTask(null)}
           onComplete={handleCompleteTask}
         />

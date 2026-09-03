@@ -10,6 +10,7 @@ import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
 import { supabase } from "@/lib/supabase";
 
 interface StudentFarmRecordViewProps {
+  studentId?: string;
   studentName?: string;
   tasks?: any[];
   onSelectTask?: (task: any) => void;
@@ -21,6 +22,7 @@ interface StudentFarmRecordViewProps {
 }
 
 export default function StudentFarmRecordView({
+  studentId,
   studentName = "受講生",
   tasks = [],
   onSelectTask,
@@ -36,29 +38,29 @@ export default function StudentFarmRecordView({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   
 
-  // 🌟 自分に現在割り当てられている最新の担当区画 (竹下様または指定生徒) をプロット単位で厳密抽出 🌟
+  // 🌟 自分（ログイン中の生徒）に現在割り当てられている担当区画を厳密抽出 🌟
   const myPlot =
-    // 1. プロット自身に生徒名が設定されているものを最優先
-    plots.find(
-      (p) =>
-        !p.is_vacant &&
-        p.student_name &&
-        (p.student_name.includes("竹下") || (studentName && studentName !== "受講生" && p.student_name.includes(studentName)))
-    ) ||
-    // 2. プロット自身に生徒IDが設定されているもの
-    plots.find(
-      (p) =>
-        !p.is_vacant &&
-        p.student_id &&
-        (p.student_id === "acf193c5-f6b4-4514-93a4-958eba0e0c38" || p.student_id === "test_student_1")
-    ) ||
-    // 3. 最初に見つかった割り当て区画へのフォールバック
-    plots.find((p) => !p.is_vacant && p.student_id) ||
-    plots.find((p) => p.code === "C3") ||
-    plots.find((p) => p.code === "C2") ||
-    { id: "plot_cell_C3", code: "C3", name: "区画 C3", student_name: "竹下 翔", beds: [] };
+    // 1. studentId に完全一致するプロットを最優先
+    (studentId
+      ? plots.find((p) => !p.is_vacant && p.student_id === studentId)
+      : null) ||
+    // 2. studentName (表示名) に一致するプロット
+    (studentName && studentName !== "受講生"
+      ? plots.find(
+          (p) =>
+            !p.is_vacant &&
+            p.student_name &&
+            (p.student_name === studentName || p.student_name.includes(studentName) || studentName.includes(p.student_name))
+        )
+      : null) ||
+    // 3. 未ログイン/デフォルト時のフォールバック (竹下翔アカウント専用)
+    (studentName && (studentName.includes("竹下") || studentId === "acf193c5-f6b4-4514-93a4-958eba0e0c38")
+      ? plots.find((p) => !p.is_vacant && (p.student_id === "acf193c5-f6b4-4514-93a4-958eba0e0c38" || p.student_name?.includes("竹下"))) ||
+        plots.find((p) => p.code === "C2") ||
+        plots.find((p) => p.code === "C3")
+      : null);
 
-  const plotCode = myPlot?.code || "C3";
+  const plotCode = myPlot?.code || "A1";
   const defaultBedCount = (myPlot?.beds && myPlot.beds.length > 0) ? myPlot.beds.length : 7;
   const rawBeds: FarmBed[] = (myPlot?.beds && myPlot.beds.length > 0)
     ? myPlot.beds
@@ -216,9 +218,15 @@ export default function StudentFarmRecordView({
 
       // 講師の相談日誌・スライドカード用に journals へも自動連動保存
       try {
+        const resolvedStudentId =
+          studentId ||
+          ((studentName?.includes("竹下") || studentName === "竹下翔" || studentName === "竹下 翔")
+            ? "acf193c5-f6b4-4514-93a4-958eba0e0c38"
+            : null);
+
         await supabase.from("journals").insert([
           {
-            student_id: (studentName?.includes("竹下") || studentName === "竹下翔" || studentName === "竹下 翔") ? "acf193c5-f6b4-4514-93a4-958eba0e0c38" : null,
+            student_id: resolvedStudentId,
             content: `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`,
             image_url: imageUrl || null,
             role: "student",

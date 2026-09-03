@@ -6,6 +6,7 @@ import { useFarmManager } from "@/hooks/useFarmManager";
 
 interface TaskDetailModelProps {
   task: any;
+  studentId?: string;
   studentName?: string;
   onClose: () => void;
   onComplete?: (id: string, bedId?: string, photoUrl?: string, memo?: string) => void;
@@ -13,14 +14,20 @@ interface TaskDetailModelProps {
 
 export default function TaskDetailModel({
   task,
-  studentName = "佐藤 健太",
+  studentId,
+  studentName = "受講生",
   onClose,
   onComplete,
 }: TaskDetailModelProps) {
   const { plots, addCropRecord } = useFarmManager();
 
-  // 生徒自身の割当区画＆畝一覧を取得
-  const myPlot = plots.find((p) => p.student_name === studentName || p.student_name?.includes(studentName)) || plots[0];
+  // 生徒自身の割当区画＆畝一覧を厳密取得
+  const myPlot =
+    (studentId ? plots.find((p) => !p.is_vacant && p.student_id === studentId) : null) ||
+    (studentName && studentName !== "受講生"
+      ? plots.find((p) => !p.is_vacant && (p.student_name === studentName || p.student_name?.includes(studentName)))
+      : null) ||
+    null;
   const myBeds = myPlot?.beds || [];
 
   const [selectedBedId, setSelectedBedId] = useState<string>(myBeds[0]?.id || "");

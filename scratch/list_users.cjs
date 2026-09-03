@@ -22,13 +22,17 @@ if (fs.existsSync(envPath)) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function main() {
-  const { data: users } = await supabase.from("users").select("*");
+  const { data: users } = await supabase.from("users").select("id, display_name, email, role");
   console.log("=== 全ユーザー一覧 ===");
-  console.table(users);
+  console.log(JSON.stringify(users, null, 2));
 
-  const { data: beds } = await supabase.from("farm_beds").select("*");
-  console.log("=== 割り当て済みの畝ベッド一覧 ===");
-  console.table(beds.filter(b => b.assigned_user_name));
+  const { data: plots } = await supabase.from("farm_plots").select("id, code, name, student_id, student_name, is_vacant");
+  console.log("=== farm_plots 割り当て ===");
+  console.log(JSON.stringify((plots || []).filter(p => p.student_id || p.student_name || !p.is_vacant), null, 2));
+
+  const { data: beds } = await supabase.from("farm_beds").select("id, plot_id, bed_number, student_id, student_name, crop_name");
+  console.log("=== farm_beds (作物設定または割り当てあり) ===");
+  console.log(JSON.stringify((beds || []).filter(b => b.student_id || b.student_name || (b.crop_name && b.crop_name !== "未確定 🌱")), null, 2));
 }
 
 main();

@@ -113,11 +113,23 @@ export function useStudentDashboard() {
 
         const currentStudentId = studentUserObj?.id || "student_default";
 
-        // 1. 講師が割り当てた畝 (farm_beds) を取得
-        let { data: bedData } = await supabase
-          .from("farm_beds")
-          .select("*, farm_plots(*)")
-          .or(`student_id.eq.${currentStudentId},student_name.ilike.%竹下%`);
+        // 1. 講師が割り当てた畝 (farm_beds) を取得 (ログイン中の生徒のみ厳密抽出)
+        let bedData: any[] = [];
+        if (currentStudentId && currentStudentId !== "student_default") {
+          const { data } = await supabase
+            .from("farm_beds")
+            .select("*, farm_plots(*)")
+            .eq("student_id", currentStudentId);
+          bedData = data || [];
+        } else {
+          // 未ログイン・デフォルト時のフォールバック (竹下翔アカウント専用)
+          const isTakeshita = studentUserObj?.name?.includes("竹下");
+          const { data } = await supabase
+            .from("farm_beds")
+            .select("*, farm_plots(*)")
+            .or(isTakeshita ? `student_id.eq.${currentStudentId},student_name.ilike.%竹下%` : `student_id.eq.${currentStudentId}`);
+          bedData = data || [];
+        }
 
         if (bedData && bedData.length > 0) {
           setMyBeds(bedData);
@@ -157,25 +169,42 @@ export function useStudentDashboard() {
 
         setTasks(taskList);
 
-        // 3. journals 取得
-        const { data: jData } = await supabase
+        // 3. journals 取得 (ログイン中の生徒自身の記録のみ厳密に取得)
+        let jData: any[] = [];
+        if (currentStudentId && currentStudentId !== "student_default") {
+          const { data } = await supabase
+            .from("journals")
+            .select("*")
+            .eq("student_id", currentStudentId)
+            .order("created_at", { ascending: false });
+          jData = data || [];
+        } else {
+          // デフォルト生徒の場合
+          const { data } = await supabase
+            .from("journals")
+            .select("*")
+            .or(`student_id.eq.${currentStudentId},student_name.ilike.%竹下%`)
+            .order("created_at", { ascending: false });
+          jData = data || [];
+        }
+
+        setJournals(jData);
+
+        // 全体お知らせ (broadcasts) のみ別途取得
+        const { data: bcData } = await supabase
           .from("journals")
           .select("*")
+          .eq("student_id", "all_students")
           .order("created_at", { ascending: false });
 
-        if (jData) {
-          setJournals(jData);
-
-          const dbBc = jData
-            .filter((j: any) => j.student_id === "all_students" || (j.task_title && j.task_title.includes("全体お知らせ")))
-            .map((j: any) => ({
-              id: j.id,
-              title: j.task_title?.replace("📢 【全体お知らせ】", "") || "講師からのお知らせ",
-              content: j.content || j.reply || "",
-              sender: "講師 (たなか自然農園)",
-              created_at: j.created_at,
-            }));
-
+        if (bcData) {
+          const dbBc = bcData.map((j: any) => ({
+            id: j.id,
+            title: j.task_title?.replace("📢 【全体お知らせ】", "") || "講師からのお知らせ",
+            content: j.content || j.reply || "",
+            sender: "講師 (たなか自然農園)",
+            created_at: j.created_at,
+          }));
           setBroadcasts(dbBc);
         }
       } catch (e) {

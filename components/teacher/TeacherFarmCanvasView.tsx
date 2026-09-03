@@ -317,6 +317,31 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     }
   }, [initialPlotCode, currentFarmPlots]);
 
+  // 🌟 開いている区画詳細モーダルを最新の plots データとリアルタイム同期 (リロード不要) 🌟
+  useEffect(() => {
+    if (detailPlot) {
+      const updated = plots.find((p) => p.id === detailPlot.id || p.code === detailPlot.code);
+      if (updated) {
+        setDetailPlot(updated);
+      }
+    }
+  }, [plots]);
+
+  // 🌟 開いている観察記録タイムラインを最新データとリアルタイム同期 (リロード不要) 🌟
+  useEffect(() => {
+    if (selectedBedForRecords && detailPlot) {
+      const displayNum = selectedBedForRecords.bed_number || 1;
+      fetchBedRecords(
+        detailPlot.code,
+        displayNum,
+        selectedBedForRecords.id,
+        detailPlot.student_name,
+        selectedBedForRecords.latest_record,
+        selectedBedForRecords.crop_name
+      );
+    }
+  }, [records, plots]);
+
   // 🚚 D&D マス目への純粋スワップハンドラー (セルアドレス A1, B2 等の位置固定・中身データのみ1対1相互交換)
   const handleMovePlotToGridCell = async (fromInput: string | number | null, toInput: string | number) => {
     if (fromInput === null || fromInput === undefined || fromInput === toInput) return;
@@ -1288,16 +1313,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                       : "bg-white border-dashed border-emerald-300 hover:border-emerald-500 hover:shadow-sm"
                   }`}
                 >
-                  {/* 要承認冠バッジ (赤系強調) */}
-                  {hasPendingApproval && (
-                    <span
-                      style={{ fontSize: `${Math.max(7, Math.round(9 * scaleRatio))}px` }}
-                      className="absolute -top-2.5 -left-1.5 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black px-1.5 py-0.5 rounded-full shadow-lg animate-bounce border border-white whitespace-nowrap z-10"
-                    >
-                      🏆 要承認
-                    </span>
-                  )}
-
                   {/* セルアドレス & 畝数 */}
                   <div className="w-full flex items-center justify-between pointer-events-none gap-0.5 overflow-hidden">
                     <span
@@ -1316,8 +1331,18 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                     )}
                   </div>
 
-                  {/* 生徒名表示 */}
-                  <div className="text-center w-full pointer-events-none overflow-hidden px-0.5">
+                  {/* 生徒名 ＆ 要承認バッジ (名前の真上で中央揃え) */}
+                  <div className="text-center w-full pointer-events-none overflow-hidden px-0.5 flex flex-col items-center justify-center gap-0.5 my-auto">
+                    {/* 🌟 要承認バッジ: 名前の真上で中央揃え 🌟 */}
+                    {hasPendingApproval && (
+                      <span
+                        style={{ fontSize: `${Math.max(7, Math.round(9 * scaleRatio))}px` }}
+                        className="bg-gradient-to-r from-red-600 to-rose-600 text-white font-black px-2 py-0.5 rounded-full shadow-xs animate-pulse border border-white/90 whitespace-nowrap inline-flex items-center gap-0.5 leading-none"
+                      >
+                        🏆 要承認
+                      </span>
+                    )}
+
                     {isAssigned ? (
                       <span
                         style={{ fontSize: `${Math.max(8, Math.round(12 * scaleRatio))}px` }}

@@ -606,11 +606,31 @@ export function useFarmManager() {
     window.addEventListener("nouato_sync_event", handleCustomSync);
 
     const handleStorageSync = (e: StorageEvent) => {
-      if (e.key === "nouato_farm_plots") {
+      if (e.key === "nouato_farm_plots" || e.key === "nouato_crop_records") {
         reloadAllFromSupabase();
       }
     };
     window.addEventListener("storage", handleStorageSync);
+
+    // 🌟 タブがアクティブになった瞬間に自動再同期 (リロード不要) 🌟
+    const handleFocus = () => {
+      reloadAllFromSupabase();
+    };
+    window.addEventListener("focus", handleFocus);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        reloadAllFromSupabase();
+      }
+    };
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 🌟 10秒ごとの自動バックグラウンドポーリング (WebSocket切断や別端末操作も完全カバー) 🌟
+    const pollInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        reloadAllFromSupabase();
+      }
+    }, 10000);
 
     return () => {
       if (broadcastRef.current) {
@@ -619,6 +639,9 @@ export function useFarmManager() {
       supabase.removeChannel(realtimeChannel);
       window.removeEventListener("storage", handleStorageSync);
       window.removeEventListener("nouato_sync_event", handleCustomSync);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(pollInterval);
     };
   }, [reloadAllFromSupabase]);
 
