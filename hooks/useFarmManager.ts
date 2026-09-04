@@ -393,9 +393,9 @@ export function useFarmManager() {
             status = "completed_pending";
           }
 
-          let total_harvest = pendingData?.total_harvest || dbB?.total_harvest || undefined;
-          let completion_notes = pendingData?.completion_notes || dbB?.completion_notes || undefined;
-          let completion_image_url = pendingData?.completion_image_url || dbB?.completion_image_url || undefined;
+          let total_harvest = pendingData?.total_harvest || ((status === "completed_pending" || status === "rejected") ? dbB?.total_harvest : undefined);
+          let completion_notes = pendingData?.completion_notes || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_notes : undefined);
+          let completion_image_url = pendingData?.completion_image_url || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_image_url : undefined);
           let season = dbB?.season || "2026年 秋冬";
 
           // 最新の観察記録を取得 (該当スロットIDまたは元のdbB.id)
@@ -404,7 +404,7 @@ export function useFarmManager() {
 
           if (isPlotAssigned) {
             const bedAllRecs = formattedRecords
-              .filter((r) => r.bed_id === bedId || (dbB?.id && r.bed_id === dbB.id))
+              .filter((r) => (r.bed_id === bedId || (dbB?.id && r.bed_id === dbB.id)) && !r.bed_id?.startsWith("archived_"))
               .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
 
             if (bedAllRecs.length > 0) {
@@ -1408,7 +1408,7 @@ export function useFarmManager() {
     }
   ) => {
     const todayStr = new Date().toLocaleDateString("ja-JP");
-    let targetCropName = "トマト";
+    let targetCropName = "未確定 🌱";
     let targetStudentName = "竹下 翔";
     let targetPlotCode = "C3";
     let targetBedNum = 1;
@@ -1429,7 +1429,7 @@ export function useFarmManager() {
           const isMatchBed = bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId);
 
           if (isMatchBed) {
-            targetCropName = bed.crop_name || "トマト";
+            targetCropName = bed.crop_name || "未確定 🌱";
             targetBedNum = bed.bed_number;
             return {
               ...bed,
@@ -1539,10 +1539,63 @@ export function useFarmManager() {
       return plot;
     });
 
-    setPlots(nextPlots);
+    // 🌟 該当スロットの最新完了報告情報（メモ・収穫量・画像）を journals または DB から安全に確認・同期 🌟
+    try {
+      const { data: pendingJournals } = await supabase
+        .from("journals")
+        .select("*")
+        .like("content", `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (pendingJournals && pendingJournals.length > 0) {
+        const pj = pendingJournals[0];
+        const cropMatch = pj.content?.match(/\((.*?)\)/);
+        const harvestMatch = pj.content?.match(/収穫量:\s*([^\n]+)/);
+        const notesMatch = pj.content?.match(/振り返り:\s*([^\n]+)/);
+
+        if (cropMatch && cropMatch[1]?.trim()) oldCropName = cropMatch[1].trim();
+        if (harvestMatch && harvestMatch[1]?.trim() && harvestMatch[1].trim() !== "未記載") {
+          oldHarvest = harvestMatch[1].trim();
+        }
+        if (notesMatch && notesMatch[1]?.trim() && notesMatch[1].trim() !== "順調に収穫できました") {
+          oldNotes = notesMatch[1].trim();
+        }
+        if (pj.image_url) oldImg = pj.image_url;
+      }
+    } catch (e) {
+      console.warn("fetch latest completion journal notice:", e);
+    }
 
     // 1. 完了した作物をアーカイブ用レコードとして DB (farm_beds) に永続保存
     const archiveId = `archived_bed_${targetPlotCode}_${targetBedNumber}_${Date.now()}`;
+    const newArchivedBed: FarmBed = {
+      id: archiveId,
+      plot_id: plotId,
+      bed_number: targetBedNumber,
+      crop_name: oldCropName,
+      status: "archived",
+      season: oldSeason,
+      harvested_at: todayStr,
+      total_harvest: oldHarvest || undefined,
+      completion_notes: oldNotes || undefined,
+      completion_image_url: oldImg || undefined,
+      progress_percent: 100,
+      is_updated: false,
+    };
+
+    const finalPlots = nextPlots.map((plot) => {
+      if (plot.id === plotId || plot.code === plotId) {
+        return {
+          ...plot,
+          beds: [...plot.beds, newArchivedBed],
+        };
+      }
+      return plot;
+    });
+
+    setPlots(finalPlots);
+
     try {
       await supabase.from("farm_beds").insert([
         {
@@ -1560,12 +1613,12 @@ export function useFarmManager() {
         },
       ]);
 
-      // 🌟 過去の観察記録 (crop_records) の bed_id をアーカイブIDへ引越し！ 🌟
-      // これにより、新しい畝はまっさらな 0 件になり、過去ログは「過去の作物を見る」で完全に保持される！
+      // 🌟 過去の観察記録 (crop_records) の bed_id をアーカイブIDへ完全移行！ 🌟
+      const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`;
       await supabase
         .from("crop_records")
         .update({ bed_id: archiveId })
-        .eq("bed_id", `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`);
+        .or(`bed_id.eq.${exactBedId},bed_id.eq.${bedId},bed_id.like.%${targetPlotCode}_bed_${targetBedNumber}`);
 
       console.log(`📦 完了作物と過去記録をアーカイブに完全移行しました: ${archiveId}`);
     } catch (e) {
@@ -1584,7 +1637,7 @@ export function useFarmManager() {
         completion_notes: null,
         total_harvest: null,
         completion_image_url: null,
-      }).eq("id", exactBedId);
+      }).or(`id.eq.${exactBedId},id.eq.${bedId}`);
     } catch (e) {
       console.warn("farm_beds reset update error:", e);
     }
@@ -1594,10 +1647,10 @@ export function useFarmManager() {
       await supabase
         .from("journals")
         .update({ is_approved: true })
-        .like("content", `%【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNumber}%`);
+        .like("content", `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
     } catch (e) {}
 
-    await savePlotsGridIndicesToSupabase(nextPlots);
+    await savePlotsGridIndicesToSupabase(finalPlots);
     notifyBroadcast();
   };
 

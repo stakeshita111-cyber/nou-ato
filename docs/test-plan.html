@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOU-ATO E2Eテスト導入 提案＆ディスカッションシート</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-16">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 bg-emerald-600/60 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-2">
+          <span>🌱 NOU-ATO (のうあと) 品質保証計画</span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">E2Eテスト導入 提案＆ディスカッションシート</h1>
+      </div>
+      <div class="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/20 text-xs flex flex-col gap-1">
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>対象: メンター / 講師レビュー・相談用</span></div>
+        <div class="text-emerald-200">更新日: 2026年9月4日</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 pt-8 space-y-8">
+
+    <!-- Lead Box -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row items-center gap-6">
+      <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl flex-shrink-0 font-black shadow-inner">
+        💡
+      </div>
+      <div class="flex-1">
+        <h2 class="text-base font-bold text-slate-900 mb-1">このシートの目的</h2>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          講師の先生と<strong>「テスト自動化のスコープ」「進め方」「技術選定」</strong>について認識を合わせ、どこまで検討しているかを共有するためのディスカッション資料です。
+        </p>
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <span class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">Playwright採用</span>
+        <span class="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-bold">自律自己修復</span>
+      </div>
+    </div>
+
+    <!-- Section 1: なぜやるのか (Why) -->
+    <section class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/80">
+      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 text-white font-bold text-sm">1</span>
+        <h2 class="text-xl font-bold text-slate-900">導入の目的 ＆ 絶対に守りたいコア機能</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="p-5 rounded-xl bg-gradient-to-b from-amber-50/70 to-white border border-amber-200">
+          <div class="text-2xl mb-2">⚡</div>
+          <h3 class="font-bold text-slate-900 text-base mb-1">2画面リアルタイム同期</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            本アプリ最大の強みである<strong>「先生PCで操作したら、生徒スマホが0.01秒で変わる」</strong>通信（BroadcastChannel / Realtime）が壊れていないかを常に自動監視します。
+          </p>
+        </div>
+
+        <div class="p-5 rounded-xl bg-gradient-to-b from-blue-50/70 to-white border border-blue-200">
+          <div class="text-2xl mb-2">🛡️</div>
+          <h3 class="font-bold text-slate-900 text-base mb-1">権限分離と誤操作防止</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            先生（Teacher）と生徒（Student）が互いの画面を不正操作できないよう、<strong>認証とロール制限（RLS）</strong>を完全に保護します。
+          </p>
+        </div>
+
+        <div class="p-5 rounded-xl bg-gradient-to-b from-emerald-50/70 to-white border border-emerald-200">
+          <div class="text-2xl mb-2">🚀</div>
+          <h3 class="font-bold text-slate-900 text-base mb-1">開発スピード＆デグレ防止</h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            今後の機能追加時に「昔作った機能が突然動かなくなる」事故を防ぎ、<strong>AIが自律修復しながら爆速で開発</strong>を継続できます。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: 設計方針（ここまで考えています） -->
+    <section class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/80">
+      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 text-white font-bold text-sm">2</span>
+        <h2 class="text-xl font-bold text-slate-900">技術方針（ここまで検討しています）</h2>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-start gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">01</div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm mb-1">テストツール: Playwright（マルチコンテキスト対応）</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Cypressでは難しい<strong>「1つのテストコード内で【先生PC画面】と【生徒スマホ画面】を同時に起動してリアルタイム同期を検証する」</strong>ことが標準で可能なため選定。
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-4 p-4 rounded-xl bg-indigo-50/60 border border-indigo-200">
+          <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">02</div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm mb-1">外部APIのモック化（Gemini AI・LINE通知）</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              AI診断やLINE通知などの外部通信はテスト時にモック（ダミー応答）に差し替え、<strong>API従量課金ゼロ ＆ 超高速実行</strong>を実現。
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-4 p-4 rounded-xl bg-cyan-50/60 border border-cyan-200">
+          <div class="w-9 h-9 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">03</div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm mb-1">認証セッションのキャッシュ（auth.setup.ts）</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              テストごとに毎回ログイン画面を操作する無駄を省き、あらかじめ保存したセッション状態を使い回すことで、テスト実行時間を大幅短縮。
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-4 p-4 rounded-xl bg-purple-50/70 border border-purple-200">
+          <div class="w-9 h-9 rounded-lg bg-purple-700 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">04</div>
+          <div>
+            <h3 class="font-bold text-purple-950 text-sm mb-1">Claude Code流 TDD ＆ 自己修復ループ（Self-Correction）</h3>
+            <p class="text-xs text-purple-900 leading-relaxed">
+              テスト実行でエラーが発生した場合、AIがターミナルログを自己解析し、コード修正〜再テストまで自動で合格するまで自律ループします。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: 段階的ロードマップ -->
+    <section class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/80">
+      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 text-white font-bold text-sm">3</span>
+        <h2 class="text-xl font-bold text-slate-900">段階的な進め方（スモールスタート）</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Step 1 -->
+        <div class="p-5 rounded-xl border-2 border-emerald-500 bg-emerald-50/40 relative">
+          <span class="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">まずはここから着手！</span>
+          <div class="text-xs font-extrabold text-emerald-700 uppercase tracking-wider mb-1">Phase 1 (最優先)</div>
+          <h3 class="font-bold text-slate-900 text-base mb-2">コア機能の自動検証</h3>
+          <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
+            <li>Playwright環境セットアップ</li>
+            <li>講師・生徒のログイン認証テスト</li>
+            <li><strong>2画面リアルタイム同期テスト</strong></li>
+          </ul>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="p-5 rounded-xl border border-slate-200 bg-white">
+          <div class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-1">Phase 2</div>
+          <h3 class="font-bold text-slate-900 text-base mb-2">主要業務フロー</h3>
+          <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
+            <li>畑区画キャンバス（配置・編集）</li>
+            <li>栽培日誌の作成・編集・削除</li>
+            <li>Gemini AI相談（モック検証）</li>
+          </ul>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="p-5 rounded-xl border border-slate-200 bg-white">
+          <div class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-1">Phase 3</div>
+          <h3 class="font-bold text-slate-900 text-base mb-2">異常系 ＆ CI自動化</h3>
+          <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
+            <li>オフライン（電波切れ）テスト</li>
+            <li>GitHub Actionsでのプルリク自動実行</li>
+            <li>テストレポートの自動出力</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: 講師とのディスカッション論点 -->
+    <section class="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-6 md:p-8 shadow-xl">
+      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-indigo-700/60">
+        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500 text-white font-bold text-sm">4</span>
+        <div>
+          <h2 class="text-xl font-bold">講師の先生と相談したいこと（論点）</h2>
+          <p class="text-xs text-indigo-200">面談やチャットで以下の3点についてご意見を伺いたいと考えています。</p>
+        </div>
+      </div>
+
+      <div class="space-y-4 text-slate-200 text-sm">
+        <div class="p-4 rounded-xl bg-white/10 border border-white/10 flex items-start gap-3">
+          <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">Q1</div>
+          <div>
+            <h4 class="font-bold text-white text-base mb-1">着手範囲の優先度について</h4>
+            <p class="text-xs text-indigo-100 leading-relaxed">
+              まずはアプリの命である <strong>「Phase 1（認証 ＋ 2画面リアルタイム同期）」</strong> に絞って実装を開始する方針で問題ないでしょうか？
+            </p>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-white/10 border border-white/10 flex items-start gap-3">
+          <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">Q2</div>
+          <div>
+            <h4 class="font-bold text-white text-base mb-1">Supabaseのテスト用データベース運用</h4>
+            <p class="text-xs text-indigo-100 leading-relaxed">
+              テスト用データの投入先について、現在の開発用Supabaseプロジェクトでテスト専用IDを用いるか、ローカルSupabaseコンテナを使うか、どちらがおすすめでしょうか？
+            </p>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-white/10 border border-white/10 flex items-start gap-3">
+          <div class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">Q3</div>
+          <div>
+            <h4 class="font-bold text-white text-base mb-1">GitHub Actions（CI）連携のタイミング</h4>
+            <p class="text-xs text-indigo-100 leading-relaxed">
+              ローカル環境でテストが100%パスすることを確認した後に、GitHub Actions（プルリクエスト時の自動テスト）を組む順番で進めて良いでしょうか？
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 mt-12">
+    NOU-ATO (Agri-Tracks) Quality Assurance Plan &copy; 2026
+  </footer>
+
+</body>
+</html>

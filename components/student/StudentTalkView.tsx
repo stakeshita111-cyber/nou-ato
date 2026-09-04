@@ -148,13 +148,23 @@ export default function StudentTalkView({
 
       (targetList || []).forEach((j: any) => {
         const c = (j.content || "").trim();
+
+        // 🌟 入力欄から送信した相談・質問以外の「畝作業記録」「タスク完了報告」「システム通知」を完全に除外 🌟
         if (
           !c ||
           c === "テスト" ||
           c === "○○困ってます" ||
+          c.startsWith("【畝") ||
+          c.includes("【畝 ") ||
+          c.includes("【畝") ||
+          c.startsWith("【収穫") ||
           c.includes("【収穫完了報告】") ||
-          c.includes("【差し戻し通知】") ||
-          c.includes("を完了報告しました")
+          c.startsWith("【差し戻し") ||
+          c.startsWith("【承認") ||
+          c.startsWith("【全体お知らせ") ||
+          c.includes("を完了報告しました") ||
+          c.includes("タスク完了") ||
+          (j.task_title && !j.reply && (c.startsWith("【") || c.includes("完了")))
         ) {
           return;
         }
@@ -316,7 +326,7 @@ export default function StudentTalkView({
 
     setMessages((prev) => [...prev, studentMsg, replyMsg]);
     setInputText("");
-    setToastMessage("💡 過去の農園知識が見つかったため、チケットを消費せず回答しました！");
+    setToastMessage("💡 農園ノートの回答を表示しました");
     setShowToast(true);
   };
 
@@ -828,9 +838,6 @@ export default function StudentTalkView({
                     <h4 className="font-black text-sm text-emerald-900 leading-tight">
                       似た回答が農園ノートに見つかりました！
                     </h4>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-md inline-block mt-0.5">
-                      🎟️ チケット消費なし（無料）で確認できます ({matchedKnowledgeList.length}件)
-                    </span>
                   </div>
                 </div>
 
@@ -868,7 +875,7 @@ export default function StudentTalkView({
                         onClick={() => handleUseFreeKnowledge(item)}
                         className="w-full py-2 bg-[#1c4d21] hover:bg-[#153e19] text-white font-black text-xs rounded-xl shadow-xs transition active:scale-95 cursor-pointer text-center flex items-center justify-center gap-1"
                       >
-                        <span>✨ この回答を見る (無料)</span>
+                        <span>✨ この回答を見る</span>
                       </button>
                     </div>
                   ))}
@@ -881,7 +888,7 @@ export default function StudentTalkView({
                     onClick={() => executeSendMessage(true)}
                     className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl transition cursor-pointer text-center"
                   >
-                    探しているものがないので新しくAIに相談 (残{ticketState.count}回)
+                    新しくAIに相談 (残{ticketState.count}回)
                   </button>
                   <button
                     type="button"

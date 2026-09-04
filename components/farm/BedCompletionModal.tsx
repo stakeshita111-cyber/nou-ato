@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FarmBed } from "@/types/farm";
 
 interface BedCompletionModalProps {
@@ -21,11 +21,21 @@ export default function BedCompletionModal({
   bed,
   onComplete,
 }: BedCompletionModalProps) {
-  const [totalHarvest, setTotalHarvest] = useState(bed?.total_harvest || "");
-  const [completionNotes, setCompletionNotes] = useState(bed?.completion_notes || "");
-  const [season, setSeason] = useState(bed?.season || "2026年 春夏");
-  const [imageUrl, setImageUrl] = useState(bed?.completion_image_url || "");
+  const [totalHarvest, setTotalHarvest] = useState("");
+  const [completionNotes, setCompletionNotes] = useState("");
+  const [season, setSeason] = useState("2026年 春夏");
+  const [imageUrl, setImageUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 🌟 モーダルが開いた時・対象畝が変わった時にフォーム入力を確実に最新化・初期化 🌟
+  useEffect(() => {
+    if (isOpen && bed) {
+      setTotalHarvest(bed.total_harvest || "");
+      setCompletionNotes(bed.completion_notes || "");
+      setSeason(bed.season || "2026年 春夏");
+      setImageUrl(bed.completion_image_url || "");
+    }
+  }, [isOpen, bed?.id, bed?.total_harvest, bed?.completion_notes, bed?.completion_image_url]);
 
   if (!isOpen || !bed) return null;
 

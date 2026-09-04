@@ -873,7 +873,7 @@ export default function StudentFarmRecordView({
         isOpen={showArchiveModal}
         onClose={() => setShowArchiveModal(false)}
         archivedBeds={archivedBeds}
-        records={records}
+        records={records.filter((r) => archivedBeds.some((b) => b.id === r.bed_id))}
         isTeacher={false}
       />
     </div>

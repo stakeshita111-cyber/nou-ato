@@ -1,6 +1,6 @@
-体系的要件定義書（PRD）：体験農業経営支援アプリ『のうあと（NOU-ATO）』
+﻿# 体系的要件定義書（PRD）：体験農業経営支援アプリ「のうあと (NOU-ATO)」
 
-> **最終更新**: 2026年9月2日 | **開発ステータス**: Phase 1 完了 / Phase 2 & 3 進行中（LINE Direct認証・AIしるべぇRAG対話基盤稼働）
+> **最終更新**: 2026年9月4日 | **開発ステータス**: Phase 1 & 2 完了 / Phase 3（AI RAG・語調・対話基盤稼働中） / Phase 4（E2Eテスト計画策定・品質保証基盤導入）
 
 ---
 
@@ -43,19 +43,21 @@
 Python（重量級インフラ）を排除し、フロントからバックエンド、AI処理までを軽量かつ拡張性の高いモダンWebスタックで構築するハイブリッド構成。
 
 ## 3.1 技術スタック
-- **フロントエンド / API**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS
-- **キャンバス / D&Dエンジン**: カスタム D&D 物理演算, AABB (Axis-Aligned Bounding Box) 衝突回避 ＆ 磁石スナップアルゴリズム
+- **フロントエンド / API**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4
+- **キャンバス / D&Dエンジン**: カスタム D&D 物理演算, AABB (Axis-Aligned Bounding Box) 衝突回避 ＆ 磁石スナップアルゴリズム, @dnd-kit
+- **状態管理**: Zustand (`useThemeStore` 等)
 - **リアルタイム通信**: HTML5 `BroadcastChannel` API (画面間 0.01秒通信) ＋ Supabase Realtime Subscriptions (`postgres_changes`)
 - **データベース / バックエンド**: Supabase (PostgreSQL)
 - **認証**: Supabase Auth (Email/Password 認証 ＋ LINE OAuth / LINE 招待URL・QRコード発行)
 - **ベクトル検索 (RAG)**: pgvector（類似度検索）
 - **セキュリティ**: Row Level Security (RLS) によるマルチテナント（農園ごとのデータ隔離）の完全適用
 - **AI・外部API連携**: Google AI Studio (Gemini 1.5 Flash API), LINE Messaging API Webhook
+- **テスト・品質保証**: Playwright（E2E自動テスト、マルチコンテキスト2画面同期テスト）、TypeScript型検査 (`tsc --noEmit`)
 - **インフラ・デプロイ**: Vercel
 
 ## 3.2 プラットフォーム・レスポンシブ戦略
 - **講師画面 (`/teacher/dashboard`)**: PC・タブレット大画面に最適化。畑レイアウトキャンバス、受講生一覧、集金・ダッシュボードを一体管理。
-- **生徒画面 (`/student`)**: スマートフォン片手操作に最適化（ボトムナビゲーション、横スワイプカード、タップ容易な畝選択タブ）。
+- **生徒画面 (`/student`, `/student/quests`)**: スマートフォン片手操作に最適化（ボトムナビゲーション、横スワイプカード、タップ容易な畝選択タブ）。
 - **リアルタイム同期保障**: シークレットモード (InPrivate) や別ブラウザタブ間でも `BroadcastChannel API` と Supabase Realtime により完全同期。
 
 ---
@@ -104,8 +106,10 @@ CREATE TABLE public.farm_beds (
   id VARCHAR NOT NULL,
   plot_id VARCHAR REFERENCES public.farm_plots(id) ON DELETE CASCADE,
   bed_number VARCHAR NOT NULL,
-  dimensions VARCHAR DEFAULT '2.0m × 0.7m (1.4㎡)',
+  dimensions VARCHAR DEFAULT '2.0m x 0.7m (1.4m2)',
   progress_percent INT DEFAULT 0,
+  crop_name VARCHAR,
+  status VARCHAR DEFAULT 'growing', -- 'growing' | 'completed_pending' | 'archived'
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (id)
 );
@@ -211,8 +215,8 @@ CREATE TABLE public.reservations (
   - Supabase Auth による LINE Direct 認証、OAuth コールバック (`/auth/callback`)。
   - 既存アカウントとの LINE 連携・解除 (`LineLinkingCard`)、重複時のマージ画面 (`/auth/merge`)。
 - **自動ポータル分岐【実装済 ✅】**:
-  - `role == 'teacher'` ➔ 講師ポータル (`/teacher/dashboard`) へ自動遷移。
-  - `role == 'student'` ➔ 生徒ポータル (`/student` または `/student/quests`) へ自動遷移。
+  - `role == 'teacher'` ➔ 講師ポータル (`/teacher/dashboard`) へ自動遷移。生徒用URLから講師用URLへの不正遷移はガード。
+  - `role == 'student'` ➔ 生徒ポータル (`/student` または `/student/quests`) へ自動遷移。講師専用URLへのアクセスを遮断。
 
 ## 5.2 講師側ポータル全機能 (`/teacher/dashboard`)
 1. **🌾 畑・区画管理キャンバス【実装済 ✅】**:
@@ -233,7 +237,7 @@ CREATE TABLE public.reservations (
 6. **💬 相談・日誌確認【実装済 ✅】**: 生徒からの日誌・相談へのフィードバック回答、AIナレッジ承認 (`is_approved`)。
 7. **💰 集金・売上管理【実装済 ✅】**: 月額会費・区画利用料・教材費の決済済み/未払い集金一覧確認。
 8. **📅 イベント・予約管理【実装済 ✅】**: 対面講習会・収穫体験イベントのカレンダー登録・定員管理。
-9. **⚙️ 農園・システム設定【実装済 ✅】**: 農園基本プロフィール設定、ダイナミックテーマ切り替え（フォントサイズ、AIしるべぇ語調設定、ダークモード）。
+9. **⚙️ 農園・システム設定【実装済 ✅】**: 農園基本プロフィール設定、ダイナミックテーマ切り替え（フォントサイズ、AIしるべぇ語調設定、相談タブ表示/非表示スイッチ、ダークモード）。
 
 ## 5.3 生徒側ポータル全機能 (`/student`, `/student/quests`)
 1. **🌾 マイ畑記録ダッシュボード【実装済 ✅】**:
@@ -257,18 +261,46 @@ CREATE TABLE public.reservations (
 
 ---
 
-# 6. 非機能要件 (Non-Functional Requirements)
+# 6. 非機能要件 ＆ E2Eテスト・品質保証要件 (Non-Functional & Quality Assurance)
 
+## 6.1 非機能要件
 - **パフォーマンス**:
   - React Client Components の最小化および `useFarmManager` カスタムフックへのロジック一元化。
   - HTML5 `BroadcastChannel API` による画面間 0.01秒超高速通信。
-  - Next.js ターボパックビルド（エラー0件維持）。
+  - Next.js ビルド（エラー0件・型エラー0件維持）。
 - **セキュリティ・データ孤立**:
   - Supabase Row Level Security (RLS) によるマルチテナント保護。
   - テナント間・受講生間のデータ不正アクセスの完全防止。
 - **保守性・拡張性**:
   - 共通コンポーネント (Toast, Modal, Card) による標準化。
   - 将来的な LINE Messaging API Webhook および pgvector RAG パイプラインへの拡張を担保。
+
+## 6.2 E2Eテスト自動化要件 (E2E Testing Specifications)
+
+本プロダクトは「講師PC画面」と「生徒スマホ画面」のリアルタイム双方向同期がコア価値であるため、E2Eテストは単一画面の回帰テストにとどまらず、**複数ブラウザコンテキスト間での協調動作テスト**を必須要件とする。
+
+### ① テスト基盤構成
+- **テストランナー**: Playwright (`@playwright/test`)
+- **実行環境**: Headless Chromium / Mobile Viewport (iPhone 14 / Pixel 7エミュレーション)
+- **認証セッション管理**: Playwright Storage State（事前作成した講師用/生徒用の認証済みCookie/LocalStorageをセッション再利用）
+- **CI/CD**: GitHub Actions 上で `npm run build` ➔ `npx playwright test` を自動実行
+
+### ② コアE2Eテストスイート ＆ シナリオ定義
+
+| スイート名 | 対象ロール | 検証シナリオ・期待値 |
+| :--- | :--- | :--- |
+| **01. 認証 ＆ ロール制御 (Auth & RBAC)** | Teacher / Student / 未認証 | ・ログイン後、`teacher` は `/teacher/dashboard` へ、`student` は `/student` へ正しくリダイレクトされること。<br>・生徒権限で `/teacher/*` にアクセスした場合に遮断・リダイレクトされること。<br>・招待URL/QRコードからのサインアップフローが成立すること。 |
+| **02. 畑キャンバス ＆ 区画管理 (Farm Canvas)** | Teacher | ・キャンバス上の区画D&D移動、AABBスナップ整列が反映されること。<br>・畝の追加（＋ボタン）およびゴミ箱へのドラッグ/クリック削除が正常に動作すること。<br>・受講生マスターから区画への受講生割り当て/解除が実行できること。 |
+| **03. クエスト配信 ＆ 完了報告 (Tasks & Quests)** | Teacher & Student | ・講師が個別/全体タスクを作成・配信 ➔ 生徒の「クエスト一覧」に即時反映されること。<br>・生徒がクエスト詳細モーダルから作業・草丈・写真を添付して完了報告 ➔ タスクが完了状態になること。<br>・畝の栽培完了報告 ➔ 講師側ダッシュボードに「修了承認申請」が表示され、承認後にアーカイブされること。 |
+| **04. 日誌タイムライン ＆ AIナレッジ (Journals & RAG)** | Student & Teacher | ・生徒が畝を選択して作業日誌を投稿 ➔ 畝別時系列タイムラインに即時追加されること。<br>・生徒自身が投稿したログの「✏️ 編集」および「🗑️ 削除」が正しくDBに反映されること。<br>・講師が日誌に返信し、「AIナレッジ承認 (`is_approved = true`)」をトグルできること。 |
+| **05. AI相棒「しるべぇ」対話 (AI Chat)** | Student | ・AIしるべぇチャットで質問を送信 ➔ `/api/chat/rag` から過去ナレッジを踏まえた回答が生成され、UIにストリーミング/表示されること。<br>・設定画面での「語調切り替え（敬語/フレンドリー）」がAI回答スタイルに反映されること。 |
+| **06. イベント予約 ＆ 集金管理 (Events & Payments)** | Teacher & Student | ・講師が講習会イベントを作成 ➔ 生徒側カレンダーに表示され、予約申し込みで残席数が減算されること。<br>・集金一覧テーブルで未払い/支払い済みのステータス変更が反映されること。 |
+| **07. リアルタイム2画面双方向同期 (Dual-Context Sync)** | Teacher (PC) ✕ Student (Mobile) | **【最重要】**<br>・同一ブラウザ/別コンテキストで講師画面と生徒画面を同時起動。<br>・生徒が日誌/タスクを投稿 ➔ 講師キャンバスの該当畝が 0.01秒でエメラルドグリーン点灯。<br>・講師がタスク配信 ➔ 生徒画面のリロード不要で即座にクエストバッジ・一覧が更新されること。 |
+
+### ③ テストデータ戦略 (Test Data Strategy)
+- **Seedスクリプト**: E2E実行前に専用テスト農園・テストユーザー（`e2e-teacher@example.com`, `e2e-student@example.com`）および標準区画・畝データをDBに自動セットアップ。
+- **Teardown**: テスト完了後に作成された一時レコード（日誌・タスク提出・予約）をクリーンアップし、冪等性を担保。
+- **外部APIモック**: Gemini API および LINE OAuth/Webhook は Playwright の `page.route()` またはモックサーバーを用いて外部依存によるテスト不安定（Flakiness）を排除。
 
 ---
 
@@ -294,6 +326,13 @@ CREATE TABLE public.reservations (
   - [x] AIしるべぇの語調・キャラクタースタイル切り替え機能（フレンドリー/敬語など）。
   - [ ] `journals` 承認データ (`is_approved = true`) の pgvector ベクトル埋め込み（Embeddings）自動生成・完全移行。
 
-- **[ ] Phase 4: 多摩地区PoC ＆ GAP認証スケーリング (【準備中】)**
+- **[-] Phase 4: E2Eテスト自動化 ＆ 品質保証基盤構築 (【計画立案・導入フェーズ】)**
+  - [x] E2Eテスト要件定義・テストスイート（01〜07）の策定。
+  - [ ] Playwright テストランナー設定 ＆ テスト環境（Seed Data, Auth Storage State Helper）構築。
+  - [ ] コアシナリオ（認証・区画D&D・日誌編集削除・AI相談・予約管理）の自動テスト実装。
+  - [ ] 講師PC ✕ 生徒Mobile 2画面同時リアルタイム同期テスト実装。
+  - [ ] GitHub Actions CI/CD パイプライン統合（PR毎の自動回帰テスト）。
+
+- **[ ] Phase 5: 多摩地区PoC ＆ GAP認証スケーリング (【準備中】)**
   - [ ] 実証実験モニタリング (DAU、自己解決率、指導時間削減KPI)。
   - [ ] GAP認証向け SOP 自動出力機能の追加。
