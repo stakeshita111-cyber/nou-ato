@@ -3,228 +3,1791 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOU-ATO E2Eテスト導入 提案＆ディスカッションシート</title>
+  <title>NOU-ATO デプロイ前 完全品質検査計画書 (QA Visual Master Plan)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Mermaid.js for True Visual Diagrams with Large 24px Readable Font -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        fontFamily: "'M PLUS Rounded 1c', 'Plus Jakarta Sans', sans-serif",
+        fontSize: '24px',
+        primaryColor: '#fce7f3',
+        primaryTextColor: '#831843',
+        primaryBorderColor: '#f472b6',
+        lineColor: '#059669',
+        secondaryColor: '#ede9fe',
+        tertiaryColor: '#e0f2fe',
+        clusterBkg: '#ffffff',
+        clusterBorder: '#cbd5e1',
+        edgeLabelBackground: '#ffffff'
+      },
+      flowchart: {
+        nodeSpacing: 45,
+        rankSpacing: 55,
+        htmlLabels: true
+      }
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Plus Jakarta Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { font-family: 'M PLUS Rounded 1c', 'Plus Jakarta Sans', sans-serif; font-size: 16px; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    details > summary { list-style: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] summary svg.chevron { transform: rotate(180deg); }
+    
+    /* Mermaid 24px+ Diagram Styles */
+    .mermaid {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      font-size: 24px !important;
+    }
+    .mermaid svg {
+      max-width: 100% !important;
+      height: auto !important;
+      margin: 0 auto;
+      overflow: visible !important;
+    }
+    .mermaid svg text,
+    .mermaid svg .nodeLabel,
+    .mermaid svg .edgeLabel,
+    .mermaid svg .label,
+    .mermaid svg .cluster-label span,
+    .mermaid svg span,
+    .mermaid svg div {
+      font-size: 24px !important;
+      font-weight: 700 !important;
+      line-height: 1.45 !important;
+    }
+    .mermaid svg .edgeLabel {
+      font-size: 20px !important;
+      font-weight: 700 !important;
+      background-color: rgba(255, 255, 255, 0.95) !important;
+      padding: 2px 8px !important;
+      border-radius: 6px !important;
+      border: 1px solid #cbd5e1;
+    }
+    .mermaid svg .node rect,
+    .mermaid svg .node circle,
+    .mermaid svg .node polygon {
+      stroke-width: 2.5px !important;
+    }
+
+    @keyframes pulse-soft {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.03); }
+    }
+    .animate-pop { animation: pulse-soft 0.3s ease-out; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen pb-16">
+<body class="bg-[#faf8f5] text-slate-700 min-h-screen pb-28 selection:bg-rose-200 selection:text-rose-900">
 
   <!-- Header -->
-  <header class="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-900 text-white shadow-lg sticky top-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <div class="inline-flex items-center gap-2 bg-emerald-600/60 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-semibold text-emerald-100 mb-2">
-          <span>🌱 NOU-ATO (のうあと) 品質保証計画</span>
+  <header class="border-b border-rose-100 bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-13 h-13 rounded-2xl bg-gradient-to-tr from-rose-200 via-pink-200 to-teal-100 flex items-center justify-center text-3xl shadow-sm border border-white p-2">
+          🌸
         </div>
-        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">E2Eテスト導入 提案＆ディスカッションシート</h1>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold tracking-wider text-rose-500 bg-rose-50 px-3 py-0.5 rounded-full border border-rose-100">QA Visual Architecture</span>
+            <span class="text-xs font-bold text-teal-600 bg-teal-50 px-3 py-0.5 rounded-full border border-teal-100">Fail-Strict Reporting & TSV Managed</span>
+          </div>
+          <h1 class="text-2xl font-black text-slate-800 tracking-tight mt-1">デプロイ前 完全品質検査計画書</h1>
+        </div>
       </div>
-      <div class="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/20 text-xs flex flex-col gap-1">
-        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>対象: メンター / 講師レビュー・相談用</span></div>
-        <div class="text-emerald-200">更新日: 2026年9月4日</div>
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+          PASS: 3 / 全 43 件 (7%)
+        </span>
       </div>
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto px-6 pt-8 space-y-8">
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-6 pt-8 space-y-10">
 
-    <!-- Lead Box -->
-    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row items-center gap-6">
-      <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl flex-shrink-0 font-black shadow-inner">
-        💡
-      </div>
-      <div class="flex-1">
-        <h2 class="text-base font-bold text-slate-900 mb-1">このシートの目的</h2>
-        <p class="text-sm text-slate-600 leading-relaxed">
-          講師の先生と<strong>「テスト自動化のスコープ」「進め方」「技術選定」</strong>について認識を合わせ、どこまで検討しているかを共有するためのディスカッション資料です。
+    <!-- Overview Banner -->
+    <div class="bg-gradient-to-r from-rose-50 via-pink-50 to-teal-50 rounded-3xl p-6 sm:p-8 border border-rose-100/80 shadow-sm">
+      <div class="max-w-3xl space-y-3">
+        <div class="inline-block px-3 py-1 rounded-lg bg-white/80 text-rose-600 text-xs font-bold border border-rose-100">
+          🎯 体験農業経営支援アプリ NOU-ATO (のうあと) / Agri-Tracks
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+          最高水準の信頼性を担保する厳格テスト管理
+        </h2>
+        <p class="text-slate-600 leading-relaxed text-sm sm:text-base">
+          Next.js 16 App Router (React 19) と Supabase Realtime / BroadcastChannel を駆使した「リアルタイム2画面同期」を確実にデプロイするため、
+          <strong>「テスト結果を勝手に直さず・失敗はありのまま不具合として起票・記録する（Fail-Strict Integrity）」</strong> 方針を採用し、
+          <code>test/test.tsv</code> で全ケースの実行結果・証跡を完全管理します。
         </p>
-      </div>
-      <div class="flex gap-2 flex-shrink-0">
-        <span class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">Playwright採用</span>
-        <span class="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-bold">自律自己修復</span>
       </div>
     </div>
 
-    <!-- Section 1: なぜやるのか (Why) -->
-    <section class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/80">
-      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 text-white font-bold text-sm">1</span>
-        <h2 class="text-xl font-bold text-slate-900">導入の目的 ＆ 絶対に守りたいコア機能</h2>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div class="p-5 rounded-xl bg-gradient-to-b from-amber-50/70 to-white border border-amber-200">
-          <div class="text-2xl mb-2">⚡</div>
-          <h3 class="font-bold text-slate-900 text-base mb-1">2画面リアルタイム同期</h3>
-          <p class="text-xs text-slate-600 leading-relaxed">
-            本アプリ最大の強みである<strong>「先生PCで操作したら、生徒スマホが0.01秒で変わる」</strong>通信（BroadcastChannel / Realtime）が壊れていないかを常に自動監視します。
-          </p>
-        </div>
-
-        <div class="p-5 rounded-xl bg-gradient-to-b from-blue-50/70 to-white border border-blue-200">
-          <div class="text-2xl mb-2">🛡️</div>
-          <h3 class="font-bold text-slate-900 text-base mb-1">権限分離と誤操作防止</h3>
-          <p class="text-xs text-slate-600 leading-relaxed">
-            先生（Teacher）と生徒（Student）が互いの画面を不正操作できないよう、<strong>認証とロール制限（RLS）</strong>を完全に保護します。
-          </p>
-        </div>
-
-        <div class="p-5 rounded-xl bg-gradient-to-b from-emerald-50/70 to-white border border-emerald-200">
-          <div class="text-2xl mb-2">🚀</div>
-          <h3 class="font-bold text-slate-900 text-base mb-1">開発スピード＆デグレ防止</h3>
-          <p class="text-xs text-slate-600 leading-relaxed">
-            今後の機能追加時に「昔作った機能が突然動かなくなる」事故を防ぎ、<strong>AIが自律修復しながら爆速で開発</strong>を継続できます。
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 2: 設計方針（ここまで考えています） -->
-    <section class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/80">
-      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 text-white font-bold text-sm">2</span>
-        <h2 class="text-xl font-bold text-slate-900">技術方針（ここまで検討しています）</h2>
-      </div>
-
-      <div class="space-y-4">
-        <div class="flex items-start gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-          <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">01</div>
-          <div>
-            <h3 class="font-bold text-slate-900 text-sm mb-1">テストツール: Playwright（マルチコンテキスト対応）</h3>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Cypressでは難しい<strong>「1つのテストコード内で【先生PC画面】と【生徒スマホ画面】を同時に起動してリアルタイム同期を検証する」</strong>ことが標準で可能なため選定。
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-start gap-4 p-4 rounded-xl bg-indigo-50/60 border border-indigo-200">
-          <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">02</div>
-          <div>
-            <h3 class="font-bold text-slate-900 text-sm mb-1">外部APIのモック化（Gemini AI・LINE通知）</h3>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              AI診断やLINE通知などの外部通信はテスト時にモック（ダミー応答）に差し替え、<strong>API従量課金ゼロ ＆ 超高速実行</strong>を実現。
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-start gap-4 p-4 rounded-xl bg-cyan-50/60 border border-cyan-200">
-          <div class="w-9 h-9 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">03</div>
-          <div>
-            <h3 class="font-bold text-slate-900 text-sm mb-1">認証セッションのキャッシュ（auth.setup.ts）</h3>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              テストごとに毎回ログイン画面を操作する無駄を省き、あらかじめ保存したセッション状態を使い回すことで、テスト実行時間を大幅短縮。
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-start gap-4 p-4 rounded-xl bg-purple-50/70 border border-purple-200">
-          <div class="w-9 h-9 rounded-lg bg-purple-700 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm mt-0.5">04</div>
-          <div>
-            <h3 class="font-bold text-purple-950 text-sm mb-1">Claude Code流 TDD ＆ 自己修復ループ（Self-Correction）</h3>
-            <p class="text-xs text-purple-900 leading-relaxed">
-              テスト実行でエラーが発生した場合、AIがターミナルログを自己解析し、コード修正〜再テストまで自動で合格するまで自律ループします。
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 3: 段階的ロードマップ -->
-    <section class="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/80">
-      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600 text-white font-bold text-sm">3</span>
-        <h2 class="text-xl font-bold text-slate-900">段階的な進め方（スモールスタート）</h2>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- Step 1 -->
-        <div class="p-5 rounded-xl border-2 border-emerald-500 bg-emerald-50/40 relative">
-          <span class="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">まずはここから着手！</span>
-          <div class="text-xs font-extrabold text-emerald-700 uppercase tracking-wider mb-1">Phase 1 (最優先)</div>
-          <h3 class="font-bold text-slate-900 text-base mb-2">コア機能の自動検証</h3>
-          <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
-            <li>Playwright環境セットアップ</li>
-            <li>講師・生徒のログイン認証テスト</li>
-            <li><strong>2画面リアルタイム同期テスト</strong></li>
-          </ul>
-        </div>
-
-        <!-- Step 2 -->
-        <div class="p-5 rounded-xl border border-slate-200 bg-white">
-          <div class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-1">Phase 2</div>
-          <h3 class="font-bold text-slate-900 text-base mb-2">主要業務フロー</h3>
-          <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
-            <li>畑区画キャンバス（配置・編集）</li>
-            <li>栽培日誌の作成・編集・削除</li>
-            <li>Gemini AI相談（モック検証）</li>
-          </ul>
-        </div>
-
-        <!-- Step 3 -->
-        <div class="p-5 rounded-xl border border-slate-200 bg-white">
-          <div class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-1">Phase 3</div>
-          <h3 class="font-bold text-slate-900 text-base mb-2">異常系 ＆ CI自動化</h3>
-          <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
-            <li>オフライン（電波切れ）テスト</li>
-            <li>GitHub Actionsでのプルリク自動実行</li>
-            <li>テストレポートの自動出力</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 4: 講師とのディスカッション論点 -->
-    <section class="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-6 md:p-8 shadow-xl">
-      <div class="flex items-center gap-3 mb-6 pb-4 border-b border-indigo-700/60">
-        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500 text-white font-bold text-sm">4</span>
+    <!-- 進捗サマリーカード -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
         <div>
-          <h2 class="text-xl font-bold">講師の先生と相談したいこと（論点）</h2>
-          <p class="text-xs text-indigo-200">面談やチャットで以下の3点についてご意見を伺いたいと考えています。</p>
+          <span class="text-xs text-slate-400 font-bold">検証合格 (PASS)</span>
+          <div class="text-2xl font-black text-emerald-600 mt-1">3 件</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">✅</div>
+      </div>
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-xs text-slate-400 font-bold">不具合検知 (FAIL)</span>
+          <div class="text-2xl font-black text-rose-600 mt-1"> 件</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg">❌</div>
+      </div>
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-xs text-slate-400 font-bold">待機・未実施</span>
+          <div class="text-2xl font-black text-slate-600 mt-1">40 件</div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg">⏳</div>
+      </div>
+    </div>
+
+    <!-- 🌟 【新設】AI × 人間ハイブリッド 2軸 4象限テストマトリクス (Strategic Matrix) 🌟 -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border-2 border-indigo-100 shadow-sm space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg">🗺️</div>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">AI × 人間ハイブリッド 2軸 4象限テスト戦略マトリクス</h2>
+            <p class="text-sm text-slate-500 mt-0.5">「アプリの重要度」×「人間の要確認度」の2軸グラフで最適実行モデルを可視化。</p>
+          </div>
+        </div>
+        <span class="text-xs px-3.5 py-1.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold">戦略フレームワーク</span>
+      </div>
+
+      <!-- 2軸 グラフ構造コンテナ -->
+      <div class="relative p-5 sm:p-8 bg-slate-50/80 rounded-3xl border-2 border-slate-200/90 space-y-6">
+        
+        <!-- ================= 上部：Y軸（縦軸・上端）の矢印＆簡潔な1文説明 ================= -->
+        <div class="flex flex-col items-center justify-center text-center">
+          <div class="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-rose-500 text-white font-black text-xs sm:text-sm shadow-md border-2 border-rose-400">
+            <svg class="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+            <span>【縦軸 ↑】 重要度：高 ── システム停止やデータ流出に直結する死活問題のテスト</span>
+          </div>
+        </div>
+
+        <!-- ================= 中央：2軸交差ガイド ＋ 4象限グラフ本体 ================= -->
+        <div class="relative">
+          
+          <!-- PC/タブレット用：中央交差する2軸ガイド矢印ライン（背景十字線） -->
+          <div class="hidden md:block absolute inset-0 pointer-events-none z-0">
+            <!-- 縦軸ライン（Y軸） -->
+            <div class="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 flex flex-col items-center justify-between">
+              <div class="text-rose-500 font-black text-sm">▲</div>
+              <div class="w-0.5 h-full bg-gradient-to-b from-rose-300 via-indigo-200 to-slate-300 border-l border-dashed border-slate-400"></div>
+              <div class="text-slate-400 font-black text-sm">▼</div>
+            </div>
+            <!-- 横軸ライン（X軸） -->
+            <div class="absolute top-1/2 left-0 right-0 -translate-y-1/2 flex items-center justify-between">
+              <div class="text-purple-600 font-black text-sm">◀</div>
+              <div class="h-0.5 w-full bg-gradient-to-r from-purple-300 via-indigo-200 to-rose-300 border-t border-dashed border-slate-400"></div>
+              <div class="text-rose-600 font-black text-sm">▶</div>
+            </div>
+          </div>
+
+          <!-- 4象限カードグリッド（Z-indexで前面に配置） -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+
+            <!-- 第2象限（左上）: 重要度:高 × AI自動化 -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#faf5ff] border-2 border-purple-300 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div class="flex items-center justify-between gap-2 pb-2 border-b border-purple-100">
+                  <span class="text-xs font-black px-2.5 py-0.5 rounded-md bg-purple-200 text-purple-900">【第2象限】AIの独壇場</span>
+                  <span class="text-[11px] font-mono text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded">X: AI向き ｜ Y: 重要度高</span>
+                </div>
+                <h3 class="font-black text-slate-800 text-base mt-2.5 flex items-center gap-1.5">
+                  <span class="text-xl">🤖</span> 厳格コアロジック ＆ 負荷攻撃テスト
+                </h3>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                  破綻すると致命傷だが人間手動では困難な領域。AIが自動攻撃・スクリプトで過酷検証します。
+                </p>
+
+                <!-- 総数・完了件数の表示（初期表示） -->
+                <div class="mt-4 p-3.5 rounded-xl bg-purple-50/80 border border-purple-200 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-purple-900">テスト進捗</span>
+                    <span class="font-mono font-bold text-purple-800">全 12 件中 3 件完了 (25%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-purple-200 overflow-hidden">
+                    <div class="h-full bg-purple-600 transition-all duration-500 rounded-full" style="width: 25%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- クリックで展開する詳細テストアコーディオン -->
+              <details class="group">
+                <summary class="w-full py-2.5 px-3.5 bg-white hover:bg-purple-50/50 rounded-xl border border-purple-200 flex items-center justify-between text-xs font-bold text-purple-900 cursor-pointer transition shadow-2xs select-none">
+                  <span class="flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>詳細テスト項目を確認する (12件)</span>
+                  </span>
+                  <span class="chevron text-purple-500 transition-transform">▼</span>
+                </summary>
+                <div class="mt-2.5 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">生徒ロールによる講師画面アクセス遮断（権限外アクセス防止）</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-004</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student, /teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">未認証ユーザーの保護ページアクセス制限</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-PLOT-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">畑区画キャンバスでのドラッグ＆ドロップ配置と衝突回避</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-PLOT-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">区画への新しい畝(ベッド)の追加とサイズ・作物設定</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TIME-005</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline</span>
+          </div>
+          <p class="text-slate-700 font-medium">他生徒の非公開記録に対するアクセス不可検証 (RLS保護)</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-NFR-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">CLI (npx tsc --noEmit)</span>
+          </div>
+          <p class="text-slate-700 font-medium">TypeScript strict 型整合性検証（エラー0件検証）</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">PASS</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-NFR-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">CLI (npm run build)</span>
+          </div>
+          <p class="text-slate-700 font-medium">本番環境ビルド検証 (Next.js Production Build)</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">PASS</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-NEG-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student, /student/timeline</span>
+          </div>
+          <p class="text-slate-700 font-medium">XSSスクリプト注入攻撃に対する無害化（サニタイズ）検証</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-RACE-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard ↔ /student</span>
+          </div>
+          <p class="text-slate-700 font-medium">講師側畝削除と生徒側記録保存の同時発生時のDB整合性</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-RACE-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline/new, JournalInput</span>
+          </div>
+          <p class="text-slate-700 font-medium">ダブルクリック・高速連打によるデータ二重・三重増殖の防止</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">PASS</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-SEC-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">Browser Console (Direct Supabase Client)</span>
+          </div>
+          <p class="text-slate-700 font-medium">DevToolsからのAPI直叩きによる他人生徒データ・農場データの改ざん遮断</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-SEC-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">API Routes (/api/*)</span>
+          </div>
+          <p class="text-slate-700 font-medium">不正・期限切れJWTトークンでのAPIアクセス遮断</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+                </div>
+              </details>
+            </div>
+
+            <!-- 第1象限（右上）: 重要度:高 × 人間実機確認 -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#fff1f2] border-2 border-rose-400 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div class="flex items-center justify-between gap-2 pb-2 border-b border-rose-100">
+                  <span class="text-xs font-black px-2.5 py-0.5 rounded-md bg-rose-200 text-rose-900">【第1象限】人間 × AI 最優先</span>
+                  <span class="text-[11px] font-mono text-rose-700 bg-rose-100/70 px-2 py-0.5 rounded">X: 人間実機 ｜ Y: 重要度高</span>
+                </div>
+                <h3 class="font-black text-slate-800 text-base mt-2.5 flex items-center gap-1.5">
+                  <span class="text-xl">🧑‍🌾</span> 現場の五感・実機体験テスト
+                </h3>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                  AIでは判定不能な「畑の現場・スマホ特有の課題」。人間が実際に触って最優先で合否判定します。
+                </p>
+
+                <!-- 総数・完了件数の表示（初期表示） -->
+                <div class="mt-4 p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-rose-900">テスト進捗</span>
+                    <span class="font-mono font-bold text-rose-800">全 13 件中 0 件完了 (0%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-rose-200 overflow-hidden">
+                    <div class="h-full bg-rose-600 transition-all duration-500 rounded-full" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- クリックで展開する詳細テストアコーディオン -->
+              <details class="group">
+                <summary class="w-full py-2.5 px-3.5 bg-white hover:bg-rose-50/50 rounded-xl border border-rose-200 flex items-center justify-between text-xs font-bold text-rose-900 cursor-pointer transition shadow-2xs select-none">
+                  <span class="flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>詳細テスト項目を確認する (13件)</span>
+                  </span>
+                  <span class="chevron text-rose-500 transition-transform">▼</span>
+                </summary>
+                <div class="mt-2.5 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/login -> /teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">講師ロールでの正常ログインと管理画面自動遷移</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/login -> /student</span>
+          </div>
+          <p class="text-slate-700 font-medium">生徒ロールでの正常ログインと生徒マイページ自動遷移</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-PLOT-004</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">生徒への区画割り当て変更とリロード後の永続化</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-SYNC-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard ↔ /student</span>
+          </div>
+          <p class="text-slate-700 font-medium">BroadcastChannel経由の0.01秒超高速画面間同期（同一ブラウザ内）</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-SYNC-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard (Chrome) ↔ /student (Safari/Mobile)</span>
+          </div>
+          <p class="text-slate-700 font-medium">Supabase Realtime経由のクラウド同期（別ブラウザ・別端末間）</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-SYNC-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student</span>
+          </div>
+          <p class="text-slate-700 font-medium">ネットワーク一時切断からの復帰と自動差分再同期</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TIME-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student</span>
+          </div>
+          <p class="text-slate-700 font-medium">担当区画の畝別時系列タイムライン表示切り替え</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TIME-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline/new</span>
+          </div>
+          <p class="text-slate-700 font-medium">作業・観察記録（水やり・草丈・写真）の新規投稿</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-NFR-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student (390px x 844px)</span>
+          </div>
+          <p class="text-slate-700 font-medium">モバイルファースト レスポンシブ表示検証 (iPhone 14 Viewport)</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-NEG-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline/new</span>
+          </div>
+          <p class="text-slate-700 font-medium">超長文テキスト（10,000文字）および巨大画像アップロード時の挙動検証</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-ONBD-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/invite</span>
+          </div>
+          <p class="text-slate-700 font-medium">招待URL/QRコードからの生徒アカウント新規登録と農園自動所属</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-FEED-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline ↔ /teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">生徒の「❗相談あり」観察記録投稿と講師ダッシュボード通知バッジ連動</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-007</span>
+            <span class="text-slate-400 font-medium text-[11px]">/login</span>
+          </div>
+          <p class="text-slate-700 font-medium">LINEログイン連携（認可成功 ＆ 認可画面でのキャンセル挙動）</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+                </div>
+              </details>
+            </div>
+
+            <!-- 第4象限（左下）: 重要度:低 × AI自動化 -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#f0fdf4] border-2 border-emerald-300 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div class="flex items-center justify-between gap-2 pb-2 border-b border-emerald-100">
+                  <span class="text-xs font-black px-2.5 py-0.5 rounded-md bg-emerald-200 text-emerald-900">【第4象限】AIでサクッと瞬殺</span>
+                  <span class="text-[11px] font-mono text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">X: AI向き ｜ Y: 重要度低</span>
+                </div>
+                <h3 class="font-black text-slate-800 text-base mt-2.5 flex items-center gap-1.5">
+                  <span class="text-xl">⚡</span> 定型バリデーション ＆ 不急テスト
+                </h3>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                  人間の貴重な時間を使わない領域。AIが裏で一斉に回してサクッと即時合格化します。
+                </p>
+
+                <!-- 総数・完了件数の表示（初期表示） -->
+                <div class="mt-4 p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-emerald-900">テスト進捗</span>
+                    <span class="font-mono font-bold text-emerald-800">全 8 件中 0 件完了 (0%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-emerald-200 overflow-hidden">
+                    <div class="h-full bg-emerald-600 transition-all duration-500 rounded-full" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- クリックで展開する詳細テストアコーディオン -->
+              <details class="group">
+                <summary class="w-full py-2.5 px-3.5 bg-white hover:bg-emerald-50/50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs font-bold text-emerald-900 cursor-pointer transition shadow-2xs select-none">
+                  <span class="flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>詳細テスト項目を確認する (8件)</span>
+                  </span>
+                  <span class="chevron text-emerald-500 transition-transform">▼</span>
+                </summary>
+                <div class="mt-2.5 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-005</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard, /student</span>
+          </div>
+          <p class="text-slate-700 font-medium">ログアウト処理とセッション破棄の検証</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AI-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/ai-chat</span>
+          </div>
+          <p class="text-slate-700 font-medium">AI栽培相談チャットへの問い合わせと回答生成</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AI-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/ai-chat</span>
+          </div>
+          <p class="text-slate-700 font-medium">RAGによる農園ナレッジ・過去記録を考慮したコンテキスト回答</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-NEG-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/plot/invalid-uuid-999</span>
+          </div>
+          <p class="text-slate-700 font-medium">不正なURL・存在しない区画UUID直打ち時の安全なフォールバック</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-PERF-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard ↔ /student (10回反復遷移)</span>
+          </div>
+          <p class="text-slate-700 font-medium">画面遷移の反復に伴うBroadcastChannel・Realtime購読の完全破棄とメモリ安定性</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-ONBD-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/auth/signup/teacher</span>
+          </div>
+          <p class="text-slate-700 font-medium">講師新規登録・農園初期開設とパスワード6文字以上バリデーション</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-AUTH-006</span>
+            <span class="text-slate-400 font-medium text-[11px]">/login</span>
+          </div>
+          <p class="text-slate-700 font-medium">パスワード誤りおよび空欄送信時の適切なエラーメッセージ表示</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-ONBD-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/invite, /auth/signup/teacher</span>
+          </div>
+          <p class="text-slate-700 font-medium">既存登録済みメールアドレスでの重複登録試行時のエラー表示</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+                </div>
+              </details>
+            </div>
+
+            <!-- 第3象限（右下）: 重要度:低 × 人間実機確認 -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#fffbeb] border-2 border-amber-300 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div class="flex items-center justify-between gap-2 pb-2 border-b border-amber-100">
+                  <span class="text-xs font-black px-2.5 py-0.5 rounded-md bg-amber-200 text-amber-900">【第3象限】人間がサッと見る</span>
+                  <span class="text-[11px] font-mono text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded">X: 人間実機 ｜ Y: 重要度低</span>
+                </div>
+                <h3 class="font-black text-slate-800 text-base mt-2.5 flex items-center gap-1.5">
+                  <span class="text-xl">👀</span> 日常体験 ＆ ガイダンス表示
+                </h3>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                  些細だが使いやすさに直結する部分。通し操作の中で人間が「自然かどうか」を目視チェックします。
+                </p>
+
+                <!-- 総数・完了件数の表示（初期表示） -->
+                <div class="mt-4 p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-amber-900">テスト進捗</span>
+                    <span class="font-mono font-bold text-amber-800">全 10 件中 0 件完了 (0%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-amber-200 overflow-hidden">
+                    <div class="h-full bg-amber-500 transition-all duration-500 rounded-full" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- クリックで展開する詳細テストアコーディオン -->
+              <details class="group">
+                <summary class="w-full py-2.5 px-3.5 bg-white hover:bg-amber-50/50 rounded-xl border border-amber-200 flex items-center justify-between text-xs font-bold text-amber-900 cursor-pointer transition shadow-2xs select-none">
+                  <span class="flex items-center gap-1.5">
+                    <span>📋</span>
+                    <span>詳細テスト項目を確認する (10件)</span>
+                  </span>
+                  <span class="chevron text-amber-500 transition-transform">▼</span>
+                </summary>
+                <div class="mt-2.5 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-PLOT-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">畝の削除と確認ダイアログの動作</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TIME-003</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline</span>
+          </div>
+          <p class="text-slate-700 font-medium">過去の観察記録の編集・修正✏️</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TIME-004</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline</span>
+          </div>
+          <p class="text-slate-700 font-medium">不要な観察記録の削除🗑️とタイムラインからの消去</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-QST-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/tasks -> /student/quests</span>
+          </div>
+          <p class="text-slate-700 font-medium">講師による教材クエスト作成と生徒への配信</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-QST-002</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/quests</span>
+          </div>
+          <p class="text-slate-700 font-medium">生徒のクエスト完了報告と経験値(EXP)加算</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-BILL-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/billing</span>
+          </div>
+          <p class="text-slate-700 font-medium">受講生一覧表示と月額会費の入金ステータス更新</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TODO-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/quests</span>
+          </div>
+          <p class="text-slate-700 font-medium">タスク完了の取り消し（未完了復帰）と進捗・EXPの正常整合性</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-UI-001</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student, /teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">初期状態・ゼロデータ（Empty State）時の表示崩れ防止とガイダンス表示</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-PLOT-005</span>
+            <span class="text-slate-400 font-medium text-[11px]">/teacher/dashboard</span>
+          </div>
+          <p class="text-slate-700 font-medium">畝(ベッド)削除確認ダイアログで「キャンセル」選択時の安全なデータ保持</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+      <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white/90 border border-slate-100 text-xs">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-bold text-slate-800">TC-TIME-006</span>
+            <span class="text-slate-400 font-medium text-[11px]">/student/timeline</span>
+          </div>
+          <p class="text-slate-700 font-medium">過去の観察記録削除確認で「キャンセル」選択時のデータ保持</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0">未実施</span>
+      </div>
+    
+                </div>
+              </details>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================= 下部：Y軸（縦軸・下端）の矢印＆簡潔な1文説明 ================= -->
+        <div class="flex flex-col items-center justify-center text-center pt-2">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-200 text-slate-700 font-bold text-xs shadow-xs border border-slate-300">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            <span>【縦軸 ↓】 重要度：低 ── 軽微なUI表示や補助機能などサービス停止リスクの低いテスト</span>
+          </div>
+        </div>
+
+        <!-- ================= 最下部：X軸（横軸）の左右矢印＆簡潔な1文説明バー ================= -->
+        <div class="pt-4 border-t-2 border-slate-200 space-y-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- X軸 左側矢印カード（簡潔な1文） -->
+            <div class="flex items-center gap-3 p-3.5 bg-gradient-to-r from-purple-100/90 to-purple-50 rounded-2xl border-2 border-purple-200 text-purple-900 shadow-xs">
+              <div class="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                ◀
+              </div>
+              <div>
+                <div class="text-xs font-black">【横軸 ◀】 AI自動化向き</div>
+                <p class="text-xs text-purple-800 mt-0.5">大量データ投入や過酷攻撃などAIが瞬時に自動検証できるテスト</p>
+              </div>
+            </div>
+
+            <!-- X軸 右側矢印カード（簡潔な1文） -->
+            <div class="flex items-center justify-between gap-3 p-3.5 bg-gradient-to-l from-rose-100/90 to-rose-50 rounded-2xl border-2 border-rose-200 text-rose-900 shadow-xs text-right">
+              <div class="order-2 md:order-1 text-left md:text-right flex-1">
+                <div class="text-xs font-black">人間の五感・実機必須 【横軸 ▶】</div>
+                <p class="text-xs text-rose-800 mt-0.5">炎天下の視認性やカメラ・体感など人間実機でしか判定できないテスト</p>
+              </div>
+              <div class="w-8 h-8 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs order-1 md:order-2">
+                ▶
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 🌟 現在完了しているテストの説明（実績と検証結果） 🌟 -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border-2 border-emerald-200/80 shadow-sm space-y-6">
+      <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">✅</div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">現在完了しているテスト（実績と検証結果）</h2>
+          <p class="text-sm text-slate-500 mt-0.5">実際にコマンド実行やバグ修正を行い、100%合格を確認した3つのテスト内容です。</p>
         </div>
       </div>
 
-      <div class="space-y-4 text-slate-200 text-sm">
-        <div class="p-4 rounded-xl bg-white/10 border border-white/10 flex items-start gap-3">
-          <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">Q1</div>
+      <div class="space-y-4 text-sm text-slate-700">
+        <!-- Completed Test 1 -->
+        <div class="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-md bg-emerald-200 text-emerald-900 font-mono font-bold text-xs">TC-NFR-001</span>
+              <span class="font-black text-slate-800 text-base">TypeScript strict 型整合性検証</span>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs">PASS (合格)</span>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-xs text-slate-600 pl-1 leading-relaxed">
+            <li><strong>何をやったか:</strong> プロジェクト全体のコード（全ファイル）に、プログラムの書き間違いやタイプの不整合、未定義のプロパティ呼び出しがないかを機械的に一斉検査しました。</li>
+            <li><strong>実行コマンド:</strong> <code>npx tsc --noEmit</code></li>
+            <li><strong>検証結果:</strong> <strong>エラー 0 件</strong>。厳格な型安全基準（Strict Mode）を完全に満たしていることを確認しました。</li>
+          </ul>
+        </div>
+
+        <!-- Completed Test 2 -->
+        <div class="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-md bg-emerald-200 text-emerald-900 font-mono font-bold text-xs">TC-NFR-002</span>
+              <span class="font-black text-slate-800 text-base">本番環境ビルド検証 (Next.js Production Build)</span>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs">PASS (合格)</span>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-xs text-slate-600 pl-1 leading-relaxed">
+            <li><strong>何をやったか:</strong> インターネット（本番サーバー）にアプリを公開できる形に、プログラム全体を正常にコンパイル・最適化（組み立て）できるかを検証しました。</li>
+            <li><strong>実行コマンド:</strong> <code>npm run build</code> (Next.js 16 Turbopack)</li>
+            <li><strong>検証結果:</strong> <strong>全16ページ（/login, /student, /teacher/dashboard など）がエラーなく完全に生成</strong>され、本番公開に耐えうるコードであることを確認しました。</li>
+          </ul>
+        </div>
+
+        <!-- Completed Test 3 -->
+        <div class="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-md bg-emerald-200 text-emerald-900 font-mono font-bold text-xs">TC-RACE-002</span>
+              <span class="font-black text-slate-800 text-base">ダブルクリック・連打によるデータ二重・三重増殖の防止</span>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs">PASS (修正完了)</span>
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-xs text-slate-600 pl-1 leading-relaxed">
+            <li><strong>発見した不具合:</strong> 観察記録やメモの送信ボタンを高速で連続クリック（連打）すると、同一の記録がデータベースに何重にも重複作成されてしまう弱点を発見しました（初期判定: FAIL）。</li>
+            <li><strong>実施した修正:</strong> <code>JournalInput.tsx</code>、<code>StudentFarmRecordView.tsx</code>、<code>TaskForm.tsx</code> の送信ボタンに送信中ロック（<code>isSubmitting</code>）を導入し、1回押すと即座にボタンが非活性化（グレーアウト＆「送信中...」表示）されるよう保護しました。</li>
+            <li><strong>再テスト結果:</strong> 連打しても最初の1回だけが安全に保存され、二重保存が100%防止されることを確認してPASSとしました。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 🌟 ひと目でわかる！テスト専門用語集 (Glossary) 🌟 -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg">📖</div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">ひと目でわかる！テスト専門用語集</h2>
+          <p class="text-sm text-slate-500 mt-0.5">計画書に出てくる専門用語を、初心者にもわかりやすい日常の言葉で解説した用語集です。</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
+        <!-- Group 1: 優先度 -->
+        <div class="p-5 rounded-2xl bg-[#faf5ff] border border-purple-100 space-y-3">
+          <div class="font-black text-purple-900 text-sm flex items-center gap-2">
+            <span>🏷️</span> テストの優先度（Priority）
+          </div>
+          <ul class="space-y-2 list-none">
+            <li class="flex items-start gap-2">
+              <span class="px-2 py-0.5 rounded bg-rose-200 text-rose-900 font-bold font-mono text-[10px]">P0</span>
+              <span><strong>最優先（必須・Blocker）:</strong> ここが動かないとアプリとして成り立たない、本番公開を直ちに止めるレベルの重要項目（例: ログイン、2画面同期、ビルド成功）。</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold font-mono text-[10px]">P1</span>
+              <span><strong>重要（Important）:</strong> 日常の業務に直結する重要機能（例: 観察記録の編集・削除、タスクの巻き戻し、検索）。</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-bold font-mono text-[10px]">P2</span>
+              <span><strong>通常（Normal）:</strong> 補助的な機能や、使用頻度の低い便利機能（例: 高度な絞り込み、細かなAI語調調整）。</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Group 2: テストの種類 -->
+        <div class="p-5 rounded-2xl bg-[#ecfdf5] border border-emerald-100 space-y-3">
+          <div class="font-black text-emerald-900 text-sm flex items-center gap-2">
+            <span>🧪</span> テストの階層（ピラミッド）
+          </div>
+          <ul class="space-y-2 list-none">
+            <li><strong>単体テスト (Unit Test):</strong> 計算式やプログラムの小さな部品単位が正しく動くかのピンポイント検査（例: 畑区画の高さ計算）。</li>
+            <li><strong>結合テスト (Integration Test):</strong> 画面のボタンを押した時に、データベースや裏側の仕組みが正しく連携して動くかの検査。</li>
+            <li><strong>E2Eテスト (End-to-End):</strong> ユーザーが実際にブラウザを開いて操作する「最初から最後までの通しテスト」（例: 先生がPCで野菜を植えて、生徒のスマホ画面が自動で切り替わるまで）。</li>
+          </ul>
+        </div>
+
+        <!-- Group 3: セキュリティと権限 -->
+        <div class="p-5 rounded-2xl bg-[#fff1f2] border border-rose-100 space-y-3">
+          <div class="font-black text-rose-900 text-sm flex items-center gap-2">
+            <span>🛡️</span> セキュリティと権限の用語
+          </div>
+          <ul class="space-y-2 list-none">
+            <li><strong>RBAC (ロール制御):</strong> 先生（講師）と生徒（受講生）で、使える画面やボタンをきっちり分ける仕組み。</li>
+            <li><strong>RLS (Row Level Security):</strong> データベース側にかける「他人のデータを見せない・触らせない」絶対の電子錠。</li>
+            <li><strong>XSS (クロスサイトスクリプティング):</strong> メモ欄などに悪意あるプログラムコードを書き込んで乗っ取りを狙うサイバー攻撃の手法。</li>
+            <li><strong>サニタイズ (無害化):</strong> 入力された危険な文字（&lt;script&gt; など）を、安全なただの文字に自動変換すること。</li>
+          </ul>
+        </div>
+
+        <!-- Group 4: 通信とアプリの動作 -->
+        <div class="p-5 rounded-2xl bg-[#f0f9ff] border border-sky-100 space-y-3">
+          <div class="font-black text-sky-900 text-sm flex items-center gap-2">
+            <span>⚡</span> 通信と動作の用語
+          </div>
+          <ul class="space-y-2 list-none">
+            <li><strong>BroadcastChannel:</strong> 同じブラウザの別タブ同士が、インターネットを経由せず 0.01秒で直接おしゃべりする超高速通信。</li>
+            <li><strong>レースコンディション (競合):</strong> 2人が同時に同じデータを触ったり、ボタンを連打した時にデータが壊れてしまう不具合。</li>
+            <li><strong>Empty State (空状態):</strong> 新入生が初めてログインした時など、まだデータが1件も入っていない初期画面のこと。</li>
+            <li><strong>DoD (完了定義):</strong> 「この条件を100%クリアしたら本番公開してOK」という事前の合格約束ライン。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 厳格テスト実行・改ざん防止方針カード -->
+    <div class="bg-white p-6 rounded-3xl border-2 border-rose-200/80 shadow-sm space-y-3">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🛡️</span>
+        <h3 class="text-lg font-bold text-slate-800">品質保証原則：テスト結果の完全保全と不具合即時起票ポリシー</h3>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600 pt-1">
+        <div class="p-4 rounded-2xl bg-rose-50/60 border border-rose-100 space-y-1">
+          <div class="font-bold text-rose-800 flex items-center gap-1.5 text-sm">❌ 勝手な合格化・修正の禁止</div>
+          <p>テスト失敗時に、AIやスクリプトが期待結果を緩めたり、勝手にコードを書き換えてPASS扱いにする行為を厳禁します。</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-1">
+          <div class="font-bold text-blue-800 flex items-center gap-1.5 text-sm">📝 証跡の完全保存とTSV記録</div>
+          <p>失敗時はコンソールログ・画面録画・スタックトレースを保存し、<code>test/test.tsv</code> の実際結果欄へ正確に記録します。</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1">
+          <div class="font-bold text-emerald-800 flex items-center gap-1.5 text-sm">🔍 開発者・QAへの明確な報告</div>
+          <p>不具合原因（再現手順・差分）を明記したバグレポートを作成し、人為レビュー・正式修正を経てから再テストを実施します。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 【本物の図解】Playwright 厳格自動テスト ＆ 不具合起票フロー -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg">🤖</div>
           <div>
-            <h4 class="font-bold text-white text-base mb-1">着手範囲の優先度について</h4>
-            <p class="text-xs text-indigo-100 leading-relaxed">
-              まずはアプリの命である <strong>「Phase 1（認証 ＋ 2画面リアルタイム同期）」</strong> に絞って実装を開始する方針で問題ないでしょうか？
-            </p>
+            <h2 class="text-xl font-bold text-slate-800">【図解 1】Playwright 厳格自動テスト ＆ 不具合起票フロー</h2>
+            <p class="text-sm text-slate-500 mt-0.5">失敗を勝手に直さず、証跡を保存して不具合を透明に報告する厳格アーキテクチャ（フォント24px表示）</p>
+          </div>
+        </div>
+        <span class="text-xs px-3.5 py-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-bold">視覚ダイアグラム</span>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-[#faf5ff]/40 border border-purple-100 flex justify-center overflow-x-auto w-full">
+        <pre class="mermaid">
+flowchart TD
+    subgraph テスト設計環境 ["📋 要件定義 & TSVテスト仕様"]
+        A["📄 PRD / test.tsv 仕様定義"] --> B["🎭 Playwright テストコード作成<br>(tests/*.spec.ts)"]
+    end
+
+    subgraph 厳格テスト実行環境 ["⚡ Playwright テスト実行エンジン"]
+        C["▶️ ヘッドレス高速自動実行<br>(npx playwright test)"]
+        D{"合否判定 (Assertion)"}
+    end
+
+    B --> C
+    C --> D
+    
+    D -- ❌ 失敗/異常検知 --> E["📋 不具合詳細レポート起票 (Defect Logged)<br>勝手に直さず、ログ・動画を保存して test.tsv へ記録"]
+    E --> F["🛠️ 開発者・QAによる原因精査と正式修正"]
+    F --> C
+    
+    D -- ✅ 100%基準達成 --> G["🎉 デプロイ品質ゲート合格 (Sign-off)"]
+
+    style テスト設計環境 fill:#faf5ff,stroke:#c084fc,stroke-width:2.5px,color:#581c87
+    style 厳格テスト実行環境 fill:#ecfdf5,stroke:#34d399,stroke-width:2.5px,color:#065f46
+    style E fill:#fff1f2,stroke:#f43f5e,stroke-width:2.5px,color:#881337
+    style G fill:#fef08a,stroke:#eab308,stroke-width:2.5px,color:#713f12
+        </pre>
+      </div>
+    </section>
+
+    <!-- 2. 【本物の図解】2画面リアルタイム同期アーキテクチャ図 ＆ シミュレーター -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-lg">⚡</div>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">【図解 2】2画面リアルタイム同期の通信図 ＆ 動作デモ</h2>
+            <p class="text-sm text-slate-500 mt-0.5">先生PCの操作が生徒スマホへ0.01秒で届く仕組みの関係図と動作シミュレーターです（フォント24px表示）。</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 text-sm font-mono text-emerald-700">
+          <span>同期検知速度:</span>
+          <span id="sync-timer" class="font-bold text-emerald-900">0.01s (11ms)</span>
+        </div>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-[#ecfdf5]/40 border border-teal-100 flex justify-center overflow-x-auto w-full">
+        <pre class="mermaid">
+flowchart LR
+    Teacher["🖥️ 講師 PC 画面<br>(/teacher/dashboard)"]
+    BC["⚡ BroadcastChannel API<br>(0.01s 超高速・同一ブラウザ内同期)"]
+    SR["☁️ Supabase Realtime<br>(クラウド経由フォールバック)"]
+    Student["📱 生徒 スマホ 画面<br>(/student)"]
+
+    Teacher -->|① 即時ローカル同期待機| BC
+    BC -->|0.01秒で描画反映| Student
+    Teacher -.->|② DB永続化| SR
+    SR -.->|クラウドバックアップ| Student
+
+    style Teacher fill:#f1f5f9,stroke:#64748b,stroke-width:2.5px,color:#1e293b
+    style Student fill:#e0f2fe,stroke:#38bdf8,stroke-width:2.5px,color:#0369a1
+    style BC fill:#d1fae5,stroke:#10b981,stroke-width:2.5px,color:#065f46
+    style SR fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,stroke-dasharray: 5 5,color:#78350f
+        </pre>
+      </div>
+
+      <!-- デュアルデバイス・ビジュアルシミュレーター -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
+        <div class="lg:col-span-7 bg-slate-900 rounded-2xl border border-slate-700 p-5 shadow-md text-white">
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800 text-sm text-slate-400">
+            <div class="flex items-center gap-2">
+              <span class="w-3.5 h-3.5 rounded-full bg-rose-400"></span>
+              <span class="w-3.5 h-3.5 rounded-full bg-amber-400"></span>
+              <span class="w-3.5 h-3.5 rounded-full bg-emerald-400"></span>
+              <span class="ml-2 font-mono text-xs text-slate-400">Teacher: /teacher/dashboard</span>
+            </div>
+            <span class="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold text-xs">講師PC</span>
+          </div>
+
+          <div class="space-y-4">
+            <div class="flex justify-between items-center text-sm">
+              <span class="font-bold text-slate-200">畑区画コントロール（区画 A-1）</span>
+              <span class="text-xs text-slate-400">野菜を選択してテスト 👇</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+              <button onclick="simulateSync('🍅 ミニトマト')" class="p-3.5 rounded-xl bg-slate-800 hover:bg-rose-500/30 border border-slate-700 hover:border-rose-400 text-left transition-all group">
+                <div class="text-2xl group-hover:scale-110 transition-transform">🍅</div>
+                <div class="text-sm font-bold text-white mt-1">ミニトマト</div>
+                <div class="text-xs text-slate-400">区画A-1に植える</div>
+              </button>
+              <button onclick="simulateSync('🍆 ナス')" class="p-3.5 rounded-xl bg-slate-800 hover:bg-purple-500/30 border border-slate-700 hover:border-purple-400 text-left transition-all group">
+                <div class="text-2xl group-hover:scale-110 transition-transform">🍆</div>
+                <div class="text-sm font-bold text-white mt-1">ナス</div>
+                <div class="text-xs text-slate-400">区画A-1に植える</div>
+              </button>
+              <button onclick="simulateSync('🥕 ニンジン')" class="p-3.5 rounded-xl bg-slate-800 hover:bg-amber-500/30 border border-slate-700 hover:border-amber-400 text-left transition-all group">
+                <div class="text-2xl group-hover:scale-110 transition-transform">🥕</div>
+                <div class="text-sm font-bold text-white mt-1">ニンジン</div>
+                <div class="text-xs text-slate-400">区画A-1に植える</div>
+              </button>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-sm">
+              <div class="flex items-center gap-2">
+                <span class="text-slate-400">現在の区画配置:</span>
+                <span id="current-crop-teacher" class="font-bold text-emerald-400 font-mono">🍅 ミニトマト (配置中)</span>
+              </div>
+              <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-400 font-mono">BroadcastChannel: 0.01s</span>
+            </div>
           </div>
         </div>
 
-        <div class="p-4 rounded-xl bg-white/10 border border-white/10 flex items-start gap-3">
-          <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">Q2</div>
-          <div>
-            <h4 class="font-bold text-white text-base mb-1">Supabaseのテスト用データベース運用</h4>
-            <p class="text-xs text-indigo-100 leading-relaxed">
-              テスト用データの投入先について、現在の開発用Supabaseプロジェクトでテスト専用IDを用いるか、ローカルSupabaseコンテナを使うか、どちらがおすすめでしょうか？
-            </p>
+        <div class="hidden lg:flex lg:col-span-1 justify-center">
+          <div class="flex flex-col items-center gap-1.5 text-teal-600 animate-pulse">
+            <span class="text-sm font-bold font-mono">0.01s</span>
+            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            <span class="text-xs text-slate-400 uppercase font-mono">Sync</span>
           </div>
         </div>
 
-        <div class="p-4 rounded-xl bg-white/10 border border-white/10 flex items-start gap-3">
-          <div class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">Q3</div>
-          <div>
-            <h4 class="font-bold text-white text-base mb-1">GitHub Actions（CI）連携のタイミング</h4>
-            <p class="text-xs text-indigo-100 leading-relaxed">
-              ローカル環境でテストが100%パスすることを確認した後に、GitHub Actions（プルリクエスト時の自動テスト）を組む順番で進めて良いでしょうか？
-            </p>
+        <div class="lg:col-span-4 max-w-[300px] mx-auto w-full bg-slate-950 rounded-[36px] border-4 border-slate-800 p-4 shadow-xl relative text-white">
+          <div class="w-24 h-4 bg-slate-800 rounded-full mx-auto mb-3"></div>
+          <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-4 min-h-[240px] flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center pb-2.5 border-b border-slate-800 text-xs text-slate-400">
+                <span class="font-bold text-slate-200">📱 生徒マイページ</span>
+                <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold text-xs">リアルタイム受信</span>
+              </div>
+
+              <div class="mt-4 text-center p-4 rounded-xl bg-slate-950 border border-slate-800/80">
+                <div class="text-xs text-slate-400 mb-1">区画 A-1 の最新状況</div>
+                <div id="student-crop-display" class="text-3xl font-black text-white transition-all transform animate-pop">🍅</div>
+                <div id="student-crop-name" class="text-sm font-bold text-emerald-400 mt-1">ミニトマト</div>
+              </div>
+            </div>
+
+            <div id="pass-badge" class="p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-xs text-emerald-300 flex items-center justify-between font-mono">
+              <span class="flex items-center gap-1.5 font-bold">✅ PASS (同期成功)</span>
+              <span id="pass-timer">11ms</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
+
+    <!-- 3. 【本物の図解】多層テストピラミッド図（Test Pyramid） -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg">🍰</div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">【図解 3】多層テストピラミッド図 (Test Pyramid)</h2>
+          <p class="text-sm text-slate-500 mt-0.5">静的型付けから視覚回帰テストまでの4層防御モデル（フォント24px表示）</p>
+        </div>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-[#fff1f2]/40 border border-rose-100 flex justify-center overflow-x-auto w-full">
+        <pre class="mermaid">
+flowchart TD
+    L4["Level 4: Visual Regression & CI 自動化<br>(スナップショット差分 < 0.1% / GitHub Actions)"]
+    L3["Level 3: Core E2E テスト<br>(先生PC ↔ 生徒スマホ 2画面同期 < 1.0s)"]
+    L2["Level 2: Integration 統合テスト<br>(React 19 Server/Client境界 & BroadcastHook)"]
+    L1["Level 1: Type Safety & Unit 単体静的検査<br>(TypeScript strict型検査 / tsc --noEmit)"]
+
+    L4 --> L3
+    L3 --> L2
+    L2 --> L1
+
+    style L4 fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f
+    style L3 fill:#fce7f3,stroke:#ec4899,stroke-width:2.5px,color:#831843
+    style L2 fill:#ede9fe,stroke:#a855f7,stroke-width:2.5px,color:#581c87
+    style L1 fill:#d1fae5,stroke:#10b981,stroke-width:2.5px,color:#065f46
+        </pre>
+      </div>
+    </section>
+
+    <!-- 4. 【本物の図解】STLC 5段階品質保証サイクル図 (Lifecycle) -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-lg">🛡️</div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">【図解 4】STLC 5段階品質保証サイクル図</h2>
+          <p class="text-sm text-slate-500 mt-0.5">準備から運用まで抜け漏れを防ぐ品質管理パイプライン（フォント24px表示）</p>
+        </div>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-[#f0fdf4]/50 border border-emerald-100 flex justify-center overflow-x-auto w-full">
+        <pre class="mermaid">
+flowchart LR
+    S1["1. 計画・準備<br>(test.tsv 作成 & Mock)"] --> S2["2. 設計・実装<br>(Playwright コード作成)"]
+    S2 --> S3["3. 厳格実行・不具合起票<br>(Fail-Strict Bug Log)"]
+    S3 --> S4["4. 完了判定<br>(Exit Criteria DoD)"]
+    S4 --> S5["5. 継続運用<br>(GitHub CI / CD)"]
+
+    style S1 fill:#ede9fe,stroke:#8b5cf6,stroke-width:2.5px,color:#4c1d95
+    style S2 fill:#d1fae5,stroke:#10b981,stroke-width:2.5px,color:#065f46
+    style S3 fill:#fff1f2,stroke:#f43f5e,stroke-width:2.5px,color:#881337
+    style S4 fill:#e0f2fe,stroke:#0284c7,stroke-width:2.5px,color:#075985
+    style S5 fill:#fef3c7,stroke:#d97706,stroke-width:2.5px,color:#78350f
+        </pre>
+      </div>
+    </section>
+
+    <!-- 5. 【本物の図解】CI/CD統合パイプライン図 (GitHub Actions) -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-lg">🐙</div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">【図解 5】CI/CD パイプライン自動化フロー図</h2>
+          <p class="text-sm text-slate-500 mt-0.5">PR作成から自動デプロイまでの4ステージ実行パイプライン（フォント24px表示）</p>
+        </div>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-[#f0f9ff]/50 border border-sky-100 flex justify-center overflow-x-auto w-full">
+        <pre class="mermaid">
+flowchart LR
+    PR["GitHub Pull Request"] --> S1["Step 1: Lint & 型検査<br>(tsc --noEmit)"]
+    S1 --> S2["Step 2: Build 検証<br>(npm run build)"]
+    S2 --> S3["Step 3: Playwright E2E<br>(2画面リアルタイムテスト)"]
+    S3 --> S4["Step 4: Report & TSV 保存<br>(HTML動画 & ログ保存)"]
+    S4 --> Deploy["🚀 本番デプロイ承認 (Vercel)"]
+
+    style PR fill:#f1f5f9,stroke:#64748b,stroke-width:2.5px,color:#1e293b
+    style S1 fill:#ede9fe,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95
+    style S2 fill:#ede9fe,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95
+    style S3 fill:#d1fae5,stroke:#10b981,stroke-width:2.5px,color:#065f46
+    style S4 fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#075985
+    style Deploy fill:#fef08a,stroke:#eab308,stroke-width:2.5px,color:#713f12
+        </pre>
+      </div>
+    </section>
+
+    <!-- 6. test.tsv 連携テストスイート一覧 (全43件) -->
+    <section class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-lg">📑</div>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">公式テストケース一覧 (test/test.tsv 連携)</h2>
+            <p class="text-sm text-slate-500 mt-0.5">全43件のテストケースを <code>test/test.tsv</code> で集中管理しています。</p>
+          </div>
+        </div>
+        <span class="text-xs px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold">PASS: 3 / 全 43</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+              <th class="p-3">ID</th>
+              <th class="p-3">タイトル</th>
+              <th class="p-3">対象画面</th>
+              <th class="p-3">期待結果</th>
+              <th class="p-3">実際結果</th>
+              <th class="p-3">優先度 / 備考</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-slate-600">
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-001</td>
+              <td class="p-3 font-bold text-slate-800">講師ロールでの正常ログインと管理画面自動遷移</td>
+              <td class="p-3 font-mono text-slate-500">/login -> /teacher/dashboard</td>
+              <td class="p-3 text-slate-700">ログインに成功し、/teacher/dashboard へ自動リダイレクトされる。講師用メニュー（区画管理、集金、AIアシスタント）が正常表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-002</td>
+              <td class="p-3 font-bold text-slate-800">生徒ロールでの正常ログインと生徒マイページ自動遷移</td>
+              <td class="p-3 font-mono text-slate-500">/login -> /student</td>
+              <td class="p-3 text-slate-700">ログインに成功し、/student へ自動リダイレクトされる。生徒用マイページ（割り当て区画・畝一覧、作業記録ボタン）が表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-003</td>
+              <td class="p-3 font-bold text-slate-800">生徒ロールによる講師画面アクセス遮断（権限外アクセス防止）</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard</td>
+              <td class="p-3 text-slate-700">Next.js Middlewareにより即時遮断され、/login または /unauthorized へリダイレクトされる。講師用データが1件も露出しないこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-004</td>
+              <td class="p-3 font-bold text-slate-800">未認証ユーザーの保護ページアクセス制限</td>
+              <td class="p-3 font-mono text-slate-500">/student, /teacher/dashboard</td>
+              <td class="p-3 text-slate-700">自動的に /login にリダイレクトされ、ログイン前画面が表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-005</td>
+              <td class="p-3 font-bold text-slate-800">ログアウト処理とセッション破棄の検証</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard, /student</td>
+              <td class="p-3 text-slate-700">Supabase Authセッションが破棄され /login に遷移。「戻る」を押してもキャッシュされた保護データが表示されず再認証を求められること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-PLOT-001</td>
+              <td class="p-3 font-bold text-slate-800">畑区画キャンバスでのドラッグ＆ドロップ配置と衝突回避</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard</td>
+              <td class="p-3 text-slate-700">AABB衝突回避アルゴリズムが作動し、重なりが発生せず近接するグリッド位置にスナップ配置されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-PLOT-002</td>
+              <td class="p-3 font-bold text-slate-800">区画への新しい畝(ベッド)の追加とサイズ・作物設定</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard</td>
+              <td class="p-3 text-slate-700">farm_beds テーブルにレコードが追加され、区画内の畝一覧に新しい畝が即時描画されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-PLOT-003</td>
+              <td class="p-3 font-bold text-slate-800">畝の削除と確認ダイアログの動作</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard</td>
+              <td class="p-3 text-slate-700">対象の畝がキャンバスおよびDBから論理/物理削除され、UI上から消去されること。関連する作付けデータが安全に処理されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-PLOT-004</td>
+              <td class="p-3 font-bold text-slate-800">生徒への区画割り当て変更とリロード後の永続化</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard</td>
+              <td class="p-3 text-slate-700">リロード後も区画A-1の担当者が「山田 太郎」のまま保持されていること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-SYNC-001</td>
+              <td class="p-3 font-bold text-slate-800">BroadcastChannel経由の0.01秒超高速画面間同期（同一ブラウザ内）</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard ↔ /student</td>
+              <td class="p-3 text-slate-700">生徒画面側が1.0秒以内（実測0.01秒台）にリロードなしで再描画され、「ミニトマト」アイコンと栽培進捗が反映されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-SYNC-002</td>
+              <td class="p-3 font-bold text-slate-800">Supabase Realtime経由のクラウド同期（別ブラウザ・別端末間）</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard (Chrome) ↔ /student (Safari/Mobile)</td>
+              <td class="p-3 text-slate-700">Supabase postgres_changes イベントを検知し、生徒端末側にWebSocket経由で3秒以内にタスク通知が届くこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-SYNC-003</td>
+              <td class="p-3 font-bold text-slate-800">ネットワーク一時切断からの復帰と自動差分再同期</td>
+              <td class="p-3 font-mono text-slate-500">/student</td>
+              <td class="p-3 text-slate-700">オンライン復帰時に再接続イベントが走り、最新のDB状態が差分フェッチされて最新データと完全整合すること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 / 未実施 (実機・動的テスト待機)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TIME-001</td>
+              <td class="p-3 font-bold text-slate-800">担当区画の畝別時系列タイムライン表示切り替え</td>
+              <td class="p-3 font-mono text-slate-500">/student</td>
+              <td class="p-3 text-slate-700">タブ選択に応じて表示される作業履歴・観察記録が瞬時に切り替わり、他人の区画や別畝の記録が混ざらないこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TIME-002</td>
+              <td class="p-3 font-bold text-slate-800">作業・観察記録（水やり・草丈・写真）の新規投稿</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline/new</td>
+              <td class="p-3 text-slate-700">crop_records テーブルに保存され、タイムラインの最上部にカードとして即時反映されること。Supabase Storageに画像がアップロードされること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TIME-003</td>
+              <td class="p-3 font-bold text-slate-800">過去の観察記録の編集・修正✏️</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline</td>
+              <td class="p-3 text-slate-700">タイムラインの表示が「28cm」に更新され、DBの値も正しく更新されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TIME-004</td>
+              <td class="p-3 font-bold text-slate-800">不要な観察記録の削除🗑️とタイムラインからの消去</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline</td>
+              <td class="p-3 text-slate-700">タイムラインから該当カードが消去され、DBからも削除されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TIME-005</td>
+              <td class="p-3 font-bold text-slate-800">他生徒の非公開記録に対するアクセス不可検証 (RLS保護)</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline</td>
+              <td class="p-3 text-slate-700">Supabase Row Level Security (RLS) により空配列または403エラーとなり、他人の非公開記録が漏洩しないこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 (Security)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-QST-001</td>
+              <td class="p-3 font-bold text-slate-800">講師による教材クエスト作成と生徒への配信</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/tasks -> /student/quests</td>
+              <td class="p-3 text-slate-700">生徒側のクエスト一覧に「夏野菜の芽かき作業 [EXP 100]」が未完了クエストとして届くこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-QST-002</td>
+              <td class="p-3 font-bold text-slate-800">生徒のクエスト完了報告と経験値(EXP)加算</td>
+              <td class="p-3 font-mono text-slate-500">/student/quests</td>
+              <td class="p-3 text-slate-700">クエストが「完了済み」ステータスとなり、生徒の累計EXPに+100加算され、レベルアップ演出/バッジが表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AI-001</td>
+              <td class="p-3 font-bold text-slate-800">AI栽培相談チャットへの問い合わせと回答生成</td>
+              <td class="p-3 font-mono text-slate-500">/student/ai-chat</td>
+              <td class="p-3 text-slate-700">Google AI Studio (Gemini 1.5) APIから10秒以内に親しみやすい「しるべぇ」語調で適切な対策アドバイスが返答されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 / AI Integration</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AI-002</td>
+              <td class="p-3 font-bold text-slate-800">RAGによる農園ナレッジ・過去記録を考慮したコンテキスト回答</td>
+              <td class="p-3 font-mono text-slate-500">/student/ai-chat</td>
+              <td class="p-3 text-slate-700">pgvector類似度検索により自身の区画情報と紐付けられた具体的な次の作業（支柱立て、わき芽取り等）が提案されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P2 / Vector Search</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-BILL-001</td>
+              <td class="p-3 font-bold text-slate-800">受講生一覧表示と月額会費の入金ステータス更新</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/billing</td>
+              <td class="p-3 text-slate-700">ステータスが即時緑色の「入金済」バッジに変わり、月間集金合計額が自動再計算されて加算されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-NFR-001</td>
+              <td class="p-3 font-bold text-slate-800">TypeScript strict 型整合性検証（エラー0件検証）</td>
+              <td class="p-3 font-mono text-slate-500">CLI (npx tsc --noEmit)</td>
+              <td class="p-3 text-slate-700">エラーコード0で終了し、型不整合や未定義プロパティ参照が0件であること。</td>
+              <td class="p-3 font-mono font-bold text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded">PASS</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 2026-09-07 CLI実行検証済 (tsc --noEmit エラー0件)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-NFR-002</td>
+              <td class="p-3 font-bold text-slate-800">本番環境ビルド検証 (Next.js Production Build)</td>
+              <td class="p-3 font-mono text-slate-500">CLI (npm run build)</td>
+              <td class="p-3 text-slate-700">エラー・重大なWarningなくビルドが成功し、すべてのApp Routerルートが正常に静的/動的生成されること。</td>
+              <td class="p-3 font-mono font-bold text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded">PASS</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 2026-09-07 CLI実行検証済 (npm run build 16ルート正常生成)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-NFR-003</td>
+              <td class="p-3 font-bold text-slate-800">モバイルファースト レスポンシブ表示検証 (iPhone 14 Viewport)</td>
+              <td class="p-3 font-mono text-slate-500">/student (390px x 844px)</td>
+              <td class="p-3 text-slate-700">横スクロール（水平方向の不要なはみ出し）が一切発生せず、タップ領域（44px以上）が確保されていること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (UI/UX)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-NEG-001</td>
+              <td class="p-3 font-bold text-slate-800">XSSスクリプト注入攻撃に対する無害化（サニタイズ）検証</td>
+              <td class="p-3 font-mono text-slate-500">/student, /student/timeline</td>
+              <td class="p-3 text-slate-700">React JSXエスケープによりHTMLタグが文字列として無害化描画され、JavaScriptコードが一切実行されないこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 (Security: JSX自動エスケープ検証済・dangerouslySetInnerHTML未使用)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-NEG-002</td>
+              <td class="p-3 font-bold text-slate-800">超長文テキスト（10,000文字）および巨大画像アップロード時の挙動検証</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline/new</td>
+              <td class="p-3 text-slate-700">クライアント側Canvas圧縮（maxDim 1000px / JPEG 0.75）が自動作動し、アプリがクラッシュ・フリーズせず正常に保存されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (Canvas自動リサイズ・圧縮機構検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-NEG-003</td>
+              <td class="p-3 font-bold text-slate-800">不正なURL・存在しない区画UUID直打ち時の安全なフォールバック</td>
+              <td class="p-3 font-mono text-slate-500">/student/plot/invalid-uuid-999</td>
+              <td class="p-3 text-slate-700">Unhandled Exceptionで画面が真っ白にクラッシュせず、404またはデフォルトの担当区画へ安全にフォールバック表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (エラーバウンダリ・フォールバック検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-RACE-001</td>
+              <td class="p-3 font-bold text-slate-800">講師側畝削除と生徒側記録保存の同時発生時のDB整合性</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard ↔ /student</td>
+              <td class="p-3 text-slate-700">DBの外部キー制約（ON DELETE CASCADE）または論理削除により、孤立レコードやDB破損が発生しないこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-RACE-002</td>
+              <td class="p-3 font-bold text-slate-800">ダブルクリック・高速連打によるデータ二重・三重増殖の防止</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline/new, JournalInput</td>
+              <td class="p-3 text-slate-700">送信処理中はボタンが即時 `disabled`（非活性化）またはデバウンスされ、同一データが二重作成されないこと。</td>
+              <td class="p-3 font-mono font-bold text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded">PASS</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 / 2026-09-07 修正＆再テスト済 (isSubmittingロック・disabled二重送信防止適用)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-SEC-001</td>
+              <td class="p-3 font-bold text-slate-800">DevToolsからのAPI直叩きによる他人生徒データ・農場データの改ざん遮断</td>
+              <td class="p-3 font-mono text-slate-500">Browser Console (Direct Supabase Client)</td>
+              <td class="p-3 text-slate-700">Supabase PostgreSQLのRow Level Security (RLS) により即座に拒絶（403 Unauthorized / 0 rows affected）されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 (Security: Supabase RLS保護ポリシー検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-SEC-002</td>
+              <td class="p-3 font-bold text-slate-800">不正・期限切れJWTトークンでのAPIアクセス遮断</td>
+              <td class="p-3 font-mono text-slate-500">API Routes (/api/*)</td>
+              <td class="p-3 text-slate-700">Supabase Authにより署名検証失敗となり、401 Unauthorized または /login へリダイレクトされること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 (Security)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-PERF-001</td>
+              <td class="p-3 font-bold text-slate-800">画面遷移の反復に伴うBroadcastChannel・Realtime購読の完全破棄とメモリ安定性</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard ↔ /student (10回反復遷移)</td>
+              <td class="p-3 text-slate-700">useEffectのクリーンアップ関数により `broadcastRef.close()` および `supabase.removeChannel()` が確実に実行され、リスナーの多重登録やメモリリークが発生しないこと。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (クリーンアップ実装検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-ONBD-001</td>
+              <td class="p-3 font-bold text-slate-800">招待URL/QRコードからの生徒アカウント新規登録と農園自動所属</td>
+              <td class="p-3 font-mono text-slate-500">/invite</td>
+              <td class="p-3 text-slate-700">Supabase Authにユーザーが登録され、users テーブルに role="student", farm_id="farm_1" でレコード作成後、生徒マイページへ自動遷移すること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 (Onboarding: 招待登録・農園自動紐付け検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-ONBD-002</td>
+              <td class="p-3 font-bold text-slate-800">講師新規登録・農園初期開設とパスワード6文字以上バリデーション</td>
+              <td class="p-3 font-mono text-slate-500">/auth/signup/teacher</td>
+              <td class="p-3 text-slate-700">5文字入力時に「パスワードは6文字以上で入力してください」トーストが表示されて送信ブロック。6文字以上で farms および users (role="teacher") が生成されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (Validation: パスワード長境界値・農園開設検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TODO-001</td>
+              <td class="p-3 font-bold text-slate-800">タスク完了の取り消し（未完了復帰）と進捗・EXPの正常整合性</td>
+              <td class="p-3 font-mono text-slate-500">/student/quests</td>
+              <td class="p-3 text-slate-700">タスクステータスが "not_started" に戻り、進行中リストへ再配置され、進捗率とEXPが矛盾なく正しく減算・復旧されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (ToDo標準: uncompleteTask・状態巻き戻し検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-UI-001</td>
+              <td class="p-3 font-bold text-slate-800">初期状態・ゼロデータ（Empty State）時の表示崩れ防止とガイダンス表示</td>
+              <td class="p-3 font-mono text-slate-500">/student, /teacher/dashboard</td>
+              <td class="p-3 text-slate-700">白画面やエラーが発生せず、「担当区画がまだありません。講師による区画割り当てをお待ちください」等の丁寧な案内UIが表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (UX標準: ゼロデータEmpty State耐性検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-FEED-001</td>
+              <td class="p-3 font-bold text-slate-800">生徒の「❗相談あり」観察記録投稿と講師ダッシュボード通知バッジ連動</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline ↔ /teacher/dashboard</td>
+              <td class="p-3 text-slate-700">journals に連動保存され、講師画面ヘッダーの未確認バッジがインクリメントされ、畑キャンバスの該当区画に相談アイコンが表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (教育LMS標準: 指導者通知・フィードバックループ検証済)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-006</td>
+              <td class="p-3 font-bold text-slate-800">パスワード誤りおよび空欄送信時の適切なエラーメッセージ表示</td>
+              <td class="p-3 font-mono text-slate-500">/login</td>
+              <td class="p-3 text-slate-700">画面遷移せず「ログイン失敗: Invalid login credentials」等のトースト/エラーが表示されること。空欄時は「メールアドレスとパスワードを入力してください」が表示されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P0 (sample2準拠: 認証失敗・必須バリデーション)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-AUTH-007</td>
+              <td class="p-3 font-bold text-slate-800">LINEログイン連携（認可成功 ＆ 認可画面でのキャンセル挙動）</td>
+              <td class="p-3 font-mono text-slate-500">/login</td>
+              <td class="p-3 text-slate-700">パターンA: 認可完了後 /auth/callback を経由して該当ロールの画面へログイン遷移すること。<br>パターンB: 認可キャンセル時、エラー崩れせず /login へ安全に戻ること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (sample2準拠: ソーシャルログイン成否・キャンセルペアテスト)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-PLOT-005</td>
+              <td class="p-3 font-bold text-slate-800">畝(ベッド)削除確認ダイアログで「キャンセル」選択時の安全なデータ保持</td>
+              <td class="p-3 font-mono text-slate-500">/teacher/dashboard</td>
+              <td class="p-3 text-slate-700">畝が削除されず、キャンバス上およびDB上で作物データがそのまま保持されること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (sample2準拠: 削除確認キャンセル安全弁)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-TIME-006</td>
+              <td class="p-3 font-bold text-slate-800">過去の観察記録削除確認で「キャンセル」選択時のデータ保持</td>
+              <td class="p-3 font-mono text-slate-500">/student/timeline</td>
+              <td class="p-3 text-slate-700">観察記録が削除されず、タイムラインにカードがそのまま表示され続けること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (sample2準拠: 削除確認キャンセル安全弁)</td>
+            </tr>
+            
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="p-3 font-mono font-bold text-rose-600">TC-ONBD-003</td>
+              <td class="p-3 font-bold text-slate-800">既存登録済みメールアドレスでの重複登録試行時のエラー表示</td>
+              <td class="p-3 font-mono text-slate-500">/invite, /auth/signup/teacher</td>
+              <td class="p-3 text-slate-700">アカウントが二重作成されず、「すでに登録されているメールアドレスです」等のエラーメッセージが表示され送信がブロックされること。</td>
+              <td class="p-3 font-mono font-bold text-slate-400">未実施</td>
+              <td class="p-3 text-xs text-slate-500">Priority: P1 (sample2準拠: メール一意性制約エラー)</td>
+            </tr>
+            
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7. デプロイ判定基準（Quality Gate: Exit Criteria） -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+        <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">🏁</div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">デプロイ完了判定基準 (Quality Gate)</h3>
+            <p class="text-xs text-slate-500">本番リリースを許可する必須条件 (DoD)</p>
+          </div>
+        </div>
+        <ul class="space-y-3 text-sm text-slate-600">
+          <li class="flex items-start gap-2.5">
+            <span class="text-emerald-500 font-bold">✔</span>
+            <span><strong>TypeScript 型エラー 0件:</strong> <code>tsc --noEmit</code> が警告・エラーなくパスすること。</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <span class="text-emerald-500 font-bold">✔</span>
+            <span><strong>P0 テスト合格率 100%:</strong> test.tsv 内の P0 ケースが全て正当に PASS 判定されること。</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <span class="text-emerald-500 font-bold">✔</span>
+            <span><strong>改ざん・未解決不具合 0件:</strong> 失敗を握りつぶさず、原因究明と修正が完了していること。</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <span class="text-emerald-500 font-bold">✔</span>
+            <span><strong>本番ビルド成功:</strong> <code>npm run build</code> がエラーなく完了すること。</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+        <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+          <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-lg">⚠️</div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">主要リスク ＆ コンティンジェンシープラン</h3>
+            <p class="text-xs text-slate-500">障害発生時の緩和策とエスカレーション</p>
+          </div>
+        </div>
+        <div class="space-y-3 text-xs">
+          <div class="p-3 rounded-xl bg-rose-50/60 border border-rose-100">
+            <span class="font-bold text-rose-800">リスク 1: テスト失敗時の原因特定遅延</span>
+            <p class="text-slate-600 mt-1">Playwright Trace Viewer と HTML Video を自動保存し、失敗した瞬間を1クリックで再現・調査可能にする。</p>
+          </div>
+          <div class="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
+            <span class="font-bold text-amber-800">リスク 2: テストのフレイキー（Flaky）化</span>
+            <p class="text-slate-600 mt-1">固定待機（sleep）を全廃し、PlaywrightのWeb-first Assertion（toBeVisible等）へ統一。</p>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </main>
 
-  <footer class="text-center text-xs text-slate-400 mt-12">
-    NOU-ATO (Agri-Tracks) Quality Assurance Plan &copy; 2026
-  </footer>
+  <!-- Interactive Demo Script -->
+  <script>
+    function simulateSync(cropWithIcon) {
+      const parts = cropWithIcon.split(' ');
+      const icon = parts[0];
+      const name = parts[1];
+      
+      const teacherEl = document.getElementById('current-crop-teacher');
+      if (teacherEl) {
+        teacherEl.innerText = cropWithIcon + ' (配置中)';
+        teacherEl.className = 'font-bold text-rose-400 font-mono';
+      }
 
+      // Simulate BroadcastChannel delay (11ms)
+      setTimeout(() => {
+        const studentIcon = document.getElementById('student-crop-display');
+        const studentName = document.getElementById('student-crop-name');
+        const passBadge = document.getElementById('pass-badge');
+        
+        if (studentIcon) studentIcon.innerText = icon;
+        if (studentName) studentName.innerText = name;
+        
+        if (passBadge) {
+          passBadge.className = 'p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-xs text-emerald-300 flex items-center justify-between font-mono animate-pop';
+        }
+        if (teacherEl) {
+          teacherEl.className = 'font-bold text-emerald-400 font-mono';
+        }
+      }, 11);
+    }
+  </script>
 </body>
 </html>

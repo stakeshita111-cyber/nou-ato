@@ -27,7 +27,12 @@ export default function TaskForm({ onAddTask }: TaskFormProps) {
       />
       <button 
         type="submit" 
-        className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-sm hover:bg-green-700 transition"
+        disabled={!newTaskTitle.trim()}
+        className={`px-8 py-3 rounded-lg font-bold shadow-sm transition ${
+          !newTaskTitle.trim()
+            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+            : "bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] cursor-pointer"
+        }`}
       >
         追加
       </button>

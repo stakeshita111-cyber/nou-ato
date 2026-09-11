@@ -97,6 +97,7 @@ export default function StudentFarmRecordView({
 
   const [customCropName, setCustomCropName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [isSubmittingRecord, setIsSubmittingRecord] = useState(false);
 
   const [selectedStage, setSelectedStage] = useState<GrowthStage>("果実肥大");
   const [heightCm, setHeightCm] = useState<number>(75);
@@ -175,81 +176,88 @@ export default function StudentFarmRecordView({
   // 新規または編集の保存
   const handleSubmitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentBed) return;
+    if (!currentBed || isSubmittingRecord) return;
 
-    // 🌟 生徒が入力した品種名 (未入力時は既存品種を引き継ぐ) 🌟
-    const finalCrop = customCropName.trim() || (currentBed.crop_name !== "未確定 🌱" ? currentBed.crop_name : "") || "未確定 🌱";
-    const cleanNotes = notes.replace(/\[IMG:[\s\S]+?\]/g, "").replace(/【.*?】/g, "").trim();
-    const taggedNotes = finalCrop !== "未確定 🌱" ? `【${finalCrop}】${cleanNotes}` : cleanNotes;
-
-    // 1. Supabase farm_beds の作物品種名を更新 (即時DB反映)
+    setIsSubmittingRecord(true);
     try {
-      if (updateBedCrop) {
-        await updateBedCrop(currentBed.id, finalCrop);
-      } else {
-        await supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", currentBed.id);
-      }
-    } catch (e) {
-      console.warn("farm_beds crop update notice:", e);
-    }
+      // 🌟 生徒が入力した品種名 (未入力時は既存品種を引き継ぐ) 🌟
+      const finalCrop = customCropName.trim() || (currentBed.crop_name !== "未確定 🌱" ? currentBed.crop_name : "") || "未確定 🌱";
+      const cleanNotes = notes.replace(/\[IMG:[\s\S]+?\]/g, "").replace(/【.*?】/g, "").trim();
+      const taggedNotes = finalCrop !== "未確定 🌱" ? `【${finalCrop}】${cleanNotes}` : cleanNotes;
 
-    if (editingRecord) {
-      updateCropRecord(editingRecord.id, {
-        growth_stage: selectedStage,
-        height_cm: Number(heightCm),
-        work_types: selectedWorks,
-        notes: taggedNotes,
-        harvest_amount: harvestAmount.trim() || undefined,
-        image_url: imageUrl || undefined,
-      });
-      setToastMessage("✏️ 過去の観察記録を更新しました！");
-    } else {
-      const todayStr = new Date().toLocaleDateString("ja-JP");
-      addCropRecord(currentBed.id, {
-        bed_id: currentBed.id,
-        date: todayStr,
-        growth_stage: selectedStage,
-        height_cm: Number(heightCm),
-        work_types: selectedWorks,
-        notes: taggedNotes,
-        harvest_amount: harvestAmount.trim() || undefined,
-        image_url: imageUrl || undefined,
-      });
-
-      // 講師の相談日誌・スライドカード用に journals へも自動連動保存
+      // 1. Supabase farm_beds の作物品種名を更新 (即時DB反映)
       try {
-        const resolvedStudentId =
-          studentId ||
-          ((studentName?.includes("竹下") || studentName === "竹下翔" || studentName === "竹下 翔")
-            ? "acf193c5-f6b4-4514-93a4-958eba0e0c38"
-            : null);
-
-        await supabase.from("journals").insert([
-          {
-            student_id: resolvedStudentId,
-            content: `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`,
-            image_url: imageUrl || null,
-            role: "student",
-          },
-        ]);
+        if (updateBedCrop) {
+          await updateBedCrop(currentBed.id, finalCrop);
+        } else {
+          await supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", currentBed.id);
+        }
       } catch (e) {
-        console.error("journals insert error:", e);
+        console.warn("farm_beds crop update notice:", e);
       }
 
-      setToastMessage(`🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`);
-    }
+      if (editingRecord) {
+        updateCropRecord(editingRecord.id, {
+          growth_stage: selectedStage,
+          height_cm: Number(heightCm),
+          work_types: selectedWorks,
+          notes: taggedNotes,
+          harvest_amount: harvestAmount.trim() || undefined,
+          image_url: imageUrl || undefined,
+        });
+        setToastMessage("✏️ 過去の観察記録を更新しました！");
+      } else {
+        const todayStr = new Date().toLocaleDateString("ja-JP");
+        addCropRecord(currentBed.id, {
+          bed_id: currentBed.id,
+          date: todayStr,
+          growth_stage: selectedStage,
+          height_cm: Number(heightCm),
+          work_types: selectedWorks,
+          notes: taggedNotes,
+          harvest_amount: harvestAmount.trim() || undefined,
+          image_url: imageUrl || undefined,
+        });
 
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("nouato_sync_event"));
-    }
+        // 講師の相談日誌・スライドカード用に journals へも自動連動保存
+        try {
+          const resolvedStudentId =
+            studentId ||
+            ((studentName?.includes("竹下") || studentName === "竹下翔" || studentName === "竹下 翔")
+              ? "acf193c5-f6b4-4514-93a4-958eba0e0c38"
+              : null);
 
-    setShowInputModal(false);
-    setEditingRecord(null);
-    setNotes("");
-    setCustomCropName("");
-    setImageUrl("");
-    setHarvestAmount("");
-    setShowToast(true);
+          await supabase.from("journals").insert([
+            {
+              student_id: resolvedStudentId,
+              content: `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`,
+              image_url: imageUrl || null,
+              role: "student",
+            },
+          ]);
+        } catch (e) {
+          console.error("journals insert error:", e);
+        }
+
+        setToastMessage(`🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`);
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+      }
+
+      setShowInputModal(false);
+      setEditingRecord(null);
+      setNotes("");
+      setCustomCropName("");
+      setImageUrl("");
+      setHarvestAmount("");
+      setShowToast(true);
+    } catch (err) {
+      console.error("handleSubmitRecord error:", err);
+    } finally {
+      setIsSubmittingRecord(false);
+    }
   };
 
   // 🌟 編集モーダルを開く 🌟
@@ -842,9 +850,14 @@ export default function StudentFarmRecordView({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black rounded-xl shadow-md transition cursor-pointer"
+                  disabled={isSubmittingRecord}
+                  className={`px-6 py-2.5 font-black rounded-xl shadow-md transition ${
+                    isSubmittingRecord
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-amber-500 hover:bg-amber-600 text-amber-950 cursor-pointer active:scale-[0.98]"
+                  }`}
                 >
-                  {editingRecord ? "変更内容を更新する" : "結果を登録する"}
+                  {isSubmittingRecord ? "登録中..." : editingRecord ? "変更内容を更新する" : "結果を登録する"}
                 </button>
               </div>
             </form>
