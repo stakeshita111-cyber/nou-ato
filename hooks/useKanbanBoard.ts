@@ -10,6 +10,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const [trashTasks, setTrashTasks] = useState<Task[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [farmId, setFarmId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // 編集中のタスク
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -53,6 +54,8 @@ export function useKanbanBoard(columns: ColumnType[]) {
       if (trashData) setTrashTasks(trashData);
     } catch (e) {
       console.error("fetchTasks 中に例外が発生しました:", e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -81,6 +84,21 @@ export function useKanbanBoard(columns: ColumnType[]) {
       supabase.removeChannel(realtimeChannel);
     };
   }, []);
+
+  const notifyTaskSync = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("nouato_tasks_updated"));
+      window.dispatchEvent(new Event("nouato_sync_event"));
+      try {
+        const bc = new BroadcastChannel("nouato_farm_sync_channel");
+        bc.postMessage({ type: "TASKS_UPDATED", timestamp: Date.now() });
+        bc.close();
+      } catch (e) {}
+      try {
+        localStorage.setItem("nouato_sync_event", Date.now().toString());
+      } catch (e) {}
+    }
+  };
 
   // タスクの追加（Create: 作成された Task を返却）
   const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
@@ -140,6 +158,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (data) {
         setTasks((prev) => [data, ...prev]);
+        notifyTaskSync();
         return data;
       }
     } catch (e) {
@@ -310,6 +329,8 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (error) {
         console.error("【デバッグ】ドラッグ更新失敗:", error);
+      } else {
+        notifyTaskSync();
       }
     } catch (e) {
       console.error("【デバッグ】handleDragEnd 例外:", e);
@@ -317,6 +338,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
   };
 
   return {
+    isLoading,
     tasks,
     trashTasks,
     addTask,

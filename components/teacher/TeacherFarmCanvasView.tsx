@@ -8,6 +8,7 @@ import { useTheme, ThemeColor, FontSize } from "@/context/ThemeContext";
 import BedApprovalNotificationBanner from "@/components/teacher/BedApprovalNotificationBanner";
 import BedApprovalModal from "@/components/farm/BedApprovalModal";
 import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
+import { SproutLoader } from "@/components/SproutLoader";
 import { supabase } from "@/lib/supabase";
 
 interface UnassignedStudent {
@@ -26,6 +27,7 @@ interface TeacherFarmCanvasViewProps {
 
 export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }: TeacherFarmCanvasViewProps = {}) {
   const {
+    isLoading,
     farms,
     setFarms,
     activeFarmId,
@@ -1055,6 +1057,14 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
   const cellDim = Math.round(92 * (zoomLevel / 100));
 
+  if (isLoading || plots.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[460px] py-20 animate-fade-in">
+        <SproutLoader size={80} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
@@ -1655,6 +1665,26 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                             className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
                           >
                             {isSelected ? "▲ 記録を閉じる" : "📖 観察記録を見る"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (window.confirm(`畝 #${displayNum} (${bed.crop_name || "未確定"}) を削除してもよろしいですか？\n※関連する観察記録も整理されます。`)) {
+                                await deleteBedFromPlot(detailPlot.id, bed.id);
+                                setDetailPlot((prev) => prev ? {
+                                  ...prev,
+                                  beds: (prev.beds || []).filter(b => b.id !== bed.id),
+                                } : prev);
+                                setToastMessage(`🗑️ 畝 #${displayNum} を削除しました`);
+                                setShowToast(true);
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 hover:border-rose-300 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs flex items-center gap-1"
+                            title="畝を削除"
+                          >
+                            <span>🗑️</span>
+                            <span>削除</span>
                           </button>
                         </div>
                       </div>

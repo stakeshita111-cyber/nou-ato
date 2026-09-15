@@ -7,6 +7,7 @@ import Toast from "@/components/ui/Toast";
 import TaskSlider from "@/components/student/TaskSlider";
 import BedCompletionModal from "@/components/farm/BedCompletionModal";
 import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
+import { SproutLoader } from "@/components/SproutLoader";
 import { supabase } from "@/lib/supabase";
 
 interface StudentFarmRecordViewProps {
@@ -32,7 +33,7 @@ export default function StudentFarmRecordView({
   setNewJournal,
   onAddJournal,
 }: StudentFarmRecordViewProps) {
-  const { plots, records, addCropRecord, updateCropRecord, deleteCropRecord, completeBedCrop, updateBedCrop } = useFarmManager();
+  const { isLoading, plots, records, addCropRecord, updateCropRecord, deleteCropRecord, completeBedCrop, updateBedCrop } = useFarmManager();
 
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -289,6 +290,14 @@ export default function StudentFarmRecordView({
       return r.bed_id === currentBed.id;
     })
     .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+
+  if (isLoading || plots.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[380px] py-16 animate-fade-in">
+        <SproutLoader size={72} />
+      </div>
+    );
+  }
 
   if (!myPlot) {
     return (

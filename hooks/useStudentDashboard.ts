@@ -141,11 +141,22 @@ export function useStudentDashboard() {
           .select("*")
           .eq("student_id", currentStudentId);
 
-        let taskList: any[] = [];
+        // 🌟 講師がカンバンで「生徒へ公開中 (status = 'todo')」に配置した教材タスクを取得 🌟
+        const { data: publicTasks } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("status", "todo")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false });
 
-        // MASTER_TASKS (全5件) をベースに、Supabase DB の student_tasks の status のみをそのまま100%信頼してマッピング
+        let taskList: any[] = [];
+        const seenTitles = new Set<string>();
+
+        // ① MASTER_TASKS (全5件) をベースに、Supabase DB の student_tasks の status のみをそのまま100%信頼してマッピング
         MASTER_TASKS.forEach((mt) => {
           const cleanMt = mt.title.replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+          seenTitles.add(cleanMt);
+
           const stMatch = stData?.find((st: any) => {
             const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
             return cleanSt && (cleanSt === cleanMt || cleanSt.includes(cleanMt) || cleanMt.includes(cleanSt));
@@ -165,6 +176,74 @@ export function useStudentDashboard() {
               exp: mt.exp,
             },
           });
+        });
+
+        // ② 講師が新規作成して「生徒へ公開中」にした動的タスクを安全に追加（重複排除）
+        if (publicTasks && publicTasks.length > 0) {
+          publicTasks.forEach((pt: any) => {
+            const cleanPt = (pt.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+            if (cleanPt && !seenTitles.has(cleanPt)) {
+              seenTitles.add(cleanPt);
+              const stMatch = stData?.find((st: any) => {
+                const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+                return cleanSt && (cleanSt === cleanPt || cleanSt.includes(cleanPt) || cleanPt.includes(cleanSt));
+              });
+
+              const isDone = stMatch ? stMatch.status === "completed" : false;
+
+              taskList.push({
+                id: stMatch ? stMatch.id : `task_${pt.id}`,
+                task_id: pt.id,
+                status: isDone ? "completed" : "not_started",
+                tasks: {
+                  id: pt.id,
+                  title: pt.title,
+                  description: pt.description || "",
+                  target_crop: pt.target_crop || "野菜全般",
+                  exp: pt.exp || 50,
+                },
+              });
+            }
+          });
+        }
+
+        // ③ 生徒の個別割当タスク (student_tasks) に直接存在するタスクも漏れなく合流
+        if (stData && stData.length > 0) {
+          stData.forEach((st: any) => {
+            const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+            if (cleanSt && !seenTitles.has(cleanSt)) {
+              seenTitles.add(cleanSt);
+              const isDone = st.status === "completed";
+              taskList.push({
+                id: st.id,
+                task_id: st.task_id || st.base_task_id || st.id,
+                status: isDone ? "completed" : "not_started",
+                tasks: {
+                  id: st.task_id || st.base_task_id || st.id,
+                  title: st.title,
+                  description: st.description || "",
+                  target_crop: st.target_crop || "野菜全般",
+                  exp: st.exp || 50,
+                },
+              });
+            }
+          });
+        }
+
+        // 🌟 新着・講師作成タスクがスライダーの先頭に最初に来るように整列 🌟
+        taskList.sort((a, b) => {
+          const aDone = a.status === "completed";
+          const bDone = b.status === "completed";
+          if (!aDone && bDone) return -1;
+          if (aDone && !bDone) return 1;
+
+          // 未完了同士の並び順: 講師作成タスク (task_ で始まるもの) を最優先で先頭に配置
+          const aIsDynamic = a.id?.startsWith("task_");
+          const bIsDynamic = b.id?.startsWith("task_");
+          if (aIsDynamic && !bIsDynamic) return -1;
+          if (!aIsDynamic && bIsDynamic) return 1;
+
+          return 0;
         });
 
         setTasks(taskList);
@@ -214,6 +293,54 @@ export function useStudentDashboard() {
     };
 
     fetchData();
+
+    // 🌟 1. BroadcastChannel 経由の 0.01秒超高速同一ブラウザ同期 🌟
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc.onmessage = () => {
+        fetchData();
+      };
+    }
+
+    // 🌟 2. カスタム DOM イベント同期 (同一タブ内) 🌟
+    const handleCustomSync = () => {
+      fetchData();
+    };
+    window.addEventListener("nouato_sync_event", handleCustomSync);
+
+    // 🌟 3. localStorage 同期 (別ウィンドウ・タブ間) 🌟
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "nouato_farm_plots" || e.key === "nouato_sync_event") {
+        fetchData();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    // 🌟 4. タブ切り替え/復帰時の自動再同期 🌟
+    const handleFocus = () => {
+      fetchData();
+    };
+    window.addEventListener("focus", handleFocus);
+
+    // 🌟 5. Supabase Realtime (別端末・スマホ実機間 WebSocket 同期) 🌟
+    const channelName = `student_sync_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const realtimeChannel = supabase
+      .channel(channelName)
+      .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "farm_plots" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener("nouato_sync_event", handleCustomSync);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+      supabase.removeChannel(realtimeChannel);
+    };
   }, []);
 
   const completeTask = async (taskId: string) => {
@@ -241,16 +368,29 @@ export function useStudentDashboard() {
         .select("id, title")
         .eq("student_id", currentStudentId);
 
+      let found = false;
       if (userSts && userSts.length > 0) {
         for (const st of userSts) {
           const stClean = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
           if (stClean && (stClean === cleanT || stClean.includes(cleanT) || cleanT.includes(stClean))) {
+            found = true;
             await supabase
               .from("student_tasks")
               .update({ status: "completed", completed_at: new Date().toISOString() })
               .eq("id", st.id);
           }
         }
+      }
+
+      if (!found && currentStudentId && currentStudentId !== "student_default") {
+        await supabase
+          .from("student_tasks")
+          .insert({
+            student_id: currentStudentId,
+            title: taskTitle,
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          });
       }
     } catch (e) {
       console.warn("completeTask DB update error:", e);
@@ -292,16 +432,28 @@ export function useStudentDashboard() {
         .select("id, title")
         .eq("student_id", currentStudentId);
 
+      let found = false;
       if (userSts && userSts.length > 0) {
         for (const st of userSts) {
           const stClean = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
           if (stClean && (stClean === cleanT || stClean.includes(cleanT) || cleanT.includes(stClean))) {
+            found = true;
             await supabase
               .from("student_tasks")
               .update({ status: "pending", completed_at: null })
               .eq("id", st.id);
           }
         }
+      }
+
+      if (!found && currentStudentId && currentStudentId !== "student_default") {
+        await supabase
+          .from("student_tasks")
+          .insert({
+            student_id: currentStudentId,
+            title: taskTitle,
+            status: "pending",
+          });
       }
     } catch (e) {
       console.warn("uncompleteTask DB update error:", e);

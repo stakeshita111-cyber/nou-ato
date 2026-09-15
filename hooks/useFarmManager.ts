@@ -116,6 +116,7 @@ export function useFarmManager() {
   const [plots, setPlots] = useState<FarmPlot[]>([]);
   const [records, setRecords] = useState<CropRecord[]>([]);
   const [supabaseStudents, setSupabaseStudents] = useState<StudentProfile[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const broadcastRef = useRef<BroadcastChannel | null>(null);
 
@@ -456,6 +457,8 @@ export function useFarmManager() {
       localStorage.setItem("nouato_farm_plots", JSON.stringify(plotsWithRecords));
     } catch (e) {
       console.error("reloadAllFromSupabase error:", e);
+    } finally {
+      setIsLoading(false);
     }
   }, [activeFarmId]);
 
@@ -1768,6 +1771,7 @@ export function useFarmManager() {
   };
 
   return {
+    isLoading,
     farms,
     setFarms,
     activeFarmId,

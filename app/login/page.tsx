@@ -130,6 +130,10 @@ export default function UnifiedLoginPage() {
             <span>{loading ? "LINEへ接続中..." : "LINEでサインイン"}</span>
           </button>
 
+          <p className="text-[10px] text-gray-400 text-center leading-tight">
+            💡 LINEの仕様上、QRコード読み取り後に再度「ログイン」の確認画面が表示される場合があります。
+          </p>
+
           <div className="relative flex py-1 items-center">
             <div className="flex-grow border-t border-gray-200"></div>
             <span className="flex-shrink mx-3 text-[10px] text-gray-400 font-bold">または</span>

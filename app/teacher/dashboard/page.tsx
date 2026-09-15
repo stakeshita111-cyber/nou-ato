@@ -17,6 +17,7 @@ import TeacherTemplatesView from "@/components/teacher/TeacherTemplatesView";
 import TeacherFarmCanvasView from "@/components/teacher/TeacherFarmCanvasView";
 
 import MobilePhonePreviewModal from "@/components/common/MobilePhonePreviewModal";
+import { SproutLoader } from "@/components/SproutLoader";
 
 export default function TeacherDashboardPage() {
   const router = useRouter();
@@ -60,6 +61,9 @@ export default function TeacherDashboardPage() {
   // 講師ロール（role === 'teacher'）権限の厳格チェック
   useEffect(() => {
     const checkTeacherRole = async () => {
+      const startTime = Date.now();
+      const minDisplayTime = 750; // 🌱 芽が出るアニメーションを心地よく見せる最低保証時間 (0.75秒)
+
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -82,6 +86,12 @@ export default function TeacherDashboardPage() {
             router.push("/student/quests");
           }, 1200);
           return;
+        }
+
+        // 最低保証時間の残り時間を待機してから画面を表示
+        const elapsed = Date.now() - startTime;
+        if (elapsed < minDisplayTime) {
+          await new Promise((res) => setTimeout(res, minDisplayTime - elapsed));
         }
 
         setIsAuthorized(true);
@@ -115,14 +125,7 @@ export default function TeacherDashboardPage() {
   }
 
   if (isAuthorized === null) {
-    return (
-      <div className="min-h-screen bg-[#f7f9f5] flex items-center justify-center p-4 font-sans text-gray-700">
-        <div className="flex items-center space-x-2 font-bold text-sm">
-          <span className="animate-spin text-xl text-emerald-800">🌀</span>
-          <span>講師権限の確認中...</span>
-        </div>
-      </div>
-    );
+    return <SproutLoader fullScreen size={80} />;
   }
 
   return (

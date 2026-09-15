@@ -7,6 +7,7 @@ import Toast from "@/components/ui/Toast";
 import IndividualTaskAssignModal from "@/components/teacher/IndividualTaskAssignModal";
 import StudentPreviewModal from "@/components/teacher/StudentPreviewModal";
 import QRCodeModal from "@/components/ui/QRCodeModal";
+import { SproutLoader } from "@/components/SproutLoader";
 
 interface StudentData {
   id: string;
@@ -463,7 +464,9 @@ export default function TeacherStudentsView() {
 
       {/* 生徒カードグリッド */}
       {loading ? (
-        <div className="text-center py-12 text-sm font-bold text-gray-400">受講生データを読み込み中...</div>
+        <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+          <SproutLoader size={72} />
+        </div>
       ) : filteredStudents.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center text-gray-500 font-bold text-sm border border-gray-200 space-y-4 shadow-xs">
           <span className="text-4xl block">🧑‍🌾</span>

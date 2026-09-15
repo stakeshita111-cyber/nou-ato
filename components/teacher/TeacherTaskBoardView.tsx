@@ -21,6 +21,7 @@ import TrashModal from "@/components/board/TrashModal";
 import PageHeader from "@/components/ui/PageHeader";
 import { ColumnType, Task } from "@/types/task";
 import { TaskTemplate } from "@/lib/taskTemplates";
+import { SproutLoader } from "@/components/SproutLoader";
 
 import IndividualTaskAssignModal from "@/components/teacher/IndividualTaskAssignModal";
 
@@ -58,6 +59,7 @@ interface TeacherTaskBoardViewProps {
 
 export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm = false }: TeacherTaskBoardViewProps) {
   const {
+    isLoading,
     tasks,
     trashTasks,
     addTask,
@@ -124,6 +126,14 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
       t.description?.toLowerCase().includes(query)
     );
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[460px] py-20 animate-fade-in">
+        <SproutLoader size={80} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
