@@ -39,9 +39,9 @@ export function sanitizePersonalNames(text: string): string {
   clean = clean.replace(/^[^\n\r]*(?:チケット無事|復活しました)[^\n\r]*[\n\r]*/gm, "");
 
   // 3. 残っている個人名呼びかけ「〇〇さん、」「竹下翔さん」等の除去
+  clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+(?:さん|様|くん|ちゃん)/g, "受講生の方");
   clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "");
   clean = clean.replace(/(?:竹下|翔|たけした)[^ \n\r!！🌱〜]*(?:さん|様|くん|ちゃん)?[、,!\s]*/g, "");
-  clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+さん/g, "受講生の方");
 
   // 4. 文頭の余分な改行の整理
   clean = clean.trim();

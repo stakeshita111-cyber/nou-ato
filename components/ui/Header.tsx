@@ -81,7 +81,7 @@ export default function Header() {
               👨‍🌾 講師ダッシュボードへ
             </Link>
             <Link 
-              href="/student/quests" 
+              href="/student" 
               onClick={() => setIsOpen(false)}
               className="block p-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg font-bold transition"
             >

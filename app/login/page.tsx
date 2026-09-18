@@ -48,7 +48,7 @@ export default function UnifiedLoginPage() {
       const userId = authData?.user?.id;
 
       // 2. 自動ロール判定 (users テーブルの role 参照)
-      let destination = "/student/quests";
+      let destination = "/student";
       if (userId) {
         const { data: userData } = await supabase
           .from("users")
@@ -60,7 +60,7 @@ export default function UnifiedLoginPage() {
           destination = "/teacher/dashboard";
           setToastMessage(`🎉 講師「${userData.display_name || "先生"}」としてログインしました！`);
         } else {
-          destination = "/student/quests";
+          destination = "/student";
           setToastMessage(`🎉 受講生「${userData?.display_name || "様"}」としてログインしました！`);
         }
       } else {
@@ -190,17 +190,26 @@ export default function UnifiedLoginPage() {
           </button>
         </form>
 
-        {/* フッターリンク (パスワードをお忘れの場合 / アカウントをお持ちでない方はこちら) */}
-        <div className="pt-2 text-center space-y-1.5 text-xs text-gray-500 font-medium">
+        {/* フッターリンク (パスワードをお忘れの場合 / 生徒・講師アカウント作成) */}
+        <div className="pt-2 text-center space-y-2 text-xs text-gray-500 font-medium">
           <div>
-            <a href="#" onClick={(e) => { e.preventDefault(); alert("パスワードの再設定リンクを送信します。登録されたメールアドレスを入力してください。"); }} className="hover:underline text-gray-500">
+            <Link href="/auth/forgot-password" className="hover:underline text-gray-500">
               パスワードをお忘れの場合
-            </a>
-          </div>
-          <div>
-            <Link href="/invite?farm_id=tanaka_farm" className="text-[#1c4d21] font-bold hover:underline">
-              アカウントをお持ちでない方はこちら
             </Link>
+          </div>
+          <div className="border-t border-gray-100 pt-2 space-y-1.5">
+            <div>
+              <span className="text-gray-400 text-[11px]">受講生の方: </span>
+              <Link href="/invite?farm_id=tanaka_farm" className="text-[#1c4d21] font-bold hover:underline">
+                体験農園に参加する
+              </Link>
+            </div>
+            <div>
+              <span className="text-gray-400 text-[11px]">農園運営者・講師の方: </span>
+              <Link href="/auth/signup/teacher" className="text-emerald-700 font-bold hover:underline">
+                農園の新規開設・講師登録はこちら
+              </Link>
+            </div>
           </div>
         </div>
       </div>

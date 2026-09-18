@@ -24,7 +24,7 @@ export default function RootPage() {
           if (userData?.role === "teacher") {
             router.replace("/teacher/dashboard");
           } else {
-            router.replace("/student/quests");
+            router.replace("/student");
           }
         } else {
           // 未ログインの場合は統一ログイン画面 (/login) へリダイレクト

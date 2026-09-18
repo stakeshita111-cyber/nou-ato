@@ -55,23 +55,23 @@ function AccountMergeForm() {
         provider: 'custom:line' as any,
         options: {
           scopes: 'openid profile email',
-          redirectTo: `${origin}/auth/callback?next=/student/quests`,
+          redirectTo: `${origin}/auth/callback?next=/student`,
         },
       });
 
       if (linkError) {
-        setToastMessage(`LINEアカウントの連携に失敗しました: ${linkError.message}`);
+        setToastMessage(`LINEアカウントの統合に失敗しました: ${linkError.message}`);
         setShowToast(true);
-      } else if (linkData?.url) {
-        // LINE認証へリダイレクトして連携を完了させる
-        window.location.href = linkData.url;
-      } else {
-        setToastMessage("🎉 アカウント統合が正常に完了しました！");
-        setShowToast(true);
-        setTimeout(() => {
-          router.push("/student/quests");
-        }, 1000);
+        setLoading(false);
+        return;
       }
+
+      setToastMessage("🎉 アカウントの統合が完了しました！");
+      setShowToast(true);
+
+      setTimeout(() => {
+        router.push("/student");
+      }, 900);
     } catch (err: any) {
       setToastMessage("エラーが発生しました: " + (err.message || ""));
       setShowToast(true);

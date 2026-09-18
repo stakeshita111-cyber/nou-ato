@@ -144,7 +144,7 @@ function InviteContent() {
         provider: "custom:line" as any,
         options: {
           scopes: "openid profile email",
-          redirectTo: `${origin}/auth/callback?next=/student/quests&farm_id=${encodeURIComponent(selectedFarmId)}`,
+          redirectTo: `${origin}/auth/callback?next=/student&farm_id=${encodeURIComponent(selectedFarmId)}`,
           queryParams: {
             farm_id: selectedFarmId,
           },
@@ -237,7 +237,7 @@ function InviteContent() {
       setShowToast(true);
 
       setTimeout(() => {
-        router.push("/student/quests");
+        router.push("/student");
       }, 900);
     } catch (err: any) {
       setToastMessage("登録中にエラーが発生しました: " + (err.message || ""));

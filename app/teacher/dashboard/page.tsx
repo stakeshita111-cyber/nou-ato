@@ -83,7 +83,7 @@ export default function TeacherDashboardPage() {
           setShowToast(true);
           setIsAuthorized(false);
           setTimeout(() => {
-            router.push("/student/quests");
+            router.push("/student");
           }, 1200);
           return;
         }

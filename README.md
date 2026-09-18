@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NOU-ATO (のうあと) - 体験農業経営支援アプリ
 
-## Getting Started
+![NOU-ATO Banner](public/globe.svg)
 
-First, run the development server:
+「**NOU-ATO（のうあと）**」は、体験農園の運営者（講師）と受講生（生徒）をつなぎ、初心者でも迷わず野菜づくりを楽しみながら学べる体験農業経営支援Webアプリケーションです。
 
+---
+
+## 🌾 プロジェクト概要・特徴
+
+- **受講生向け機能 (Student Portal)**:
+  - **マイタスク管理 & 進捗可視化**: 栽培ステップ（土作り、苗植え、芽かき、追肥、収穫など）を段階的にクリア。
+  - **農園交換日記（日誌報告）**: 作業報告や写真を投稿し、講師からの個別アドバイスを受信。
+  - **AI相棒「しるべぇ」相談**: 農園の蓄積ノウハウ（RAG）を活用し、自然栽培のコツをいつでも相談（1日3回チケット制）。
+- **講師向け機能 (Teacher Dashboard)**:
+  - **受講生・区画マネジメント**: 受講生ごとの進捗率、割り当て畝（農地キャンバス）、未読日誌を一元把握。
+  - **一括アナウンス配信**: 天候不良や収穫イベントの連絡を受講生全員へ即時配信。
+  - **農地キャンバス（畝・区画管理）**: ドラッグ＆ドロップやステータス管理で畝の栽培状況をグラフィカルに管理。
+
+---
+
+## 🛠️ 技術スタック
+
+| レイヤー | 採用技術 |
+| :--- | :--- |
+| **フロントエンド** | Next.js 16 (App Router), React 19, TypeScript |
+| **スタイリング** | Tailwind CSS v4, Lucide Icons |
+| **状態管理・D&D** | Zustand, @dnd-kit (Core, Sortable, Modifiers) |
+| **バックエンド / DB** | Supabase (PostgreSQL, Supabase Auth, SSR, Storage) |
+| **AI / RAG** | Google AI Studio (Gemini 1.5 / Flash-Lite), 農園ナレッジ検索エンジン |
+| **テストフレームワーク** | Vitest (単体テスト・認可セキュリティテスト・E2E画面横断テスト) |
+
+---
+
+## 🚀 環境構築 & ローカル起動手順
+
+### 1. 前提条件
+- Node.js `v20` 以上 (推奨: `v24` 以上)
+- npm `v10` 以上
+
+### 2. リポジトリのクローンと依存関係インストール
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd nou-ato
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. 環境変数の設定
+プロジェクトルートに `.env.local` を作成し、必要なキーを設定します：
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Google AI Studio (Gemini API)
+GEMINI_API_KEY=your-gemini-api-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. 開発サーバーの起動
+```bash
+npm run dev
+```
+ブラウザで [http://localhost:3000](http://localhost:3000) を開きます。
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🧪 テスト・品質検証コマンド
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+本プロジェクトでは品質とセキュリティを担保するため、自律検証用テストスイートを導入しています。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# 1. 自動テストの実行 (単体・セキュリティ・E2E画面横断テスト 全28項目)
+npm run test
 
-## Deploy on Vercel
+# 2. TypeScript 型チェック (型エラー0件の検証)
+npx tsc --noEmit
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# 3. 本番ビルド検証
+npm run build
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 4. コードスタイル・Lint検証
+npm run lint
+```
+
+---
+
+## 👥 デモアカウント情報（動作確認用）
+
+| ロール | 画面URL | 目的・確認可能機能 |
+| :--- | :--- | :--- |
+| **講師 (Teacher)** | `/teacher/dashboard` | 受講生一覧、進捗率、日誌返信、農園キャンバス、一括配信 |
+| **受講生 (Student)** | `/student` | マイタスク確認、日誌報告、AIしるべぇチャット相談、区画確認 |
+| **招待・参加** | `/invite` | 新規受講生の農園参加フロー |
+
+---
+
+## 📂 ディレクトリ構成
+
+```text
+nou-ato/
+├── app/                  # Next.js App Router (ルーティング & API)
+│   ├── api/              # API Route Handlers (chat, settings)
+│   ├── student/          # 受講生ポータル画面
+│   ├── teacher/          # 講師ダッシュボード画面
+│   └── login/            # 認証・ログイン画面
+├── components/           # UIコンポーネント (teacher, student, ui, board)
+├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager)
+├── test/                 # 自動テストスイート (Vitest)
+│   ├── auth-security.test.ts      # 認可・アクセス制御・入力検証
+│   ├── knowledge-retriever.test.ts # 個人名匿名化・ナレッジ検索
+│   └── e2e-cross-screen.test.ts   # E2E画面横断シナリオ
+└── types/                # TypeScript型定義
+```

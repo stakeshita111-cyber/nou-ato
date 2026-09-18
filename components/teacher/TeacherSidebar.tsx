@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import { useThemeStore } from "@/store/useThemeStore";
 
 interface TeacherSidebarProps {
@@ -22,15 +24,68 @@ export default function TeacherSidebar({
   pendingApprovalCount = 0,
 }: TeacherSidebarProps) {
   const { settings } = useThemeStore();
+  const router = useRouter();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [teacherName, setTeacherName] = useState("テスト講師");
+  const [teacherName, setTeacherName] = useState("講師");
+  const [farmName, setFarmName] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedName = localStorage.getItem("nouato_owner_name") || "テスト講師";
-      setTeacherName(savedName);
+  const handleLogout = async () => {
+    setIsUserMenuOpen(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Sign out error:", err);
     }
+    router.push("/login");
+  };
+
+  useEffect(() => {
+    const fetchUserAndFarm = async () => {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("display_name, farm_id")
+            .eq("id", authData.user.id)
+            .single();
+
+          if (userData?.display_name) {
+            setTeacherName(userData.display_name);
+            localStorage.setItem("nouato_owner_name", userData.display_name);
+          } else if (authData.user.email) {
+            const fallback = authData.user.email.split("@")[0];
+            setTeacherName(fallback);
+          }
+
+          // 農園名を取得
+          const { data: teacherFarm } = await supabase
+            .from("farms")
+            .select("name")
+            .or(`owner_id.eq.${authData.user.id},id.eq.${userData?.farm_id || "5cf1b060-8229-4669-85e6-3bfca5d04c6d"}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (teacherFarm?.name) {
+            setFarmName(teacherFarm.name);
+            localStorage.setItem("nouato_current_farm_name", teacherFarm.name);
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("TeacherSidebar fetch error:", err);
+      }
+
+      if (typeof window !== "undefined") {
+        const savedName = localStorage.getItem("nouato_owner_name");
+        if (savedName) setTeacherName(savedName);
+        const savedFarm = localStorage.getItem("nouato_current_farm_name");
+        if (savedFarm) setFarmName(savedFarm);
+      }
+    };
+
+    fetchUserAndFarm();
   }, []);
 
   // ポップアップメニュー外クリック検知閉じる
@@ -231,7 +286,7 @@ export default function TeacherSidebar({
               {/* ポップアップヘッダー */}
               <div className="px-3 py-2 border-b border-gray-100 mb-1">
                 <p className="text-xs font-black text-emerald-950 truncate">{teacherName}</p>
-                <p className="text-[10px] text-gray-500 font-medium truncate">農園主 / 講師アカウント</p>
+                <p className="text-[10px] text-gray-500 font-medium truncate">{farmName ? `🏡 ${farmName} / 講師` : "農園主 / 講師アカウント"}</p>
               </div>
 
               {/* 1. 👀 生徒画面の確認 */}
@@ -262,14 +317,14 @@ export default function TeacherSidebar({
               </button>
 
               {/* 3. 🚪 ログアウト */}
-              <Link
-                href="/login"
-                onClick={() => setIsUserMenuOpen(false)}
-                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition duration-150"
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-black text-rose-600 hover:bg-rose-50 transition duration-150 text-left cursor-pointer"
               >
                 <span className="text-sm">🚪</span>
                 <span>ログアウト</span>
-              </Link>
+              </button>
             </div>
           )}
 
@@ -292,7 +347,7 @@ export default function TeacherSidebar({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black text-gray-900 truncate leading-tight">{teacherName}</p>
-                <p className="text-[10px] text-emerald-600 font-bold truncate">ログイン中</p>
+                <p className="text-[10px] text-emerald-600 font-bold truncate">{farmName ? `🏡 ${farmName}` : "講師ログイン中"}</p>
               </div>
             </div>
 

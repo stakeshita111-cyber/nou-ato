@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/student/quests';
+  const next = searchParams.get('next') ?? '/student';
   const cookieHeader = request.headers.get('cookie') || '';
   const cookieFarmId = cookieHeader.split(';').find(c => c.trim().startsWith('nouato_invite_farm_id='))?.split('=')[1];
   const farmIdParam = searchParams.get('farm_id') || cookieFarmId || '';

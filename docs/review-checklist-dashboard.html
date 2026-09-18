@@ -1,0 +1,2519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOU-ATO - オリアプレビュー項目DB（全101項目）検証ダッシュボード</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      flowchart: { htmlLabels: true, curve: 'basis' }
+    });
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+    body { font-family: 'Inter', 'Noto Sans JP', sans-serif; }
+    .status-badge-pass { background-color: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .status-badge-partial { background-color: #fefce8; color: #854d0e; border: 1px solid #fde047; }
+    .status-badge-todo { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status-badge-na { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .diff-A { background-color: #fef2f2; color: #b91c1c; border: 1px solid #f87171; }
+    .diff-B { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #60a5fa; }
+    .diff-C { background-color: #f0fdf4; color: #15803d; border: 1px solid #4ade80; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <span class="w-10 h-10 rounded-2xl bg-emerald-700 text-white font-black text-xl flex items-center justify-center shadow-sm">
+          🌱
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-black text-slate-900 tracking-tight">NOU-ATO (のうあと)</h1>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">最新検証完了</span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">オリアプレビュー項目DB（受講生用）全101項目 準拠検証ダッシュボード</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <span>最終更新: 2026年9月18日</span>
+        <span>•</span>
+        <span>Vitest 40件テスト通過</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- サマリー統計カード -->
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <p class="text-xs font-bold text-slate-500">総項目数</p>
+        <p class="text-3xl font-black text-slate-900 mt-1">101 <span class="text-sm font-semibold text-slate-400">項目</span></p>
+        <p class="text-[11px] text-slate-400 mt-1">Notionチェックシート全件</p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-emerald-200 bg-emerald-50/20 shadow-xs">
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-emerald-700">◯ 対応済み</p>
+          <span class="text-emerald-500 text-sm font-bold">✓</span>
+        </div>
+        <p class="text-3xl font-black text-emerald-700 mt-1">67 <span class="text-sm font-semibold">件</span></p>
+        <p class="text-[11px] text-emerald-600 font-medium mt-1">合格率: 72.0%</p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-xs">
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-amber-700">△ 一部対応</p>
+          <span class="text-amber-500 text-sm font-bold">▲</span>
+        </div>
+        <p class="text-3xl font-black text-amber-700 mt-1">20 <span class="text-sm font-semibold">件</span></p>
+        <p class="text-[11px] text-amber-600 font-medium mt-1">改善・拡張推奨</p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-rose-200 bg-rose-50/20 shadow-xs">
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-rose-700">❌ 未対応</p>
+          <span class="text-rose-500 text-sm font-bold">✕</span>
+        </div>
+        <p class="text-3xl font-black text-rose-700 mt-1">6 <span class="text-sm font-semibold">件</span></p>
+        <p class="text-[11px] text-rose-600 font-medium mt-1">CI/CD・OpenAPI等</p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-xs col-span-2 md:col-span-1">
+        <p class="text-xs font-bold text-slate-500">➖ 対象外 (アーキテクチャ差)</p>
+        <p class="text-3xl font-black text-slate-600 mt-1">8 <span class="text-sm font-semibold">件</span></p>
+        <p class="text-[11px] text-slate-400 mt-1">AWS VPC/Hono特有項目</p>
+      </div>
+    </section>
+
+    <!-- 達成プログレスバー -->
+    <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+      <div class="flex items-center justify-between text-xs font-bold">
+        <span class="text-slate-700">チェックシート適合進捗率 (有効 93 項目中)</span>
+        <span class="text-emerald-700 font-black text-sm">72.0% 達成</span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden p-0.5 border border-slate-200">
+        <div style="width: 66.3%" class="bg-emerald-600 rounded-full h-full" title="対応済み: 67件"></div>
+        <div style="width: 19.8%" class="bg-amber-400 h-full ml-0.5" title="一部対応: 20件"></div>
+        <div style="width: 5.9%" class="bg-rose-500 h-full ml-0.5" title="未対応: 6件"></div>
+      </div>
+      <div class="flex flex-wrap gap-4 text-[11px] font-medium text-slate-500 pt-1">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>対応済み (67)</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>一部対応 (20)</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>未対応 (6)</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>対象外 (8)</span>
+      </div>
+    </section>
+
+    <!-- 用途別 画面遷移図セクション -->
+    <section class="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-6">
+      <div class="border-b border-slate-100 pb-4">
+        <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+          🗺️ 用途別・完全画面遷移図 (Screen Transition Diagrams)
+        </h2>
+        <p class="text-xs text-slate-500 mt-0.5 font-medium">ペルソナ（生徒・講師・未ログイン）と目的ごとに完全分割された動線マップ</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- ① 認証フロー -->
+        <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              【用途 1】認証・アカウント開設・パスワード復旧フロー
+            </h3>
+            <span class="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">認証系</span>
+          </div>
+          <div class="overflow-x-auto py-2">
+            <pre class="mermaid text-xs">
+flowchart TD
+    Root["/ (セッション判定)"] -->|未ログイン| Login["/login (統合ログイン)"]
+    Login -->|講師開設| TeacherSign["/auth/signup/teacher"]
+    Login -->|生徒参加| Invite["/invite (生徒招待)"]
+    Login -->|PWお忘れ| Forgot["/auth/forgot-password"]
+    Login -->|LINE認証| OAuth["/auth/callback"]
+    Login -->|生徒ログイン| Student["/student"]
+    Login -->|講師ログイン| Teacher["/teacher/dashboard"]
+
+    TeacherSign -->|開設完了| Teacher
+    TeacherSign -->|戻る| Login
+    Invite -->|参加完了| Student
+    Invite -->|戻る| Login
+
+    Forgot -->|メール送信| Mail["メール内リンク"]
+    Mail --> Reset["/auth/reset-password"]
+    Reset -->|更新完了| Login
+
+    OAuth -->|生徒成功| Student
+    OAuth -->|講師成功| Teacher
+    OAuth -->|メール重複| Merge["/auth/merge"]
+    Merge --> Student
+    OAuth -->|エラー| Err["/auth/auth-code-error"]
+    Err --> Login
+            </pre>
+          </div>
+        </div>
+
+        <!-- ② 生徒フロー -->
+        <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              【用途 2】受講生（生徒）の学習・実践フロー (/student)
+            </h3>
+            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">受講生</span>
+          </div>
+          <div class="overflow-x-auto py-2">
+            <pre class="mermaid text-xs">
+flowchart TD
+    Portal["/student (受講生ポータル)"]
+    Portal --> Farm["畑 タブ (マイファーム)"]
+    Portal --> Weather["天気 タブ (予報・配信)"]
+    Portal --> Cal["カレンダー タブ (予約)"]
+    Portal --> Talk["相談 タブ (AIしるべぇ)"]
+    Portal --> Feed["成長 タブ (スキルボード)"]
+    Portal --> Menu["アカウントメニュー"]
+
+    Farm -->|タスク選択| TaskModal["(モーダル) タスク予習・完了報告"]
+    TaskModal -->|写真・報告送信| Farm
+    Farm -->|気づきメモ投稿| Farm
+    Weather --> Broad["講師からの一括お知らせ閲覧"]
+    Cal --> Res["イベント参加申し込み"]
+    Talk --> AI["1日3回チケット相談・ナレッジ連携"]
+    Menu -->|ログアウト| Login["/login (ログイン画面)"]
+            </pre>
+          </div>
+        </div>
+
+        <!-- ③ 講師フロー -->
+        <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="text-xs font-black text-blue-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+              【用途 3】講師（農園運営者）の指導・管理フロー (/teacher/dashboard)
+            </h3>
+            <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">講師・管理者</span>
+          </div>
+          <div class="overflow-x-auto py-2">
+            <pre class="mermaid text-xs">
+flowchart TD
+    Dashboard["/teacher/dashboard (講師ポータル)"]
+    Dashboard --> Students["受講生管理 (進捗・遅れ把握)"]
+    Dashboard --> Canvas["畑・区画キャンバス (D&D畝管理)"]
+    Dashboard --> Tasks["教材タスク管理 (プール/Todo)"]
+    Dashboard --> Journals["交換日記 (生徒日誌・返信)"]
+    Dashboard --> Events["イベント管理 (講習会登録)"]
+    Dashboard --> Settings["設定 (AI相談タブON/OFF)"]
+
+    Students -->|招待URL発行| InvModal["(モーダル) 招待コード"]
+    Students -->|全体配信| BroadModal["(モーダル) 一括アナウンス配信"]
+    Students -->|個別タスク割当| AssignModal["(モーダル) タスク割当"]
+    Canvas -->|畝完了申請| ApprModal["(モーダル) 畝作業承認"]
+
+    Dashboard -->|生徒画面確認| StudentView["/student (別窓確認)"]
+    Dashboard -->|スマホビュー表示| MobilePreview["(モーダル) スマホプレビュー"]
+    Dashboard -->|ログアウト| Login["/login (signOut)"]
+            </pre>
+          </div>
+        </div>
+
+        <!-- ④ 全体鳥瞰図 -->
+        <div class="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="text-xs font-black text-purple-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-purple-600"></span>
+              【用途 4】全体統合鳥瞰マップ (System Bird's-eye View)
+            </h3>
+            <span class="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">全体俯瞰</span>
+          </div>
+          <div class="overflow-x-auto py-2">
+            <pre class="mermaid text-xs">
+flowchart LR
+    subgraph AuthArea ["1. 認証・エントリー"]
+        Root["/"] --> Login["/login"]
+        Login --> TSign["講師開設"]
+        TSign --> Login
+        Login --> SSign["生徒招待"]
+        SSign --> Login
+        Login --> Reset["PW再設定"]
+    end
+    subgraph StudentArea ["2. 生徒ポータル (/student)"]
+        S_Main["生徒マイページ"]
+        S_Tabs["畑・天気・予約・相談・成長"]
+        S_Main --- S_Tabs
+    end
+    subgraph TeacherArea ["3. 講師ポータル (/teacher)"]
+        T_Main["講師ダッシュボード"]
+        T_Views["受講生・畑・日誌返信"]
+        T_Main --- T_Views
+    end
+
+    Login -->|生徒認証| S_Main
+    SSign -->|参加登録| S_Main
+    Login -->|講師認証| T_Main
+    TSign -->|開設完了| T_Main
+    T_Main -->|プレビュー確認| S_Main
+    S_Main -->|ログアウト| Login
+    T_Main -->|ログアウト| Login
+            </pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 検索 & フィルターバー -->
+    <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+      <div class="flex flex-col md:flex-row gap-3 md:items-center justify-between">
+        <!-- 検索窓 -->
+        <div class="relative flex-1 max-w-md">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="項目名・カテゴリ・コースで検索..."
+            oninput="filterTable()"
+            class="w-full pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition"
+          >
+          <span class="absolute left-3 top-3 text-slate-400 text-xs">🔍</span>
+        </div>
+
+        <!-- フィルターグループ -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <!-- ステータスフィルター -->
+          <select id="statusFilter" onchange="filterTable()" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:outline-none">
+            <option value="all">ステータス: すべて</option>
+            <option value="pass">◯ 対応済み</option>
+            <option value="partial">△ 一部対応</option>
+            <option value="todo">❌ 未対応</option>
+            <option value="na">➖ 対象外</option>
+          </select>
+
+          <!-- 難易度フィルター -->
+          <select id="diffFilter" onchange="filterTable()" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:outline-none">
+            <option value="all">難易度: すべて</option>
+            <option value="A">難易度: A</option>
+            <option value="B">難易度: B</option>
+            <option value="C">難易度: C</option>
+          </select>
+
+          <!-- カテゴリフィルター -->
+          <select id="categoryFilter" onchange="filterTable()" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:outline-none">
+            <option value="all">カテゴリ: すべて</option>
+            <option value="1.要件定義">1.要件定義</option>
+            <option value="2.設計">2.設計</option>
+            <option value="3.デモ">3.デモ</option>
+            <option value="4.API仕様">4.API仕様・動作確認</option>
+            <option value="5.機能">5.機能</option>
+            <option value="6.品質">6.品質</option>
+            <option value="7.Readme">7.Readme</option>
+          </select>
+
+          <button onclick="resetFilters()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition">
+            リセット
+          </button>
+        </div>
+      </div>
+      <div class="text-[11px] text-slate-500 flex justify-between items-center font-medium">
+        <span>表示中: <strong id="matchedCount" class="text-slate-900">101</strong> / 101 件</span>
+      </div>
+    </section>
+
+    <!-- 全101項目 データテーブル -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse" id="checklistTable">
+          <thead>
+            <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold">
+              <th class="p-3 w-12 text-center">No</th>
+              <th class="p-3 w-28">カテゴリ</th>
+              <th class="p-3 w-16 text-center">難易度</th>
+              <th class="p-3">チェック項目名</th>
+              <th class="p-3 w-24 text-center">ステータス</th>
+              <th class="p-3 w-1/3">現在の実装状況・確認結果</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200" id="tableBody">
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="その他">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">1</td>
+                <td class="p-3 font-semibold text-slate-600">その他</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【Webアプリ】オリジナルポートフォリオアプリ レビューチェックリスト (受講生公開)</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: 全コース</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  チェックシート全101項目と対照したセルフレビューと改善を実施完了しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="1.要件定義">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">2</td>
+                <td class="p-3 font-semibold text-slate-600">1.要件定義</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>明確な目的がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, AIエンジニア, Java/Python/PHP, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  体験農園の受講生自立支援および講師の業務効率化（作業進捗・日誌共有）という明確な目的がPRDに定義されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="1.要件定義">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">3</td>
+                <td class="p-3 font-semibold text-slate-600">1.要件定義</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>模倣やクローンアプリではなく、独自性がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  「農園区画（畝）キャンバス管理」「農園特化RAG（AIしるべぇ）」「チケット制交換日記」といった高い独自性があります。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="1.要件定義">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">4</td>
+                <td class="p-3 font-semibold text-slate-600">1.要件定義</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>何らかの問題解決ができている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  初心者の「次に何をすればいいか分からない」問題と、講師の「区画ごとの進捗把握が困難」という課題を同時に解決しています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="A" data-category="1.要件定義">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">5</td>
+                <td class="p-3 font-semibold text-slate-600">1.要件定義</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>マネタイズができる</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  月額受講料や体験チケット課金のビジネス構想はPRDにありますが、Stripe等の実決済API連携は未実装です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="1.要件定義">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">6</td>
+                <td class="p-3 font-semibold text-slate-600">1.要件定義</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>システム要件と制約が文書化されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  PRD.md および AGENTS.md にNext.js 16 (App Router)、Supabase、Gemini等の要件と制約が文書化されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="-" data-category="1.要件定義">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">7</td>
+                <td class="p-3 font-semibold text-slate-600">1.要件定義</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>非機能要件が定義されている（パフォーマンス、可用性、セキュリティ）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  RLSやレスポンシブ設計方針は記載されていますが、SLO/SLA、レスポンス目標値、レート制限の具体的数値定義は今後の課題です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">8</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>「簡易アプリ仕様設計」シートかそれと同程度の設計書がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  PRD.md、docs/SITE_STRUCTURE.md、テーマ設計書等が同等以上の粒度で整備されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">9</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ER図がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  PRD.mdにSQLテーブル構造は記載されていますが、グラフィカルに可視化された最新ER図ドキュメントは未配置です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="A" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">10</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ログ設計がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  console.error によるエラー捕捉はありますが、構造化JSONログやSentry等の外部ログ収集基盤の設計は未整備です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="todo" data-diff="A" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">11</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>Open API 仕様に則った API の仕様書がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-todo">
+                    ❌ 未対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  APIルート（/api/chat/rag, /api/settings 等）のOpenAPI (Swagger) 仕様書は未作成です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">12</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>フロントエンドとバックエンドを分けて設計している</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  フロント（Next.js App Router）とバック（Supabase PostgreSQL/Auth + Route Handlers）が明確に分離設計されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">13</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>デザインカンプがある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Figmaカンプはありませんが、Tailwind CSSを用いた高品質なUIコンポーネントとしてデザインが実装されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">14</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>シーケンス図がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  最新の画面遷移図および用途別ユーザーフロー図（Mermaid）を作成し、認証・画面間の連携フローを可視化しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">15</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>テーブル定義書がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  PRD.mdにテーブル定義SQLが記載されていますが、独立したスプレッドシートやMarkdown定義書は未整備です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">16</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>アーキテクチャ図・シーケンス図が用意されている（複雑なフローの場合）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  docs/architecture-map.html および Mermaid画面遷移図にてシステム全体の動線と構成が可視化されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">17</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>エラーレスポンスの形式が統一されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  { error: string } 形式で返却していますが、RFC 7807等の厳格な共通エラーフォーマットへの統一は今後の課題です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">18</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div> IAMロールとポリシーが適切に設計されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Supabase Authのteacher/studentロール制御およびMiddleware認可を実装済み。全テーブルのRLSポリシー監査が推奨されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">19</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ネットワーク構成（VPC, サブネット、セキュリティグループ）が明示されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （Vercel + Supabase PaaS運用のWebスタックのため、AWS VPC等の直接構築は対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">20</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>IaCツール（Terraform, CDK など）の構造が適切</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （現状はSupabaseダッシュボードおよびマイグレーション運用のため対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">21</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>Honoの構成（ルーティング・ミドルウェア・エラーハンドリング）が明確</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （本アプリは Next.js Route Handlers を採用しているため対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">22</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>APIエンドポイント設計がRESTfulで整合性がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  /api/settings, /api/chat/rag, /api/chat/check-knowledge など直感的なHTTPメソッド・エンドポイント設計となっています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="2.設計">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">23</td>
+                <td class="p-3 font-semibold text-slate-600">2.設計</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>AWS構成図（ECS, Lambda, S3, RDS, VPCなど）が整理されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （Vercel + Supabase構成のため対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="C" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">24</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>デモURLのリンク先画面が正常に表示できる</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  ローカル環境（localhost:3000）で全画面エラーなく表示。本番Vercel公開URLの設定が推奨されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">25</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>アプリの全機能を確認できるデモアカウントが用意されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  README.md に講師アカウント、受講生アカウントそれぞれの確認手順とアクセス先を明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">26</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>デモのためのデータが入っている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  マスタタスク（5件）、サンプル受講生、農園区画データ、プリセットFAQが登録されており即座に体験可能です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="todo" data-diff="-" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">27</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>自動テストがCI/CDパイプラインで実行される</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-todo">
+                    ❌ 未対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  ローカルでの自動テスト（npm run test 全40件）は完備しましたが、GitHub Actions等のCI連携は未構築です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">28</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>主要機能のデモが確認できる（API動作、ログ出力など）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  タスク完了、日誌報告、AI相談、区画D&D、一括配信、パスワード再設定の動作デモが可能です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="todo" data-diff="-" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">29</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>デプロイパイプライン（GitHub Actionsなど）が構築されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-todo">
+                    ❌ 未対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Vercel自動デプロイは可能ですが、テスト自動実行を挟んだCI/CDパイプラインは未構築です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="-" data-category="3.デモ">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">30</td>
+                <td class="p-3 font-semibold text-slate-600">3.デモ</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>本番環境URLが稼働している</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  ローカルビルド（npm run build）はTurbopackで正常成功を確認済み。本番デプロイ公開待ちです。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="4.API仕様・動作確認">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">31</td>
+                <td class="p-3 font-semibold text-slate-600">4.API仕様・動作確認</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>レスポンシブ対応されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  <div class="text-[10px] text-amber-600 font-medium mt-0.5">💡 バックエンド言語（Javaなど）学習の方は不要です。</div>
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  PC向け講師ダッシュボードとスマホ向け生徒ポータルの双方に対応し、スマホプレビューモーダルも完備。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="4.API仕様・動作確認">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">32</td>
+                <td class="p-3 font-semibold text-slate-600">4.API仕様・動作確認</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>アイコンが用途に適した素材になっている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Lucide Iconsおよび農業用絵文字が、作業・ステータスに適した形で美しく配置されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="A" data-category="4.API仕様・動作確認">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">33</td>
+                <td class="p-3 font-semibold text-slate-600">4.API仕様・動作確認</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>フォーム入力はキーボード操作で完結できる</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  日誌投稿、チャット、ログイン、パスワード再設定ともにEnterキー送信やTab移動に対応しています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="4.API仕様・動作確認">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">34</td>
+                <td class="p-3 font-semibold text-slate-600">4.API仕様・動作確認</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>APIレスポンスの設計が直感的（キー名・構造など）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  { reply, referencedQa, timestamp } など、キー名と構造が明確で直感的です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="todo" data-diff="-" data-category="4.API仕様・動作確認">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">35</td>
+                <td class="p-3 font-semibold text-slate-600">4.API仕様・動作確認</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>エンドポイントを試せるUI（Swagger, Postman collection, curl例など）が用意されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-todo">
+                    ❌ 未対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Swagger UI や Postman Collection は未配置です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">36</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>全ての画面がエラーなく表示できる</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発, AWS</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  /login, /student, /teacher/dashboard, /auth/* 全18ルートがエラーなく正常表示されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">37</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>登録機能が想定通りに動く（CRUDのC）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  タスク作成、日誌投稿、区画作成（畝登録）、農園開設、パスワード再設定リクエストが正常に動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">38</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>表示機能が想定通りに動く（CRUDのR）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  タスク一覧、受講生一覧、日誌タイムライン、農園キャンバス表示が正常に動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">39</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>更新機能が想定通りに動く（CRUDのU）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  タスク完了化、日誌返信、区画承認、新パスワード更新が正常に動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">40</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>削除機能が想定通りに動く（CRUDのD）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  タスク削除（ゴミ箱モーダル）、区画クリア、アーカイブ機能が実装されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">41</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>サインアップ機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  講師サインアップ（/auth/signup/teacher）および生徒招待参加（/invite）が正常に動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">42</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ログアウト機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  講師・生徒ともに supabase.auth.signOut() を呼び出して確実にセッション破棄するよう改修完了。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">43</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ログイン機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  メール/パスワード認証による自動ロール振り分け（/student または /teacher/dashboard）が動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">44</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>DBが想定通りに構築されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Supabase上に farms, users, farm_beds, tasks, student_tasks, journals が構築されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">45</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ソーシャル認証機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  LINEログイン処理およびコールバック（/auth/callback）、アカウント統合画面を実装済み。本番LINE App連携が必要です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">46</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ページネーション機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  横スワイプスライダーおよび無限スクロール表示を採用。従来の数字ページネーションは未導入です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">47</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>検索機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  RAGナレッジ検索、FAQキーワード検索、受講生検索が正常に動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">48</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>フィルター機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  受講生進捗フィルター（すべて/遅れ気味/完了）やタスクカテゴリフィルターが動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">49</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ソート機能が想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  日誌の日付降順ソート、受講生の進捗率ソートが正常に動作します。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">50</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>画面操作の失敗時のメッセージが表示される</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Toastコンポーネントにより、バリデーションエラーや通信失敗時に明確なエラーが表示されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">51</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>画面操作の成功時のメッセージが表示される</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  日誌投稿、タスク完了、一括配信、パスワード更新完了時に成功トーストが表示されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">52</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>バリデーションが想定通りに動く</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  空文字、文字数制限（PW6文字以上）、確認用PW一致チェック等のバリデーションを完備。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">53</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>認証/認可が実装されている（JWT, Supabase Authなど）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Supabase Auth + middleware.ts による未認証リダイレクトおよび生徒の講師画面侵入防止を実装・テスト済み。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="5.機能">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">54</td>
+                <td class="p-3 font-semibold text-slate-600">5.機能</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>AWSサービス連携（S3アップロード, DynamoDB, RDSなど）が正しく動作</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （Supabase Storage / Database を利用しているため対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">55</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>命名が正確である</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  変数名・関数名・コンポーネント名は役割に即した明確な英語で命名されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">56</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【静的型付け言語】型エラーがない</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  npx tsc --noEmit を実行し、型エラー0件であることを確認済みです。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">57</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【静的型付け言語】型が正確に定義されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  主要型は定義済みですが、一部 any キャストが残っており、Supabase自動生成の Database 型適用の余地があります。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">58</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>環境依存の値が環境変数に設定されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Supabase URL, Anon Key, Gemini API Key が .env.local に分離されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">59</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>コメントが記載されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  JSDocや複雑なビジネスロジック解説コメントが日本語で丁寧に記載されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">60</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>整形されている（もしくはオート整形機能が入っている）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Prettier/ESLintフォーマットに準拠しています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">61</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>不要なパッケージがインストールされていない</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  package.json は必要な依存関係（D&D、Supabase、Zustand、Vitest等）に絞り込まれています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">62</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>不要な記述がない</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  eslint.config.mjs で作業用スクリプトを除外し、本番コードのデバッグログを整理済みです。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">63</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>誤字脱字がない</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  UI文言、エラーメッセージ、READMEの誤字脱字はありません。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="todo" data-diff="B" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">64</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>CI/CDが実装されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-todo">
+                    ❌ 未対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  GitHub Actions ワークフロー（.github/workflows/）は未実装です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">65</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>早期リターンが行われている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  ミドルウェア、APIルート、各ハンドラーでガード節による早期リターンが徹底されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">66</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>非同期処理で例外処理が記載されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  async/await は try-catch で囲まれ、エラーハンドリングが行われています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">67</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>DRY（Don’t Repeat Yourself）である</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  共通フックやlib/への切り出しを進めましたが、一部タスク完了計算に共通化の余地があります。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">68</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>単体テストが実装されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Vitestにより個人名匿名化、キーワード抽出、パスワード検証などの単体テストを実装・パス済み。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">69</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【JavaScript/TypeScript】インポートにエイリアスが使われている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  すべて @/... エイリアスで統一されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="A" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">70</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【Next.js】Server Actionsが使われている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  画面更新にはRoute HandlersとSupabaseクライアントSDKが中心で、Server Actionsの利用は限定的です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="A" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">71</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【Next.js】Route Hanlderが使われている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  /api/chat/rag, /api/chat/check-knowledge, /api/settings で活用されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="A" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">72</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>【React.js/Next.js】クライアントコンポーネントが必要最小限に使われている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  インタラクティブ操作が多いため "use client" が多数使われています。静的ブロックのServer Components分離が推奨されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="A" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">73</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>ログ出力が実装されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  重要なAPIエラーおよびデータフェッチ例外時に適切なコンソールログを出力しています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="A" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">74</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>e2eテストが実装されいてる</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  test/e2e-cross-screen.test.ts にて認証・画面横断（生徒⇄講師）のE2Eシナリオテストを実装・パス済み。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="A" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">75</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-A">A</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>特定のデザインパターンでディレクトリ構成が考えられている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Next.js App Router標準の機能別ディレクトリ構成（components/teacher, components/student等）に整理されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">76</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>適切なインスタンスタイプが選択されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （サーバーレス・PaaS環境のため対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">77</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>使用していないリソースがない</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  不要な旧画面や一時ファイルを整理しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">78</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div> ローカルでテストが実行できる</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  npm run test で誰でも即座に全40件のテストを実行可能です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">79</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div> テストカバレッジが設定されている（目標値：70%以上など）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  主要ロジックのテストは作成済みですが、カバレッジ閾値（70%目標など）の自動チェック設定は未設定です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">80</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div> APIエンドポイントのテストが実装されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  不正入力・バリデーションエラー返却のAPI検証テストを実装・パス済みです。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">81</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>単体テスト（Unit Test）が実装されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Vitestにより個人名匿名化、キーワード抽出、パスワード検証などの単体テストを実装・パス済み。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">82</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div> 統合テスト（Integration Test）が実装されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  test/auth-security.test.ts（ミドルウェア認可・権限昇格防止）を実装・パス済みです。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">83</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>環境変数やSecrets管理が適切（.env, AWS Secrets Manager等）</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  .gitignore に .env*.local が含まれ、機密情報の漏洩を防いでいます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="6.品質">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">84</td>
+                <td class="p-3 font-semibold text-slate-600">6.品質</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>AWSリソースの設定が最小権限（Least Privilege）を守っている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （Supabase RLSポリシーの最小権限運用がこれに該当）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">85</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>マークダウン記法を使って書いている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  見出し・リスト・コードブロック・表を適切に用いたマークダウンで記述されています。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">86</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>デモURLがある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  README.md に各機能のデモアクセス先パスを明記。本番公開URLの追加が推奨されます。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">87</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>デモアカウントの認証情報がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  README.md に講師・生徒それぞれの確認方法とテスト用ロールを明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">88</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>要件定義の内容が書かれている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  課題背景と生徒・講師双方の提供価値をREADME冒頭に明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">89</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>機能が一覧で書かれている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  生徒向け機能・講師向け機能の主要項目を箇条書きで網羅しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">90</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>使っているフレームワークやライブラリの情報が書かれている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Next.js 16, React 19, Supabase, Tailwind CSS, Vitest 等を表形式で明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="C" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">91</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-C">C</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>使っている外部APIの情報が書かれている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Google AI Studio (Gemini API) の利用を明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="B" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">92</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>環境構築方法が書かれている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  git clone, npm install, 環境変数設定, 開発起動までステップ順に記載しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">93</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>実装の予定の機能が書かれている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  決済連携やネイティブプッシュ通知などのロードマップ追記の余地があります。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="todo" data-diff="B" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">94</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>アプリの動作を表すGIF画像がある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-todo">
+                    ❌ 未対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  README内へのGIF動画の埋め込みは未配置です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="partial" data-diff="B" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">95</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff-B">B</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>アプリの画面キャプチャがある</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial">
+                    △ 一部対応
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  アイコン画像はありますが、実際の画面スクショ画像の掲載は未配置です。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">96</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>前提条件（必要なツール、バージョン）が記載されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  Node.js v20以上、npm v10以上を明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">97</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>プロジェクト概要が記載されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  冒頭でプロジェクトの目的と概要を明確に記載しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">98</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>環境変数説明あり</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  設定すべき各キーの役割を明記しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="na" data-diff="-" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">99</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>AWSデプロイ手順（ECS/Fargate, Lambdaなど）が明示</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-na">
+                    ➖ 対象外
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  （Vercelデプロイ対象のため対象外）
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">100</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>主要エンドポイントと機能説明</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  ディレクトリ構成と各主要パスの役割を記載しました。
+                </td>
+              </tr>
+            
+              <tr class="hover:bg-slate-50/80 transition item-row" data-status="pass" data-diff="-" data-category="7.Readme">
+                <td class="p-3 text-center font-mono text-slate-400 font-bold">101</td>
+                <td class="p-3 font-semibold text-slate-600">7.Readme</td>
+                <td class="p-3 text-center">
+                  <span class="inline-block px-2 py-0.5 rounded-md font-bold text-[10px] diff--">-</span>
+                </td>
+                <td class="p-3 font-bold text-slate-900">
+                  <div>セットアップ手順（ローカル・本番）が記載されている</div>
+                  <div class="text-[10px] text-slate-400 font-normal mt-0.5">対象: AWS, React, Java/Python/PHP, AIエンジニア, AI駆動開発</div>
+                  
+                </td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass">
+                    ◯ 対応済み
+                  </span>
+                </td>
+                <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
+                  ローカルセットアップ手順を完備しました。
+                </td>
+              </tr>
+            
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 py-8 text-center text-xs text-slate-400 border-t border-slate-200 mt-12">
+    <p>体験農業経営支援アプリ NOU-ATO (のうあと) - 自動生成品質保証ダッシュボード</p>
+  </footer>
+
+  <script>
+    // テーブル検索 & フィルタリング
+    function filterTable() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const status = document.getElementById('statusFilter').value;
+      const diff = document.getElementById('diffFilter').value;
+      const category = document.getElementById('categoryFilter').value;
+
+      const rows = document.querySelectorAll('.item-row');
+      let matched = 0;
+
+      rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        const rowDiff = row.getAttribute('data-diff');
+        const rowCategory = row.getAttribute('data-category');
+        const rowText = row.innerText.toLowerCase();
+
+        const matchQ = !q || rowText.includes(q);
+        const matchStatus = status === 'all' || rowStatus === status;
+        const matchDiff = diff === 'all' || rowDiff === diff;
+        const matchCategory = category === 'all' || rowCategory.includes(category);
+
+        if (matchQ && matchStatus && matchDiff && matchCategory) {
+          row.style.display = '';
+          matched++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      document.getElementById('matchedCount').innerText = matched;
+    }
+
+    function resetFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('statusFilter').value = 'all';
+      document.getElementById('diffFilter').value = 'all';
+      document.getElementById('categoryFilter').value = 'all';
+      filterTable();
+    }
+  </script>
+</body>
+</html>

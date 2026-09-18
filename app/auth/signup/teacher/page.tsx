@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
 export default function TeacherSignUpPage() {
-  const router = useRouter();
 
   // フォームステート
   const [farmName, setFarmName] = useState("");
@@ -40,7 +38,8 @@ export default function TeacherSignUpPage() {
     setLoading(true);
 
     try {
-      // 1. Supabase Auth 登録
+      // 1. Supabase Auth 登録 または ログイン
+      let userId: string | null = null;
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -48,53 +47,100 @@ export default function TeacherSignUpPage() {
 
       if (authError) {
         // すでに登録済みの場合はログイン試行
-        const { error: loginError } = await supabase.auth.signInWithPassword({
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
 
         if (loginError) {
-          setToastMessage(`登録エラー: ${authError.message}`);
+          setToastMessage(`登録/ログインエラー: ${loginError.message || authError.message}`);
           setShowToast(true);
           setLoading(false);
           return;
         }
+        userId = loginData?.user?.id || null;
+      } else {
+        userId = authData?.user?.id || null;
+        // セッションが確立していない場合は自動ログインを試行
+        if (!authData?.session) {
+          const { data: signInData } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (signInData?.user) {
+            userId = signInData.user.id;
+          }
+        }
       }
 
-      const userId = authData?.user?.id || `user_${Date.now()}`;
+      if (!userId) {
+        const { data: sessionUser } = await supabase.auth.getUser();
+        userId = sessionUser?.user?.id || null;
+      }
 
-      // 2. users テーブルに講師情報保存
-      await supabase.from("users").upsert([
+      if (!userId) {
+        setToastMessage("ユーザーアカウントの認証に失敗しました。再度お試しください。");
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
+
+      // 2. farms テーブルに農園情報保存 (UUID形式)
+      const farmId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined;
+      const farmPayload: { id?: string; name: string; owner_id: string } = {
+        name: farmName.trim(),
+        owner_id: userId,
+      };
+      if (farmId) {
+        farmPayload.id = farmId;
+      }
+
+      const { data: insertedFarm, error: farmError } = await supabase
+        .from("farms")
+        .insert([farmPayload])
+        .select("id")
+        .single();
+
+      if (farmError) {
+        console.error("farms table insert error:", farmError);
+      }
+
+      const assignedFarmId = insertedFarm?.id || farmId || "5cf1b060-8229-4669-85e6-3bfca5d04c6d";
+
+      // 3. users テーブルに講師情報保存 (role: 'teacher' と UUID farm_id)
+      const { error: userError } = await supabase.from("users").upsert([
         {
           id: userId,
           email: email.trim(),
           display_name: teacherName.trim(),
           role: "teacher",
-          farm_id: farmName.trim(),
+          farm_id: assignedFarmId,
         },
-      ]);
+      ], { onConflict: "id" });
 
-      // 3. farms テーブルに農園情報保存
-      try {
-        await supabase.from("farms").upsert([
-          {
-            id: `farm_${Date.now()}`,
-            name: farmName.trim(),
-            owner_id: userId,
-          },
-        ]);
-      } catch (fErr) {
-        console.error("farms table upsert error:", fErr);
+      if (userError) {
+        console.error("users table upsert error:", userError);
+        setToastMessage(`講師プロフィールの保存に失敗しました: ${userError.message}`);
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("nouato_owner_name", teacherName.trim());
+        localStorage.setItem("nouato_current_farm_name", farmName.trim());
+        localStorage.setItem("nouato_active_farm_id", assignedFarmId);
       }
 
       setToastMessage("🎉 講師アカウントおよび農場を開設しました！ダッシュボードへ移動します");
       setShowToast(true);
 
       setTimeout(() => {
-        router.push("/teacher/dashboard");
-      }, 900);
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+        window.location.href = "/teacher/dashboard";
+      }, 800);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setToastMessage(`エラーが発生しました: ${msg}`);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -107,7 +153,7 @@ export default function TeacherSignUpPage() {
     try {
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "custom:line" as any,
+        provider: "custom:line" as unknown as "github",
         options: {
           scopes: "openid profile email",
           redirectTo: `${origin}/auth/callback?next=/teacher/dashboard`,
@@ -118,8 +164,9 @@ export default function TeacherSignUpPage() {
         setToastMessage(`LINE登録エラー: ${error.message}`);
         setShowToast(true);
       }
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setToastMessage(`エラーが発生しました: ${msg}`);
       setShowToast(true);
     } finally {
       setLoading(false);

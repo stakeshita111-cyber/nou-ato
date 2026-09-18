@@ -122,31 +122,81 @@ export function useFarmManager() {
 
   const reloadAllFromSupabase = useCallback(async () => {
     try {
-      // 1. 生徒ユーザー一覧
+      // 0. ログイン中講師情報の取得
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id;
+      let teacherFarmId: string | null = null;
+      let teacherDisplayName: string | null = null;
+
+      if (currentUserId) {
+        const { data: uData } = await supabase
+          .from("users")
+          .select("display_name, farm_id")
+          .eq("id", currentUserId)
+          .single();
+
+        if (uData?.farm_id) {
+          teacherFarmId = uData.farm_id;
+        }
+        if (uData?.display_name) {
+          teacherDisplayName = uData.display_name;
+          if (typeof window !== "undefined") {
+            localStorage.setItem("nouato_owner_name", uData.display_name);
+          }
+        }
+      }
+
+      // 1. 農場一覧の取得とアクティブ農場の決定
+      const { data: dbFarms } = await supabase.from("farms").select("*");
+      const currentFarms: Farm[] = dbFarms && dbFarms.length > 0 ? dbFarms : INITIAL_FARMS_LIST;
+      setFarms(currentFarms);
+
+      let targetFarm: Farm | undefined;
+      if (teacherFarmId) {
+        targetFarm = currentFarms.find((f: any) => f.id === teacherFarmId);
+      }
+      if (!targetFarm && currentUserId) {
+        targetFarm = currentFarms.find((f: any) => f.owner_id === currentUserId);
+      }
+      if (!targetFarm && typeof window !== "undefined") {
+        const savedFarmId = localStorage.getItem("nouato_active_farm_id");
+        if (savedFarmId) {
+          targetFarm = currentFarms.find((f: any) => f.id === savedFarmId);
+        }
+      }
+
+      const effectiveActiveId = targetFarm ? targetFarm.id : (currentFarms[0]?.id || "farm_1");
+      setActiveFarmId(effectiveActiveId);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("nouato_active_farm_id", effectiveActiveId);
+        if (targetFarm?.name) {
+          localStorage.setItem("nouato_current_farm_name", targetFarm.name);
+        }
+      }
+
+      // 2. 生徒ユーザー一覧 (該当農園のみ & 講師自身は除外)
       let usersList: any[] = [];
       const { data: usersData } = await supabase
         .from("users")
-        .select("id, display_name, role")
+        .select("id, display_name, role, farm_id")
         .eq("role", "student");
 
-      const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
+      const isDemoFarm = effectiveActiveId === "5cf1b060-8229-4669-85e6-3bfca5d04c6d" || effectiveActiveId === "farm_1";
 
       if (usersData && usersData.length > 0) {
-        usersList = usersData.filter((u: any) => !dummyNames.includes(u.display_name));
-        // 竹下様が一覧にない場合は追加
-        if (!usersList.some((u) => u.display_name.includes("竹下"))) {
-          usersList.push({ id: "acf193c5-f6b4-4514-93a4-958eba0e0c38", display_name: "竹下 翔", role: "student" });
-        }
+        const filtered = usersData.filter((u: any) => {
+          if (currentUserId && u.id === currentUserId) return false;
+          if (teacherDisplayName && u.display_name === teacherDisplayName) return false;
+          if (u.display_name === "テスト講師") return false;
+          if (isDemoFarm) return true;
+          return u.farm_id === effectiveActiveId;
+        });
+        usersList = filtered;
         setSupabaseStudents(
           usersList.map((u) => ({ id: u.id, full_name: u.display_name, role: u.role }))
         );
       } else {
-        const defaultStudents = [
-          { id: "acf193c5-f6b4-4514-93a4-958eba0e0c38", display_name: "竹下 翔", role: "student" },
-          { id: "test_student_1", display_name: "テスト生徒", role: "student" },
-        ];
-        usersList = defaultStudents;
-        setSupabaseStudents(defaultStudents.map((u) => ({ id: u.id, full_name: u.display_name, role: u.role })));
+        setSupabaseStudents([]);
       }
 
       // 生徒マップを作成 (ID ↔ 名前)
@@ -154,9 +204,8 @@ export function useFarmManager() {
       usersList.forEach((u: any) => {
         studentMap.set(u.id, u.display_name);
       });
-      studentMap.set("acf193c5-f6b4-4514-93a4-958eba0e0c38", "竹下 翔");
 
-      // 2. 観察記録 (crop_records)
+      // 3. 観察記録 (crop_records)
       const { data: cropRecs } = await supabase
         .from("crop_records")
         .select("*")
@@ -189,31 +238,14 @@ export function useFarmManager() {
       }
       setRecords(formattedRecords);
 
-      // 3. 農場一覧
-      const { data: dbFarms } = await supabase.from("farms").select("*");
-      if (dbFarms && dbFarms.length > 0) {
-        setFarms(dbFarms);
-      }
-
-      // 4. 区画 & 畝ベッド
+      // 4. 区画 & 畝ベッド (デモ農園と新規農園の完全分離)
       const { data: dbPlots } = await supabase.from("farm_plots").select("*");
       const { data: dbBeds } = await supabase.from("farm_beds").select("*");
 
-      let savedPlots: FarmPlot[] = [];
-      const savedPlotsStr = localStorage.getItem("nouato_farm_plots");
-      if (savedPlotsStr) {
-        try {
-          savedPlots = JSON.parse(savedPlotsStr);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      // 🌟 生徒の重複割り当てを排除しつつプロットを構築 🌟
-      const seenStudentIds = new Set<string>();
       let loadedBasePlots: FarmPlot[] = [];
-      if (dbPlots && dbPlots.length > 0) {
-        // C2やC3などの明示的割り当てを優先マッピング
+
+      if (isDemoFarm && dbPlots && dbPlots.length > 0) {
+        const seenStudentIds = new Set<string>();
         loadedBasePlots = dbPlots.map((dp: any) => {
           let sId = dp.student_id ? dp.student_id : undefined;
           let sName = dp.student_name ? dp.student_name : (sId ? studentMap.get(sId) : undefined);
@@ -227,7 +259,6 @@ export function useFarmManager() {
             }
           }
 
-          // 同一生徒の重複割り当て排除
           if (sId && seenStudentIds.has(sId)) {
             sId = undefined;
             sName = undefined;
@@ -239,7 +270,7 @@ export function useFarmManager() {
 
           return {
             id: dp.id,
-            farm_id: dp.farm_id || activeFarmId,
+            farm_id: effectiveActiveId,
             name: sName ? `区画 ${dp.code} - ${sName}` : `区画 ${dp.code}`,
             code: dp.code,
             student_id: isVac ? undefined : sId,
@@ -250,8 +281,16 @@ export function useFarmManager() {
             beds: [],
           };
         });
-      } else if (savedPlots.length > 0) {
-        loadedBasePlots = savedPlots;
+      } else if (typeof window !== "undefined") {
+        const savedKey = `nouato_farm_plots_${effectiveActiveId}`;
+        const farmSavedPlotsStr = localStorage.getItem(savedKey);
+        if (farmSavedPlotsStr) {
+          try {
+            loadedBasePlots = JSON.parse(farmSavedPlotsStr);
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
 
       // 🌟 セルアドレス (code) 絶対位置マップを動的サイズで構築 🌟
@@ -1777,8 +1816,9 @@ export function useFarmManager() {
     activeFarmId,
     setActiveFarmId,
     addFarm: async (name: string) => {
+      const generatedId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `farm_${Date.now()}`;
       const newFarm: Farm = {
-        id: `farm_${Date.now()}`,
+        id: generatedId,
         name,
         created_at: new Date().toISOString(),
       };
@@ -1786,14 +1826,22 @@ export function useFarmManager() {
       setActiveFarmId(newFarm.id);
 
       try {
-        await supabase.from("farms").upsert([
-          {
-            id: newFarm.id,
-            name: newFarm.name,
-            created_at: newFarm.created_at,
-          },
-        ]);
-        console.log(`✅ 新規畑・エリア「${name}」を Supabase farms テーブルに永続保存しました`);
+        const { data: authData } = await supabase.auth.getUser();
+        const payload: any = {
+          id: newFarm.id,
+          name: newFarm.name,
+          created_at: newFarm.created_at,
+        };
+        if (authData?.user?.id) {
+          payload.owner_id = authData.user.id;
+        }
+
+        const { error } = await supabase.from("farms").upsert([payload]);
+        if (error) {
+          console.error("addFarm Supabase insert error:", error);
+        } else {
+          console.log(`✅ 新規畑・エリア「${name}」を Supabase farms テーブルに永続保存しました`);
+        }
       } catch (e) {
         console.error("addFarm Supabase insert error:", e);
       }

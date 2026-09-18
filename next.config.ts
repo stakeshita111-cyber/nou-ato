@@ -30,8 +30,8 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
-        source: "/student",
-        destination: "/student/quests",
+        source: "/student/quests",
+        destination: "/student",
         permanent: true,
       },
     ];

@@ -163,11 +163,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
     const colorBgs = ["bg-emerald-800", "bg-[#e89980]", "bg-[#0b548b]", "bg-purple-800"];
 
-    // 生徒一覧 (竹下様を必ず含む)
     const baseStudents = [...(supabaseStudents || [])];
-    if (!baseStudents.some((s) => s.full_name.includes("竹下"))) {
-      baseStudents.push({ id: "acf193c5-f6b4-4514-93a4-958eba0e0c38", full_name: "竹下 翔", role: "student" });
-    }
 
     return baseStudents
       .filter(
@@ -1082,6 +1078,37 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
       <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
         {/* 🎯 畑サイズ操作 (列 A-L × 行 1-12) & 畝数一括変更 */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* 🏡 対象農園 */}
+          <div className="flex items-center space-x-2 bg-emerald-100/70 border border-emerald-300 text-emerald-950 px-3 py-1.5 rounded-2xl">
+            <span className="text-xs font-black">🏡 対象農園:</span>
+            <select
+              value={activeFarmId}
+              onChange={(e) => {
+                const selectedId = e.target.value;
+                setActiveFarmId(selectedId);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("nouato_active_farm_id", selectedId);
+                }
+                const f = farms.find((farm) => farm.id === selectedId);
+                setToastMessage(`農園「${f?.name || selectedId}」に切り替えました`);
+                setShowToast(true);
+              }}
+              className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-emerald-900 focus:outline-none cursor-pointer"
+            >
+              {farms.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={openFarmSettingsModal}
+              className="px-2 py-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
+              title="農園設定・代表者情報を編集"
+            >
+              ⚙️ 設定
+            </button>
+          </div>
+
           <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-2xl border border-emerald-200 text-emerald-950">
             <span className="text-xs font-black">🌱 畑サイズ:</span>
             <div className="flex items-center space-x-1">

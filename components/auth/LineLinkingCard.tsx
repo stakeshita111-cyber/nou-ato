@@ -38,7 +38,7 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
         provider: "custom:line" as any,
         options: {
           scopes: 'openid profile email',
-          redirectTo: `${origin}/auth/callback?next=/student/quests`,
+          redirectTo: `${origin}/auth/callback?next=/student`,
         },
       });
 

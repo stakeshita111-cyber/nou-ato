@@ -18,7 +18,7 @@ function AuthCodeErrorContent() {
     if (window.location.hash.includes("access_token")) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          router.replace("/student/quests");
+          router.replace("/student");
           return;
         }
         setCheckingSession(false);

@@ -140,7 +140,7 @@ export default function Sidebar({ activeMenu, onMenuClick }: SidebarProps) {
               </Link>
 
               <Link
-                href="/student/quests"
+                href="/student"
                 onClick={() => setShowProfileMenu(false)}
                 className="block w-full text-left p-2.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-800 rounded-xl font-bold transition flex items-center gap-2"
               >

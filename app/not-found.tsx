@@ -19,11 +19,11 @@ export default function NotFound() {
 
         <div className="pt-2">
           <Link
-            href="/student/quests"
+            href="/"
             className="inline-flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-[#1c4d21] text-white font-bold text-sm rounded-2xl hover:bg-[#163e1a] shadow-sm transition active:scale-[0.98]"
           >
             <span>🏠</span>
-            <span>受講生マイページへ戻る</span>
+            <span>トップページへ戻る</span>
           </Link>
         </div>
       </div>
