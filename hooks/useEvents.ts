@@ -11,7 +11,7 @@ const INITIAL_EVENTS: EventItem[] = [
     date: "2026-05-24",
     dateDisplay: "2026年5月24日(日)",
     time: "10:00 - 12:30",
-    location: "たなか自然農園 A区画メインエリア",
+    location: "農園 A区画メインエリア",
     capacity: 12,
     reservedCount: 9,
     fee: "無料 (受講生特典)",
@@ -29,7 +29,7 @@ const INITIAL_EVENTS: EventItem[] = [
     date: "2026-06-07",
     dateDisplay: "2026年6月7日(日)",
     time: "14:00 - 15:30",
-    location: "たなか自然農園 講習スペース",
+    location: "農園 講習スペース",
     capacity: 8,
     reservedCount: 4,
     fee: "500円 (資材代)",
@@ -41,23 +41,40 @@ const INITIAL_EVENTS: EventItem[] = [
   },
 ];
 
-export function useEvents() {
+export function useEvents(farmId?: string) {
   const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
   const [loading, setLoading] = useState(false);
+
+  const getEffectiveFarmId = () => {
+    if (farmId) return farmId;
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nouato_active_farm_id") || null;
+    }
+    return null;
+  };
 
   // Supabase / LocalStorage からイベントデータを取得して同期
   const fetchEvents = async () => {
     setLoading(true);
+    const fid = getEffectiveFarmId();
+    const eventKey = fid ? `nouato_shared_events_${fid}` : "nouato_shared_events";
+
     try {
-      const saved = localStorage.getItem("nouato_shared_events");
+      const saved = typeof window !== "undefined" ? localStorage.getItem(eventKey) : null;
       if (saved) {
         setEvents(JSON.parse(saved));
+      } else if (fid && fid !== "5cf1b060-8229-4669-85e6-3bfca5d04c6d") {
+        // 新規農園でイベント未登録の場合は空配列
+        setEvents([]);
       }
 
-      const { data } = await supabase
+      let eQuery = supabase
         .from("events")
-        .select("*")
-        .order("date", { ascending: true });
+        .select("*");
+      if (fid) {
+        eQuery = eQuery.or(`farm_id.eq.${fid},farm_id.is.null`);
+      }
+      const { data } = await eQuery.order("date", { ascending: true });
 
       if (data && data.length > 0) {
         const formatted: EventItem[] = data.map((d: any) => ({
@@ -85,12 +102,15 @@ export function useEvents() {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [farmId]);
 
   // ローカル更新・共有保存ヘルパー
   const saveSharedEvents = (newEvents: EventItem[]) => {
     setEvents(newEvents);
+    const fid = getEffectiveFarmId();
+    const eventKey = fid ? `nouato_shared_events_${fid}` : "nouato_shared_events";
     try {
+      localStorage.setItem(eventKey, JSON.stringify(newEvents));
       localStorage.setItem("nouato_shared_events", JSON.stringify(newEvents));
     } catch (e) {
       console.error("saveSharedEvents error:", e);
@@ -99,6 +119,7 @@ export function useEvents() {
 
   // 講師: イベント新規登録
   const addEvent = async (eventData: Omit<EventItem, "id" | "reservedCount" | "attendees">) => {
+    const fid = getEffectiveFarmId();
     const newEv: EventItem = {
       ...eventData,
       id: `ev_${Date.now()}`,
@@ -122,11 +143,13 @@ export function useEvents() {
           fee: newEv.fee,
           category: newEv.category,
           description: newEv.description,
+          reserved_count: 0,
           attendees: [],
+          farm_id: fid || null,
         },
       ]);
     } catch (e) {
-      console.warn("addEvent DB insert warning:", e);
+      console.warn("addEvent DB warning:", e);
     }
     return newEv;
   };

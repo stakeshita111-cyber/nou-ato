@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useFarmStore } from "@/store/useFarmStore";
 import Toast from "@/components/ui/Toast";
 
 interface PaymentRecord {
@@ -66,21 +67,62 @@ export default function TeacherPaymentsView() {
   // ----------------------------------------------------
   // 📊 収支シミュレーション用ステート (生徒数×年間受講料 - 経費 - システム利用料(1%))
   // ----------------------------------------------------
-  const [studentCount, setStudentCount] = useState<number>(4); // DBから自動計算
+  const [studentCount, setStudentCount] = useState<number>(0); // DBから自農園生徒数を自動計算
   const [annualTuitionFee, setAnnualTuitionFee] = useState<number>(120000); // 手動設定 (年間12万円/人)
   const [annualExpenses, setAnnualExpenses] = useState<number>(150000); // 手動設定 (年間経費15万円)
 
-  // Supabase から実際の生徒数を自動取得
+  // Supabase から自農園の生徒数と請求レコードを自動取得
   useEffect(() => {
     const fetchStudentCount = async () => {
       try {
-        const { count } = await supabase
+        let fid = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+        if (!fid) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: userData } = await supabase
+              .from("users")
+              .select("farm_id")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (userData?.farm_id) fid = userData.farm_id;
+          }
+        }
+
+        let query = supabase
           .from("users")
           .select("*", { count: "exact" })
           .eq("role", "student");
 
-        if (count && count > 0) {
-          setStudentCount(count);
+        if (fid) {
+          query = query.eq("farm_id", fid);
+        }
+
+        const { count } = await query;
+        setStudentCount(count || 0);
+
+        // 自農園の受講生データをもとに請求リストを構築
+        if (fid) {
+          const { data: farmStudents } = await supabase
+            .from("users")
+            .select("id, display_name")
+            .eq("role", "student")
+            .eq("farm_id", fid);
+
+          if (farmStudents && farmStudents.length > 0) {
+            const dynamicPayments: PaymentRecord[] = farmStudents.map((s, idx) => ({
+              id: `p_${s.id}`,
+              studentName: s.display_name || `受講生 ${idx + 1}`,
+              plot: `区画 ${idx + 1}`,
+              itemTitle: "月額農園利用料 (今月分)",
+              amount: 9800,
+              dueDate: new Date().toISOString().split("T")[0],
+              status: "paid" as const,
+              method: "credit_card" as const,
+            }));
+            setPayments(dynamicPayments);
+          } else if (fid !== "5cf1b060-8229-4669-85e6-3bfca5d04c6d") {
+            setPayments([]);
+          }
         }
       } catch (err) {
         console.error("fetchStudentCount error:", err);

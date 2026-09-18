@@ -133,7 +133,7 @@ export function useFarmManager() {
           .from("users")
           .select("display_name, farm_id")
           .eq("id", currentUserId)
-          .single();
+          .maybeSingle();
 
         if (uData?.farm_id) {
           teacherFarmId = uData.farm_id;
@@ -146,23 +146,34 @@ export function useFarmManager() {
         }
       }
 
-      // 1. 農場一覧の取得とアクティブ農場の決定
-      const { data: dbFarms } = await supabase.from("farms").select("*");
-      const currentFarms: Farm[] = dbFarms && dbFarms.length > 0 ? dbFarms : INITIAL_FARMS_LIST;
+      // 1. 農場一覧の取得とアクティブ農場の決定 (ログイン講師が所有または所属する農園のみ厳格抽出)
+      let farmsQuery = supabase.from("farms").select("*");
+      if (currentUserId) {
+        if (teacherFarmId) {
+          farmsQuery = farmsQuery.or(`owner_id.eq.${currentUserId},id.eq.${teacherFarmId}`);
+        } else {
+          farmsQuery = farmsQuery.eq("owner_id", currentUserId);
+        }
+      }
+      const { data: dbFarms } = await farmsQuery;
+      let currentFarms: Farm[] = dbFarms && dbFarms.length > 0 ? dbFarms : [];
+      if (currentFarms.length === 0 && !currentUserId) {
+        currentFarms = INITIAL_FARMS_LIST;
+      }
       setFarms(currentFarms);
 
       let targetFarm: Farm | undefined;
-      if (teacherFarmId) {
-        targetFarm = currentFarms.find((f: any) => f.id === teacherFarmId);
-      }
-      if (!targetFarm && currentUserId) {
-        targetFarm = currentFarms.find((f: any) => f.owner_id === currentUserId);
-      }
-      if (!targetFarm && typeof window !== "undefined") {
+      if (typeof window !== "undefined") {
         const savedFarmId = localStorage.getItem("nouato_active_farm_id");
         if (savedFarmId) {
           targetFarm = currentFarms.find((f: any) => f.id === savedFarmId);
         }
+      }
+      if (!targetFarm && teacherFarmId) {
+        targetFarm = currentFarms.find((f: any) => f.id === teacherFarmId);
+      }
+      if (!targetFarm && currentUserId) {
+        targetFarm = currentFarms.find((f: any) => f.owner_id === currentUserId);
       }
 
       const effectiveActiveId = targetFarm ? targetFarm.id : (currentFarms[0]?.id || "farm_1");
@@ -334,7 +345,7 @@ export function useFarmManager() {
         } catch (e) {}
       }
 
-      const finalFixedPlots = buildFixedPlots(activeFarmId, loadedBasePlots, detectedCols, detectedRows, savedDefaultBeds);
+      const finalFixedPlots = buildFixedPlots(effectiveActiveId, loadedBasePlots, detectedCols, detectedRows, savedDefaultBeds);
 
       // 🌟 1. journals からの未承認の収穫完了報告を「区画コード_畝番号」の完全一致で収集 🌟
       const pendingApprovalMap = new Map<string, {
@@ -382,11 +393,12 @@ export function useFarmManager() {
         const plotCode = plot.code || "C3";
         const isPlotAssigned = !plot.is_vacant && (!!plot.student_id || !!plot.student_name);
 
-        // DB (farm_beds) から該当区画のベッドを取得
+        // DB (farm_beds) から該当区画のベッドを取得 (デモ農園のみDB初期ベッドを適用し、新規農園への不要混入を防止)
         const plotArchivedBeds: FarmBed[] = [];
         const rawActiveBeds: any[] = [];
+        const relevantDbBeds = isDemoFarm ? (dbBeds || []) : [];
 
-        (dbBeds || []).forEach((b: any) => {
+        relevantDbBeds.forEach((b: any) => {
           const isBelong = b.plot_id === plot.id || b.id?.startsWith(`plot_cell_${plotCode}_bed_`);
           if (!isBelong) return;
 
@@ -647,6 +659,15 @@ export function useFarmManager() {
     const handleCustomSync = () => reloadAllFromSupabase();
     window.addEventListener("nouato_sync_event", handleCustomSync);
 
+    const handleFarmChanged = (e: any) => {
+      const newFarmId = e?.detail?.farmId;
+      if (newFarmId) {
+        setActiveFarmId(newFarmId);
+      }
+      reloadAllFromSupabase();
+    };
+    window.addEventListener("nouato_active_farm_changed", handleFarmChanged);
+
     const handleStorageSync = (e: StorageEvent) => {
       if (e.key === "nouato_farm_plots" || e.key === "nouato_crop_records") {
         reloadAllFromSupabase();
@@ -681,6 +702,7 @@ export function useFarmManager() {
       supabase.removeChannel(realtimeChannel);
       window.removeEventListener("storage", handleStorageSync);
       window.removeEventListener("nouato_sync_event", handleCustomSync);
+      window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(pollInterval);

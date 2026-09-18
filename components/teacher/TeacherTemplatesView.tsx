@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { VEGETABLE_TASK_TEMPLATES, TaskTemplate } from "@/lib/taskTemplates";
 import Toast from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
+import { useFarmStore } from "@/store/useFarmStore";
 
 export default function TeacherTemplatesView() {
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
@@ -45,13 +46,13 @@ export default function TeacherTemplatesView() {
     setAddingId(tpl.id);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      let farmId: string | null = null;
-      if (user) {
+      let farmId = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      if (!farmId && user) {
         const { data: userData } = await supabase
           .from("users")
           .select("farm_id")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
         if (userData?.farm_id) farmId = userData.farm_id;
       }
 

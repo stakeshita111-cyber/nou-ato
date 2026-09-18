@@ -10,6 +10,7 @@ import BedApprovalModal from "@/components/farm/BedApprovalModal";
 import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { supabase } from "@/lib/supabase";
+import { useFarmStore } from "@/store/useFarmStore";
 
 interface UnassignedStudent {
   id: string;
@@ -674,7 +675,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
             .from("users")
             .select("display_name, email")
             .eq("id", authData.user.id)
-            .single();
+            .maybeSingle();
 
           if (uData?.display_name) setOwnerNameInput(uData.display_name);
           if (uData?.email) setEmailInput(uData.email);
@@ -1025,28 +1026,26 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   // 🌟 農園設定モーダルオープン (DBから実際の講師農園名を取得) 🌟
   const openFarmSettingsModal = async () => {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user) {
+      const currentStoreName = useFarmStore.getState().activeFarmName;
+      if (currentStoreName) {
+        setFarmSettingsName(currentStoreName);
+      } else {
         const { data: teacherFarm } = await supabase
           .from("farms")
           .select("name")
-          .eq("owner_id", authData.user.id)
-          .single();
+          .eq("id", activeFarmId)
+          .maybeSingle();
 
         if (teacherFarm?.name) {
           setFarmSettingsName(teacherFarm.name);
         } else {
-          const { data: latestFarm } = await supabase
-            .from("farms")
-            .select("name")
-            .limit(1)
-            .single();
-          setFarmSettingsName(latestFarm?.name || "テスト農園");
+          const currentFarm = farms.find((f) => f.id === activeFarmId);
+          setFarmSettingsName(currentFarm?.name || "農園");
         }
       }
     } catch (e) {
       console.error(e);
-      setFarmSettingsName("テスト農園");
+      setFarmSettingsName("農園");
     }
     setShowFarmSettingsModal(true);
   };
@@ -1086,9 +1085,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
               onChange={(e) => {
                 const selectedId = e.target.value;
                 setActiveFarmId(selectedId);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("nouato_active_farm_id", selectedId);
-                }
+                useFarmStore.getState().setActiveFarmId(selectedId);
                 const f = farms.find((farm) => farm.id === selectedId);
                 setToastMessage(`農園「${f?.name || selectedId}」に切り替えました`);
                 setShowToast(true);

@@ -50,27 +50,13 @@ export function useStudentDashboard() {
         let studentUserObj: any = null;
 
         if (!authUser) {
-          // 「竹下 翔」様の受講生プロファイルを優先取得、なければ他の生徒
-          const { data: takeshitaUsers } = await supabase
-            .from("users")
-            .select("id, display_name")
-            .eq("role", "student")
-            .ilike("display_name", "%竹下%");
-
-          if (takeshitaUsers && takeshitaUsers.length > 0) {
-            studentUserObj = { id: takeshitaUsers[0].id, name: takeshitaUsers[0].display_name };
-          } else {
-            const { data: defaultUsers } = await supabase
-              .from("users")
-              .select("id, display_name")
-              .eq("role", "student")
-              .limit(1);
-
-            if (defaultUsers && defaultUsers.length > 0) {
-              studentUserObj = { id: defaultUsers[0].id, name: defaultUsers[0].display_name };
-            } else {
-              studentUserObj = { id: "student_default", name: "竹下 翔" };
-            }
+          // 未認証の場合、localStorageの nouato_student_user またはゲスト
+          const savedStudent = typeof window !== "undefined" ? localStorage.getItem("nouato_student_user") : null;
+          if (savedStudent) {
+            try { studentUserObj = JSON.parse(savedStudent); } catch (e) {}
+          }
+          if (!studentUserObj) {
+            studentUserObj = { id: "student_guest", name: "受講生" };
           }
           setUser(studentUserObj);
         } else {
@@ -87,7 +73,7 @@ export function useStudentDashboard() {
             .from("users")
             .select("*")
             .eq("id", authUser.id)
-            .single();
+            .maybeSingle();
 
           if (userData) {
             studentUserObj = {
@@ -96,7 +82,7 @@ export function useStudentDashboard() {
             };
             setUser(studentUserObj);
           } else {
-            studentUserObj = { id: authUser.id, name: displayName, email: authUser.email };
+            studentUserObj = { id: authUser.id, name: displayName, email: authUser.email, farm_id: storedFarmId };
             setUser(studentUserObj);
           }
         }
@@ -111,23 +97,16 @@ export function useStudentDashboard() {
           } catch (e) {}
         }
 
-        const currentStudentId = studentUserObj?.id || "student_default";
+        const currentStudentId = studentUserObj?.id || "student_guest";
+        const studentFarmId = studentUserObj?.farm_id || (typeof window !== "undefined" ? localStorage.getItem("nouato_invite_farm_id") : null);
 
         // 1. 講師が割り当てた畝 (farm_beds) を取得 (ログイン中の生徒のみ厳密抽出)
         let bedData: any[] = [];
-        if (currentStudentId && currentStudentId !== "student_default") {
+        if (currentStudentId && currentStudentId !== "student_guest" && currentStudentId !== "student_default") {
           const { data } = await supabase
             .from("farm_beds")
             .select("*, farm_plots(*)")
             .eq("student_id", currentStudentId);
-          bedData = data || [];
-        } else {
-          // 未ログイン・デフォルト時のフォールバック (竹下翔アカウント専用)
-          const isTakeshita = studentUserObj?.name?.includes("竹下");
-          const { data } = await supabase
-            .from("farm_beds")
-            .select("*, farm_plots(*)")
-            .or(isTakeshita ? `student_id.eq.${currentStudentId},student_name.ilike.%竹下%` : `student_id.eq.${currentStudentId}`);
           bedData = data || [];
         }
 
@@ -141,13 +120,18 @@ export function useStudentDashboard() {
           .select("*")
           .eq("student_id", currentStudentId);
 
-        // 🌟 講師がカンバンで「生徒へ公開中 (status = 'todo')」に配置した教材タスクを取得 🌟
-        const { data: publicTasks } = await supabase
+        // 🌟 講師がカンバンで「生徒へ公開中 (status = 'todo')」に配置した教材タスクを取得 (自農園または共通教材) 🌟
+        let ptQuery = supabase
           .from("tasks")
           .select("*")
           .eq("status", "todo")
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false });
+          .is("deleted_at", null);
+
+        if (studentFarmId) {
+          ptQuery = ptQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+        }
+
+        const { data: publicTasks } = await ptQuery.order("created_at", { ascending: false });
 
         let taskList: any[] = [];
         const seenTitles = new Set<string>();
@@ -250,41 +234,40 @@ export function useStudentDashboard() {
 
         // 3. journals 取得 (ログイン中の生徒自身の記録のみ厳密に取得)
         let jData: any[] = [];
-        if (currentStudentId && currentStudentId !== "student_default") {
+        if (currentStudentId && currentStudentId !== "student_guest" && currentStudentId !== "student_default") {
           const { data } = await supabase
             .from("journals")
             .select("*")
             .eq("student_id", currentStudentId)
             .order("created_at", { ascending: false });
           jData = data || [];
-        } else {
-          // デフォルト生徒の場合
-          const { data } = await supabase
-            .from("journals")
-            .select("*")
-            .or(`student_id.eq.${currentStudentId},student_name.ilike.%竹下%`)
-            .order("created_at", { ascending: false });
-          jData = data || [];
         }
 
         setJournals(jData);
 
-        // 全体お知らせ (broadcasts) のみ別途取得
-        const { data: bcData } = await supabase
+        // 全体お知らせ (broadcasts) のみ別途取得 (自農園スコープ)
+        let bcQuery = supabase
           .from("journals")
           .select("*")
-          .eq("student_id", "all_students")
-          .order("created_at", { ascending: false });
+          .eq("student_id", "all_students");
 
-        if (bcData) {
+        if (studentFarmId) {
+          bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+        }
+
+        const { data: bcData } = await bcQuery.order("created_at", { ascending: false });
+
+        if (bcData && bcData.length > 0) {
           const dbBc = bcData.map((j: any) => ({
             id: j.id,
             title: j.task_title?.replace("📢 【全体お知らせ】", "") || "講師からのお知らせ",
             content: j.content || j.reply || "",
-            sender: "講師 (たなか自然農園)",
+            sender: "講師",
             created_at: j.created_at,
           }));
           setBroadcasts(dbBc);
+        } else if (localBc && localBc.length > 0) {
+          setBroadcasts(localBc);
         }
       } catch (e) {
         console.error("useStudentDashboard fetchData error:", e);

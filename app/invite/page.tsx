@@ -233,6 +233,10 @@ function InviteContent() {
         ], { onConflict: "id" });
       }
 
+      if (selectedFarmId) {
+        localStorage.setItem("nouato_invite_farm_id", selectedFarmId);
+      }
+
       setToastMessage(`🎉 「${farmName}」への参加登録が完了しました！`);
       setShowToast(true);
 

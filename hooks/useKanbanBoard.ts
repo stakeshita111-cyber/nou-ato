@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Task, ColumnType } from "../types/task";
+import { useFarmStore } from "../store/useFarmStore";
 
 export function useKanbanBoard(columns: ColumnType[]) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -25,32 +26,43 @@ export function useKanbanBoard(columns: ColumnType[]) {
       if (!user) return;
       setUserId(user.id);
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("farm_id")
-        .eq("id", user.id)
-        .single();
-      
-      if (userData?.farm_id) {
-        setFarmId(userData.farm_id);
+      let effectiveFarmId = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      if (!effectiveFarmId) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("farm_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        effectiveFarmId = userData?.farm_id || "";
+      }
+      if (effectiveFarmId) {
+        setFarmId(effectiveFarmId);
       }
 
-      // 1. 有効なタスク
-      const { data: tasksData } = await supabase
+      // 1. 有効なタスク (自農園のもの、または共通テンプレート教材)
+      let tasksQuery = supabase
         .from("tasks")
         .select("*")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false });
+        .is("deleted_at", null);
 
+      if (effectiveFarmId) {
+        tasksQuery = tasksQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
+      }
+
+      const { data: tasksData } = await tasksQuery.order("created_at", { ascending: false });
       if (tasksData) setTasks(tasksData);
 
       // 2. ゴミ箱内のタスク (deleted_at IS NOT NULL)
-      const { data: trashData } = await supabase
+      let trashQuery = supabase
         .from("tasks")
         .select("*")
-        .not("deleted_at", "is", null)
-        .order("deleted_at", { ascending: false });
+        .not("deleted_at", "is", null);
 
+      if (effectiveFarmId) {
+        trashQuery = trashQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
+      }
+
+      const { data: trashData } = await trashQuery.order("deleted_at", { ascending: false });
       if (trashData) setTrashTasks(trashData);
     } catch (e) {
       console.error("fetchTasks 中に例外が発生しました:", e);
@@ -69,6 +81,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
     if (typeof window !== "undefined") {
       window.addEventListener("nouato_tasks_updated", handleTaskUpdated);
       window.addEventListener("nouato_sync_event", handleTaskUpdated);
+      window.addEventListener("nouato_active_farm_changed", handleTaskUpdated);
     }
 
     const realtimeChannel = supabase
@@ -80,6 +93,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       if (typeof window !== "undefined") {
         window.removeEventListener("nouato_tasks_updated", handleTaskUpdated);
         window.removeEventListener("nouato_sync_event", handleTaskUpdated);
+        window.removeEventListener("nouato_active_farm_changed", handleTaskUpdated);
       }
       supabase.removeChannel(realtimeChannel);
     };
@@ -102,7 +116,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
   // タスクの追加（Create: 作成された Task を返却）
   const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
-    if (!userId || !farmId) {
+    let effectiveFarmId = farmId;
+    if (!effectiveFarmId && typeof window !== "undefined") {
+      effectiveFarmId = localStorage.getItem("nouato_active_farm_id") || "";
+    }
+
+    if (!userId || !effectiveFarmId) {
       // 一時IDでフロント用オブジェクトを生成
       const tempTask: Task = {
         id: `temp_${Date.now()}`,
@@ -140,7 +159,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         difficulty: options?.difficulty || 1,
         estimated_time: options?.estimated_time || null,
         created_by: userId,
-        farm_id: farmId 
+        farm_id: effectiveFarmId 
       };
 
       const { data, error } = await supabase

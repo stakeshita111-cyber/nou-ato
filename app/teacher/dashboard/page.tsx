@@ -18,9 +18,11 @@ import TeacherFarmCanvasView from "@/components/teacher/TeacherFarmCanvasView";
 
 import MobilePhonePreviewModal from "@/components/common/MobilePhonePreviewModal";
 import { SproutLoader } from "@/components/SproutLoader";
+import { useFarmStore } from "@/store/useFarmStore";
 
 export default function TeacherDashboardPage() {
   const router = useRouter();
+  const { activeFarmId, fetchTeacherFarms } = useFarmStore();
   const { plots } = useFarmManager();
 
   // 🌟 畑管理の未承認収穫完了報告（要承認）の総数を算出 (LINE風バッジ用) 🌟
@@ -95,6 +97,7 @@ export default function TeacherDashboardPage() {
         }
 
         setIsAuthorized(true);
+        fetchTeacherFarms();
       } catch (err) {
         console.error("Auth role check error:", err);
         setIsAuthorized(true);
@@ -174,13 +177,13 @@ export default function TeacherDashboardPage() {
           }
           onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          
         />
 
         {/* ページコンテンツ */}
         <main className="p-4 sm:p-8 max-w-7xl w-full mx-auto flex-1">
           {(activeMenu === "dashboard" || activeMenu === "students") && (
             <TeacherOverviewView
+              key={`overview_${activeFarmId}`}
               onAddNewTaskClick={handleAddNewTask}
               onNavigateToStudents={() => setActiveMenu("dashboard")}
               onNavigateToJournals={() => setActiveMenu("journals")}
@@ -192,30 +195,32 @@ export default function TeacherDashboardPage() {
 
           {activeMenu === "farm" && (
             <TeacherFarmCanvasView
+              key={`canvas_${activeFarmId}`}
               initialPlotCode={targetPlotCode}
-              initialFarmId={targetFarmId}
+              initialFarmId={targetFarmId || activeFarmId}
               initialApprovalBedId={targetApprovalBedId}
             />
           )}
 
           {activeMenu === "tasks" && (
             <TeacherTaskBoardView
+              key={`tasks_${activeFarmId}`}
               searchQuery={searchQuery}
               initialShowForm={showTaskFormImmediate}
             />
           )}
 
-          {activeMenu === "templates" && <TeacherTemplatesView />}
+          {activeMenu === "templates" && <TeacherTemplatesView key={`templates_${activeFarmId}`} />}
 
           {activeMenu === "journals" && (
-            <TeacherJournalsView onNavigateToFarm={handleNavigateToFarm} />
+            <TeacherJournalsView key={`journals_${activeFarmId}`} onNavigateToFarm={handleNavigateToFarm} />
           )}
 
-          {activeMenu === "payments" && <TeacherPaymentsView />}
+          {activeMenu === "payments" && <TeacherPaymentsView key={`payments_${activeFarmId}`} />}
 
-          {activeMenu === "events" && <TeacherEventsView />}
+          {activeMenu === "events" && <TeacherEventsView key={`events_${activeFarmId}`} />}
 
-          {activeMenu === "settings" && <TeacherSettingsView />}
+          {activeMenu === "settings" && <TeacherSettingsView key={`settings_${activeFarmId}`} />}
         </main>
       </div>
     </div>

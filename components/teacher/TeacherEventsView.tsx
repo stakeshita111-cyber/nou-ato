@@ -17,6 +17,12 @@ export default function TeacherEventsView() {
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [farmName, setFarmName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nouato_current_farm_name") || "当農園";
+    }
+    return "当農園";
+  });
 
   // カレンダーの日付から直接追加モーダルを開く
   const handleOpenAddModalForDate = (dateStr: string) => {
@@ -34,7 +40,7 @@ export default function TeacherEventsView() {
       date: newDate,
       dateDisplay: `${newDate} 開催`,
       time: newTime,
-      location: "たなか自然農園 A区画メインエリア",
+      location: `${farmName} メインエリア`,
       capacity: newCapacity,
       fee: "無料 (受講生特典)",
       category: "harvest",

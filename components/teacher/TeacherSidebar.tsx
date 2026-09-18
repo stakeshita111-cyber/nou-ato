@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useThemeStore } from "@/store/useThemeStore";
+import { useFarmStore } from "@/store/useFarmStore";
 
 interface TeacherSidebarProps {
   activeMenu: string;
@@ -24,6 +25,7 @@ export default function TeacherSidebar({
   pendingApprovalCount = 0,
 }: TeacherSidebarProps) {
   const { settings } = useThemeStore();
+  const { activeFarmName } = useFarmStore();
   const router = useRouter();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [teacherName, setTeacherName] = useState("講師");
@@ -49,7 +51,7 @@ export default function TeacherSidebar({
             .from("users")
             .select("display_name, farm_id")
             .eq("id", authData.user.id)
-            .single();
+            .maybeSingle();
 
           if (userData?.display_name) {
             setTeacherName(userData.display_name);
@@ -286,7 +288,7 @@ export default function TeacherSidebar({
               {/* ポップアップヘッダー */}
               <div className="px-3 py-2 border-b border-gray-100 mb-1">
                 <p className="text-xs font-black text-emerald-950 truncate">{teacherName}</p>
-                <p className="text-[10px] text-gray-500 font-medium truncate">{farmName ? `🏡 ${farmName} / 講師` : "農園主 / 講師アカウント"}</p>
+                <p className="text-[10px] text-gray-500 font-medium truncate">{activeFarmName || farmName ? `🏡 ${activeFarmName || farmName} / 講師` : "農園主 / 講師アカウント"}</p>
               </div>
 
               {/* 1. 👀 生徒画面の確認 */}
@@ -347,7 +349,7 @@ export default function TeacherSidebar({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black text-gray-900 truncate leading-tight">{teacherName}</p>
-                <p className="text-[10px] text-emerald-600 font-bold truncate">{farmName ? `🏡 ${farmName}` : "講師ログイン中"}</p>
+                <p className="text-[10px] text-emerald-600 font-bold truncate">{activeFarmName || farmName ? `🏡 ${activeFarmName || farmName}` : "講師ログイン中"}</p>
               </div>
             </div>
 

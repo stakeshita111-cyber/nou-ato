@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useFarmStore } from "@/store/useFarmStore";
 import Toast from "@/components/ui/Toast";
 import SlideSettingsModal, { SlideSettings } from "@/components/teacher/SlideSettingsModal";
 
@@ -139,10 +140,46 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       setLoading(true);
     }
     try {
-      const { data: journalData, error: journalError } = await supabase
+      // ログイン講師の現在選択中農園IDを取得
+      let farmId = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      if (!farmId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("farm_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (userData?.farm_id) farmId = userData.farm_id;
+        }
+      }
+
+      // 自農園に所属する生徒のID一覧を取得
+      let myStudentIds: string[] = [];
+      if (farmId) {
+        const { data: farmStudents } = await supabase
+          .from("users")
+          .select("id")
+          .eq("farm_id", farmId)
+          .eq("role", "student");
+        if (farmStudents) {
+          myStudentIds = farmStudents.map((s: any) => s.id);
+        }
+      }
+
+      let jDataQuery = supabase
         .from("journals")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*");
+
+      if (farmId) {
+        if (myStudentIds.length > 0) {
+          jDataQuery = jDataQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(",")})`);
+        } else {
+          jDataQuery = jDataQuery.eq("farm_id", farmId);
+        }
+      }
+
+      const { data: journalData, error: journalError } = await jDataQuery.order("created_at", { ascending: false });
 
       if (journalError) {
         console.warn("Journals fetch info:", journalError.message || journalError);
@@ -161,13 +198,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (studentIds.length > 0) {
         const { data: usersData } = await supabase
           .from("users")
-          .select("id, email, full_name")
+          .select("id, email, full_name, display_name")
           .in("id", studentIds);
 
         if (usersData) {
           usersData.forEach((u: any) => {
             if (u.id) {
-              userMap[u.id] = u.full_name || (u.email ? u.email.split("@")[0] : "竹下 翔");
+              userMap[u.id] = u.display_name || u.full_name || (u.email ? u.email.split("@")[0] : "受講生");
             }
           });
         }

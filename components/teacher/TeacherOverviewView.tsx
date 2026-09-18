@@ -7,14 +7,15 @@ import QRCodeModal from "@/components/ui/QRCodeModal";
 import WeatherWidget from "@/components/ui/WeatherWidget";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
+import { useFarmStore } from "@/store/useFarmStore";
 
 interface TeacherOverviewViewProps {
   onAddNewTaskClick: () => void;
   onNavigateToStudents: () => void;
   onNavigateToJournals: () => void;
-  onNavigateToFarm?: () => void;
-  onNavigateToTasks?: () => void;
-  onNavigateToEvents?: () => void;
+  onNavigateToFarm: () => void;
+  onNavigateToTasks: () => void;
+  onNavigateToEvents: () => void;
 }
 
 export default function TeacherOverviewView({
@@ -26,137 +27,116 @@ export default function TeacherOverviewView({
   onNavigateToEvents,
 }: TeacherOverviewViewProps) {
   const { plots } = useFarmManager();
+  const { activeFarmId, activeFarmName } = useFarmStore();
+
+  const farmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") || "" : "");
+  const farmName = activeFarmName || (typeof window !== "undefined" ? localStorage.getItem("nouato_current_farm_name") || "農園" : "農園");
+
   const [reportCount, setReportCount] = useState<number>(0);
   const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
 
-  // 🌟【正確な動的計算】全48マスから空き地を除外した「稼働区画数 (47区画)」と「総畝数 (141畝)」🌟
+  // 🌟 全マスから空き地を除外した「稼働区画数」と「総畝数」 (未作成時は 0) 🌟
   const activePlots = plots.filter((p) => !p.is_vacant);
-  const displayPlotsCount = plots.length > 0 ? activePlots.length : 47;
-  const displayBedsCount = plots.length > 0
-    ? activePlots.reduce((sum, p) => sum + (p.beds && p.beds.length > 0 ? p.beds.length : 3), 0)
-    : 141;
+  const displayPlotsCount = activePlots.length;
+  const displayBedsCount = activePlots.reduce((sum, p) => sum + (p.beds && p.beds.length > 0 ? p.beds.length : 3), 0);
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [showQRModal, setShowQRModal] = useState(false);
 
   const [origin, setOrigin] = useState("http://localhost:3000");
-  const [farmId, setFarmId] = useState<string>("tanaka_farm");
-  const [farmName, setFarmName] = useState<string>("たなか自然農園");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
     }
-
-    const fetchTeacherFarm = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: farm } = await supabase
-            .from("farms")
-            .select("*")
-            .eq("owner_id", user.id)
-            .single();
-
-          if (farm) {
-            setFarmId(farm.id);
-            if (farm.name) setFarmName(farm.name);
-            return;
-          }
-        }
-
-        const { data: latestFarm } = await supabase
-          .from("farms")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (latestFarm) {
-          setFarmId(latestFarm.id);
-          if (latestFarm.name) setFarmName(latestFarm.name);
-        }
-      } catch (err) {
-        console.error("fetchTeacherFarm error:", err);
-      }
-    };
-
-    fetchTeacherFarm();
-  }, []);
+    fetchCounts(farmId);
+  }, [farmId]);
 
   const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
 
-  useEffect(() => {
-    const fetchCounts = async () => {
-      // 1. 本日以降のイベント・講習予約件数
-      const todayStr = new Date().toISOString().split("T")[0];
-      const { count: eCount } = await supabase
-        .from("events")
-        .select("*", { count: "exact" })
-        .gte("date", todayStr);
+  const fetchCounts = async (targetFarmId?: string) => {
+    const currentFid = targetFarmId || farmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
 
-      if (eCount !== null && eCount !== undefined) {
-        setEventsCount(eCount);
-      } else {
-        const saved = localStorage.getItem("nouato_shared_events");
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            const futureEvents = parsed.filter((ev: any) => ev.date >= todayStr);
-            setEventsCount(futureEvents.length);
-          } catch (e) {
-            setEventsCount(2);
-          }
-        } else {
-          setEventsCount(2);
+    // 1. 本日以降のイベント・講習予約件数 (自農園)
+    const todayStr = new Date().toISOString().split("T")[0];
+    let eQuery = supabase
+      .from("events")
+      .select("*", { count: "exact" })
+      .gte("date", todayStr);
+    if (currentFid) {
+      eQuery = eQuery.or(`farm_id.eq.${currentFid},farm_id.is.null`);
+    }
+    const { count: eCount } = await eQuery;
+
+    if (eCount !== null && eCount !== undefined) {
+      setEventsCount(eCount);
+    } else {
+      const eventKey = currentFid ? `nouato_shared_events_${currentFid}` : "nouato_shared_events";
+      const saved = typeof window !== "undefined" ? localStorage.getItem(eventKey) : null;
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const futureEvents = parsed.filter((ev: any) => ev.date >= todayStr);
+          setEventsCount(futureEvents.length);
+        } catch (e) {
+          setEventsCount(0);
         }
-      }
-
-      // 2. 本日の作業記録件数 (crop_records)
-      const { count: cCount } = await supabase
-        .from("crop_records")
-        .select("*", { count: "exact" });
-      
-      if (cCount !== null && cCount !== undefined) {
-        setReportCount(cCount);
       } else {
-        const savedRec = localStorage.getItem("nouato_crop_records");
-        if (savedRec) {
-          try {
-            setReportCount(JSON.parse(savedRec).length);
-          } catch (e) {
-            setReportCount(0);
-          }
-        } else {
+        setEventsCount(0);
+      }
+    }
+
+    // 2. 本日の作業記録件数 (crop_records) (自農園)
+    let cQuery = supabase
+      .from("crop_records")
+      .select("*", { count: "exact" });
+    if (currentFid) {
+      cQuery = cQuery.eq("farm_id", currentFid);
+    }
+    const { count: cCount } = await cQuery;
+    
+    if (cCount !== null && cCount !== undefined) {
+      setReportCount(cCount);
+    } else {
+      const cropKey = currentFid ? `nouato_crop_records_${currentFid}` : "nouato_crop_records";
+      const savedRec = typeof window !== "undefined" ? localStorage.getItem(cropKey) : null;
+      if (savedRec) {
+        try {
+          setReportCount(JSON.parse(savedRec).length);
+        } catch (e) {
           setReportCount(0);
         }
-      }
-
-      // 3. 未回答の質問・気づきメモ (journals で reply が空かつシステム完了ログでない手入力分)
-      const { data: jData } = await supabase
-        .from("journals")
-        .select("*")
-        .is("reply", null);
-
-      if (jData) {
-        const unrepliedNotices = jData.filter((j: any) => {
-          const content = (j.content || "").trim();
-          return content && 
-            !content.includes("【収穫完了報告】") && 
-            !content.includes("【差し戻し通知】") && 
-            !content.includes("を完了報告しました") && 
-            content !== "（コメントなし）";
-        });
-        setUnrepliedCount(unrepliedNotices.length);
       } else {
-        setUnrepliedCount(0);
+        setReportCount(0);
       }
-    };
+    }
 
-    fetchCounts();
-  }, []);
+    // 3. 未回答の質問・気づきメモ (自農園スコープ)
+    let jQuery = supabase
+      .from("journals")
+      .select("*")
+      .is("reply", null);
+    if (currentFid) {
+      jQuery = jQuery.eq("farm_id", currentFid);
+    }
+    const { data: jData } = await jQuery;
+
+    if (jData) {
+      const unrepliedNotices = jData.filter((j: any) => {
+        const content = (j.content || "").trim();
+        return content && 
+          !content.includes("【収穫完了報告】") && 
+          !content.includes("【差し戻し通知】") && 
+          !content.includes("を完了報告しました") && 
+          content !== "（コメントなし）";
+      });
+      setUnrepliedCount(unrepliedNotices.length);
+    } else {
+      setUnrepliedCount(0);
+    }
+  };
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl);
