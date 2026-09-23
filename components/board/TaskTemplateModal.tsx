@@ -10,6 +10,8 @@ interface TaskTemplateModalProps {
 
 export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTemplateModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<string>("default");
   const [allTemplates, setAllTemplates] = useState<TaskTemplate[]>(VEGETABLE_TASK_TEMPLATES);
 
   useEffect(() => {
@@ -31,10 +33,26 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
     { id: "土作り", label: "🌱 土作り・畝立て" },
   ];
 
-  const filteredTemplates = allTemplates.filter((t) => {
-    if (selectedCategory === "all") return true;
-    return t.category === selectedCategory;
-  });
+  const filteredAndSortedTemplates = allTemplates
+    .filter((t) => {
+      const matchesCategory = selectedCategory === "all" || t.category === selectedCategory;
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        !query ||
+        (t.title && t.title.toLowerCase().includes(query)) ||
+        (t.target_crop && t.target_crop.toLowerCase().includes(query)) ||
+        (t.description && t.description.toLowerCase().includes(query));
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortOrder === "title_asc") {
+        return a.title.localeCompare(b.title, "ja");
+      }
+      if (sortOrder === "title_desc") {
+        return b.title.localeCompare(a.title, "ja");
+      }
+      return 0; // default
+    });
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 text-gray-800 animate-fade-in">
@@ -54,26 +72,50 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
           </button>
         </div>
 
-        {/* カテゴリフィルター */}
-        <div className="p-4 bg-gray-50/70 border-b border-gray-100 flex overflow-x-auto space-x-2 text-xs font-bold shrink-0">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition ${
-                selectedCategory === cat.id
-                  ? "app-accent-btn shadow-xs"
-                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+        {/* カテゴリフィルターと検索・ソート */}
+        <div className="p-4 bg-gray-50/70 border-b border-gray-100 flex flex-col gap-3 shrink-0">
+          <div className="flex overflow-x-auto space-x-2 text-xs font-bold">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition ${
+                  selectedCategory === cat.id
+                    ? "app-accent-btn shadow-xs"
+                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="🔍 テンプレート名、作物名、作業名で検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+              />
+            </div>
+            <div className="flex gap-3">
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-bold bg-white focus:ring-2 focus:ring-green-500 outline-none"
+              >
+                <option value="default">デフォルト順</option>
+                <option value="title_asc">名前順 (昇順)</option>
+                <option value="title_desc">名前順 (降順)</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* テンプレートカードグリッド */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
-          {filteredTemplates.map((template) => (
+          {filteredAndSortedTemplates.map((template) => (
             <div
               key={template.id}
               className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:shadow-md hover:border-gray-400 transition flex flex-col justify-between space-y-4 relative group"

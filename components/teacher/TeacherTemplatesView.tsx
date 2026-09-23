@@ -13,6 +13,9 @@ export default function TeacherTemplatesView() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<string>("default");
 
   // 初期読み込み (LocalStorageからカスタムテンプレートを同期)
   useEffect(() => {
@@ -144,6 +147,27 @@ export default function TeacherTemplatesView() {
     setShowToast(true);
   };
 
+  const filteredAndSortedTemplates = templates
+    .filter((tpl) => {
+      const matchesCategory = selectedCategory === "all" || tpl.category === selectedCategory;
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        !query ||
+        (tpl.title && tpl.title.toLowerCase().includes(query)) ||
+        (tpl.target_crop && tpl.target_crop.toLowerCase().includes(query)) ||
+        (tpl.description && tpl.description.toLowerCase().includes(query));
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortOrder === "title_asc") {
+        return a.title.localeCompare(b.title, "ja");
+      }
+      if (sortOrder === "title_desc") {
+        return b.title.localeCompare(a.title, "ja");
+      }
+      return 0; // default
+    });
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
@@ -165,9 +189,44 @@ export default function TeacherTemplatesView() {
         </button>
       </div>
 
+      {/* 検索・フィルタ・ソート */}
+      <div className="flex flex-col sm:flex-row gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="🔍 テンプレート名、作物名、作業名で検索..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-medium focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+          />
+        </div>
+        <div className="flex gap-3">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-bold bg-white focus:ring-2 focus:ring-green-500 outline-none"
+          >
+            <option value="all">すべて</option>
+            <option value="果菜">🍅 果菜 (トマト等)</option>
+            <option value="根菜">🥔 根菜 (ジャガイモ等)</option>
+            <option value="葉菜">🥬 葉菜 (コマツナ等)</option>
+            <option value="土作り">🌱 土作り</option>
+          </select>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-bold bg-white focus:ring-2 focus:ring-green-500 outline-none"
+          >
+            <option value="default">デフォルト順</option>
+            <option value="title_asc">名前順 (昇順)</option>
+            <option value="title_desc">名前順 (降順)</option>
+          </select>
+        </div>
+      </div>
+
       {/* テンプレートカード一覧 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {templates.map((tpl) => (
+        {filteredAndSortedTemplates.map((tpl) => (
           <div
             key={tpl.id}
             className="app-bg-card rounded-3xl p-6 border app-border shadow-sm space-y-4 flex flex-col justify-between"
