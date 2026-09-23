@@ -15,14 +15,19 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
   const [allTemplates, setAllTemplates] = useState<TaskTemplate[]>(VEGETABLE_TASK_TEMPLATES);
 
   useEffect(() => {
+    let customTemplates: TaskTemplate[] = [];
     const saved = localStorage.getItem("nouato_custom_templates");
     if (saved) {
       try {
-        setAllTemplates(JSON.parse(saved));
+        customTemplates = JSON.parse(saved);
       } catch (e) {
         console.error(e);
       }
     }
+    const map = new Map<string, TaskTemplate>();
+    VEGETABLE_TASK_TEMPLATES.forEach((tpl) => map.set(tpl.id, tpl));
+    customTemplates.forEach((tpl) => map.set(tpl.id, tpl));
+    setAllTemplates(Array.from(map.values()));
   }, []);
 
   const categories = [
@@ -122,12 +127,21 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-[#2e7d32] bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
-                    {template.category} • 想定{template.estimated_time}
-                  </span>
-                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                    {template.badge_icon} {template.badge_name}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-[#2e7d32] bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
+                      {template.category} • 想定{template.estimated_time}
+                    </span>
+                    {template.timing && (
+                      <span className="text-[10px] font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                        📅 {template.timing}
+                      </span>
+                    )}
+                  </div>
+                  {template.badge_name && (
+                    <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                      {template.badge_icon} {template.badge_name}
+                    </span>
+                  )}
                 </div>
 
                 <h3 className="font-extrabold text-gray-900 text-sm leading-snug">{template.title}</h3>

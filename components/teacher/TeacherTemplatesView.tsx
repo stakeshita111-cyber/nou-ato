@@ -84,13 +84,21 @@ export default function TeacherTemplatesView() {
         if (userData?.farm_id) farmId = userData.farm_id;
       }
 
+      const memoContent = [
+        tpl.memo || "",
+        tpl.timing ? `【実施目安】${tpl.timing}` : "",
+        tpl.source ? `【出典】${tpl.source}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const newTaskData = {
         title: tpl.title,
         status: "pool", // 教材準備レーンへ
         category: tpl.category || "work",
         description: tpl.description,
         tools_needed: tpl.tools_needed,
-        memo: tpl.memo || null,
+        memo: memoContent || null,
         target_crop: tpl.target_crop,
         require_photo: tpl.require_photo ?? true,
         exp: tpl.exp || 50,
@@ -98,6 +106,7 @@ export default function TeacherTemplatesView() {
         estimated_time: tpl.estimated_time,
         badge_name: tpl.badge_name || null,
         badge_icon: tpl.badge_icon || null,
+        reference_links: tpl.reference_links || null,
         created_by: user?.id || null,
         farm_id: farmId || null,
       };
@@ -311,6 +320,11 @@ export default function TeacherTemplatesView() {
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
                       {tpl.category} • 想定{tpl.estimated_time}
                     </span>
+                    {tpl.timing && (
+                      <span className="bg-sky-50 text-sky-800 border border-sky-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                        📅 {tpl.timing}
+                      </span>
+                    )}
                     {tpl.badge_name && (
                       <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
                         {tpl.badge_icon} {tpl.badge_name}
@@ -321,13 +335,27 @@ export default function TeacherTemplatesView() {
                 </div>
 
                 <h3 className="font-extrabold text-gray-900 text-base">{tpl.title}</h3>
-                <p className="text-xs text-gray-500 font-semibold">
-                  🌱 対象作物: {tpl.target_crop} | 🛠️ 工具: {tpl.tools_needed}
+                <p className="text-xs text-gray-500 font-semibold flex flex-wrap gap-x-2">
+                  <span>🌱 対象作物: {tpl.target_crop}</span>
+                  <span>|</span>
+                  <span>🛠️ 道具: {tpl.tools_needed}</span>
                 </p>
 
                 <div className="text-xs text-gray-700 bg-gray-50/80 p-4 rounded-2xl border app-border whitespace-pre-wrap leading-relaxed font-medium">
                   {tpl.description}
                 </div>
+
+                {tpl.memo && (
+                  <div className="text-[11px] text-amber-950 bg-amber-50/70 p-3 rounded-2xl border border-amber-200/60 leading-relaxed font-medium">
+                    <span className="font-bold">💡 師匠のメモ: </span>
+                    {tpl.memo}
+                    {tpl.source && (
+                      <span className="block text-[10px] text-amber-800/80 mt-1 font-semibold">
+                        出典: {tpl.source}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
