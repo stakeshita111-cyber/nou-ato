@@ -17,20 +17,30 @@ export default function TeacherTemplatesView() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<string>("default");
 
-  // 初期読み込み (LocalStorageからカスタムテンプレートを同期)
+  // 初期読み込み (LocalStorageからカスタムテンプレートを同期し、デフォルトとマージする)
   useEffect(() => {
     const fetchTemplates = () => {
+      let customTemplates: TaskTemplate[] = [];
       const saved = localStorage.getItem("nouato_custom_templates");
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
-          setTemplates(parsed);
-          return;
+          customTemplates = JSON.parse(saved);
         } catch (e) {
           console.error(e);
         }
       }
-      setTemplates(VEGETABLE_TASK_TEMPLATES);
+      // カスタムテンプレートと公式テンプレートを結合
+      const merged = [...customTemplates, ...VEGETABLE_TASK_TEMPLATES];
+      // IDの重複を排除 (同IDならカスタムを優先)
+      const uniqueTemplates = merged.reduce((acc: TaskTemplate[], current) => {
+        const x = acc.find((item) => item.id === current.id);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+      setTemplates(uniqueTemplates);
     };
     fetchTemplates();
   }, []);
@@ -38,7 +48,9 @@ export default function TeacherTemplatesView() {
   const saveTemplatesToStorage = (updatedList: TaskTemplate[]) => {
     setTemplates(updatedList);
     try {
-      localStorage.setItem("nouato_custom_templates", JSON.stringify(updatedList));
+      // 公式テンプレート（IDが"tpl_"で始まるもの）を除外してカスタムのみを保存
+      const customOnly = updatedList.filter(t => !t.id.startsWith("tpl_"));
+      localStorage.setItem("nouato_custom_templates", JSON.stringify(customOnly));
     } catch (e) {
       console.error(e);
     }
@@ -79,7 +91,7 @@ export default function TeacherTemplatesView() {
 
       const { error } = await supabase.from("tasks").insert([newTaskData]);
       if (error) {
-        console.warn("DB追加警告(フォールバック):", error.message);
+        throw error;
       }
 
       if (typeof window !== "undefined") {
@@ -89,9 +101,9 @@ export default function TeacherTemplatesView() {
 
       setToastMessage(`✨ テンプレート「${tpl.title}」を教材・タスクに追加しました！看板ボード（教材準備）で配信できます。`);
       setShowToast(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error("handleAddToTasks error:", e);
-      setToastMessage(`✨ テンプレート「${tpl.title}」を教材・タスクに追加しました！`);
+      setToastMessage(`❌ タスクの追加に失敗しました: ${e.message}`);
       setShowToast(true);
     } finally {
       setAddingId(null);
@@ -101,7 +113,7 @@ export default function TeacherTemplatesView() {
   // 新規テンプレート作成の開始
   const handleStartCreate = () => {
     const newTpl: TaskTemplate = {
-      id: `custom_tpl_${Date.now()}`,
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `custom_tpl_${Date.now()}`,
       title: "🌱 新しい栽培タスクテンプレート",
       target_crop: "野菜",
       category: "果菜",
@@ -147,6 +159,16 @@ export default function TeacherTemplatesView() {
     setShowToast(true);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && editingTemplate) {
+        setEditingTemplate(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editingTemplate]);
+
   const filteredAndSortedTemplates = templates
     .filter((tpl) => {
       const matchesCategory = selectedCategory === "all" || tpl.category === selectedCategory;
@@ -180,13 +202,40 @@ export default function TeacherTemplatesView() {
           </p>
         </div>
 
-        <button
-          onClick={handleStartCreate}
-          className="px-5 py-3 app-accent-btn font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 shrink-0"
-        >
-          <span className="text-base leading-none">＋</span>
-          <span>新しいテンプレートを作成</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              if (confirm("初期テンプレートの設定を復元しますか？（自作テンプレートは削除されません）")) {
+                const customOnly = templates.filter(t => !t.id.startsWith("tpl_"));
+                const merged = [...customOnly, ...VEGETABLE_TASK_TEMPLATES];
+
+                const uniqueTemplates = merged.reduce((acc: TaskTemplate[], current) => {
+                  const x = acc.find((item) => item.id === current.id);
+                  if (!x) {
+                    return acc.concat([current]);
+                  } else {
+                    return acc;
+                  }
+                }, []);
+
+                setTemplates(uniqueTemplates);
+                localStorage.setItem("nouato_custom_templates", JSON.stringify(customOnly));
+                setToastMessage("🔄 テンプレートを初期状態にリセットしました。");
+                setShowToast(true);
+              }
+            }}
+            className="px-5 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 shrink-0"
+          >
+            <span>🔄 リセット</span>
+          </button>
+          <button
+            onClick={handleStartCreate}
+            className="px-5 py-3 app-accent-btn font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 shrink-0"
+          >
+            <span className="text-base leading-none">＋</span>
+            <span>新しいテンプレートを作成</span>
+          </button>
+        </div>
       </div>
 
       {/* 検索・フィルタ・ソート */}
@@ -291,7 +340,11 @@ export default function TeacherTemplatesView() {
               <h3 className="font-black text-gray-900 text-base">
                 {isCreatingNew ? "📝 新しいタスクテンプレートを作成" : "✏️ テンプレートの編集"}
               </h3>
-              <button onClick={() => setEditingTemplate(null)} className="text-gray-400 hover:text-gray-600 font-bold text-lg">
+              <button
+                onClick={() => setEditingTemplate(null)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+                aria-label="閉じる"
+              >
                 ✕
               </button>
             </div>
@@ -362,6 +415,57 @@ export default function TeacherTemplatesView() {
                   onChange={(e) => setEditingTemplate({ ...editingTemplate, description: e.target.value })}
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 resize-none font-medium"
                 />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">師匠からのアドバイス・補足メモ (任意)</label>
+                <textarea
+                  rows={3}
+                  value={editingTemplate.memo || ""}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, memo: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 resize-none font-medium"
+                  placeholder="芽を引き抜く時は、種イモごと抜け上がらないように片手でしっかり地面を押さえてね！"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-gray-700 mb-1">難易度 (1〜5)</label>
+                  <select
+                    value={editingTemplate.difficulty}
+                    onChange={(e) => setEditingTemplate({ ...editingTemplate, difficulty: parseInt(e.target.value) || 1 })}
+                    className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50"
+                  >
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <option key={level} value={level}>
+                        {level} {level === 1 ? "(簡単)" : level === 5 ? "(難しい)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 mb-1">獲得EXP</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingTemplate.exp}
+                    onChange={(e) => setEditingTemplate({ ...editingTemplate, exp: parseInt(e.target.value) || 0 })}
+                    className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50"
+                  />
+                </div>
+
+                <div className="flex flex-col justify-center mt-6">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingTemplate.require_photo}
+                      onChange={(e) => setEditingTemplate({ ...editingTemplate, require_photo: e.target.checked })}
+                      className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                    />
+                    <span className="text-gray-700 font-bold text-xs">写真提出必須</span>
+                  </label>
+                </div>
               </div>
 
               {/* 獲得バッジ設定 */}
