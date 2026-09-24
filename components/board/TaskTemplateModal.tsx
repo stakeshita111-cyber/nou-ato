@@ -146,6 +146,13 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
 
                 <h3 className="font-extrabold text-gray-900 text-sm leading-snug">{template.title}</h3>
 
+                <p className="text-[11px] text-gray-500 font-semibold">
+                  🌱 対象: {template.target_crop}
+                  {template.variety && (
+                    <span className="text-emerald-700 ml-1 font-bold">（{template.variety}）</span>
+                  )}
+                </p>
+
                 <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-xl line-clamp-3 leading-relaxed">
                   {template.description}
                 </div>

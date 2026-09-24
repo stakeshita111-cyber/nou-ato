@@ -131,6 +131,13 @@ export default function StudentTaskPreviewModal({
                 <span className="underline decoration-emerald-300">{template.timing}</span>
               </p>
             )}
+
+            {template.variety && (
+              <p className="text-[11px] text-emerald-100 mt-1 font-bold flex items-center gap-1">
+                <span>🏷️ 代表品種:</span>
+                <span className="text-white font-extrabold">{template.variety}</span>
+              </p>
+            )}
           </div>
 
           {/* スクロール可能メインコンテンツ */}

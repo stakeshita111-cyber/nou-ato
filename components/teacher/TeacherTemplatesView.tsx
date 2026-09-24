@@ -154,6 +154,7 @@ export default function TeacherTemplatesView() {
       id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `custom_tpl_${Date.now()}`,
       title: "🌱 新しい栽培タスクテンプレート",
       target_crop: "野菜",
+      variety: "",
       category: "果菜",
       season: "春夏",
       phase: "準備・植付",
@@ -728,7 +729,12 @@ export default function TeacherTemplatesView() {
 
                       <h3 className="font-extrabold text-gray-900 text-base leading-snug">{tpl.title}</h3>
                       <p className="text-xs text-gray-500 font-semibold flex flex-wrap gap-x-2">
-                        <span>🌱 対象作物: {tpl.target_crop}</span>
+                        <span>
+                          🌱 対象作物: {tpl.target_crop}
+                          {tpl.variety && (
+                            <span className="text-emerald-700 ml-1 font-bold">（{tpl.variety}）</span>
+                          )}
+                        </span>
                         <span>|</span>
                         <span>🛠️ 道具: {tpl.tools_needed}</span>
                         {tpl.phase && (
@@ -933,6 +939,17 @@ export default function TeacherTemplatesView() {
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">代表品種 (任意)</label>
+                <input
+                  type="text"
+                  value={editingTemplate.variety || ""}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, variety: e.target.value })}
+                  placeholder="例: 千果、アイコ など"
+                  className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
