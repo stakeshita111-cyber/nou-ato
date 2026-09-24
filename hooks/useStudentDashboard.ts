@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { MASTER_TASKS } from "@/lib/taskMaster";
 
 export function useStudentDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -136,33 +135,7 @@ export function useStudentDashboard() {
         let taskList: any[] = [];
         const seenTitles = new Set<string>();
 
-        // ① MASTER_TASKS (全5件) をベースに、Supabase DB の student_tasks の status のみをそのまま100%信頼してマッピング
-        MASTER_TASKS.forEach((mt) => {
-          const cleanMt = mt.title.replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-          seenTitles.add(cleanMt);
-
-          const stMatch = stData?.find((st: any) => {
-            const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-            return cleanSt && (cleanSt === cleanMt || cleanSt.includes(cleanMt) || cleanMt.includes(cleanSt));
-          });
-
-          const isDone = stMatch ? stMatch.status === "completed" : false;
-
-          taskList.push({
-            id: stMatch ? stMatch.id : `st_${mt.id}`,
-            task_id: mt.id,
-            status: isDone ? "completed" : "not_started",
-            tasks: {
-              id: mt.id,
-              title: mt.title,
-              description: mt.description,
-              target_crop: mt.target_crop,
-              exp: mt.exp,
-            },
-          });
-        });
-
-        // ② 講師が新規作成して「生徒へ公開中」にした動的タスクを安全に追加（重複排除）
+        // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加
         if (publicTasks && publicTasks.length > 0) {
           publicTasks.forEach((pt: any) => {
             const cleanPt = (pt.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
@@ -184,6 +157,20 @@ export function useStudentDashboard() {
                   title: pt.title,
                   description: pt.description || "",
                   target_crop: pt.target_crop || "野菜全般",
+                  variety: pt.variety || "",
+                  category: pt.category || "共通",
+                  season: pt.season || "",
+                  phase: pt.phase || "",
+                  timing: pt.timing || "",
+                  estimated_time: pt.estimated_time || "30分",
+                  tools_needed: pt.tools_needed || "",
+                  memo: pt.memo || "",
+                  difficulty: pt.difficulty || 2,
+                  badge_name: pt.badge_name || "",
+                  badge_icon: pt.badge_icon || "🌱",
+                  require_photo: pt.require_photo ?? true,
+                  reference_links: pt.reference_links || "",
+                  source: pt.source || "",
                   exp: pt.exp || 50,
                 },
               });
@@ -191,7 +178,7 @@ export function useStudentDashboard() {
           });
         }
 
-        // ③ 生徒の個別割当タスク (student_tasks) に直接存在するタスクも漏れなく合流
+        // ② 生徒の個別割当タスク (student_tasks) に直接存在するタスクも漏れなく合流
         if (stData && stData.length > 0) {
           stData.forEach((st: any) => {
             const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
@@ -207,6 +194,20 @@ export function useStudentDashboard() {
                   title: st.title,
                   description: st.description || "",
                   target_crop: st.target_crop || "野菜全般",
+                  variety: st.variety || "",
+                  category: st.category || "共通",
+                  season: st.season || "",
+                  phase: st.phase || "",
+                  timing: st.timing || "",
+                  estimated_time: st.estimated_time || "30分",
+                  tools_needed: st.tools_needed || "",
+                  memo: st.memo || "",
+                  difficulty: st.difficulty || 2,
+                  badge_name: st.badge_name || "",
+                  badge_icon: st.badge_icon || "🌱",
+                  require_photo: st.require_photo ?? true,
+                  reference_links: st.reference_links || "",
+                  source: st.source || "",
                   exp: st.exp || 50,
                 },
               });

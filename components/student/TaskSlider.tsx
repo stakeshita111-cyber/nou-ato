@@ -103,27 +103,18 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 </p>
               </div>
 
-              {/* アクションボタン */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+              {/* アクションボタン: 詳細展開ボタンに一本化（完了報告は展開後モーダル内でのみ受付） */}
+              <div className="pt-2 border-t border-gray-100">
                 <button
+                  type="button"
                   onClick={() => onSelect(currentTask)}
-                  className="py-2.5 px-3 bg-[#edf2ea] hover:bg-green-100 text-[#1d5c23] font-bold text-xs rounded-xl transition flex items-center justify-center space-x-1"
+                  className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  <span>詳細・手順を見る</span>
-                </button>
-
-                <button
-                  onClick={() => onComplete(currentTask.id)}
-                  className="py-2.5 px-3 bg-[#1d5c23] hover:bg-[#16471a] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>完了を報告</span>
+                  <span>📖 詳細・手順を確認して作業する</span>
                 </button>
               </div>
             </div>
