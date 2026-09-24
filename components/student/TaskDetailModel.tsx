@@ -27,7 +27,9 @@ export default function TaskDetailModel({
       ? plots.find((p) => !p.is_vacant && (p.student_name === studentName || p.student_name?.includes(studentName)))
       : null) ||
     null;
-  const myBeds = myPlot?.beds || [];
+  const myBeds = (myPlot?.beds || [])
+    .filter((b: { id?: string; status?: string; bed_number?: string | number }) => b.status !== "archived" && !b.id?.startsWith("archived_"))
+    .sort((a: { bed_number?: string | number }, b: { bed_number?: string | number }) => (Number(a.bed_number) || 0) - (Number(b.bed_number) || 0));
 
   const [selectedBedId, setSelectedBedId] = useState<string>(myBeds[0]?.id || "");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
