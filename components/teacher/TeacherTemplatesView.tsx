@@ -570,7 +570,7 @@ export default function TeacherTemplatesView() {
       {/* ────────────── メインレイアウト (左: サイドバー / 右: カード一覧) ────────────── */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* デスクトップ用 左固定サイドバー */}
-        <aside className="hidden lg:block w-72 shrink-0 bg-white p-5 rounded-3xl border app-border shadow-sm sticky top-6">
+        <aside className="hidden lg:block w-72 shrink-0 bg-white p-5 rounded-3xl border app-border shadow-sm sticky top-0 max-h-[calc(100vh-120px)] overflow-y-auto">
           {renderSidebarFilters()}
         </aside>
 

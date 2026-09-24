@@ -119,11 +119,11 @@ export default function TeacherSidebar({
 
       {/* サイドバー本体 */}
       <aside
-        className={`w-64 app-bg-card border-r app-border flex flex-col justify-between flex-shrink-0 min-h-screen transition-all duration-300 z-50
+        className={`w-64 app-bg-card border-r app-border flex flex-col justify-between flex-shrink-0 h-screen transition-all duration-300 z-50 overflow-hidden
           fixed inset-y-0 left-0 ${isOpenMobile ? "translate-x-0" : "-translate-x-full"}
-          md:static md:translate-x-0 md:flex`}
+          md:sticky md:top-0 md:translate-x-0 md:flex`}
       >
-        <div>
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
           {/* ブランドロゴ ＆ モバイル閉じるボタン */}
           <div className="p-5 border-b border-emerald-100/60 flex items-center justify-between bg-gradient-to-r from-emerald-50/40 via-white to-transparent">
             <div className="flex items-center space-x-3">
@@ -281,7 +281,7 @@ export default function TeacherSidebar({
         </div>
 
         {/* 🌟 サイドバー左下 ログインユーザープロファイル (人型マーク ＆ ポップアップメニュー) 🌟 */}
-        <div className="p-3 border-t border-emerald-100/60 relative" ref={menuRef}>
+        <div className="p-3 border-t border-emerald-100/60 relative shrink-0 bg-white/60 backdrop-blur-xs" ref={menuRef}>
           {/* 上展開ポップアップメニュー */}
           {isUserMenuOpen && (
             <div className="absolute bottom-full left-3 right-3 mb-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-emerald-200 p-2 space-y-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">

@@ -132,7 +132,7 @@ export default function TeacherDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen app-bg-main flex app-text-main font-sans transition-colors duration-300">
+    <div className="h-screen w-full app-bg-main flex app-text-main font-sans transition-colors duration-300 overflow-hidden">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* 📱 超美麗スマホ実機プレビューモーダル 📱 */}
@@ -153,7 +153,7 @@ export default function TeacherDashboardPage() {
       />
 
       {/* 2. メインエリア */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* トップヘッダー */}
         <TeacherHeader
           title={
@@ -180,7 +180,7 @@ export default function TeacherDashboardPage() {
         />
 
         {/* ページコンテンツ */}
-        <main className="p-4 sm:p-8 max-w-7xl w-full mx-auto flex-1">
+        <main className="p-4 sm:p-8 max-w-7xl w-full mx-auto flex-1 overflow-y-auto">
           {(activeMenu === "dashboard" || activeMenu === "students") && (
             <TeacherOverviewView
               key={`overview_${activeFarmId}`}
