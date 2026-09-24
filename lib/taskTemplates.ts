@@ -1,3 +1,7 @@
+export type TaskSeason = "春夏" | "秋冬" | "通年";
+export type TaskPhase = "準備・植付" | "育成・管理" | "収穫・片付け";
+export type TaskCategory = "果菜" | "根菜" | "葉菜" | "共通" | "土作り";
+
 export type TaskTemplate = {
   id: string;
   title: string;
@@ -11,19 +15,99 @@ export type TaskTemplate = {
   require_photo: boolean;
   badge_name: string;
   badge_icon: string;
-  category: "根菜" | "果菜" | "葉菜" | "土作り";
+  category: TaskCategory;
   timing?: string;
   reference_links?: string;
   source?: string;
+  season?: TaskSeason;
+  phase?: TaskPhase;
 };
 
 export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
+  {
+    id: "tpl_spring_supplies",
+    title: "📦 【春の準備】春夏野菜の種・苗配布＆資材受取",
+    target_crop: "共通",
+    category: "共通",
+    season: "春夏",
+    phase: "準備・植付",
+    timing: "4月下旬〜5月上旬",
+    estimated_time: "20分",
+    tools_needed: "持ち帰り用手提げ袋, 軍手, マジックペン",
+    description:
+      "・管理棟前の配布ブースにて区画番号と氏名を告げて受付を行う\n・受講品種（トマト、ナス、キュウリ等）の苗と種子セットを受け取り、苗のポットに傷みがないか葉裏まで点検する\n・品種名を油性マジックで園芸ラベルに記入し、苗ポットに挿しておく\n・配布資材（仮支柱・麻紐・防虫不織布等）を自区画の資材置き場へ運ぶ",
+    memo: "苗を受け取ったら風当たりの少ない日陰に置き、定植まで土を乾かさないように軽く水をあげておこう！",
+    difficulty: 1,
+    exp: 30,
+    require_photo: false,
+    badge_name: "準備万端ルーキー",
+    badge_icon: "📦",
+  },
+  {
+    id: "tpl_autumn_supplies",
+    title: "📦 【秋の準備】秋冬野菜の種・苗配布＆資材受取",
+    target_crop: "共通",
+    category: "共通",
+    season: "秋冬",
+    phase: "準備・植付",
+    timing: "8月下旬〜9月上旬",
+    estimated_time: "20分",
+    tools_needed: "持ち帰り用手提げ袋, 軍手, 園芸ラベル",
+    description:
+      "・管理棟にて秋冬シーズンの種子セット（ダイコン、ニンジン、カブ等）と苗（キャベツ、ブロッコリー等）を受け取る\n・秋の害虫対策用サンサンネット（防虫ネット）とダンポール支柱一式を揃える\n・種袋裏面のまき時と発芽適温を確認し、当日の作付けスケジュールを組み立てる",
+    memo: "秋冬作は「種まき・定植の1週間の遅れが収穫の1ヶ月の遅れ」になる！受け取ったら適期を逃さず植え付けよう。",
+    difficulty: 1,
+    exp: 30,
+    require_photo: false,
+    badge_name: "秋支度マスター",
+    badge_icon: "📦",
+  },
+  {
+    id: "tpl_weed_control",
+    title: "🌿 【環境維持】畝間通路の草むしり＆雑草マルチ敷設",
+    target_crop: "共通",
+    category: "共通",
+    season: "通年",
+    phase: "育成・管理",
+    timing: "通年（特に5月〜9月の生育期）",
+    estimated_time: "30分",
+    tools_needed: "草削り（三角ホー）, 鎌, テミ（ちりとり）, 手袋",
+    description:
+      "・通路や畝の肩に生えた雑草を、三角ホーや鎌で根元から削り取る\n・根についた土を払い落とし、種がついていない青い雑草は畝の株元に敷いて「草マルチ（乾燥防止）」として再利用する\n・多年生雑草（スギナ、ドクダミ等）や種がついた雑草は畑の外の残渣集積所へ運び出す\n・通路を平らに均し、歩行時のつまずきや害虫の潜伏を防ぐ",
+    memo: "雑草は小さいうちに根から削り取るのが一番ラク！敷き草マルチにすれば土の乾燥を防ぎ、分解されてミミズの餌にもなるよ。",
+    difficulty: 1,
+    exp: 35,
+    require_photo: false,
+    badge_name: "農園美化レンジャー",
+    badge_icon: "🌿",
+  },
+  {
+    id: "tpl_membership_payment",
+    title: "💳 【事務・連絡】新年度区画利用料・シーズン更新手続きのご案内",
+    target_crop: "共通",
+    category: "共通",
+    season: "通年",
+    phase: "準備・植付",
+    timing: "シーズン更新時（2月または8月）",
+    estimated_time: "15分",
+    tools_needed: "スマホまたはPC, 筆記用具",
+    description:
+      "・管理画面（または受付窓口）にて、次回シーズンの継続希望または区画変更の有無を確認する\n・指定のお支払い方法（オンライン決済または農園窓口）にて次期区画利用料を納付する\n・シーズン更新完了メールまたは領収印を受領し、マイページの会員ステータスが更新されたことを確認する",
+    memo: "いつも農園を大切にご利用いただきありがとうございます！次シーズンも美味しい野菜を一緒に育てましょう🌱",
+    difficulty: 1,
+    exp: 50,
+    require_photo: false,
+    badge_name: "パートナーシップ証",
+    badge_icon: "💳",
+  },
   // ─── 土作り・共通基盤管理 ───
   {
     id: "tpl_soil_prep_spring",
+    season: "春夏",
+    phase: "準備・植付",
     title: "⛏️ 【春の基盤作り】堆肥・苦土石灰の深耕混和＆整地",
     target_crop: "共通",
-    category: "土作り",
+    category: "共通",
     timing: "3月上旬〜4月中旬（作付け2週間前）",
     estimated_time: "50分",
     tools_needed: "剣先スコップ, レーキ, 完熟牛ふん堆肥, 苦土石灰, メジャー",
@@ -40,9 +124,11 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_summer_solar",
+    season: "春夏",
+    phase: "育成・管理",
     title: "☀️ 【夏の土壌浄化】残渣撤去＆米ぬか太陽熱土壌消毒",
     target_crop: "共通",
-    category: "土作り",
+    category: "共通",
     timing: "7月下旬〜8月中旬（梅雨明け後の猛暑期）",
     estimated_time: "50分",
     tools_needed: "万能平グワ, 米ぬか（またはフスマ）, 透明ビニールシート, スコップ, ジョウロ（ホース）",
@@ -61,6 +147,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：ミニトマト ───
   {
     id: "tpl_tomato_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🍅 【初回必須】ミニトマトの若苗定植＆仮支柱・水やりガード",
     target_crop: "ミニトマト",
     category: "果菜",
@@ -80,6 +168,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_tomato_pruning",
+    season: "春夏",
+    phase: "育成・管理",
     title: "✂️ 【樹形管理】ミニトマトのわき芽かき＆主枝1本誘引",
     target_crop: "ミニトマト",
     category: "果菜",
@@ -99,6 +189,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_tomato_care",
+    season: "春夏",
+    phase: "育成・管理",
     title: "🧪 【肥培・通気】第1回追肥＆下葉かき",
     target_crop: "ミニトマト",
     category: "果菜",
@@ -118,6 +210,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_tomato_harvest",
+    season: "春夏",
+    phase: "収穫・片付け",
     title: "🧺 【完熟収穫】ミニトマトの朝採り＆先端摘心",
     target_crop: "ミニトマト",
     category: "果菜",
@@ -139,6 +233,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：ナス ───
   {
     id: "tpl_eggplant_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🍆 【初回必須】ナスの若苗定植＆あんどん（風よけ）設置",
     target_crop: "ナス",
     category: "果菜",
@@ -158,6 +254,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_eggplant_training",
+    season: "春夏",
+    phase: "育成・管理",
     title: "🌿 【骨格形成】ナスの3本仕立て＆支柱交差結束",
     target_crop: "ナス",
     category: "果菜",
@@ -177,6 +275,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_eggplant_renew",
+    season: "春夏",
+    phase: "収穫・片付け",
     title: "✂️ 【真夏の若返り】ナスの更新剪定＆根切り追肥",
     target_crop: "ナス",
     category: "果菜",
@@ -198,6 +298,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：キュウリ ───
   {
     id: "tpl_cucumber_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🥒 【初回必須】キュウリ浅植え＆合掌ネット展張",
     target_crop: "キュウリ",
     category: "果菜",
@@ -217,6 +319,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_cucumber_care",
+    season: "春夏",
+    phase: "育成・管理",
     title: "✂️ 【増収仕立て】下段5節のわき芽・雌花摘除＆つる上げ",
     target_crop: "キュウリ",
     category: "果菜",
@@ -238,6 +342,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：ピーマン ───
   {
     id: "tpl_pepper_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🫑 【初回必須】ピーマンの定植＆4本仕立て用仮留め",
     target_crop: "ピーマン",
     category: "果菜",
@@ -259,6 +365,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：エダマメ ───
   {
     id: "tpl_edamame_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🫛 【初回必須】エダマメの点まき＆鳥よけ不織布ベタがけ",
     target_crop: "エダマメ",
     category: "果菜",
@@ -278,6 +386,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_edamame_care",
+    season: "春夏",
+    phase: "育成・管理",
     title: "✂️ 【選抜・増収】エダマメの間引き2本立ち＆株元土寄せ",
     target_crop: "エダマメ",
     category: "果菜",
@@ -299,6 +409,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：オクラ ───
   {
     id: "tpl_okra_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "⭐ 【初回必須】オクラの4粒点まき＆初期保温被覆",
     target_crop: "オクラ",
     category: "果菜",
@@ -318,6 +430,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_okra_harvest",
+    season: "春夏",
+    phase: "収穫・片付け",
     title: "🗡️ 【連続増収】オクラの若採り収穫＆直下葉かき",
     target_crop: "オクラ",
     category: "果菜",
@@ -339,6 +453,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：トウモロコシ ───
   {
     id: "tpl_corn_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🌽 【初回必須】トウモロコシの2条千鳥まき＆初期保温",
     target_crop: "トウモロコシ",
     category: "果菜",
@@ -358,6 +474,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_corn_pollinate",
+    season: "春夏",
+    phase: "育成・管理",
     title: "🌾 【実詰まり向上】トウモロコシの人工授粉＆ヤングコーン除房",
     target_crop: "トウモロコシ",
     category: "果菜",
@@ -379,6 +497,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 果菜類：ズッキーニ ───
   {
     id: "tpl_zucchini_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🌼 【初回必須】ズッキーニの高畝定植＆仮支柱留め",
     target_crop: "ズッキーニ",
     category: "果菜",
@@ -398,6 +518,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_zucchini_pollinate",
+    season: "春夏",
+    phase: "育成・管理",
     title: "🐝 【朝限定】ズッキーニの早朝人工授粉＆適期収穫",
     target_crop: "ズッキーニ",
     category: "果菜",
@@ -419,6 +541,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 根菜類：ジャガイモ ───
   {
     id: "tpl_potato_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🥔 【初回必須】ジャガイモの種芋カット＆溝植え元肥配置",
     target_crop: "ジャガイモ",
     category: "根菜",
@@ -438,6 +562,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_potato_care",
+    season: "春夏",
+    phase: "育成・管理",
     title: "⛏️ 【大粒化】ジャガイモの芽かき＆第1回追肥土寄せ",
     target_crop: "ジャガイモ",
     category: "根菜",
@@ -457,6 +583,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_potato_harvest",
+    season: "春夏",
+    phase: "収穫・片付け",
     title: "🥔 【歓喜の収穫】ジャガイモの掘り上げ＆風乾",
     target_crop: "ジャガイモ",
     category: "根菜",
@@ -478,6 +606,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 根菜類：サトイモ ───
   {
     id: "tpl_taro_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🥔 【初回必須】サトイモの深溝植え付け＆初期潅水",
     target_crop: "サトイモ",
     category: "根菜",
@@ -497,6 +627,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_taro_care",
+    season: "春夏",
+    phase: "育成・管理",
     title: "🌾 【乾燥防止】サトイモの追肥・土寄せ＆敷き藁マルチ",
     target_crop: "サトイモ",
     category: "根菜",
@@ -518,6 +650,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 根菜類：サツマイモ ───
   {
     id: "tpl_sweetpotato_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🍠 【初回必須】サツマイモの高畝成形＆船底挿し定植",
     target_crop: "サツマイモ",
     category: "根菜",
@@ -537,6 +671,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_sweetpotato_care",
+    season: "春夏",
+    phase: "育成・管理",
     title: "🌿 【つるボケ防止】サツマイモのつる返し＆除草",
     target_crop: "サツマイモ",
     category: "根菜",
@@ -558,6 +694,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 根菜類：秋冬ダイコン ───
   {
     id: "tpl_radish_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "⚪ 【初回必須】ダイコンの点まき・鎮圧＆不織布ベタがけ",
     target_crop: "秋冬ダイコン",
     category: "根菜",
@@ -577,6 +715,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_radish_care",
+    season: "秋冬",
+    phase: "育成・管理",
     title: "✂️ 【一本立ち】ダイコンの間引き・追肥＆青首土寄せ",
     target_crop: "秋冬ダイコン",
     category: "根菜",
@@ -598,6 +738,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 根菜類：秋ニンジン ───
   {
     id: "tpl_carrot_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🥕 【初回必須】ニンジンの浅溝筋まき＆遮光ネット保湿",
     target_crop: "秋ニンジン",
     category: "根菜",
@@ -617,6 +759,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_carrot_care",
+    season: "秋冬",
+    phase: "育成・管理",
     title: "✂️ 【美肌化】ニンジンの第2回間引き＆肩の土寄せ",
     target_crop: "秋ニンジン",
     category: "根菜",
@@ -638,6 +782,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 根菜類：コカブ ───
   {
     id: "tpl_turnip_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "⚪ 【初回必須】コカブの筋まき＆サンサンネット完全トンネル",
     target_crop: "コカブ",
     category: "根菜",
@@ -659,6 +805,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：キャベツ ───
   {
     id: "tpl_cabbage_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🥬 【初回必須】キャベツ健苗定植＆防虫ネット完全密閉",
     target_crop: "キャベツ",
     category: "葉菜",
@@ -678,6 +826,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_cabbage_care",
+    season: "秋冬",
+    phase: "育成・管理",
     title: "🥬 【外葉拡大】キャベツ結球初期の追肥・除草中耕",
     target_crop: "キャベツ",
     category: "葉菜",
@@ -699,6 +849,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：ブロッコリー ───
   {
     id: "tpl_broccoli_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🥦 【初回必須】ブロッコリーの定植＆防虫ネットガード",
     target_crop: "ブロッコリー",
     category: "葉菜",
@@ -718,6 +870,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_broccoli_harvest",
+    season: "秋冬",
+    phase: "収穫・片付け",
     title: "🥦 【頂花蕾収穫】斜めカット＆側花蕾発生追肥",
     target_crop: "ブロッコリー",
     category: "葉菜",
@@ -739,6 +893,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：ハクサイ ───
   {
     id: "tpl_chinese_cabbage_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🥬 【初回必須】ハクサイ定植＆防虫トンネル密閉",
     target_crop: "ハクサイ",
     category: "葉菜",
@@ -758,6 +914,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_chinese_cabbage_tie",
+    season: "秋冬",
+    phase: "育成・管理",
     title: "🥋 【伝統の防寒】ハクサイの冬越し外葉結束",
     target_crop: "ハクサイ",
     category: "葉菜",
@@ -779,6 +937,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：ホウレンソウ ───
   {
     id: "tpl_spinach_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🍃 【初回必須】石灰中和＆ホウレンソウ密着条まき",
     target_crop: "ホウレンソウ",
     category: "葉菜",
@@ -800,6 +960,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：コマツナ ───
   {
     id: "tpl_komatsuna_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🥬 【初回必須】コマツナの筋まき＆サンサンネットベタがけ",
     target_crop: "コマツナ",
     category: "葉菜",
@@ -821,6 +983,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：長ネギ ───
   {
     id: "tpl_leek_start",
+    season: "春夏",
+    phase: "準備・植付",
     title: "🥢 【初回必須】長ネギの30cm深溝掘り・苗直立並べ＆敷きわら",
     target_crop: "ネギ",
     category: "葉菜",
@@ -840,6 +1004,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_leek_care",
+    season: "秋冬",
+    phase: "育成・管理",
     title: "👔 【軟白化】長ネギの第2回追肥＆葉分岐下土寄せ",
     target_crop: "ネギ",
     category: "葉菜",
@@ -861,6 +1027,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 葉菜類：タマネギ ───
   {
     id: "tpl_onion_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🧅 【初回必須】穴あきマルチ浅植え＆鎮圧",
     target_crop: "タマネギ",
     category: "葉菜",
@@ -880,6 +1048,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_onion_harvest",
+    season: "春夏",
+    phase: "収穫・片付け",
     title: "🧅 【倒伏判定】タマネギの収穫・天日干し＆吊るし玉結束",
     target_crop: "タマネギ",
     category: "葉菜",
@@ -901,6 +1071,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   // ─── 伝統野菜：のらぼう菜（多摩特産・江戸東京野菜） ───
   {
     id: "tpl_norabona_start",
+    season: "秋冬",
+    phase: "準備・植付",
     title: "🏛️ 【初回必須】多摩伝統のらぼう菜の秋定植＆防虫ガード",
     target_crop: "のらぼう菜",
     category: "葉菜",
@@ -920,6 +1092,8 @@ export const VEGETABLE_TASK_TEMPLATES: TaskTemplate[] = [
   },
   {
     id: "tpl_norabona_harvest",
+    season: "春夏",
+    phase: "収穫・片付け",
     title: "🌿 【ポキポキ収穫】のらぼう菜の主茎摘心＆春のわき芽収穫",
     target_crop: "のらぼう菜",
     category: "葉菜",
