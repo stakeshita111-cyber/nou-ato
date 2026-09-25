@@ -448,20 +448,15 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         }
       }
 
-      // 1. crop_records から生徒の観察ノート・現場報告を取得（自農園・自生徒に厳密制限）
-      let recQuery = supabase
+      // 1. crop_records から生徒の観察ノート・現場報告を取得（全件取得し、メモリ上で自農園・自生徒へ安全マッピング）
+      const { data: recData, error: recError } = await supabase
         .from("crop_records")
-        .select("*");
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (farmId) {
-        if (myStudentIds.length > 0) {
-          recQuery = recQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(",")})`);
-        } else {
-          recQuery = recQuery.eq("farm_id", farmId);
-        }
+      if (recError) {
+        console.warn("fetchCropRecords crop_records query error:", recError);
       }
-
-      const { data: recData } = await recQuery.order("created_at", { ascending: false });
 
       // 2. journals から生徒の手入力日誌・相談メモを取得（自農園・自生徒に厳密制限）
       let jQuery = supabase
@@ -496,16 +491,32 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         });
       }
 
-      // 4. ユーザー名 (users) の取得
+      // 4. 区画情報 (farm_plots) を取得
+      const { data: plotsData } = await supabase
+        .from("farm_plots")
+        .select("id, code, student_id");
+
+      const plotMap: { [id: string]: any } = {};
+      if (plotsData) {
+        plotsData.forEach((p: any) => {
+          if (p.id) plotMap[p.id] = p;
+        });
+      }
+
+      // 5. ユーザー名 (users) の取得および他農園生徒の判定
       const { data: usersData } = await supabase
         .from("users")
-        .select("id, display_name, email");
+        .select("id, display_name, email, farm_id, role");
 
       const userMap: { [key: string]: string } = {};
+      const otherFarmStudentIds = new Set<string>();
       if (usersData) {
         usersData.forEach((u: any) => {
           if (u.id) {
-            userMap[u.id] = u.display_name || (u.email ? u.email.split("@")[0] : "受講生徒");
+            userMap[u.id] = u.display_name || (u.email ? u.email.split("@")[0] : "受講生");
+            if (farmId && u.farm_id && u.farm_id !== farmId && u.role === "student") {
+              otherFarmStudentIds.add(u.id);
+            }
           }
         });
       }
@@ -517,20 +528,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           const rawDate = r.created_at || r.date;
           const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
           const bedInfo = r.bed_id ? bedMap[r.bed_id] : null;
-          const resolvedStudentId = r.student_id || bedInfo?.student_id;
+          const plotInfo = bedInfo?.plot_id ? plotMap[bedInfo.plot_id] : null;
+          const resolvedStudentId = r.student_id || bedInfo?.student_id || plotInfo?.student_id;
 
-          // 🌟 自農園に所属する生徒の記録のみに厳密制限 🌟
-          if (farmId) {
-            const isMyStudent = resolvedStudentId && myStudentIds.includes(resolvedStudentId);
-            const isMyFarm = r.farm_id === farmId;
-            if (!isMyStudent && !isMyFarm) return;
+          // 🌟 他農園生徒の記録は除外（自農園生徒、または未割当・共通区画の記録を表示） 🌟
+          if (resolvedStudentId && otherFarmStudentIds.has(resolvedStudentId)) {
+            return;
           }
 
           const studentName =
             r.student_name ||
             bedInfo?.student_name ||
             (resolvedStudentId && userMap[resolvedStudentId]) ||
-            "受講生徒";
+            "受講生";
 
           let cleanNotes = r.notes || "観察記録を送信しました。";
           let imgUrl = r.photo_url || r.image_url || undefined;
@@ -542,6 +552,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
           const derivedPlotCode =
             r.plot_code ||
+            plotInfo?.code ||
             (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : "B3");
 
           allRecords.push({
@@ -549,7 +560,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             id: r.id || `rec_${idx}`,
             studentName,
             studentAvatar: studentName.slice(0, 1),
-            title: Array.isArray(r.work_types) ? r.work_types.join(", ") : (r.crop_name || "作業記録"),
+            title: Array.isArray(r.work_types) && r.work_types.length > 0
+              ? r.work_types.join(", ")
+              : (r.crop_name && r.crop_name !== "未確定" ? r.crop_name : "観察記録"),
             content: cleanNotes,
             imageUrl: imgUrl,
             harvestAmount: r.harvest_amount || undefined,
@@ -557,7 +570,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             timeStr,
             timestamp,
             plotCode: derivedPlotCode,
-            farmId: r.farm_id,
+            farmId: farmId || undefined,
           });
         });
       }
@@ -577,12 +590,12 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             if (farmId) {
               const isMyStudent = j.student_id && myStudentIds.includes(j.student_id);
               const isMyFarm = j.farm_id === farmId;
-              if (!isMyStudent && !isMyFarm) return;
+              if (!isMyStudent && !isMyFarm && otherFarmStudentIds.has(j.student_id)) return;
             }
 
             const rawDate = j.created_at;
             const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
-            const studentName = (j.student_id && userMap[j.student_id]) || "受講生徒";
+            const studentName = (j.student_id && userMap[j.student_id]) || "受講生";
 
             let cleanContent = j.content || "";
             let imgUrl = j.image_url || j.photo_url || undefined;

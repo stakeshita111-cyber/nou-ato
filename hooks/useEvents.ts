@@ -65,13 +65,10 @@ export function useEvents(farmId?: string) {
         setEvents(JSON.parse(saved));
       }
 
-      let eQuery = supabase
+      const { data } = await supabase
         .from("events")
-        .select("*");
-      if (fid) {
-        eQuery = eQuery.or(`farm_id.eq.${fid},farm_id.is.null`);
-      }
-      const { data } = await eQuery.order("date", { ascending: true });
+        .select("*")
+        .order("date", { ascending: true });
 
       if (data && data.length > 0) {
         const formatted: EventItem[] = data.map((d: any) => ({

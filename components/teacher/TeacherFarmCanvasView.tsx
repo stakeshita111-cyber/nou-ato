@@ -439,7 +439,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
         const oldB = toPlot.beds[i];
         const newBedId = toBedsForFrom[i]?.id;
         if (oldB?.id && newBedId) {
-          await supabase.from("crop_records").update({ bed_id: newBedId, plot_code: fromAddr }).eq("bed_id", oldB.id);
+          await supabase.from("crop_records").update({ bed_id: newBedId }).eq("bed_id", oldB.id);
         }
       }
       // 3. 一時退避していた fromBeds の crop_records を toAddr の bed_id へ更新
@@ -447,7 +447,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
         const tempId = `temp_swap_${toAddr}_${i + 1}`;
         const newBedId = fromBedsForTo[i]?.id;
         if (newBedId) {
-          await supabase.from("crop_records").update({ bed_id: newBedId, plot_code: toAddr }).eq("bed_id", tempId);
+          await supabase.from("crop_records").update({ bed_id: newBedId }).eq("bed_id", tempId);
         }
       }
     } catch (e) {
@@ -781,7 +781,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     setActiveFarmId(nextFarms[0].id);
 
     try {
-      await supabase.from("farm_plots").delete().eq("farm_id", activeFarmId);
       await supabase.from("farms").delete().eq("id", activeFarmId);
     } catch (err) {
       console.error(err);

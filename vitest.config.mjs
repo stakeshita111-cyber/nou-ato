@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    setupFiles: ["./test/setup.ts"],
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "https://rarwrsrmkubhcndfpokl.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_fxOlNtgJTxAZNzP6QxN-Uw_8SwxpgIe",

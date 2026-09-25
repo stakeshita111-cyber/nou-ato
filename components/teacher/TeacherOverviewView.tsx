@@ -59,16 +59,12 @@ export default function TeacherOverviewView({
   const fetchCounts = async (targetFarmId?: string) => {
     const currentFid = targetFarmId || farmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
 
-    // 1. 本日以降のイベント・講習予約件数 (自農園)
+    // 1. 本日以降のイベント・講習予約件数
     const todayStr = new Date().toISOString().split("T")[0];
-    let eQuery = supabase
+    const { count: eCount } = await supabase
       .from("events")
       .select("*", { count: "exact" })
       .gte("date", todayStr);
-    if (currentFid) {
-      eQuery = eQuery.or(`farm_id.eq.${currentFid},farm_id.is.null`);
-    }
-    const { count: eCount } = await eQuery;
 
     if (eCount !== null && eCount !== undefined) {
       setEventsCount(eCount);
@@ -88,14 +84,10 @@ export default function TeacherOverviewView({
       }
     }
 
-    // 2. 本日の作業記録件数 (crop_records) (自農園)
-    let cQuery = supabase
+    // 2. 本日の作業記録件数 (crop_records)
+    const { count: cCount } = await supabase
       .from("crop_records")
       .select("*", { count: "exact" });
-    if (currentFid) {
-      cQuery = cQuery.eq("farm_id", currentFid);
-    }
-    const { count: cCount } = await cQuery;
     
     if (cCount !== null && cCount !== undefined) {
       setReportCount(cCount);

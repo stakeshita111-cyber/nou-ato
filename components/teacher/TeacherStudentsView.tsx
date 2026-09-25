@@ -303,15 +303,14 @@ export default function TeacherStudentsView() {
       // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
       let bedMap: Record<string, string> = {};
       try {
-        let bedsQuery = supabase.from("farm_beds").select("*");
-        if (effectiveFarmId) {
-          bedsQuery = bedsQuery.eq("farm_id", effectiveFarmId);
-        }
-        const { data: dbBeds } = await bedsQuery;
+        const { data: dbBeds } = await supabase.from("farm_beds").select("*");
         if (dbBeds && dbBeds.length > 0) {
           dbBeds.forEach((b: any) => {
-            if (b.user_id) bedMap[b.user_id] = b.plot_name || `区画 ${b.bed_number || 1}`;
-            if (b.user_name) bedMap[b.user_name] = b.plot_name || `区画 ${b.bed_number || 1}`;
+            const assignedUser = b.student_id || b.user_id;
+            const assignedName = b.student_name || b.user_name;
+            const plotLabel = b.plot_id ? b.plot_id.replace(/^plot_cell_/, "区画 ") : `畝 ${b.bed_number || 1}`;
+            if (assignedUser) bedMap[assignedUser] = plotLabel;
+            if (assignedName) bedMap[assignedName] = plotLabel;
           });
         }
       } catch (err) {
