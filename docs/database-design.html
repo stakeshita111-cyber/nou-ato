@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOU-ATO - データベース設計書 & ER図</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      flowchart: { htmlLabels: true, curve: 'basis' }
+    });
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+    body { font-family: 'Inter', 'Noto Sans JP', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <span class="w-10 h-10 rounded-2xl bg-emerald-700 text-white font-black text-xl flex items-center justify-center shadow-sm">
+          🌱
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-black text-slate-900 tracking-tight">NOU-ATO (のうあと)</h1>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">PostgreSQL / Supabase</span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">データベース設計書・完全ER図・テーブル定義書・RLS認可規約</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <span>テーブル数: 8 テーブル</span>
+        <span>•</span>
+        <span>RLS ポリシー完備</span>
+      </div>
+    </div>
+
+    <!-- 📚 関連ドキュメント・ナビゲーションタブ 📚 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3 pt-1 border-t border-slate-100 flex flex-wrap items-center gap-2 text-xs font-bold">
+      <span class="text-slate-400 font-semibold mr-1">📑 関連資料:</span>
+      <a href="review-checklist-dashboard.html" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+        ✅ オリアプレビュー項目一覧 (101項目)
+      </a>
+      <a href="database-design.html" class="px-3 py-1.5 rounded-xl bg-emerald-700 text-white shadow-xs">
+        🗄️ ER図 & テーブル定義書
+      </a>
+      <a href="api-docs.html" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+        ⚡ API仕様書 (Swagger UI)
+      </a>
+      <a href="test-plan.html" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+        🧪 完全品質検査計画書 (QA Master Plan)
+      </a>
+      <a href="architecture-map.html" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+        🗺️ システム & データフロー
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- 1. Mermaid ER図セクション -->
+    <section class="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+      <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+            🗺️ リレーショナル ER 図 (Entity Relationship Diagram)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">ユーザー、農園区画、畝、教材タスク、交換日記、イベント間の関連構造</p>
+        </div>
+        <span class="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+          Mermaid Live Rendered
+        </span>
+      </div>
+
+      <div class="overflow-x-auto py-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+        <pre class="mermaid text-xs">
+erDiagram
+    users ||--o{ farms : "owns"
+    users ||--o{ farm_beds : "assigned_to"
+    users ||--o{ student_tasks : "assigned_to"
+    users ||--o{ journals : "authors"
+    farms ||--o{ farm_plots : "contains"
+    farms ||--o{ tasks : "owns"
+    farm_plots ||--o{ farm_beds : "contains"
+    tasks ||--o{ student_tasks : "templates"
+    student_tasks ||--o{ journals : "reports"
+
+    users {
+        uuid id PK
+        varchar role "teacher | student"
+        varchar display_name
+        varchar email
+        varchar line_user_id
+        uuid farm_id FK
+        timestamptz deleted_at
+    }
+
+    farms {
+        uuid id PK
+        varchar name
+        uuid owner_id FK
+    }
+
+    farm_plots {
+        uuid id PK
+        uuid farm_id FK
+        varchar name
+        varchar code
+        uuid student_id FK
+    }
+
+    farm_beds {
+        uuid id PK
+        uuid plot_id FK
+        varchar bed_number
+        uuid student_id FK
+        varchar crop_name
+        integer progress_percent
+        varchar status "active|harvested"
+    }
+
+    tasks {
+        uuid id PK
+        uuid farm_id FK
+        varchar title
+        varchar category
+        varchar target_crop
+        boolean require_photo
+        integer exp
+    }
+
+    student_tasks {
+        uuid id PK
+        uuid student_id FK
+        uuid base_task_id FK
+        varchar title
+        varchar status "todo|completed"
+        timestamptz completed_at
+    }
+
+    journals {
+        uuid id PK
+        uuid student_id FK
+        uuid student_task_id FK
+        text content
+        text reply
+        boolean is_approved
+    }
+
+    events {
+        uuid id PK
+        varchar title
+        date date
+        varchar location
+        integer capacity
+    }
+        </pre>
+      </div>
+    </section>
+
+    <!-- 2. 全テーブル定義書 -->
+    <section class="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-6">
+      <div class="border-b border-slate-100 pb-3">
+        <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+          📑 詳細テーブル定義書 (Table Definitions)
+        </h2>
+        <p class="text-xs text-slate-500 mt-0.5">全8テーブルのカラム名、データ型、NULL制約、外部キー、詳細説明</p>
+      </div>
+
+      <!-- users -->
+      <div class="space-y-2">
+        <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+          1. users (ユーザー・受講生・講師プロフィール)
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse border border-slate-200 rounded-xl overflow-hidden">
+            <thead class="bg-slate-100 text-slate-700 font-bold">
+              <tr>
+                <th class="p-2.5 border-b border-slate-200">カラム名</th>
+                <th class="p-2.5 border-b border-slate-200">型</th>
+                <th class="p-2.5 border-b border-slate-200 text-center">PK/FK</th>
+                <th class="p-2.5 border-b border-slate-200 text-center">Nullable</th>
+                <th class="p-2.5 border-b border-slate-200">説明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">id</td><td class="p-2.5 font-mono">uuid</td><td class="p-2.5 text-center font-bold text-blue-600">PK / FK</td><td class="p-2.5 text-center">No</td><td class="p-2.5 text-slate-600">Supabase auth.users(id) への参照</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">role</td><td class="p-2.5 font-mono">varchar(20)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">No</td><td class="p-2.5 text-slate-600">'teacher' (講師) または 'student' (受講生)</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">display_name</td><td class="p-2.5 font-mono">varchar(100)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">受講生・講師の表示氏名</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">email</td><td class="p-2.5 font-mono">varchar(255)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">連絡用メールアドレス</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">line_user_id</td><td class="p-2.5 font-mono">varchar(100)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">LINE OAuth連携ID</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">farm_id</td><td class="p-2.5 font-mono">uuid</td><td class="p-2.5 text-center font-bold text-amber-600">FK</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">farms(id) への外部キー</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">deleted_at</td><td class="p-2.5 font-mono">timestamptz</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">退会・論理削除日時 (即時アクセス遮断)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- farm_beds -->
+      <div class="space-y-2 pt-4">
+        <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+          2. farm_beds (農園区画・畝データ)
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse border border-slate-200 rounded-xl overflow-hidden">
+            <thead class="bg-slate-100 text-slate-700 font-bold">
+              <tr>
+                <th class="p-2.5 border-b border-slate-200">カラム名</th>
+                <th class="p-2.5 border-b border-slate-200">型</th>
+                <th class="p-2.5 border-b border-slate-200 text-center">PK/FK</th>
+                <th class="p-2.5 border-b border-slate-200 text-center">Nullable</th>
+                <th class="p-2.5 border-b border-slate-200">説明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">id</td><td class="p-2.5 font-mono">uuid</td><td class="p-2.5 text-center font-bold text-blue-600">PK</td><td class="p-2.5 text-center">No</td><td class="p-2.5 text-slate-600">畝固有の一意ID</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">plot_id</td><td class="p-2.5 font-mono">uuid</td><td class="p-2.5 text-center font-bold text-amber-600">FK</td><td class="p-2.5 text-center">No</td><td class="p-2.5 text-slate-600">farm_plots(id) への参照</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">bed_number</td><td class="p-2.5 font-mono">varchar(50)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">No</td><td class="p-2.5 text-slate-600">畝番号・識別記号 (例: 畝-1)</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">student_id</td><td class="p-2.5 font-mono">uuid</td><td class="p-2.5 text-center font-bold text-amber-600">FK</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">利用中の受講生 users(id)</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">crop_name</td><td class="p-2.5 font-mono">varchar(100)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">栽培中の作物 (ミニトマト, きゅうり等)</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">crop_icon</td><td class="p-2.5 font-mono">varchar(20)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">作物絵文字 (🍅, 🥒等)</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">progress_percent</td><td class="p-2.5 font-mono">integer</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">Yes</td><td class="p-2.5 text-slate-600">栽培完了進捗率 (0〜100%)</td></tr>
+              <tr><td class="p-2.5 font-mono font-bold text-emerald-900">status</td><td class="p-2.5 font-mono">varchar(30)</td><td class="p-2.5 text-center">-</td><td class="p-2.5 text-center">No</td><td class="p-2.5 text-slate-600">'active' | 'harvested' | 'archived'</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- tasks & student_tasks -->
+      <div class="space-y-2 pt-4">
+        <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+          3. tasks & student_tasks (カリキュラム教材 & 個別割当タスク)
+        </h3>
+        <p class="text-xs text-slate-500">
+          講師が作成するマスター教材テンプレート (<code>tasks</code>) を基に、受講生ごとにインスタンス化されて個別進捗・現場写真・チェックリストを保持する (<code>student_tasks</code>) 設計です。
+        </p>
+      </div>
+
+      <!-- journals -->
+      <div class="space-y-2 pt-4">
+        <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+          4. journals (交換日記・AIしるべぇチャット対話ログ & 農園ナレッジ)
+        </h3>
+        <p class="text-xs text-slate-500">
+          受講生の日々の作業日誌・質問メモおよびAI相談ログを統合管理。<code>is_approved = true</code> のレコードは農園固有の推奨ナレッジとしてAIしるべぇ (RAG) の類似検索対象に自動昇格します。
+        </p>
+      </div>
+    </section>
+
+    <!-- 3. RLS ポリシー規約セクション -->
+    <section class="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+      <div class="border-b border-slate-100 pb-3">
+        <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+          🛡️ Row Level Security (RLS) ポリシー設計規準
+        </h2>
+        <p class="text-xs text-slate-500 mt-0.5">マルチテナント保護と受講生・講師のアクセス厳格分離</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-2">
+          <p class="font-black text-emerald-900">👨‍🎓 受講生 (student) 認可ルール</p>
+          <ul class="list-disc list-inside text-slate-700 space-y-1">
+            <li>自身の <code>student_id = auth.uid()</code> に一致するレコードのみ SELECT / UPDATE</li>
+            <li>論理削除済み (<code>deleted_at IS NOT NULL</code>) の場合は全操作拒絶</li>
+            <li>他生徒の非公開日誌や個人情報へのアクセスを完全遮断</li>
+          </ul>
+        </div>
+        <div class="p-4 bg-blue-50/50 border border-blue-200 rounded-2xl space-y-2">
+          <p class="font-black text-blue-900">👨‍🌾 講師 (teacher) 認可ルール</p>
+          <ul class="list-disc list-inside text-slate-700 space-y-1">
+            <li>所属農園 (<code>farm_id</code>) に紐づく全受講生・全畝・全日誌の閲覧・編集権限</li>
+            <li>受講生の日誌に対する承認 (<code>is_approved = true</code>) および返信権限</li>
+            <li>タスクテンプレートの作成・割当・編集権限</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+    <p>NOU-ATO - Experience Farming Management Platform • Database & Schema Specification</p>
+  </footer>
+</body>
+</html>

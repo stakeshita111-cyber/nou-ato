@@ -1,0 +1,38 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-check:
+    name: Production Deployment Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full Test & Typecheck
+        run: |
+          npx tsc --noEmit
+          npm run test
+
+      - name: Production Build for Vercel/Edge
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://rarwrsrmkubhcndfpokl.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_fxOlNtgJTxAZNzP6QxN-Uw_8SwxpgIe' }}
+
+      - name: Deployment Success Notification
+        run: echo "🎉 Build & Deployment pipeline verified successfully!"

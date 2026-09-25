@@ -1,10 +1,19 @@
-import { NextResponse } from "next/server";
 import {
   searchSimilarKnowledge,
   sanitizePersonalNames,
   CROPS_LIST,
   STOP_WORDS,
 } from "@/lib/rag/qaKnowledgeRetriever";
+import { ApiResponse } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
+
+interface KnowledgeMatch {
+  id: string;
+  question: string;
+  answer: string;
+  matchedKeywords: string[];
+  score: number;
+}
 
 // プリセットFAQデータ (明確な事象キーワードでのみヒット)
 const PRESET_FAQS = [
@@ -36,28 +45,24 @@ const PRESET_FAQS = [
 
 export async function POST(request: Request) {
   try {
-    const { question } = await request.json();
-    if (!question || !question.trim()) {
-      return NextResponse.json({ matches: [] });
+    const body = await request.json();
+    const { question } = body;
+    if (!question || typeof question !== "string" || !question.trim()) {
+      return ApiResponse.success({ matches: [] });
     }
 
     const qClean = question.trim();
 
     // 単なる挨拶や報告（「〜した」「〜しました」）で疑問・相談でない場合は一致なし
-    const isReportOrGreeting = /^(?:こんにちは|おはよう|お疲れ様|ありがとう|.*?(?:収穫した|とれた|採れた|植えた|買った))[！!。\s]*$/i.test(qClean) &&
+    const isReportOrGreeting =
+      /^(?:こんにちは|おはよう|お疲れ様|ありがとう|.*?(?:収穫した|とれた|採れた|植えた|買った))[！!。\s]*$/i.test(qClean) &&
       !/(?:どう|教えて|いい|なぜ|方法|コツ|時期|対策|病気|虫|肥料|水)/.test(qClean);
 
     if (isReportOrGreeting) {
-      return NextResponse.json({ matches: [] });
+      return ApiResponse.success({ matches: [] });
     }
 
-    const matches: Array<{
-      id: string;
-      question: string;
-      answer: string;
-      matchedKeywords: string[];
-      score: number;
-    }> = [];
+    const matches: KnowledgeMatch[] = [];
 
     // ユーザー質問に含まれる作物を特定
     const queryCrops = CROPS_LIST.filter((crop) => qClean.includes(crop));
@@ -66,7 +71,6 @@ export async function POST(request: Request) {
     for (const faq of PRESET_FAQS) {
       const hitKeywords = faq.keywords.filter((kw) => qClean.includes(kw));
       if (hitKeywords.length > 0) {
-        // もしユーザーが特定作物を指定している場合、一般的なFAQはスコア調整
         matches.push({
           id: faq.id,
           question: faq.question,
@@ -88,14 +92,14 @@ export async function POST(request: Request) {
             const hits = words.filter(
               (w) => qClean.includes(w) && w.length >= 2 && !STOP_WORDS.includes(w)
             );
-            const uniqueHits = Array.from(new Set([...queryCrops.filter(c => (k.question + k.answer).includes(c)), ...hits]));
+            const uniqueHits = Array.from(new Set([...queryCrops.filter((c) => (k.question + k.answer).includes(c)), ...hits]));
 
             // 意味のあるキーワードがヒットしている場合のみ追加
             if (uniqueHits.length > 0) {
               const cleanQ = sanitizePersonalNames(k.question);
               const cleanA = sanitizePersonalNames(k.answer);
               matches.push({
-                id: "db_" + ((k as any).id || Math.random().toString(36).slice(2)),
+                id: `db_${k.id || Math.random().toString(36).slice(2)}`,
                 question: cleanQ,
                 answer: cleanA,
                 matchedKeywords: uniqueHits,
@@ -111,9 +115,9 @@ export async function POST(request: Request) {
     matches.sort((a, b) => b.score - a.score);
     const topMatches = matches.slice(0, 3);
 
-    return NextResponse.json({ matches: topMatches });
-  } catch (err: any) {
-    console.error("check-knowledge error:", err);
-    return NextResponse.json({ matches: [] });
+    return ApiResponse.success({ matches: topMatches });
+  } catch (err: unknown) {
+    logger.error("check-knowledge processing error", "api/chat/check-knowledge", undefined, err);
+    return ApiResponse.success({ matches: [] });
   }
 }

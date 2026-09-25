@@ -1,33 +1,53 @@
-﻿import { NextResponse } from "next/server";
+import { ApiResponse } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
 
-let globalServerSettings: Record<string, any> = {
+interface ServerSettings {
+  showStudentTalkTab: boolean;
+  [key: string]: unknown;
+}
+
+let globalServerSettings: ServerSettings = {
   showStudentTalkTab: true,
 };
 
 export async function GET() {
   try {
-    return NextResponse.json({
+    logger.info("Fetching global server settings", "api/settings");
+    return ApiResponse.success({
       settings: globalServerSettings,
       showStudentTalkTab: globalServerSettings.showStudentTalkTab !== false,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "設定の取得に失敗しました";
+    logger.error("Failed to fetch settings", "api/settings", undefined, err);
+    return ApiResponse.internalError(errorMsg);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as Partial<ServerSettings>;
+    if (!body || typeof body !== "object") {
+      return ApiResponse.badRequest("リクエストボディが不正です");
+    }
+
     globalServerSettings = {
       ...globalServerSettings,
       ...body,
     };
-    return NextResponse.json({
+
+    logger.info("Updated global server settings", "api/settings", {
+      showStudentTalkTab: globalServerSettings.showStudentTalkTab,
+    });
+
+    return ApiResponse.success({
       success: true,
       settings: globalServerSettings,
       showStudentTalkTab: globalServerSettings.showStudentTalkTab !== false,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "設定の更新に失敗しました";
+    logger.error("Failed to update settings", "api/settings", undefined, err);
+    return ApiResponse.internalError(errorMsg);
   }
 }

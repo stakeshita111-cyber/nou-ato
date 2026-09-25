@@ -1,10 +1,20 @@
-import { NextResponse } from "next/server";
-import { generateRagAnswer, ChatHistoryItem } from "@/lib/rag/qaKnowledgeRetriever";
+import { generateRagAnswer, ChatHistoryItem, ReferencedQA } from "@/lib/rag/qaKnowledgeRetriever";
 import { createClient } from "@/utils/supabase/server";
+import { ApiResponse } from "@/lib/apiResponse";
+import { logger } from "@/lib/logger";
+
+interface ChatRequestBody {
+  message?: string;
+  studentName?: string;
+  studentId?: string | null;
+  history?: ChatHistoryItem[];
+  isMemoOnly?: boolean;
+  isSpell?: boolean;
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as ChatRequestBody;
     const {
       message,
       studentName = "受講生",
@@ -15,7 +25,7 @@ export async function POST(request: Request) {
     } = body;
 
     if (!message || !message.trim()) {
-      return NextResponse.json({ error: "メッセージが空です" }, { status: 400 });
+      return ApiResponse.badRequest("メッセージが空です");
     }
 
     const supabase = await createClient();
@@ -37,7 +47,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (authErr) {
-      console.warn("Auth user resolution in /api/chat/rag:", authErr);
+      logger.warn("Auth user resolution in /api/chat/rag:", "api/chat/rag", undefined, authErr);
     }
 
     if (!effectiveStudentId) {
@@ -45,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     let reply = "";
-    let referencedQa: any[] = [];
+    let referencedQa: ReferencedQA[] = [];
 
     // 🌟 1. 秘密の呪文の場合 🌟
     if (isSpell) {
@@ -81,22 +91,20 @@ export async function POST(request: Request) {
       ]);
 
       if (insertErr) {
-        console.error("journals insert error:", insertErr);
+        logger.error("journals insert error:", "api/chat/rag", undefined, insertErr);
       }
     } catch (dbErr) {
-      console.warn("journals insert exception:", dbErr);
+      logger.warn("journals insert exception:", "api/chat/rag", undefined, dbErr);
     }
 
-    return NextResponse.json({
+    return ApiResponse.success({
       reply,
       referencedQa,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
-    console.error("API /api/chat/rag error:", error);
-    return NextResponse.json(
-      { error: error.message || "チャット回答生成中にエラーが発生しました" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : "チャット回答生成中にエラーが発生しました";
+    logger.error("API /api/chat/rag error", "api/chat/rag", undefined, error);
+    return ApiResponse.internalError(errorMsg);
   }
 }

@@ -1,0 +1,96 @@
+{
+  "info": {
+    "_postman_id": "nou-ato-api-collection-v1",
+    "name": "NOU-ATO REST API Collection",
+    "description": "体験農業支援アプリ「NOU-ATO」の全APIエンドポイントコレクションです。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "AI相談 (RAG) - チャット質問",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"トマトの脇芽かきはいつ行うべきですか？\",\n  \"studentName\": \"竹下 翔\",\n  \"studentId\": null,\n  \"history\": [],\n  \"isMemoOnly\": false,\n  \"isSpell\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/chat/rag",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "chat", "rag"]
+        },
+        "description": "Gemini 1.5 Flash-Lite と農園ナレッジを組み合わせたAIしるべぇチャット回答を生成します。"
+      }
+    },
+    {
+      "name": "ナレッジリアルタイム照合 (Check Knowledge)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"追肥のタイミングやおすすめのやり方を教えてください\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/chat/check-knowledge",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "chat", "check-knowledge"]
+        },
+        "description": "入力テキストから作物品種とキーワードを判定し、FAQおよび過去承認日誌から類似ノウハウを即時返却します。"
+      }
+    },
+    {
+      "name": "システム設定 - 取得",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/settings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "settings"]
+        },
+        "description": "生徒画面のAI相談タブ表示フラグなどのシステム設定を取得します。"
+      }
+    },
+    {
+      "name": "システム設定 - 更新",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"showStudentTalkTab\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/settings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "settings"]
+        },
+        "description": "講師画面からシステム設定を動的に更新します。"
+      }
+    }
+  ]
+}

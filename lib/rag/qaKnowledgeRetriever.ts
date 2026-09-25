@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
 export interface ReferencedQA {
+  id?: string;
   question: string;
   answer: string;
   similarityScore?: number;

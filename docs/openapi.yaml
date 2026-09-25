@@ -1,0 +1,302 @@
+openapi: 3.1.0
+info:
+  title: NOU-ATO (のうあと) API Specification
+  description: |
+    体験農業経営支援アプリ「NOU-ATO」のバックエンド API 仕様書です。
+    農園特化型 AI ナレッジ検索（RAG）、AI しるべぇ対話相談、システム設定などのエンドポイントを提供します。
+    エラーレスポンスは RFC 7807 (Problem Details for HTTP APIs) に準拠しています。
+  version: 1.0.0
+  contact:
+    name: NOU-ATO Development Team
+servers:
+  - url: http://localhost:3000
+    description: ローカル開発環境
+  - url: https://nou-ato.vercel.app
+    description: 本番環境 (Production)
+
+paths:
+  /api/chat/rag:
+    post:
+      summary: AI しるべぇ (農園特化型 RAG) チャット相談
+      description: |
+        受講生の農業に関する質問を受け付け、Gemini 1.5 Flash-Lite と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。
+        1日3回のチケット制に対応し、呪文による回復やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。
+      operationId: postChatRag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRagRequest'
+            example:
+              message: "ミニトマトの脇芽かきはいつ行うべきですか？"
+              studentName: "竹下 翔"
+              studentId: "usr_student_01"
+              history: []
+              isMemoOnly: false
+              isSpell: false
+      responses:
+        '200':
+          description: チャット回答生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRagResponse'
+              example:
+                reply: "🌱【脇芽かきのコツ】\nミニトマトの主枝と葉の付け根から出てくる「わき芽」は、晴れた日の午前中に手で摘み取るのがおすすめです！"
+                referencedQa:
+                  - id: "db_journal_123"
+                    question: "トマトの芽かきのやり方を教えてください"
+                    answer: "天気の良い日の午前中に手でぽきっと折るように摘み取ります。"
+                    similarityScore: 8.5
+                timestamp: "2026-09-25T12:00:00.000Z"
+        '400':
+          description: 不正なリクエスト (メッセージ未指定など)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: サーバー内部エラー (Gemini API 呼び出し失敗など)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/chat/check-knowledge:
+    post:
+      summary: 入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合
+      description: |
+        受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。
+      operationId: postCheckKnowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - question
+              properties:
+                question:
+                  type: string
+                  description: 照合対象の質問テキスト
+                  example: "きゅうりの葉っぱが黄色くなってきました"
+      responses:
+        '200':
+          description: 照合結果リストの返却
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KnowledgeMatch'
+              example:
+                matches:
+                  - id: "faq_yellow_leaf"
+                    question: "葉っぱが黄色くなってきました。どうすればいいですか？"
+                    answer: "【農園アドバイス：葉の黄変について】一番下の古い葉が黄色い場合は自然な老化ですので切り取って大丈夫です。"
+                    matchedKeywords: ["黄色", "葉が黄色"]
+                    score: 20
+
+  /api/settings:
+    get:
+      summary: システム・機能設定の取得
+      description: |
+        講師および受講生画面の機能フラグ（生徒用AI相談タブの表示/非表示など）を取得します。
+      operationId: getSettings
+      responses:
+        '200':
+          description: 設定情報の返却成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    type: object
+                    additionalProperties: true
+                  showStudentTalkTab:
+                    type: boolean
+                    description: 生徒画面の相談タブを表示するか否か
+              example:
+                settings:
+                  showStudentTalkTab: true
+                showStudentTalkTab: true
+    post:
+      summary: システム・機能設定の更新
+      description: |
+        講師による機能フラグ設定の動的更新を受け付けます。
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                showStudentTalkTab:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: 設定更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  settings:
+                    type: object
+                  showStudentTalkTab:
+                    type: boolean
+        '400':
+          description: 不正な設定パラメータ
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  schemas:
+    ChatRagRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: 受講生の質問・相談メッセージ本文
+        studentName:
+          type: string
+          description: 受講生氏名（パーソナライズ用）
+          default: "受講生"
+        studentId:
+          type: string
+          nullable: true
+          description: 受講生のユーザーUUID
+        history:
+          type: array
+          description: 直近の対話履歴
+          items:
+            type: object
+            required:
+              - role
+              - text
+            properties:
+              role:
+                type: string
+                enum: [user, model]
+              text:
+                type: string
+        isMemoOnly:
+          type: boolean
+          description: チケット0枚時のメモ専用モードフラグ
+          default: false
+        isSpell:
+          type: boolean
+          description: 秘密のチケット全回復呪文フラグ
+          default: false
+
+    ChatRagResponse:
+      type: object
+      required:
+        - reply
+        - referencedQa
+        - timestamp
+      properties:
+        reply:
+          type: string
+          description: AI またはシステムからの回答テキスト
+        referencedQa:
+          type: array
+          description: 回答生成に参照された農園ノウハウ・日誌Q&A
+          items:
+            $ref: '#/components/schemas/ReferencedQaItem'
+        timestamp:
+          type: string
+          format: date-time
+          description: 回答生成日時
+
+    ReferencedQaItem:
+      type: object
+      required:
+        - question
+        - answer
+      properties:
+        id:
+          type: string
+          nullable: true
+        question:
+          type: string
+        answer:
+          type: string
+        similarityScore:
+          type: number
+
+    KnowledgeMatch:
+      type: object
+      required:
+        - id
+        - question
+        - answer
+        - matchedKeywords
+        - score
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        answer:
+          type: string
+        matchedKeywords:
+          type: array
+          items:
+            type: string
+        score:
+          type: number
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          description: エラー種別を識別する URI リファレンス (RFC 7807)
+          example: "https://httpstatuses.com/400"
+        title:
+          type: string
+          description: 人間が理解可能なエラーの概要タイトル
+          example: "Bad Request"
+        status:
+          type: integer
+          description: HTTP ステータスコード
+          example: 400
+        detail:
+          type: string
+          description: 本エラーの具体的な発生事由
+          example: "メッセージが空です"
+        instance:
+          type: string
+          description: エラー発生リソースの URI
+        error:
+          type: string
+          description: 従来クライアントとの後方互換用エラーメッセージ
+          example: "メッセージが空です"
+        invalidParams:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              reason:
+                type: string
