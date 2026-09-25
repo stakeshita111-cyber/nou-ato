@@ -77,7 +77,9 @@ export default function StudentPage() {
           if (parsed.state?.settings?.showStudentTalkTab !== undefined) {
             return parsed.state.settings.showStudentTalkTab !== false;
           }
-        } catch (e) {}
+        } catch {
+          // ignore parsing error
+        }
       }
     }
     return true;
@@ -101,7 +103,9 @@ export default function StudentPage() {
             setTalkTabEnabled(parsed.state.settings.showStudentTalkTab !== false);
             return;
           }
-        } catch (e) {}
+        } catch {
+          // ignore parsing error
+        }
       }
       setTalkTabEnabled(useThemeStore.getState().settings.showStudentTalkTab !== false);
     };
@@ -118,7 +122,9 @@ export default function StudentPage() {
             setTalkTabEnabled(data.showStudentTalkTab !== false);
           }
         }
-      } catch (e) {}
+      } catch {
+        // ignore fetch error
+      }
     };
 
     fetchServerSettings();
@@ -141,16 +147,18 @@ export default function StudentPage() {
       }
     }
 
-    const handleCustom = (e: any) => {
-      if (e.detail?.showStudentTalkTab !== undefined) {
-        useThemeStore.setState({ settings: e.detail });
-        setTalkTabEnabled(e.detail.showStudentTalkTab !== false);
+    const handleCustom = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.showStudentTalkTab !== undefined) {
+        useThemeStore.setState({ settings: customEvent.detail });
+        setTalkTabEnabled(customEvent.detail.showStudentTalkTab !== false);
       }
     };
 
-    const handleTalkToggle = (e: any) => {
-      if (e.detail && e.detail.show !== undefined) {
-        setTalkTabEnabled(e.detail.show !== false);
+    const handleTalkToggle = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && customEvent.detail.show !== undefined) {
+        setTalkTabEnabled(customEvent.detail.show !== false);
       }
     };
 
@@ -187,7 +195,10 @@ export default function StudentPage() {
   // 相談タブがOFFに設定されたら、畑タブに自動で戻す
   useEffect(() => {
     if (!talkTabEnabled && activeTab === "talk") {
-      handleTabChange("myfarm");
+      const timer = setTimeout(() => {
+        handleTabChange("myfarm");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [talkTabEnabled, activeTab]);
 

@@ -50,6 +50,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     updatePlotBedsCount,
     updateAllUnassignedBedsCount,
     assignStudentToPlot,
+    assignAllUnassignedStudents,
     unassignStudentFromPlot,
     updatePlotStatus,
     confirmBedArchived,
@@ -1182,7 +1183,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
       {/* 🧑‍🌾 未割り当て受講生一覧 (D&Dで畑に配置) 🧑‍🌾 */}
       <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
               <span>🧑‍🌾</span>
               <span>未割り当て受講生</span>
@@ -1194,15 +1195,37 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
               ※カードをマスにドラッグして割り当て。マス同士をドラッグ＆ドロップすると区画データを相互入れ替えできます
             </span>
           </div>
-          {unassignedList.length > 5 && (
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="受講生を検索..."
-              className="text-xs border border-gray-200 rounded-xl px-2.5 py-1 w-36 focus:outline-emerald-500"
-            />
-          )}
+          <div className="flex items-center gap-2">
+            {unassignedList.length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm(`未割り当ての受講生（${unassignedList.length}名）を空いている区画へ一括割り当てしますか？`)) return;
+                  const res = await assignAllUnassignedStudents(unassignedList);
+                  if (res && res.count > 0) {
+                    setToastMessage(`⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`);
+                    setShowToast(true);
+                  } else {
+                    setToastMessage("⚠️ 割り当て可能な空き区画がありませんでした");
+                    setShowToast(true);
+                  }
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+              >
+                <span>⚡</span>
+                <span>空き区画へ一括割り当て</span>
+              </button>
+            )}
+            {unassignedList.length > 5 && (
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="受講生を検索..."
+                className="text-xs border border-gray-200 rounded-xl px-2.5 py-1 w-36 focus:outline-emerald-500"
+              />
+            )}
+          </div>
         </div>
 
         {filteredStudents.length > 0 ? (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
+import type { Provider } from "@supabase/supabase-js";
 
 interface LineLinkingCardProps {
   onStatusChange?: () => void;
@@ -13,21 +14,26 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const checkLinkingStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const lineIdentity = user.identities?.find((id) => id.provider === "custom:line" || id.provider === "line");
-        setIsLinked(!!lineIdentity);
-      }
-    } catch (err) {
-      console.error("Failed to fetch user identities:", err);
-    }
-  };
-
   useEffect(() => {
-    checkLinkingStatus();
-  }, []);
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && isMounted) {
+          const lineIdentity = user.identities?.find((id) => id.provider === "custom:line" || id.provider === "line");
+          setIsLinked(!!lineIdentity);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user identities:", err);
+      }
+    };
+
+    fetchStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase]);
 
   const handleLinkLine = async () => {
     setLoading(true);
@@ -35,7 +41,7 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
     try {
       const origin = window.location.origin;
       const { data, error } = await supabase.auth.linkIdentity({
-        provider: "custom:line" as any,
+        provider: "custom:line" as unknown as Provider,
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student`,
@@ -47,8 +53,9 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
       } else if (data?.url) {
         window.location.href = data.url;
       }
-    } catch (err: any) {
-      setMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      setMessage(`エラーが発生しました: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -75,8 +82,9 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
         setIsLinked(false);
         if (onStatusChange) onStatusChange();
       }
-    } catch (err: any) {
-      setMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      setMessage(`エラーが発生しました: ${msg}`);
     } finally {
       setLoading(false);
     }

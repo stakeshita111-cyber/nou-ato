@@ -80,20 +80,12 @@ export default function TeacherDashboardPage() {
   const [showMobilePreviewModal, setShowMobilePreviewModal] = useState(false);
   const [targetPlotCode, setTargetPlotCode] = useState<string | undefined>(undefined);
   const [targetFarmId, setTargetFarmId] = useState<string | undefined>(undefined);
-  const [targetApprovalBedId, setTargetApprovalBedId] = useState<string | undefined>(undefined);
+  const [targetApprovalBedId] = useState<string | undefined>(undefined);
 
   const handleNavigateToFarm = (plotCode?: string, farmId?: string) => {
     setTargetPlotCode(plotCode);
     setTargetFarmId(farmId);
     handleMenuChange("farm");
-  };
-
-  const handleOpenApprovalFromNotification = (plotCode: string, bedId?: string) => {
-    setTargetPlotCode(plotCode);
-    setTargetApprovalBedId(bedId);
-    handleMenuChange("farm");
-    setToastMessage(`🎯 区画 ${plotCode} の収穫完了確認画面へ移動しました`);
-    setShowToast(true);
   };
 
   // 講師ロール（role === 'teacher'）権限の厳格チェック
@@ -141,7 +133,7 @@ export default function TeacherDashboardPage() {
     };
 
     checkTeacherRole();
-  }, [router]);
+  }, [router, fetchTeacherFarms]);
 
   const handleAddNewTask = () => {
     handleMenuChange("tasks");

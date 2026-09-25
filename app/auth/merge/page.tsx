@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import type { Provider } from "@supabase/supabase-js";
 import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
@@ -14,17 +15,15 @@ function AccountMergeForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [showToast, setShowToast] = useState(false);
 
   const reason = searchParams.get("reason");
-
-  useEffect(() => {
-    if (reason === "already_registered" || reason === "identity_conflict") {
-      setToastMessage("このLINEアカウントのメールアドレスは既存のアカウントで登録されています。パスワードを入力して連携を完了してください。");
-      setShowToast(true);
-    }
-  }, [reason]);
+  const isReasonNotice = reason === "already_registered" || reason === "identity_conflict";
+  const [toastMessage, setToastMessage] = useState(
+    isReasonNotice
+      ? "このLINEアカウントのメールアドレスは既存のアカウントで登録されています。パスワードを入力して連携を完了してください。"
+      : ""
+  );
+  const [showToast, setShowToast] = useState(isReasonNotice);
 
   const handleMergeAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +36,7 @@ function AccountMergeForm() {
     setLoading(true);
     try {
       // 1. 既存のメール・パスワードで認証
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -51,8 +50,8 @@ function AccountMergeForm() {
 
       // 2. 認証完了後、LINE Identityを統合リンク
       const origin = window.location.origin;
-      const { data: linkData, error: linkError } = await supabase.auth.linkIdentity({
-        provider: 'custom:line' as any,
+      const { error: linkError } = await supabase.auth.linkIdentity({
+        provider: "custom:line" as unknown as Provider,
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student`,
@@ -72,8 +71,9 @@ function AccountMergeForm() {
       setTimeout(() => {
         router.push("/student");
       }, 900);
-    } catch (err: any) {
-      setToastMessage("エラーが発生しました: " + (err.message || ""));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage("エラーが発生しました: " + message);
       setShowToast(true);
     } finally {
       setLoading(false);

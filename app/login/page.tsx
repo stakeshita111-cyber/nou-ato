@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import type { Provider } from "@supabase/supabase-js";
 import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
@@ -72,8 +73,9 @@ export default function UnifiedLoginPage() {
       setTimeout(() => {
         router.push(destination);
       }, 800);
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -86,7 +88,7 @@ export default function UnifiedLoginPage() {
     try {
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "custom:line" as any,
+        provider: "custom:line" as unknown as Provider,
         options: {
           scopes: "openid profile email",
           redirectTo: `${origin}/auth/callback`,
@@ -97,8 +99,9 @@ export default function UnifiedLoginPage() {
         setToastMessage(`LINEログインエラー: ${error.message}`);
         setShowToast(true);
       }
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -138,6 +141,46 @@ export default function UnifiedLoginPage() {
             <div className="flex-grow border-t border-gray-200"></div>
             <span className="flex-shrink mx-3 text-[10px] text-gray-400 font-bold">または</span>
             <div className="flex-grow border-t border-gray-200"></div>
+          </div>
+        </div>
+
+        {/* 🌟 ポートフォリオ確認用・簡単デモログイン 🌟 */}
+        <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-emerald-900 flex items-center gap-1">
+              <span>⚡</span> ポートフォリオ確認用デモ
+            </span>
+            <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+              PW自動入力
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("test01@example.com");
+                setPassword("test01");
+              }}
+              className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group"
+            >
+              <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
+                <span>👨‍🌾</span> 講師
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">test01@example.com</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("test11@example.com");
+                setPassword("test11");
+              }}
+              className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group"
+            >
+              <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
+                <span>👨‍🎓</span> 受講生
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">test11@example.com</div>
+            </button>
           </div>
         </div>
 

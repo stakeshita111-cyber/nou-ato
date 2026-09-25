@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { FarmBed, CropRecord } from "@/types/farm";
 
 interface ArchivedCropsModalProps {
@@ -163,9 +164,12 @@ export default function ArchivedCropsModal({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-11 h-11 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-2xl shrink-0 overflow-hidden shadow-2xs">
                         {bed.completion_image_url ? (
-                          <img
+                          <Image
                             src={bed.completion_image_url}
                             alt="収穫写真"
+                            width={44}
+                            height={44}
+                            unoptimized
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -246,9 +250,12 @@ export default function ArchivedCropsModal({
                               <span>収穫記念写真:</span>
                             </span>
                             <div className="rounded-xl overflow-hidden border border-emerald-100 max-h-56 bg-black/5">
-                              <img
+                              <Image
                                 src={bed.completion_image_url}
                                 alt="収穫記念写真"
+                                width={600}
+                                height={400}
+                                unoptimized
                                 className="w-full h-full object-contain max-h-56 mx-auto"
                               />
                             </div>
@@ -290,9 +297,12 @@ export default function ArchivedCropsModal({
                                 </p>
                                 {rec.image_url && (
                                   <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 mt-1">
-                                    <img
+                                    <Image
                                       src={rec.image_url}
                                       alt="観察写真"
+                                      width={64}
+                                      height={64}
+                                      unoptimized
                                       className="w-full h-full object-cover"
                                     />
                                   </div>

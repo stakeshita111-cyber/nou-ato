@@ -36,8 +36,9 @@ export default function ForgotPasswordPage() {
         setToastMessage("✉️ パスワード再設定メールを送信しました！");
         setShowToast(true);
       }
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
       setLoading(false);

@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import type { Provider } from "@supabase/supabase-js";
 import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
@@ -42,7 +43,7 @@ function InviteContent() {
         const { data: dbFarms } = await supabase.from("farms").select("*");
 
         if (dbFarms && dbFarms.length > 0) {
-          const formattedFarms: FarmOption[] = dbFarms.map((f: any) => ({
+          const formattedFarms: FarmOption[] = (dbFarms as Array<{ id: string; name?: string | null; owner_name?: string | null }>).map((f) => ({
             id: f.id,
             name: f.name || "自然農園",
             owner_name: f.owner_name || "講師",
@@ -141,7 +142,7 @@ function InviteContent() {
         document.cookie = `nouato_invite_farm_id=${selectedFarmId}; path=/; max-age=3600`;
       }
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "custom:line" as any,
+        provider: "custom:line" as unknown as Provider,
         options: {
           scopes: "openid profile email",
           redirectTo: `${origin}/auth/callback?next=/student&farm_id=${encodeURIComponent(selectedFarmId)}`,
@@ -155,8 +156,9 @@ function InviteContent() {
         setToastMessage(`LINE登録エラー: ${error.message}`);
         setShowToast(true);
       }
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -243,8 +245,9 @@ function InviteContent() {
       setTimeout(() => {
         router.push("/student");
       }, 900);
-    } catch (err: any) {
-      setToastMessage("登録中にエラーが発生しました: " + (err.message || ""));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage("登録中にエラーが発生しました: " + message);
       setShowToast(true);
     } finally {
       setLoading(false);

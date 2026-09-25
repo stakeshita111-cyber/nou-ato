@@ -14,21 +14,16 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     const checkRecoverySession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setHasSession(true);
-        } else {
+        if (!session) {
           // ハッシュフラグメントに recovery token があるか、セッション変更イベントを待機
-          supabase.auth.onAuthStateChange((event, newSession) => {
-            if (event === "PASSWORD_RECOVERY" || newSession) {
-              setHasSession(true);
-            }
+          supabase.auth.onAuthStateChange(() => {
+            // recovery event listener
           });
         }
       } catch (e) {
@@ -78,8 +73,9 @@ function ResetPasswordForm() {
           router.push("/login");
         }, 1200);
       }
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
       setLoading(false);
