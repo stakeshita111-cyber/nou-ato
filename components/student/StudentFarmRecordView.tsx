@@ -133,42 +133,66 @@ export default function StudentFarmRecordView({
     }
   };
 
-  // 画像ファイル選択・自動リサイズ＆圧縮ハンドラー (スマホ写真の高画質軽量化)
+  // 画像ファイルを自動リサイズ＆圧縮（スマホ写真やスクショを超軽量JPEG変換）
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const rawResult = readerEvent.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL("image/jpeg", 0.65);
+          setImageUrl(compressed);
+        } else {
+          setImageUrl(rawResult);
+        }
+        setToastMessage("📸 写真・画像を添付しました！");
+        setShowToast(true);
+      };
+      img.src = rawResult;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 画像ファイル選択ハンドラー
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (readerEvent) => {
-        const rawResult = readerEvent.target?.result as string;
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 1000;
-          let w = img.width;
-          let h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.round((h * maxDim) / w);
-              w = maxDim;
-            } else {
-              w = Math.round((w * maxDim) / h);
-              h = maxDim;
-            }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, w, h);
-            const compressed = canvas.toDataURL("image/jpeg", 0.75);
-            setImageUrl(compressed);
-          } else {
-            setImageUrl(rawResult);
-          }
-        };
-        img.src = rawResult;
-      };
-      reader.readAsDataURL(file);
+      processImageFile(file);
+    }
+  };
+
+  // 🌟 クリップボード貼り付け (Ctrl+V / Paste) ハンドラー 🌟
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          processImageFile(file);
+          break;
+        }
+      }
     }
   };
 
@@ -226,14 +250,23 @@ export default function StudentFarmRecordView({
             myPlot?.student_id ||
             null;
 
-          await supabase.from("journals").insert([
+          // 🌟 journals.image_url は VARCHAR(255) のため、Base64画像は content に [IMG:...] 形式で安全に埋め込む 🌟
+          const hasHttpImg = imageUrl && imageUrl.startsWith("http");
+          const journalContent = imageUrl && !hasHttpImg
+            ? `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}\n[IMG:${imageUrl}]`
+            : `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`;
+
+          const { error: jErr } = await supabase.from("journals").insert([
             {
               student_id: resolvedStudentId,
-              content: `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`,
-              image_url: imageUrl || null,
+              content: journalContent,
+              image_url: hasHttpImg ? imageUrl : null,
               role: "student",
             },
           ]);
+          if (jErr) {
+            console.warn("journals insert warning:", jErr);
+          }
         } catch (e) {
           console.error("journals insert error:", e);
         }
@@ -702,7 +735,7 @@ export default function StudentFarmRecordView({
               </button>
             </div>
 
-            <form onSubmit={handleSubmitRecord} className="space-y-4 text-xs font-bold">
+            <form onSubmit={handleSubmitRecord} onPaste={handlePaste} className="space-y-4 text-xs font-bold">
               <div>
                 <label className="block text-gray-700 mb-1">対象の畝(ベッド) *</label>
                 <select
@@ -732,17 +765,39 @@ export default function StudentFarmRecordView({
 
               <div>
                 <label className="block text-gray-700 mb-1">📷 画像・写真を添付</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="w-full p-2 text-xs border border-gray-300 rounded-xl bg-gray-50 font-bold"
-                />
-                {imageUrl && (
-                  <div className="mt-2 relative w-24 h-24 rounded-xl overflow-hidden border border-emerald-300 shadow-xs">
-                    <img src={imageUrl} alt="添付写真プレビュー" className="w-full h-full object-cover" />
-                  </div>
-                )}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) processImageFile(file);
+                  }}
+                  className="space-y-1.5"
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full p-2 text-xs border border-gray-300 rounded-xl bg-gray-50 font-bold"
+                  />
+                  <p className="text-[10px] text-gray-400 font-medium">
+                    💡 端末の写真選択のほか、画像をコピーしてこの画面で貼り付け（Ctrl+V）やドラッグ＆ドロップも可能です。
+                  </p>
+                  {imageUrl && (
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-sm shrink-0">
+                        <img src={imageUrl} alt="添付写真プレビュー" className="w-full h-full object-cover" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl("")}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 text-[11px] font-bold transition cursor-pointer"
+                      >
+                        ✕ 画像を解除
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -816,9 +871,10 @@ export default function StudentFarmRecordView({
                 <textarea
                   required
                   rows={3}
-                  placeholder="本日の観察結果や作業の気づきを入力してください..."
+                  placeholder="本日の観察結果や作業の気づきを入力してください...（画像の直接貼り付け Ctrl+V も可能です）"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  onPaste={handlePaste}
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-medium text-xs leading-relaxed"
                 />
               </div>

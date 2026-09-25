@@ -1428,7 +1428,19 @@ export function useFarmManager() {
 
     const nextRecords = [newRecord, ...records];
     setRecords(nextRecords);
-    localStorage.setItem("nouato_crop_records", JSON.stringify(nextRecords));
+    try {
+      localStorage.setItem("nouato_crop_records", JSON.stringify(nextRecords));
+    } catch (quotaErr) {
+      console.warn("localStorage quota exceeded, storing lightweight records:", quotaErr);
+      try {
+        const lightweight = nextRecords.map((r) => ({
+          ...r,
+          image_url: r.image_url?.startsWith("data:") ? undefined : r.image_url,
+          notes: (r.notes || "").replace(/\[IMG:data:image\/[^\]]+\]/g, ""),
+        }));
+        localStorage.setItem("nouato_crop_records", JSON.stringify(lightweight));
+      } catch (e2) {}
+    }
 
     const imgToSave = recordData.image_url || recordData.photo_url;
     const finalNotes =
@@ -1466,7 +1478,19 @@ export function useFarmManager() {
       r.id === recordId ? { ...r, ...updatedData } : r
     );
     setRecords(nextRecords);
-    localStorage.setItem("nouato_crop_records", JSON.stringify(nextRecords));
+    try {
+      localStorage.setItem("nouato_crop_records", JSON.stringify(nextRecords));
+    } catch (quotaErr) {
+      console.warn("localStorage quota exceeded, storing lightweight records:", quotaErr);
+      try {
+        const lightweight = nextRecords.map((r) => ({
+          ...r,
+          image_url: r.image_url?.startsWith("data:") ? undefined : r.image_url,
+          notes: (r.notes || "").replace(/\[IMG:data:image\/[^\]]+\]/g, ""),
+        }));
+        localStorage.setItem("nouato_crop_records", JSON.stringify(lightweight));
+      } catch (e2) {}
+    }
 
     const imgToSave = updatedData.image_url || updatedData.photo_url;
     let baseNotes = updatedData.notes || "";

@@ -73,41 +73,61 @@ export default function TaskDetailModel({
     ));
   };
 
+  const processPhotoFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const rawResult = readerEvent.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL("image/jpeg", 0.65);
+          setPhotoPreview(compressed);
+        } else {
+          setPhotoPreview(rawResult);
+        }
+      };
+      img.src = rawResult;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (readerEvent) => {
-        const rawResult = readerEvent.target?.result as string;
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 1000;
-          let w = img.width;
-          let h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.round((h * maxDim) / w);
-              w = maxDim;
-            } else {
-              w = Math.round((w * maxDim) / h);
-              h = maxDim;
-            }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, w, h);
-            const compressed = canvas.toDataURL("image/jpeg", 0.75);
-            setPhotoPreview(compressed);
-          } else {
-            setPhotoPreview(rawResult);
-          }
-        };
-        img.src = rawResult;
-      };
-      reader.readAsDataURL(file);
+      processPhotoFile(file);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          processPhotoFile(file);
+          break;
+        }
+      }
     }
   };
 
@@ -148,7 +168,7 @@ export default function TaskDetailModel({
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* モーダル本体コンテナ */}
-      <div className="relative z-10 flex flex-col items-center max-h-[96vh] w-full max-w-md">
+      <div onPaste={handlePaste} className="relative z-10 flex flex-col items-center max-h-[96vh] w-full max-w-md">
         {/* モーダル上部コントロール */}
         <div className="w-full flex items-center justify-between pb-2 px-2 text-white">
           <div className="flex items-center space-x-2">
@@ -402,11 +422,23 @@ export default function TaskDetailModel({
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
                   {photoPreview ? (
-                    <img src={photoPreview} alt="現場写真" className="h-24 object-cover rounded-xl shadow-xs" />
+                    <div className="flex flex-col items-center gap-1.5 py-1 z-10">
+                      <img src={photoPreview} alt="現場写真" className="h-24 object-cover rounded-xl shadow-xs" />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPhotoPreview(null);
+                        }}
+                        className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        ✕ 写真を解除
+                      </button>
+                    </div>
                   ) : (
                     <div className="text-xs text-gray-500 space-y-0.5">
                       <span className="text-lg">📷</span>
-                      <p className="font-bold text-[11px]">タップして作業写真を撮影・追加</p>
+                      <p className="font-bold text-[11px]">タップして写真を選択、または貼り付け (Ctrl+V)</p>
                     </div>
                   )}
                 </div>

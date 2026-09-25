@@ -14,6 +14,7 @@ interface JournalItem {
   created_at: string;
   taskTitle?: string;
   content: string;
+  imageUrl?: string;
   reply?: string;
   is_approved: boolean;
 }
@@ -228,6 +229,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       const formatted: JournalItem[] = filteredData.map((j: any) => {
         const name = userMap[j.student_id] || "受講生徒";
+        let cleanContent = j.content || "";
+        let imgUrl = j.image_url || undefined;
+        const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
+        if (imgMatch) {
+          imgUrl = imgMatch[1];
+          cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+        }
+
         return {
           id: j.id,
           student_id: j.student_id,
@@ -242,7 +251,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               })
             : "最近",
           taskTitle: j.task_title || "💡 気づきメモ・質問相談",
-          content: j.content,
+          content: cleanContent,
+          imageUrl: imgUrl,
           reply: j.reply || "",
           is_approved: j.is_approved || false,
         };
@@ -574,15 +584,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
             const studentName = (j.student_id && userMap[j.student_id]) || "受講生徒";
 
-            if (!allRecords.some((r) => r.content === j.content)) {
+            let cleanContent = j.content || "";
+            let imgUrl = j.image_url || j.photo_url || undefined;
+            const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
+            if (imgMatch) {
+              imgUrl = imgMatch[1];
+              cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+            }
+
+            if (!allRecords.some((r) => r.content === cleanContent)) {
               allRecords.push({
                 itemType: "record",
                 id: j.id || `j_${idx}`,
                 studentName,
                 studentAvatar: studentName.slice(0, 1),
                 title: j.task_title || "💡 質問・相談日誌",
-                content: j.content,
-                imageUrl: j.image_url || j.photo_url || undefined,
+                content: cleanContent,
+                imageUrl: imgUrl,
                 dateStr: dateKey,
                 timeStr,
                 timestamp,
@@ -1040,6 +1058,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   <div className="text-sm text-gray-800 leading-relaxed bg-amber-50/40 p-5 rounded-2xl border border-amber-100 shadow-inner font-medium whitespace-pre-wrap">
                     {currentJournal.content}
                   </div>
+                  {currentJournal.imageUrl && (
+                    <div className="mt-3 max-w-sm rounded-2xl overflow-hidden border border-emerald-200 shadow-sm">
+                      <img
+                        src={currentJournal.imageUrl}
+                        alt="生徒添付写真"
+                        className="w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition"
+                        onClick={() => window.open(currentJournal.imageUrl, "_blank")}
+                      />
+                      <div className="p-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-500 font-bold text-center">
+                        📷 生徒の現場添付写真（クリックで拡大）
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 講師からの回答・返信＆編集エリア (返信と同時にナレッジ承認も可能) */}
