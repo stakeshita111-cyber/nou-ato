@@ -70,9 +70,9 @@ export default function TeacherSettingsView() {
                   className="w-7 h-7 rounded-lg font-black text-white flex items-center justify-center text-[11px] shadow-2xs shrink-0"
                   style={{ backgroundColor: settings.primaryColor }}
                 >
-                  竹下
+                  山田
                 </div>
-                <span className="font-bold text-xs text-gray-900">竹下 翔 様 (区画2)</span>
+                <span className="font-bold text-xs text-gray-900">山田 太郎 様 (区画1)</span>
               </div>
               <span className="text-[11px] font-bold text-emerald-950 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 📅 {formatDate(sampleDate, settings.dateFormat)}

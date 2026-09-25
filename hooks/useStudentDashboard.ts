@@ -9,6 +9,7 @@ export function useStudentDashboard() {
   const [newJournal, setNewJournal] = useState("");
   const [user, setUser] = useState<any>(null);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const DEFAULT_STUDENT_TASKS = [
     {
@@ -36,7 +37,10 @@ export function useStudentDashboard() {
   ];
 
   useEffect(() => {
+    let isInitial = true;
     const fetchData = async () => {
+      const startTime = Date.now();
+      const minDisplayTime = isInitial ? 600 : 0; // 初回ロード時のみ芽が出るアニメーションを心地よく見せる
       try {
         // 0. 一括配信 (broadcasts) を LocalStorage & DB からロード
         const savedBcStr = typeof window !== "undefined" ? localStorage.getItem("nouato_broadcast_announcements") : null;
@@ -273,6 +277,15 @@ export function useStudentDashboard() {
       } catch (e) {
         console.error("useStudentDashboard fetchData error:", e);
         setTasks([]);
+      } finally {
+        if (minDisplayTime > 0) {
+          const elapsed = Date.now() - startTime;
+          if (elapsed < minDisplayTime) {
+            await new Promise((res) => setTimeout(res, minDisplayTime - elapsed));
+          }
+        }
+        setIsLoading(false);
+        isInitial = false;
       }
     };
 
@@ -457,7 +470,7 @@ export function useStudentDashboard() {
   const addJournal = async () => {
     if (!newJournal.trim()) return;
 
-    const studentId = user?.id || "acf193c5-f6b4-4514-93a4-958eba0e0c38";
+    const studentId = user?.id || null;
     const contentToSave = newJournal.trim();
 
     try {
@@ -511,5 +524,6 @@ export function useStudentDashboard() {
     completeTask,
     uncompleteTask,
     addJournal,
+    isLoading,
   };
 }

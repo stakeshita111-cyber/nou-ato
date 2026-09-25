@@ -204,7 +204,7 @@ export function useFarmManager() {
         });
         usersList = filtered;
         setSupabaseStudents(
-          usersList.map((u) => ({ id: u.id, full_name: u.display_name, role: u.role }))
+          usersList.map((u) => ({ id: u.id, full_name: u.display_name || "受講生", role: u.role }))
         );
       } else {
         setSupabaseStudents([]);
@@ -1473,7 +1473,8 @@ export function useFarmManager() {
   ) => {
     const todayStr = new Date().toLocaleDateString("ja-JP");
     let targetCropName = "未確定 🌱";
-    let targetStudentName = "竹下 翔";
+    let targetStudentName = "受講生徒";
+    let targetStudentId: string | null = null;
     let targetPlotCode = "C3";
     let targetBedNum = 1;
 
@@ -1486,7 +1487,8 @@ export function useFarmManager() {
 
       if (isMatchPlot) {
         targetPlotCode = plot.code || "C3";
-        targetStudentName = plot.student_name || "竹下 翔";
+        targetStudentName = plot.student_name || "受講生徒";
+        targetStudentId = plot.student_id || null;
 
         const nextBeds = (plot.beds || []).map((bed) => {
           const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
@@ -1495,6 +1497,8 @@ export function useFarmManager() {
           if (isMatchBed) {
             targetCropName = bed.crop_name || "未確定 🌱";
             targetBedNum = bed.bed_number;
+            if (bed.student_id) targetStudentId = bed.student_id;
+            if (bed.student_name) targetStudentName = bed.student_name;
             return {
               ...bed,
               status: "completed_pending" as const,
@@ -1518,7 +1522,7 @@ export function useFarmManager() {
     try {
       await supabase.from("journals").insert([
         {
-          student_id: targetStudentName.includes("竹下") ? "acf193c5-f6b4-4514-93a4-958eba0e0c38" : null,
+          student_id: targetStudentId,
           content: `【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum} (${targetCropName}) の収穫が完了しました！\n収穫量: ${details.totalHarvest || "未記載"}\n振り返り: ${details.completionNotes || "順調に収穫できました"}`,
           image_url: details.imageUrl || null,
           role: "student",
@@ -1721,12 +1725,12 @@ export function useFarmManager() {
   const rejectBedCompletion = async (plotId: string, bedId: string, rejectReason: string = "内容の再確認をお願いします") => {
     let targetPlotCode = "C3";
     let targetBedNum = 1;
-    let targetStudentName = "竹下 翔";
+    let targetStudentName = "受講生徒";
 
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId || plot.code === plotId) {
         targetPlotCode = plot.code;
-        targetStudentName = plot.student_name || "竹下 翔";
+        targetStudentName = plot.student_name || "受講生徒";
         const nextBeds = (plot.beds || []).map((bed) => {
           const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
           if (bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId)) {

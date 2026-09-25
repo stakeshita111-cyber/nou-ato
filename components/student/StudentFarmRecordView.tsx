@@ -54,12 +54,10 @@ export default function StudentFarmRecordView({
             (p.student_name === studentName || p.student_name.includes(studentName) || studentName.includes(p.student_name))
         )
       : null) ||
-    // 3. 未ログイン/デフォルト時のフォールバック (竹下翔アカウント専用)
-    (studentName && (studentName.includes("竹下") || studentId === "acf193c5-f6b4-4514-93a4-958eba0e0c38")
-      ? plots.find((p) => !p.is_vacant && (p.student_id === "acf193c5-f6b4-4514-93a4-958eba0e0c38" || p.student_name?.includes("竹下"))) ||
-        plots.find((p) => p.code === "C2") ||
-        plots.find((p) => p.code === "C3")
-      : null);
+    // 3. 未ログイン/デフォルト時のフォールバック (最初の利用可能プロット)
+    plots.find((p) => !p.is_vacant) ||
+    plots[0] ||
+    null;
 
   const plotCode = myPlot?.code || "A1";
   const defaultBedCount = (myPlot?.beds && myPlot.beds.length > 0) ? myPlot.beds.length : 7;
@@ -224,9 +222,9 @@ export default function StudentFarmRecordView({
         try {
           const resolvedStudentId =
             studentId ||
-            ((studentName?.includes("竹下") || studentName === "竹下翔" || studentName === "竹下 翔")
-              ? "acf193c5-f6b4-4514-93a4-958eba0e0c38"
-              : null);
+            (currentBed as any)?.student_id ||
+            myPlot?.student_id ||
+            null;
 
           await supabase.from("journals").insert([
             {

@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     if (!effectiveStudentId) {
-      effectiveStudentId = "acf193c5-f6b4-4514-93a4-958eba0e0c38";
+      effectiveStudentId = null;
     }
 
     let reply = "";

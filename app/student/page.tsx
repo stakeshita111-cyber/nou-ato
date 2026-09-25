@@ -14,6 +14,7 @@ import TaskDetailModel from "@/components/student/TaskDetailModel";
 import Toast from "@/components/ui/Toast";
 import WeatherWidget from "@/components/ui/WeatherWidget";
 import EventCalendar from "@/components/ui/EventCalendar";
+import { SproutLoader } from "@/components/SproutLoader";
 
 export default function StudentPage() {
   const router = useRouter();
@@ -29,14 +30,39 @@ export default function StudentPage() {
     completeTask,
     uncompleteTask,
     addJournal,
+    isLoading,
   } = useStudentDashboard();
 
   const { events, reserveEvent } = useEvents();
 
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
-  const [activeTab, setActiveTab] = useState("myfarm");
+  const VALID_STUDENT_TABS = ["myfarm", "weather", "events", "talk", "feed", "library"];
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get("tab");
+      if (tabParam && VALID_STUDENT_TABS.includes(tabParam)) {
+        return tabParam;
+      }
+      const savedTab = sessionStorage.getItem("nouato_student_active_tab");
+      if (savedTab && VALID_STUDENT_TABS.includes(savedTab)) {
+        return savedTab;
+      }
+    }
+    return "myfarm";
+  });
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("nouato_student_active_tab", newTab);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", newTab);
+      window.history.replaceState(null, "", url.toString());
+    }
+  };
   
   // 🌟 クライアント初期化時に即座にLocalStorageから判定 🌟
   const [talkTabEnabled, setTalkTabEnabled] = useState<boolean>(() => {
@@ -160,7 +186,7 @@ export default function StudentPage() {
   // 相談タブがOFFに設定されたら、畑タブに自動で戻す
   useEffect(() => {
     if (!talkTabEnabled && activeTab === "talk") {
-      setActiveTab("myfarm");
+      handleTabChange("myfarm");
     }
   }, [talkTabEnabled, activeTab]);
 
@@ -169,7 +195,7 @@ export default function StudentPage() {
     ? user.name
     : user?.email
     ? user.email
-    : "佐藤 健太";
+    : "受講生";
 
   // タスク完了トリガー
   const handleCompleteTask = async (id: string) => {
@@ -217,6 +243,11 @@ export default function StudentPage() {
       router.push("/login");
     }, 800);
   };
+
+  // 🌟 データ読み込み中は愛らしい芽吹きローダーを表示 🌟
+  if (isLoading) {
+    return <SproutLoader fullScreen size={80} />;
+  }
 
   return (
     <div className={`bg-[#f8faf7] flex flex-col items-center justify-between font-sans text-gray-800 ${
@@ -384,7 +415,7 @@ export default function StudentPage() {
       <footer className="w-full max-w-md bg-white border-t border-gray-200 fixed bottom-0 z-20 px-2 py-2 flex items-center justify-around shadow-lg">
         {/* 🌟 1. 畑 🌟 */}
         <button
-          onClick={() => setActiveTab("myfarm")}
+          onClick={() => handleTabChange("myfarm")}
           className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
             activeTab === "myfarm" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
           }`}
@@ -395,7 +426,7 @@ export default function StudentPage() {
 
         {/* 🌟 2. 天気 🌟 */}
         <button
-          onClick={() => setActiveTab("weather")}
+          onClick={() => handleTabChange("weather")}
           className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
             activeTab === "weather" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
           }`}
@@ -406,7 +437,7 @@ export default function StudentPage() {
 
         {/* 🌟 3. カレンダー 🌟 */}
         <button
-          onClick={() => setActiveTab("events")}
+          onClick={() => handleTabChange("events")}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
             activeTab === "events" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
           }`}
@@ -418,7 +449,7 @@ export default function StudentPage() {
         {/* 🌟 4. 相談 (ON時のみ表示) 🌟 */}
         {talkTabEnabled && (
           <button
-            onClick={() => setActiveTab("talk")}
+            onClick={() => handleTabChange("talk")}
             className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${
               activeTab === "talk" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
             }`}
@@ -433,7 +464,7 @@ export default function StudentPage() {
 
         {/* 🌟 5. 成長 🌟 */}
         <button
-          onClick={() => setActiveTab("feed")}
+          onClick={() => handleTabChange("feed")}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
             activeTab === "feed" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
           }`}

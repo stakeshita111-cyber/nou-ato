@@ -198,13 +198,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (studentIds.length > 0) {
         const { data: usersData } = await supabase
           .from("users")
-          .select("id, email, full_name, display_name")
+          .select("id, email, display_name")
           .in("id", studentIds);
 
         if (usersData) {
           usersData.forEach((u: any) => {
             if (u.id) {
-              userMap[u.id] = u.display_name || u.full_name || (u.email ? u.email.split("@")[0] : "受講生");
+              userMap[u.id] = u.display_name || (u.email ? u.email.split("@")[0] : "受講生");
             }
           });
         }
@@ -422,16 +422,34 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         .select("*")
         .order("created_at", { ascending: false });
 
-      // 3. ユーザー名の取得
+      // 3. 畝情報 (farm_beds) を取得して bed_id -> 生徒情報のマッピングを作成
+      const { data: bedsData } = await supabase
+        .from("farm_beds")
+        .select("id, student_name, student_id, plot_id");
+
+      const bedMap: { [id: string]: { student_name?: string | null; student_id?: string | null; plot_id?: string | null } } = {};
+      if (bedsData) {
+        bedsData.forEach((b: any) => {
+          if (b.id) {
+            bedMap[b.id] = {
+              student_name: b.student_name,
+              student_id: b.student_id,
+              plot_id: b.plot_id,
+            };
+          }
+        });
+      }
+
+      // 4. ユーザー名 (users) の取得
       const { data: usersData } = await supabase
         .from("users")
-        .select("id, full_name, email");
+        .select("id, display_name, email");
 
       const userMap: { [key: string]: string } = {};
       if (usersData) {
         usersData.forEach((u: any) => {
           if (u.id) {
-            userMap[u.id] = u.full_name || (u.email ? u.email.split("@")[0] : "受講生徒");
+            userMap[u.id] = u.display_name || (u.email ? u.email.split("@")[0] : "受講生徒");
           }
         });
       }
@@ -442,7 +460,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         recData.forEach((r: any, idx: number) => {
           const rawDate = r.created_at || r.date;
           const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
-          const studentName = r.student_name || (r.student_id && userMap[r.student_id]) || "竹下 翔";
+          const bedInfo = r.bed_id ? bedMap[r.bed_id] : null;
+          const resolvedStudentId = r.student_id || bedInfo?.student_id;
+          const studentName =
+            r.student_name ||
+            bedInfo?.student_name ||
+            (resolvedStudentId && userMap[resolvedStudentId]) ||
+            "受講生徒";
 
           let cleanNotes = r.notes || "観察記録を送信しました。";
           let imgUrl = r.photo_url || r.image_url || undefined;
@@ -451,6 +475,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             imgUrl = imgMatch[1];
             cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
           }
+
+          const derivedPlotCode =
+            r.plot_code ||
+            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : "B3");
 
           allRecords.push({
             itemType: "record",
@@ -464,7 +492,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             dateStr: dateKey,
             timeStr,
             timestamp,
-            plotCode: r.plot_code || "B3",
+            plotCode: derivedPlotCode,
             farmId: r.farm_id,
           });
         });
@@ -483,7 +511,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           .forEach((j: any, idx: number) => {
             const rawDate = j.created_at;
             const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
-            const studentName = (j.student_id && userMap[j.student_id]) || "竹下 翔";
+            const studentName = (j.student_id && userMap[j.student_id]) || "受講生徒";
 
             if (!allRecords.some((r) => r.content === j.content)) {
               allRecords.push({
@@ -510,8 +538,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           {
             itemType: "record",
             id: "fb_1",
-            studentName: "竹下 翔",
-            studentAvatar: "竹",
+            studentName: "受講生徒",
+            studentAvatar: "受",
             title: "🌱 水やり・追肥",
             content: "ミニトマトの本葉が順調に展開しています。水やりと液肥の追肥を行いました。",
             imageUrl: undefined,
@@ -549,8 +577,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           {
             itemType: "record",
             id: "fb_4",
-            studentName: "竹下 翔",
-            studentAvatar: "竹",
+            studentName: "受講生徒",
+            studentAvatar: "受",
             title: "🥬 収穫記録",
             content: "初収穫！立派なナスとキュウリが収穫できました。",
             harvestAmount: "🍆 ナス 3本, 🥒 2本",

@@ -34,7 +34,43 @@ export default function TeacherDashboardPage() {
       }
     });
   });
-  const [activeMenu, setActiveMenu] = useState("dashboard");
+  const VALID_TEACHER_MENUS = [
+    "dashboard",
+    "farm",
+    "tasks",
+    "templates",
+    "journals",
+    "events",
+    "payments",
+    "settings",
+    "students",
+  ];
+
+  const [activeMenu, setActiveMenu] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get("tab");
+      if (tabParam && VALID_TEACHER_MENUS.includes(tabParam)) {
+        return tabParam;
+      }
+      const savedMenu = sessionStorage.getItem("nouato_teacher_active_menu");
+      if (savedMenu && VALID_TEACHER_MENUS.includes(savedMenu)) {
+        return savedMenu;
+      }
+    }
+    return "dashboard";
+  });
+
+  const handleMenuChange = (menu: string) => {
+    setActiveMenu(menu);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("nouato_teacher_active_menu", menu);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", menu);
+      window.history.replaceState(null, "", url.toString());
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [showTaskFormImmediate, setShowTaskFormImmediate] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
@@ -49,13 +85,13 @@ export default function TeacherDashboardPage() {
   const handleNavigateToFarm = (plotCode?: string, farmId?: string) => {
     setTargetPlotCode(plotCode);
     setTargetFarmId(farmId);
-    setActiveMenu("farm");
+    handleMenuChange("farm");
   };
 
   const handleOpenApprovalFromNotification = (plotCode: string, bedId?: string) => {
     setTargetPlotCode(plotCode);
     setTargetApprovalBedId(bedId);
-    setActiveMenu("farm");
+    handleMenuChange("farm");
     setToastMessage(`🎯 区画 ${plotCode} の収穫完了確認画面へ移動しました`);
     setShowToast(true);
   };
@@ -108,7 +144,7 @@ export default function TeacherDashboardPage() {
   }, [router]);
 
   const handleAddNewTask = () => {
-    setActiveMenu("tasks");
+    handleMenuChange("tasks");
     setShowTaskFormImmediate(true);
   };
 
@@ -145,7 +181,7 @@ export default function TeacherDashboardPage() {
       {/* 1. 左サイドバー */}
       <TeacherSidebar
         activeMenu={activeMenu}
-        onMenuClick={setActiveMenu}
+        onMenuClick={handleMenuChange}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
         onOpenMobilePreview={() => setShowMobilePreviewModal(true)}
@@ -185,11 +221,11 @@ export default function TeacherDashboardPage() {
             <TeacherOverviewView
               key={`overview_${activeFarmId}`}
               onAddNewTaskClick={handleAddNewTask}
-              onNavigateToStudents={() => setActiveMenu("dashboard")}
-              onNavigateToJournals={() => setActiveMenu("journals")}
+              onNavigateToStudents={() => handleMenuChange("dashboard")}
+              onNavigateToJournals={() => handleMenuChange("journals")}
               onNavigateToFarm={() => handleNavigateToFarm()}
-              onNavigateToTasks={() => setActiveMenu("tasks")}
-              onNavigateToEvents={() => setActiveMenu("events")}
+              onNavigateToTasks={() => handleMenuChange("tasks")}
+              onNavigateToEvents={() => handleMenuChange("events")}
             />
           )}
 
