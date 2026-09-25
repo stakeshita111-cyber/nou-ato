@@ -84,6 +84,7 @@ const extractDateInfo = (dateStrOrIso?: string) => {
 };
 
 export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournalsViewProps) {
+  const activeFarmId = useFarmStore((state) => state.activeFarmId);
   const [journals, setJournals] = useState<JournalItem[]>([]);
   const [slideColumns, setSlideColumns] = useState<SlideItemRecord[][]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +142,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     }
     try {
       // ログイン講師の現在選択中農園IDを取得
-      let farmId = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      let farmId = activeFarmId || useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
       if (!farmId) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -410,17 +411,62 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   // 🌟【実データ完全連動】下部自動スライド用: 生徒の最新投稿（各生徒直近3回分抽出 ＆ ソート並べ替え ＆ 2行化） 🌟
   const fetchCropRecords = useCallback(async () => {
     try {
-      // 1. crop_records から生徒の観察ノート・現場報告を取得
-      const { data: recData } = await supabase
-        .from("crop_records")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // ログイン講師の現在選択中農園IDを取得
+      let farmId = activeFarmId || useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      if (!farmId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("farm_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (userData?.farm_id) farmId = userData.farm_id;
+        }
+      }
 
-      // 2. journals から生徒の手入力日誌・相談メモを取得
-      const { data: jData } = await supabase
+      // 自農園に所属する生徒のID一覧を取得
+      let myStudentIds: string[] = [];
+      if (farmId) {
+        const { data: farmStudents } = await supabase
+          .from("users")
+          .select("id")
+          .eq("farm_id", farmId)
+          .eq("role", "student");
+        if (farmStudents) {
+          myStudentIds = farmStudents.map((s: any) => s.id);
+        }
+      }
+
+      // 1. crop_records から生徒の観察ノート・現場報告を取得（自農園・自生徒に厳密制限）
+      let recQuery = supabase
+        .from("crop_records")
+        .select("*");
+
+      if (farmId) {
+        if (myStudentIds.length > 0) {
+          recQuery = recQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(",")})`);
+        } else {
+          recQuery = recQuery.eq("farm_id", farmId);
+        }
+      }
+
+      const { data: recData } = await recQuery.order("created_at", { ascending: false });
+
+      // 2. journals から生徒の手入力日誌・相談メモを取得（自農園・自生徒に厳密制限）
+      let jQuery = supabase
         .from("journals")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*");
+
+      if (farmId) {
+        if (myStudentIds.length > 0) {
+          jQuery = jQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(",")})`);
+        } else {
+          jQuery = jQuery.eq("farm_id", farmId);
+        }
+      }
+
+      const { data: jData } = await jQuery.order("created_at", { ascending: false });
 
       // 3. 畝情報 (farm_beds) を取得して bed_id -> 生徒情報のマッピングを作成
       const { data: bedsData } = await supabase
@@ -462,6 +508,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
           const bedInfo = r.bed_id ? bedMap[r.bed_id] : null;
           const resolvedStudentId = r.student_id || bedInfo?.student_id;
+
+          // 🌟 自農園に所属する生徒の記録のみに厳密制限 🌟
+          if (farmId) {
+            const isMyStudent = resolvedStudentId && myStudentIds.includes(resolvedStudentId);
+            const isMyFarm = r.farm_id === farmId;
+            if (!isMyStudent && !isMyFarm) return;
+          }
+
           const studentName =
             r.student_name ||
             bedInfo?.student_name ||
@@ -509,6 +563,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               c !== "（コメントなし）";
           })
           .forEach((j: any, idx: number) => {
+            // 🌟 自農園に所属する生徒の記録のみに厳密制限 🌟
+            if (farmId) {
+              const isMyStudent = j.student_id && myStudentIds.includes(j.student_id);
+              const isMyFarm = j.farm_id === farmId;
+              if (!isMyStudent && !isMyFarm) return;
+            }
+
             const rawDate = j.created_at;
             const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
             const studentName = (j.student_id && userMap[j.student_id]) || "受講生徒";
@@ -604,7 +665,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       console.error("fetchCropRecords error:", err);
       setSlideColumns([]);
     }
-  }, [slideSettings]);
+  }, [slideSettings, activeFarmId]);
 
   useEffect(() => {
     fetchJournals(true);
@@ -641,7 +702,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         window.removeEventListener("nouato_sync_event", handleSync);
       }
     };
-  }, [fetchCropRecords]);
+  }, [fetchCropRecords, activeFarmId]);
 
   // 🌟【要件: 30%低速化 & ホバー一時停止 & 左側ホバーで逆スライド & 設定連動】🌟
   useEffect(() => {
