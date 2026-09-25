@@ -12,31 +12,6 @@ export function useStudentDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeactivated, setIsDeactivated] = useState(false);
 
-  const DEFAULT_STUDENT_TASKS = [
-    {
-      id: "st_1",
-      status: "not_started",
-      tasks: {
-        id: "t_1",
-        title: "ジャガイモの芽かき作業",
-        description: "草丈10〜15cmほどに成長した芽の中から、元気な芽を1〜2本残して他を引き抜きます。",
-        target_crop: "ジャガイモ",
-        exp: 50,
-      },
-    },
-    {
-      id: "st_2",
-      status: "not_started",
-      tasks: {
-        id: "t_2",
-        title: "春野菜の土作り＆畝立て",
-        description: "堆肥と肥料を混ぜ込んでしっかり耕し、排水性の良い畝を作ります。",
-        target_crop: "春野菜全般",
-        exp: 30,
-      },
-    },
-  ];
-
   useEffect(() => {
     let isInitial = true;
     const fetchData = async () => {
@@ -54,15 +29,9 @@ export function useStudentDashboard() {
         let studentUserObj: any = null;
 
         if (!authUser) {
-          // 未認証の場合、localStorageの nouato_student_user またはゲスト
-          const savedStudent = typeof window !== "undefined" ? localStorage.getItem("nouato_student_user") : null;
-          if (savedStudent) {
-            try { studentUserObj = JSON.parse(savedStudent); } catch (e) {}
-          }
-          if (!studentUserObj) {
-            studentUserObj = { id: "student_guest", name: "受講生" };
-          }
-          setUser(studentUserObj);
+          // 未認証の場合、架空のゲストやモックへフォールバックせず未認証状態とする
+          setUser(null);
+          setIsDeactivated(true);
         } else {
           const oauthName =
             authUser.user_metadata?.full_name ||
@@ -108,22 +77,25 @@ export function useStudentDashboard() {
           } catch (e) {}
         }
 
-        const currentStudentId = studentUserObj?.id || "student_guest";
+        const currentStudentId = studentUserObj?.id || null;
         const studentFarmId = studentUserObj?.farm_id || (typeof window !== "undefined" ? localStorage.getItem("nouato_invite_farm_id") : null);
+
+        if (!currentStudentId) {
+          setMyBeds([]);
+          setTasks([]);
+          setJournals([]);
+          setIsLoading(false);
+          return;
+        }
 
         // 1. 講師が割り当てた畝 (farm_beds) を取得 (ログイン中の生徒のみ厳密抽出)
         let bedData: any[] = [];
-        if (currentStudentId && currentStudentId !== "student_guest" && currentStudentId !== "student_default") {
-          const { data } = await supabase
-            .from("farm_beds")
-            .select("*, farm_plots(*)")
-            .eq("student_id", currentStudentId);
-          bedData = data || [];
-        }
-
-        if (bedData && bedData.length > 0) {
-          setMyBeds(bedData);
-        }
+        const { data } = await supabase
+          .from("farm_beds")
+          .select("*, farm_plots(*)")
+          .eq("student_id", currentStudentId);
+        bedData = data || [];
+        setMyBeds(bedData);
 
         // 2. 講師が公開中のタスク (tasks: status = "todo", deleted_at is null) 及び 個別割当 (student_tasks) のみ取得
         const { data: stData } = await supabase
@@ -247,7 +219,7 @@ export function useStudentDashboard() {
 
         // 3. journals 取得 (ログイン中の生徒自身の記録のみ厳密に取得)
         let jData: any[] = [];
-        if (currentStudentId && currentStudentId !== "student_guest" && currentStudentId !== "student_default") {
+        if (currentStudentId) {
           const { data } = await supabase
             .from("journals")
             .select("*")
@@ -279,8 +251,8 @@ export function useStudentDashboard() {
             created_at: j.created_at,
           }));
           setBroadcasts(dbBc);
-        } else if (localBc && localBc.length > 0) {
-          setBroadcasts(localBc);
+        } else {
+          setBroadcasts([]);
         }
       } catch (e) {
         console.error("useStudentDashboard fetchData error:", e);

@@ -42,7 +42,7 @@ const INITIAL_EVENTS: EventItem[] = [
 ];
 
 export function useEvents(farmId?: string) {
-  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   const getEffectiveFarmId = () => {
@@ -63,9 +63,6 @@ export function useEvents(farmId?: string) {
       const saved = typeof window !== "undefined" ? localStorage.getItem(eventKey) : null;
       if (saved) {
         setEvents(JSON.parse(saved));
-      } else if (fid && fid !== "5cf1b060-8229-4669-85e6-3bfca5d04c6d") {
-        // 新規農園でイベント未登録の場合は空配列
-        setEvents([]);
       }
 
       let eQuery = supabase
@@ -92,6 +89,8 @@ export function useEvents(farmId?: string) {
           attendees: d.attendees || [],
         }));
         setEvents(formatted);
+      } else if (!saved) {
+        setEvents([]);
       }
     } catch (e) {
       console.warn("fetchEvents info:", e);

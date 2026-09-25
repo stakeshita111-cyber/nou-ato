@@ -531,66 +531,6 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           });
       }
 
-      // データが少ない場合の初期フォールバック (実稼働初期用)
-      if (allRecords.length === 0) {
-        const now = Date.now();
-        allRecords.push(
-          {
-            itemType: "record",
-            id: "fb_1",
-            studentName: "受講生徒",
-            studentAvatar: "受",
-            title: "🌱 水やり・追肥",
-            content: "ミニトマトの本葉が順調に展開しています。水やりと液肥の追肥を行いました。",
-            imageUrl: undefined,
-            dateStr: new Date(now).toLocaleDateString("ja-JP"),
-            timeStr: "14:20",
-            timestamp: now,
-            plotCode: "B3",
-          },
-          {
-            itemType: "record",
-            id: "fb_2",
-            studentName: "佐藤 健太",
-            studentAvatar: "佐",
-            title: "✂️ わき芽かき",
-            content: "下葉の整理とわき芽かきを実施。日当たりと風通しが大きく改善しました。",
-            imageUrl: undefined,
-            dateStr: new Date(now).toLocaleDateString("ja-JP"),
-            timeStr: "11:45",
-            timestamp: now - 3600000 * 2,
-            plotCode: "A2",
-          },
-          {
-            itemType: "record",
-            id: "fb_3",
-            studentName: "高橋 美咲",
-            studentAvatar: "高",
-            title: "💡 質問相談",
-            content: "葉の裏に少し白っぽい斑点を見つけました。これはうどんこ病でしょうか？",
-            imageUrl: undefined,
-            dateStr: new Date(now - 86400000).toLocaleDateString("ja-JP"),
-            timeStr: "16:30",
-            timestamp: now - 86400000,
-            plotCode: "C1",
-          },
-          {
-            itemType: "record",
-            id: "fb_4",
-            studentName: "受講生徒",
-            studentAvatar: "受",
-            title: "🥬 収穫記録",
-            content: "初収穫！立派なナスとキュウリが収穫できました。",
-            harvestAmount: "🍆 ナス 3本, 🥒 2本",
-            imageUrl: undefined,
-            dateStr: new Date(now - 86400000).toLocaleDateString("ja-JP"),
-            timeStr: "09:15",
-            timestamp: now - 86400000 - 3600000 * 4,
-            plotCode: "B3",
-          }
-        );
-      }
-
       // 🌟【要件: 各生徒の直近N回分のみに厳密制限 (デフォルト: 直近3回分)】🌟
       const limit = slideSettings.limitPerStudent;
       let filteredByStudentRecords: SlideItemRecord[] = [];

@@ -154,7 +154,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   };
 
   const unassignedList = useMemo<UnassignedStudent[]>(() => {
-    const dummyNames = ["佐藤 健太", "高橋 美咲", "伊藤 大輝", "渡辺 陸", "佐藤健太"];
     const assignedStudentIds = new Set(
       currentFarmPlots.filter((p) => !p.is_vacant).map((p) => p.student_id).filter(Boolean)
     );
@@ -171,8 +170,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
         (s) =>
           !assignedStudentIds.has(s.id) &&
           !assignedStudentNames.has(s.full_name) &&
-          !Array.from(assignedStudentNames).some((an) => an && (an.includes(s.full_name) || s.full_name.includes(an))) &&
-          !dummyNames.includes(s.full_name)
+          !Array.from(assignedStudentNames).some((an) => an && (an.includes(s.full_name) || s.full_name.includes(an)))
       )
       .map((s, idx) => ({
         id: s.id,
