@@ -243,8 +243,8 @@ export default function UnifiedLoginPage() {
           <div className="border-t border-gray-100 pt-2 space-y-1.5">
             <div>
               <span className="text-gray-400 text-[11px]">受講生の方: </span>
-              <Link href="/invite?farm_id=tanaka_farm" className="text-[#1c4d21] font-bold hover:underline">
-                体験農園に参加する
+              <Link href="/invite" className="text-[#1c4d21] font-bold hover:underline">
+                招待URL・農園に参加する
               </Link>
             </div>
             <div>

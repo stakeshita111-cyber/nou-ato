@@ -17,48 +17,7 @@ interface PaymentRecord {
 }
 
 export default function TeacherPaymentsView() {
-  const [payments, setPayments] = useState<PaymentRecord[]>([
-    {
-      id: "p1",
-      studentName: "佐藤 健太",
-      plot: "区画 1",
-      itemTitle: "月額農園利用料 (5月分) + 夏野菜資材代",
-      amount: 12800,
-      dueDate: "2026-05-25",
-      status: "paid",
-      method: "credit_card",
-    },
-    {
-      id: "p2",
-      studentName: "高橋 美咲",
-      plot: "区画 2",
-      itemTitle: "月額農園利用料 (5月分)",
-      amount: 9800,
-      dueDate: "2026-05-25",
-      status: "unpaid",
-      method: "line_pay",
-    },
-    {
-      id: "p3",
-      studentName: "伊藤 大輝",
-      plot: "区画 3",
-      itemTitle: "月額農園利用料 (5月分) + 収穫体験イベント参加費",
-      amount: 14800,
-      dueDate: "2026-05-25",
-      status: "paid",
-      method: "credit_card",
-    },
-    {
-      id: "p4",
-      studentName: "渡辺 陸",
-      plot: "区画 4",
-      itemTitle: "月額農園利用料 (5月分)",
-      amount: 9800,
-      dueDate: "2026-05-25",
-      status: "reminded",
-      method: "cash",
-    },
-  ]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
   const [filter, setFilter] = useState<"all" | "unpaid">("all");
   const [showToast, setShowToast] = useState(false);
@@ -120,7 +79,7 @@ export default function TeacherPaymentsView() {
               method: "credit_card" as const,
             }));
             setPayments(dynamicPayments);
-          } else if (fid !== "5cf1b060-8229-4669-85e6-3bfca5d04c6d") {
+          } else {
             setPayments([]);
           }
         }

@@ -103,9 +103,19 @@ export default function TeacherSignUpPage() {
 
       if (farmError) {
         console.error("farms table insert error:", farmError);
+        setToastMessage(`農園の作成に失敗しました: ${farmError.message}`);
+        setShowToast(true);
+        setLoading(false);
+        return;
       }
 
-      const assignedFarmId = insertedFarm?.id || farmId || "5cf1b060-8229-4669-85e6-3bfca5d04c6d";
+      const assignedFarmId = insertedFarm?.id || farmId;
+      if (!assignedFarmId) {
+        setToastMessage("農園IDの発行に失敗しました。再度お試しください。");
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
 
       // 3. users テーブルに講師情報保存 (role: 'teacher' と UUID farm_id)
       const { error: userError } = await supabase.from("users").upsert([

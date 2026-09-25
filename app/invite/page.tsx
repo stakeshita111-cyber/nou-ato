@@ -188,6 +188,23 @@ function InviteContent() {
     setLoading(true);
 
     try {
+      // 参加先農園IDの厳格解決 (デモUUIDフォールバックを完全撤廃)
+      let targetFarmId = selectedFarmId;
+      if (!targetFarmId || targetFarmId === "tanaka_farm") {
+        if (farmIdParam) {
+          targetFarmId = farmIdParam;
+        } else if (farmsList.length > 0) {
+          targetFarmId = farmsList[0].id;
+        }
+      }
+
+      if (!targetFarmId || targetFarmId === "tanaka_farm") {
+        setToastMessage("参加する農園を選択してください");
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
+
       // 1. まずログインを試行
       const { data: signInData, error: loginError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -202,7 +219,7 @@ function InviteContent() {
             email: email.trim(),
             display_name: name.trim() || signInData.user.email?.split("@")[0] || "受講生",
             role: "student",
-            farm_id: selectedFarmId || "5cf1b060-8229-4669-85e6-3bfca5d04c6d",
+            farm_id: targetFarmId,
           },
         ], { onConflict: "id" });
       } else {
@@ -230,7 +247,7 @@ function InviteContent() {
             email: email.trim(),
             display_name: name.trim(),
             role: "student",
-            farm_id: selectedFarmId || "5cf1b060-8229-4669-85e6-3bfca5d04c6d",
+            farm_id: targetFarmId,
           },
         ], { onConflict: "id" });
       }

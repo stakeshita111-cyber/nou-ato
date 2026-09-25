@@ -61,13 +61,14 @@ export default function TeacherSidebar({
             setTeacherName(fallback);
           }
 
-          // 農園名を取得
-          const { data: teacherFarm } = await supabase
-            .from("farms")
-            .select("name")
-            .or(`owner_id.eq.${authData.user.id},id.eq.${userData?.farm_id || "5cf1b060-8229-4669-85e6-3bfca5d04c6d"}`)
-            .limit(1)
-            .maybeSingle();
+          // 農園名を取得 (所有または所属する農園を安全に取得)
+          let farmQuery = supabase.from("farms").select("name");
+          if (userData?.farm_id) {
+            farmQuery = farmQuery.or(`owner_id.eq.${authData.user.id},id.eq.${userData.farm_id}`);
+          } else {
+            farmQuery = farmQuery.eq("owner_id", authData.user.id);
+          }
+          const { data: teacherFarm } = await farmQuery.limit(1).maybeSingle();
 
           if (teacherFarm?.name) {
             setFarmName(teacherFarm.name);

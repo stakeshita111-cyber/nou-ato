@@ -200,14 +200,10 @@ export function useFarmManager() {
         .select("id, display_name, role, farm_id")
         .eq("role", "student");
 
-      const isDemoFarm = effectiveActiveId === "5cf1b060-8229-4669-85e6-3bfca5d04c6d" || effectiveActiveId === "farm_1";
-
       if (usersData && usersData.length > 0) {
         const filtered = usersData.filter((u: any) => {
           if (currentUserId && u.id === currentUserId) return false;
           if (teacherDisplayName && u.display_name === teacherDisplayName) return false;
-          if (u.display_name === "テスト講師") return false;
-          if (isDemoFarm) return true;
           return u.farm_id === effectiveActiveId;
         });
         usersList = filtered;

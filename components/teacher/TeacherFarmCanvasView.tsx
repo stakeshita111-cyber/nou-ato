@@ -218,8 +218,8 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   const [showFarmSettingsModal, setShowFarmSettingsModal] = useState(false);
   const [farmSettingsName, setFarmSettingsName] = useState("");
   const [ownerNameInput, setOwnerNameInput] = useState("");
-  const [emailInput, setEmailInput] = useState("testtest@gmail.com");
-  const [farmAddressInput, setFarmAddressInput] = useState("千葉県千葉市緑区あすみが丘 1-23");
+  const [emailInput, setEmailInput] = useState("");
+  const [farmAddressInput, setFarmAddressInput] = useState("");
 
   // 🏰 農園設備・インフラオブジェクト (ハウス、水場、作業小屋等)
   interface FarmFacility {
@@ -660,8 +660,8 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
   useEffect(() => {
     const fetchUserAndFarm = async () => {
-      const savedOwner = typeof window !== "undefined" ? (localStorage.getItem("nouato_owner_name") || "テスト講師") : "テスト講師";
-      const savedAddress = typeof window !== "undefined" ? (localStorage.getItem("nouato_farm_address") || "千葉県千葉市緑区あすみが丘 1-23") : "千葉県千葉市緑区あすみが丘 1-23";
+      const savedOwner = typeof window !== "undefined" ? (localStorage.getItem("nouato_owner_name") || "") : "";
+      const savedAddress = typeof window !== "undefined" ? (localStorage.getItem("nouato_farm_address") || "") : "";
       setOwnerNameInput(savedOwner);
       setFarmAddressInput(savedAddress);
 
