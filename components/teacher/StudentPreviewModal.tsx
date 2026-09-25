@@ -3,9 +3,10 @@
 interface StudentPreviewModalProps {
   student: any;
   onClose: () => void;
+  onDeleteStudent?: (student: any) => void;
 }
 
-export default function StudentPreviewModal({ student, onClose }: StudentPreviewModalProps) {
+export default function StudentPreviewModal({ student, onClose, onDeleteStudent }: StudentPreviewModalProps) {
   if (!student) return null;
 
   const activeTask = student.activeTask || null;
@@ -110,12 +111,24 @@ export default function StudentPreviewModal({ student, onClose }: StudentPreview
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 bg-gray-800 text-white font-bold text-xs rounded-xl hover:bg-gray-900 transition"
-        >
-          プレビューを閉じる
-        </button>
+        <div className="space-y-2">
+          {onDeleteStudent && (
+            <button
+              onClick={() => onDeleteStudent(student)}
+              className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+            >
+              <span>🚫</span>
+              <span>この受講生を退会・農園から削除</span>
+            </button>
+          )}
+
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 bg-gray-800 text-white font-bold text-xs rounded-xl hover:bg-gray-900 transition"
+          >
+            プレビューを閉じる
+          </button>
+        </div>
       </div>
     </div>
   );

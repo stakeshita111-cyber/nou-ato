@@ -31,6 +31,7 @@ export default function StudentPage() {
     uncompleteTask,
     addJournal,
     isLoading,
+    isDeactivated,
   } = useStudentDashboard();
 
   const { events, reserveEvent } = useEvents();
@@ -247,6 +248,40 @@ export default function StudentPage() {
   // 🌟 データ読み込み中は愛らしい芽吹きローダーを表示 🌟
   if (isLoading) {
     return <SproutLoader fullScreen size={80} />;
+  }
+
+  // 🌟 退会済み（所属農園なし）受講生のアクセス遮断画面 🌟
+  if (isDeactivated) {
+    return (
+      <div className="min-h-screen bg-[#f8faf7] flex items-center justify-center p-4 font-sans text-gray-800">
+        <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-xl max-w-sm w-full text-center space-y-4 animate-fade-in">
+          <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl mx-auto flex items-center justify-center text-3xl shadow-inner border border-amber-100">
+            🌾
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-black text-gray-900">所属している農園がありません</h2>
+            <p className="text-xs text-gray-500 font-bold leading-relaxed pt-1">
+              このアカウントは現在、農園に所属していないか、退会手続きが完了しています。
+            </p>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 text-left space-y-1 text-[11px] text-gray-600 font-semibold">
+            <p className="font-bold text-gray-800">💡 再度利用したい場合:</p>
+            <p>農園の講師から共有された新しい招待リンク（URLまたはQRコード）から再度農園へご参加ください。</p>
+          </div>
+
+          <div className="pt-2 space-y-2">
+            <button
+              onClick={handleLogout}
+              className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-md transition"
+            >
+              ログアウトして別アカウントで入る
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

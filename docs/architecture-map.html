@@ -35,16 +35,35 @@
 </head>
 <body class="min-h-screen p-6 max-w-7xl mx-auto space-y-8">
 
-  <header class="flex items-center justify-between border-b border-gray-800 pb-4">
-    <div>
-      <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
-        🌱 NOU-ATO システム & データフロー マップ
-      </h1>
-      <p class="text-xs text-gray-400">Next.js 16 (App Router) × Supabase × Gemini 1.5 × Agent Engine</p>
+  <header class="border-b border-gray-800 pb-4 space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
+          🌱 NOU-ATO システム & データフロー マップ
+        </h1>
+        <p class="text-xs text-gray-400">Next.js 16 (App Router) × Supabase × Gemini 1.5 × Agent Engine</p>
+      </div>
     </div>
-    <a href="agent-and-skills-guide.html" class="text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-3 py-1.5 rounded-lg border border-emerald-500/30 font-medium transition">
-      🤖 エージェント＆スキル使い方ガイドを開く →
-    </a>
+
+    <!-- 📚 関連ドキュメント・ナビゲーションタブ 📚 -->
+    <div class="pt-2 border-t border-gray-800/80 flex flex-wrap items-center gap-2 text-xs font-bold">
+      <span class="text-gray-500 font-semibold mr-1">📑 関連資料:</span>
+      <a href="review-checklist-dashboard.html" class="px-3 py-1.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700 transition">
+        ✅ オリアプレビュー項目一覧 (101項目)
+      </a>
+      <a href="test-plan.html" class="px-3 py-1.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700 transition">
+        🧪 完全品質検査計画書 (QA Master Plan)
+      </a>
+      <a href="architecture-map.html" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-black shadow-xs">
+        🗺️ システム & データフロー アーキテクチャマップ
+      </a>
+      <a href="agent-and-skills-guide.html" class="px-3 py-1.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700 transition">
+        🤖 エージェント＆スキル活用ガイド
+      </a>
+      <a href="../public/screen_flow.html" class="px-3 py-1.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700 transition">
+        📱 完全画面遷移図 (Screen Flow)
+      </a>
+    </div>
   </header>
 
   <!-- Visual Architecture Layers -->

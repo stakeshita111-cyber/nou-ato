@@ -10,6 +10,7 @@ export function useStudentDashboard() {
   const [user, setUser] = useState<any>(null);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeactivated, setIsDeactivated] = useState(false);
 
   const DEFAULT_STUDENT_TASKS = [
     {
@@ -84,9 +85,16 @@ export function useStudentDashboard() {
               name: userData.display_name || displayName,
             };
             setUser(studentUserObj);
+            // 🌟 退会済み（deleted_at あり）または農園未所属の場合を検知 🌟
+            if (userData.deleted_at || (!userData.farm_id && !storedFarmId)) {
+              setIsDeactivated(true);
+            }
           } else {
             studentUserObj = { id: authUser.id, name: displayName, email: authUser.email, farm_id: storedFarmId };
             setUser(studentUserObj);
+            if (!storedFarmId) {
+              setIsDeactivated(true);
+            }
           }
         }
 
@@ -525,5 +533,6 @@ export function useStudentDashboard() {
     uncompleteTask,
     addJournal,
     isLoading,
+    isDeactivated,
   };
 }

@@ -109,5 +109,21 @@ nou-ato/
 │   ├── auth-security.test.ts      # 認可・アクセス制御・入力検証
 │   ├── knowledge-retriever.test.ts # 個人名匿名化・ナレッジ検索
 │   └── e2e-cross-screen.test.ts   # E2E画面横断シナリオ
+├── docs/                 # 仕様書・品質ダッシュボード・アーキテクチャマップ
 └── types/                # TypeScript型定義
 ```
+
+---
+
+## 📑 オリアプレビュー & 品質検証ドキュメント一覧
+
+ブラウザで直接開いて確認・操作できるインタラクティブなHTMLドキュメント群です。各ドキュメント間は上部ナビゲーションタブでシームレスに相互移動できます。
+
+| ドキュメント | ファイルパス | 内容・役割 |
+| :--- | :--- | :--- |
+| **オリアプレビュー項目DB (全101項目)** | [`docs/review-checklist-dashboard.html`](docs/review-checklist-dashboard.html) | 全101機能・非機能要件の検証ダッシュボード、合否判定、エビデンス集約 |
+| **品質検査計画書 (QA Master Plan)** | [`docs/test-plan.html`](docs/test-plan.html) | `test.tsv` (全28項目) と完全同期したテスト計画、自動テスト実行・検証 |
+| **アーキテクチャ & データフロー** | [`docs/architecture-map.html`](docs/architecture-map.html) | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図 |
+| **エージェント & スキル活用ガイド** | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html) | AI開発エージェントチームの役割分担と自律修正プロトコル解説 |
+| **全画面フロー & 仕様マップ** | [`public/screen_flow.html`](public/screen_flow.html) | 講師・受講生の全画面遷移、機能、データ連携使い方完全マップ |
+

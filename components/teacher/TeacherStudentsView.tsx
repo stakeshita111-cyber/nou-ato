@@ -52,6 +52,12 @@ export default function TeacherStudentsView() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // 🌟 受講生退会・削除確認モーダル用ステート 🌟
+  const [deleteTargetStudent, setDeleteTargetStudent] = useState<StudentData | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"deactivate" | "purge">("deactivate");
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const { activeFarmId, activeFarmName } = useFarmStore();
   const [origin, setOrigin] = useState("http://localhost:3000");
   const [farmId, setFarmId] = useState<string>(() => {
@@ -166,6 +172,109 @@ export default function TeacherStudentsView() {
     }
   };
 
+  // 🌟 受講生の退会・データ削除の実行処理 🌟
+  const handleExecuteStudentDelete = async () => {
+    if (!deleteTargetStudent) return;
+    setIsDeleting(true);
+
+    try {
+      const studentId = deleteTargetStudent.id;
+      const studentName = deleteTargetStudent.name;
+
+      // 1. farm_beds で該当生徒が割り当てられていた区画・畝を解放
+      try {
+        await supabase
+          .from("farm_beds")
+          .update({
+            student_id: null,
+            student_name: null,
+          })
+          .or(`student_id.eq.${studentId},student_name.eq.${studentName}`);
+      } catch (err) {
+        console.warn("farm_beds release error:", err);
+      }
+
+      // localStorage 内の farm_plots も同期更新
+      if (typeof window !== "undefined") {
+        const farmPlotKey = farmId ? `nouato_farm_plots_${farmId}` : "nouato_farm_plots";
+        const savedPlotsStr = localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots");
+        if (savedPlotsStr) {
+          try {
+            const parsedPlots = JSON.parse(savedPlotsStr);
+            const updatedPlots = parsedPlots.map((plot: any) => {
+              const nextBeds = (plot.beds || []).map((bed: any) => {
+                if (bed.student_id === studentId || bed.student_name === studentName) {
+                  return { ...bed, student_id: null, student_name: null };
+                }
+                return bed;
+              });
+              const isMatchPlot = plot.student_id === studentId || plot.student_name === studentName;
+              return {
+                ...plot,
+                beds: nextBeds,
+                student_id: isMatchPlot ? null : plot.student_id,
+                student_name: isMatchPlot ? null : plot.student_name,
+                is_vacant: isMatchPlot ? true : plot.is_vacant,
+              };
+            });
+            localStorage.setItem(farmPlotKey, JSON.stringify(updatedPlots));
+            localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
+          } catch (e) {}
+        }
+      }
+
+      if (deleteMode === "purge") {
+        // 完全消去モード: 関連データも DELETE
+        try {
+          await supabase.from("student_tasks").delete().eq("student_id", studentId);
+          await supabase.from("journals").delete().eq("student_id", studentId);
+          // users テーブルからも削除
+          await supabase.from("users").delete().eq("id", studentId);
+        } catch (err) {
+          console.warn("purge error:", err);
+        }
+      } else {
+        // アクセス遮断（推奨）モード: farm_id 解除 & deleted_at 記録
+        try {
+          await supabase
+            .from("users")
+            .update({
+              farm_id: null,
+              deleted_at: new Date().toISOString(),
+            })
+            .eq("id", studentId);
+        } catch (err) {
+          console.warn("deactivate error:", err);
+        }
+      }
+
+      // 画面とキャッシュの更新
+      setShowDeleteConfirmModal(false);
+      setSelectedStudent(null);
+      setDeleteTargetStudent(null);
+      setToastMessage(`👋 ${studentName} さんの退会処理が完了しました（農園へのアクセスを遮断し、区画を解放しました）`);
+      setShowToast(true);
+
+      // 他の画面（畑管理など）へ同調発火
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch (e) {}
+      }
+
+      await fetchStudents(farmId);
+    } catch (e) {
+      console.error("handleExecuteStudentDelete error:", e);
+      setToastMessage("退会処理中にエラーが発生しました");
+      setShowToast(true);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const fetchStudents = async (targetFarmId?: string) => {
     setLoading(true);
     const effectiveFarmId = targetFarmId || farmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
@@ -178,11 +287,12 @@ export default function TeacherStudentsView() {
       } catch (e) {}
     }
     try {
-      // 1. まず public.users (display_name) から受講生データを取得 (自農園限定)
+      // 1. まず public.users (display_name) から受講生データを取得 (自農園限定・未退会のみ)
       let usersQuery = supabase
         .from("users")
         .select("*")
-        .eq("role", "student");
+        .eq("role", "student")
+        .is("deleted_at", null);
 
       if (effectiveFarmId) {
         usersQuery = usersQuery.eq("farm_id", effectiveFarmId);
@@ -557,13 +667,28 @@ export default function TeacherStudentsView() {
                   <span>🎯 タスク割り当て</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setSelectedStudent(student)}
-                  className="text-emerald-800 text-[11px] font-bold hover:underline"
-                >
-                  詳細 →
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    title="この受講生を退会・削除する"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTargetStudent(student);
+                      setShowDeleteConfirmModal(true);
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-xs"
+                  >
+                    🗑️
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudent(student)}
+                    className="text-emerald-800 text-[11px] font-bold hover:underline"
+                  >
+                    詳細 →
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -654,6 +779,10 @@ export default function TeacherStudentsView() {
         <StudentPreviewModal
           student={selectedStudent}
           onClose={() => setSelectedStudent(null)}
+          onDeleteStudent={(s) => {
+            setDeleteTargetStudent(s);
+            setShowDeleteConfirmModal(true);
+          }}
         />
       )}
 
@@ -719,6 +848,120 @@ export default function TeacherStudentsView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ 受講生退会・削除 確認モーダル (確認ポップアップ) ⚠️ */}
+      {showDeleteConfirmModal && deleteTargetStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-red-200 relative">
+            <button
+              onClick={() => {
+                if (!isDeleting) {
+                  setShowDeleteConfirmModal(false);
+                  setDeleteTargetStudent(null);
+                }
+              }}
+              disabled={isDeleting}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center text-2xl shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900 leading-snug">
+                  受講生「{deleteTargetStudent.name}」さんを退会処理しますか？
+                </h3>
+                <p className="text-[11px] text-gray-500 font-bold mt-0.5">
+                  区画: {deleteTargetStudent.plot || "未割り当て"}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2 text-xs text-amber-900 font-bold">
+              <p className="flex items-center gap-1.5 font-black text-amber-950">
+                <span>📌</span>
+                <span>実行される処理内容:</span>
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800 font-semibold pl-1">
+                <li>この農園へのアクセスを即時遮断（生徒画面に入れなくなります）</li>
+                <li>担当している畑区画・畝の割り当てを自動解除（空き区画に解放）</li>
+              </ul>
+            </div>
+
+            {/* 処理モード選択 */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black text-gray-700">処理オプション</label>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2.5 p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 cursor-pointer text-xs">
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    value="deactivate"
+                    checked={deleteMode === "deactivate"}
+                    onChange={() => setDeleteMode("deactivate")}
+                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="font-black text-emerald-950">農園から除名・アクセス遮断（推奨）</span>
+                    <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
+                      過去の提出写真や質問・収穫実績は農園の活動ナレッジとして保持されます。
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 p-3 rounded-xl border border-red-200 bg-red-50/30 cursor-pointer text-xs">
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    value="purge"
+                    checked={deleteMode === "purge"}
+                    onChange={() => setDeleteMode("purge")}
+                    className="mt-0.5 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <span className="font-black text-red-950">生徒データも完全消去（物理削除）</span>
+                    <p className="text-[11px] text-red-800 font-medium mt-0.5">
+                      生徒のアカウント情報・日誌・タスク履歴を含めて完全にデータベースから抹消します。
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setShowDeleteConfirmModal(false);
+                  setDeleteTargetStudent(null);
+                }}
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleExecuteStudentDelete}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <span>処理中...</span>
+                ) : (
+                  <>
+                    <span>🗑️</span>
+                    <span>退会・削除を実行する</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
