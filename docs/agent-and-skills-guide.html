@@ -97,23 +97,60 @@
     </div>
 
     <!-- 📚 関連ドキュメント・ナビゲーションタブ 📚 -->
-    <div class="max-w-7xl mx-auto pt-3 border-t border-gray-800/80 flex flex-wrap items-center gap-2 text-xs font-bold">
-      <span class="text-gray-500 font-semibold mr-1">📑 関連資料:</span>
-      <a href="review-checklist-dashboard.html" class="px-3 py-1.5 rounded-xl bg-gray-900/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-800 transition">
-        ✅ オリアプレビュー項目一覧 (101項目)
-      </a>
-      <a href="test-plan.html" class="px-3 py-1.5 rounded-xl bg-gray-900/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-800 transition">
-        🧪 完全品質検査計画書 (QA Master Plan)
-      </a>
-      <a href="architecture-map.html" class="px-3 py-1.5 rounded-xl bg-gray-900/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-800 transition">
-        🗺️ システム & データフロー アーキテクチャマップ
-      </a>
-      <a href="agent-and-skills-guide.html" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-black shadow-xs">
-        🤖 エージェント＆スキル活用ガイド
-      </a>
-      <a href="../public/screen_flow.html" class="px-3 py-1.5 rounded-xl bg-gray-900/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-800 transition">
-        📱 完全画面遷移図 (Screen Flow)
-      </a>
+    <div class="border-t border-gray-800/90 bg-gray-900/60 px-4 sm:px-6 lg:px-8 py-2.5">
+      <div class="max-w-7xl mx-auto flex flex-col gap-2">
+        <!-- グループ1: HTML検証・設計ダッシュボード -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+          <span class="text-gray-400 font-semibold px-1 flex items-center gap-1">
+            <span>📊</span><span class="hidden sm:inline">検証・設計:</span>
+          </span>
+        <a href="review-checklist-dashboard.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          ✅ オリアプレビュー (101項目)
+        </a>
+        <a href="api-docs.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          ⚡ API仕様 (Swagger UI)
+        </a>
+        <a href="database-design.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          🗄️ ER図・DB定義書
+        </a>
+        <a href="test-plan.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          🧪 品質検査計画 (QA)
+        </a>
+        <a href="architecture-map.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          🗺️ システム構成マップ
+        </a>
+        <a href="agent-and-skills-guide.html" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-black shadow-xs">
+          🤖 エージェント設計
+        </a>
+        <a href="../public/screen_flow.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          📱 画面遷移図
+        </a>
+        </div>
+        <!-- グループ2: Markdown要件・仕様書 -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+          <span class="text-emerald-400 font-semibold px-1 flex items-center gap-1">
+            <span>📑</span><span class="hidden sm:inline">仕様・要件書:</span>
+          </span>
+        <a href="markdown-viewer.html?doc=prd" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          📋 要件定義書 (PRD)
+        </a>
+        <a href="markdown-viewer.html?doc=nfr" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          🛡️ 非機能要件書
+        </a>
+        <a href="markdown-viewer.html?doc=log" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          🪵 ログ設計書
+        </a>
+        <a href="markdown-viewer.html?doc=erd" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          📑 DB仕様書 (ERD)
+        </a>
+        <a href="markdown-viewer.html?doc=curl" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          🔌 cURLサンプル集
+        </a>
+        <a href="markdown-viewer.html?doc=readme" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
+          📖 プロジェクトREADME
+        </a>
+        </div>
+      </div>
     </div>
   </header>
 

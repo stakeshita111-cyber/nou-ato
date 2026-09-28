@@ -140,18 +140,31 @@ nou-ato/
 
 ---
 
-## 📑 オリアプレビュー & 品質検証ドキュメント一覧
+## 📑 プロジェクト仕様書・ドキュメント一覧
 
-ブラウザで直接開いて確認・操作できるインタラクティブなHTMLドキュメント群です。各ドキュメント間は上部ナビゲーションタブでシームレスに相互移動できます。
+ブラウザで直接開いて確認・操作できるインタラクティブなHTMLダッシュボード群およびMarkdown仕様書群です。全ドキュメントの上部に**統一ナビゲーションバー**が備わっており、1クリックで相互移動できます。
+
+### 1. 📊 インタラクティブ設計＆検証ダッシュボード (HTML)
 
 | ドキュメント | ファイルパス | 内容・役割 |
 | :--- | :--- | :--- |
 | **オリアプレビュー項目DB (全101項目)** | [`docs/review-checklist-dashboard.html`](docs/review-checklist-dashboard.html) | 全101機能・非機能要件の検証ダッシュボード、合否判定、エビデンス集約 |
-| **API 仕様書 & Swagger UI** | [`docs/api-docs.html`](docs/api-docs.html) | OpenAPI 3.1 仕様に基づくブラウザ対話型 API ドキュメント |
+| **API 仕様書 & Swagger UI** | [`docs/api-docs.html`](docs/api-docs.html) | OpenAPI 3.1 仕様に基づくブラウザ対話型 API ドキュメント・実行サンドボックス |
 | **ER図 & テーブル定義書** | [`docs/database-design.html`](docs/database-design.html) | Mermaid ER図、全8テーブルのカラム型・制約・RLSポリシー設計書 |
-| **非機能要件定義書** | [`docs/NON_FUNCTIONAL_REQUIREMENTS.md`](docs/NON_FUNCTIONAL_REQUIREMENTS.md) | パフォーマンスSLO、可用性99.9%、セキュリティRLS監査規準 |
-| **ログ設計書** | [`docs/LOGGING_DESIGN.md`](docs/LOGGING_DESIGN.md) | 構造化JSONログ、ログレベル、個人情報マスキング規定 |
-| **品質検査計画書 (QA Master Plan)** | [`docs/test-plan.html`](docs/test-plan.html) | 全テスト項目と完全同期したテスト計画、自動テスト実行・検証 |
+| **品質検査計画書 (QA Master Plan)** | [`docs/test-plan.html`](docs/test-plan.html) | 全テスト項目と完全同期したテスト計画、自動テスト実行・カバレッジ検証 |
 | **アーキテクチャ & データフロー** | [`docs/architecture-map.html`](docs/architecture-map.html) | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図 |
 | **エージェント & スキル活用ガイド** | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html) | AI開発エージェントチームの役割分担と自律修正プロトコル解説 |
 | **全画面フロー & 仕様マップ** | [`public/screen_flow.html`](public/screen_flow.html) | 講師・受講生の全画面遷移、機能、データ連携使い方完全マップ |
+
+### 2. 📑 要件定義＆設計仕様書 (Markdown / ブラウザ統合ビューア)
+
+ブラウザ上で美しく読める [**仕様書統合ビューア (docs/markdown-viewer.html)**](docs/markdown-viewer.html) からも全仕様書をワンクリックで閲覧できます。
+
+| ドキュメント | ビューアで閲覧 | 生ファイル | 内容・役割 |
+| :--- | :--- | :--- | :--- |
+| **要件定義書 (PRD)** | [ブラウザで開く](docs/markdown-viewer.html?doc=prd) | [`PRD.md`](PRD.md) | プロダクト要求仕様書、ユーザーストーリー、機能要件一覧 |
+| **非機能要件定義書** | [ブラウザで開く](docs/markdown-viewer.html?doc=nfr) | [`docs/NON_FUNCTIONAL_REQUIREMENTS.md`](docs/NON_FUNCTIONAL_REQUIREMENTS.md) | パフォーマンスSLO、可用性99.9%、セキュリティRLS監査規準 |
+| **ログ設計書** | [ブラウザで開く](docs/markdown-viewer.html?doc=log) | [`docs/LOGGING_DESIGN.md`](docs/LOGGING_DESIGN.md) | RFC 7807 統一エラー、機密マスキング、Supabase監査ログ |
+| **データベース設計書 (ERD)** | [ブラウザで開く](docs/markdown-viewer.html?doc=erd) | [`docs/ERD.md`](docs/ERD.md) | スキーマ設計、テーブルリレーション、インデックス設計 |
+| **API cURLサンプル集** | [ブラウザで開く](docs/markdown-viewer.html?doc=curl) | [`docs/API_CURL_SAMPLES.md`](docs/API_CURL_SAMPLES.md) | 各エンドポイントへのリクエスト例・レスポンス定義 |
+| **エージェント運用規定** | [ブラウザで開く](docs/markdown-viewer.html?doc=agents) | [`AGENTS.md`](AGENTS.md) | AI開発エージェント規約、自律型セルフコレクション規定 |
