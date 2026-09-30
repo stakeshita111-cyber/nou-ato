@@ -5,7 +5,7 @@ interface StudentSkillBoardViewProps {
   user: any;
 }
 
-export default function StudentSkillBoardView({ tasks, user }: StudentSkillBoardViewProps) {
+export default function StudentSkillBoardView({ tasks, user: _user }: StudentSkillBoardViewProps) {
   const completedTasks = tasks.filter((t) => t.status === "completed");
 
   // 経験値計算
