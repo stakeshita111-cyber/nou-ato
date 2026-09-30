@@ -54,6 +54,33 @@ export default function StudentPage() {
     return "myfarm";
   });
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [readBroadcastIds, setReadBroadcastIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nouato_read_broadcast_ids");
+      if (saved) {
+        try { return JSON.parse(saved); } catch { return []; }
+      }
+    }
+    return [];
+  });
+
+  // 未読お知らせの有無判定
+  const unreadBroadcasts = broadcasts.filter((b: { id: string }) => !readBroadcastIds.includes(b.id));
+  const hasUnreadBroadcasts = unreadBroadcasts.length > 0;
+
+  // お知らせモーダルを開いた際の既読処理
+  const handleOpenNotificationModal = () => {
+    setShowNotificationModal(true);
+    if (broadcasts && broadcasts.length > 0) {
+      const allIds = broadcasts.map((b: { id: string }) => b.id);
+      const updated = Array.from(new Set([...readBroadcastIds, ...allIds]));
+      setReadBroadcastIds(updated);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("nouato_read_broadcast_ids", JSON.stringify(updated));
+      }
+    }
+  };
 
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
@@ -306,11 +333,24 @@ export default function StudentPage() {
         <Link href="/login" title="ログイン画面に戻る" className="text-gray-500 hover:text-gray-800 text-lg font-bold">
           ✕
         </Link>
-        <div className="text-center">
+        <div className="text-center flex flex-col items-center">
           <h1 className="font-bold text-gray-800 text-sm leading-tight tracking-wide">NOU-ATO</h1>
-          <p className="text-[10px] text-gray-500 font-semibold truncate max-w-[180px]">
-            👤 {userAccountName}
-          </p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] text-gray-500 font-semibold truncate max-w-[140px]">
+              👤 {userAccountName}
+            </span>
+            {/* 🔔 通知ベルアイコン */}
+            <button
+              onClick={handleOpenNotificationModal}
+              className="relative p-1 text-gray-600 hover:text-amber-600 transition flex items-center justify-center rounded-full hover:bg-amber-50 cursor-pointer"
+              title="📢 講師からのお知らせ"
+            >
+              <span className="text-sm leading-none">🔔</span>
+              {hasUnreadBroadcasts && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 右上アカウント・ドロップダウンボタン */}
@@ -352,17 +392,54 @@ export default function StudentPage() {
       <main className={`w-full max-w-md ${activeTab === "talk" ? "p-2 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden" : "p-4 space-y-5 flex-1 pb-28"}`}>
         {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
         {activeTab === "myfarm" && (
-          <StudentFarmRecordView
-            studentId={user?.id}
-            studentName={userAccountName}
-            tasks={tasks}
-            onSelectTask={setSelectedTask}
-            onCompleteTask={handleCompleteTask}
-            onUncompleteTask={handleUncompleteTask}
-            newJournal={newJournal}
-            setNewJournal={setNewJournal}
-            onAddJournal={handleAddJournal}
-          />
+          <div className="space-y-4">
+            {/* 📢 畑タブ最上部のお知らせ注意喚起バナー */}
+            {broadcasts && broadcasts.length > 0 && (
+              <div
+                onClick={handleOpenNotificationModal}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 hover:border-amber-400 p-3 rounded-2xl shadow-2xs flex items-center justify-between text-xs text-amber-950 transition cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="relative shrink-0">
+                    <span className="text-base leading-none">📢</span>
+                    {!readBroadcastIds.includes(broadcasts[0].id) && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-amber-900 text-[11px] truncate">
+                        {broadcasts[0].title}
+                      </span>
+                      {!readBroadcastIds.includes(broadcasts[0].id) && (
+                        <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full shrink-0">
+                          新着
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-amber-800 font-medium truncate max-w-[230px]">
+                      {broadcasts[0].content}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-amber-700 shrink-0 ml-2">
+                  一覧 →
+                </span>
+              </div>
+            )}
+
+            <StudentFarmRecordView
+              studentId={user?.id}
+              studentName={userAccountName}
+              tasks={tasks}
+              onSelectTask={(task) => setSelectedTask(task as unknown as import("@/hooks/useStudentDashboard").StudentTaskItem)}
+              onCompleteTask={handleCompleteTask}
+              onUncompleteTask={handleUncompleteTask}
+              newJournal={newJournal}
+              setNewJournal={setNewJournal}
+              onAddJournal={handleAddJournal}
+            />
+          </div>
         )}
 
         {/* 🌟 2. 天気 タブ (天気予報ウィジェット ＆ 気象アドバイス) 🌟 */}
@@ -388,7 +465,7 @@ export default function StudentPage() {
             )}
 
             {/* 農園ピンポイント天気予報 ＆ 気象アドバイスウィジェット */}
-            <WeatherWidget />
+            <WeatherWidget hideBroadcastButton />
           </div>
         )}
 
@@ -445,6 +522,78 @@ export default function StudentPage() {
           </div>
         )}
       </main>
+
+      {/* 📢 講師からのお知らせモーダル */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200 relative max-h-[85vh] flex flex-col">
+            <button
+              onClick={() => setShowNotificationModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+            >
+              ✕
+            </button>
+
+            <div className="border-b border-gray-100 pb-3 shrink-0">
+              <h3 className="text-base font-black text-amber-950 flex items-center gap-2">
+                <span>📢 講師からのお知らせ</span>
+                <span className="text-xs font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full">
+                  全 {broadcasts.length} 件
+                </span>
+              </h3>
+              <p className="text-xs text-gray-500 font-bold mt-1">
+                農園の講師から届いた全体一括配信・個別連絡一覧です
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
+              {broadcasts.length === 0 ? (
+                <div className="py-12 text-center text-gray-400 font-bold text-xs space-y-2">
+                  <span className="text-3xl block">📭</span>
+                  <p>現在届いているお知らせはありません</p>
+                </div>
+              ) : (
+                broadcasts.map((bc: { id: string; sender?: string; created_at?: string; title: string; content: string }) => (
+                  <div
+                    key={bc.id}
+                    className="bg-amber-50/70 border border-amber-200 p-4 rounded-2xl space-y-2 text-xs font-bold text-gray-800 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-amber-200/60 pb-1.5">
+                      <span className="text-[11px] font-black text-amber-900 flex items-center gap-1">
+                        <span>👤 {bc.sender || "講師"}</span>
+                      </span>
+                      <span className="text-[10px] text-gray-500 font-semibold">
+                        {bc.created_at ? new Date(bc.created_at).toLocaleString("ja-JP", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) : "最新"}
+                      </span>
+                    </div>
+                    <h4 className="font-extrabold text-sm text-gray-900 leading-snug">
+                      {bc.title}
+                    </h4>
+                    <p className="text-xs text-gray-800 font-medium whitespace-pre-wrap leading-relaxed bg-white/80 p-3 rounded-xl border border-amber-200/50">
+                      {bc.content}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-100 shrink-0">
+              <button
+                onClick={() => setShowNotificationModal(false)}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-xs transition cursor-pointer"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* タスク詳細・予習・報告モーダル */}
       {selectedTask && (

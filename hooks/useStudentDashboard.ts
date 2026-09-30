@@ -1,14 +1,39 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+export interface BroadcastItem {
+  id: string;
+  title: string;
+  content: string;
+  sender?: string;
+  created_at?: string;
+}
+
+export interface StudentTaskItem {
+  id: string;
+  task_id?: string;
+  status: string;
+  title?: string;
+  tasks?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface StudentUserItem {
+  id: string;
+  name?: string;
+  email?: string;
+  farm_id?: string | null;
+  [key: string]: unknown;
+}
+
 export function useStudentDashboard() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [myBeds, setMyBeds] = useState<any[]>([]);
-  const [journals, setJournals] = useState<any[]>([]);
-  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<StudentTaskItem[]>([]);
+  const [, setMyBeds] = useState<Record<string, unknown>[]>([]);
+  const [journals, setJournals] = useState<Record<string, unknown>[]>([]);
+  const [broadcasts, setBroadcasts] = useState<BroadcastItem[]>([]);
   const [newJournal, setNewJournal] = useState("");
-  const [user, setUser] = useState<any>(null);
-  const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [user, setUser] = useState<StudentUserItem | null>(null);
+  const [selectedTask, setSelectedTask] = useState<StudentTaskItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeactivated, setIsDeactivated] = useState(false);
 
@@ -20,13 +45,12 @@ export function useStudentDashboard() {
       try {
         // 0. 一括配信 (broadcasts) を LocalStorage & DB からロード
         const savedBcStr = typeof window !== "undefined" ? localStorage.getItem("nouato_broadcast_announcements") : null;
-        let localBc: any[] = [];
         if (savedBcStr) {
-          try { localBc = JSON.parse(savedBcStr); } catch (e) {}
+          try { JSON.parse(savedBcStr); } catch {}
         }
 
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        let studentUserObj: any = null;
+        let studentUserObj: StudentUserItem | null = null;
 
         if (!authUser) {
           // 未認証の場合、架空のゲストやモックへフォールバックせず未認証状態とする
@@ -74,7 +98,7 @@ export function useStudentDashboard() {
             localStorage.removeItem("nouato_takeshita_task_completed_flag");
             localStorage.removeItem("nouato_takeshita_all_completed_flag");
             localStorage.removeItem("nouato_student_all_completed_status");
-          } catch (e) {}
+          } catch {}
         }
 
         const currentStudentId = studentUserObj?.id || null;
@@ -89,12 +113,12 @@ export function useStudentDashboard() {
         }
 
         // 1. 講師が割り当てた畝 (farm_beds) を取得 (ログイン中の生徒のみ厳密抽出)
-        let bedData: any[] = [];
+        let bedData: Record<string, unknown>[] = [];
         const { data } = await supabase
           .from("farm_beds")
           .select("*, farm_plots(*)")
           .eq("student_id", currentStudentId);
-        bedData = data || [];
+        bedData = (data as Record<string, unknown>[]) || [];
         setMyBeds(bedData);
 
         // 2. 講師が公開中のタスク (tasks: status = "todo", deleted_at is null) 及び 個別割当 (student_tasks) のみ取得
@@ -116,25 +140,25 @@ export function useStudentDashboard() {
 
         const { data: publicTasks } = await ptQuery.order("created_at", { ascending: false });
 
-        let taskList: any[] = [];
+        const taskList: StudentTaskItem[] = [];
         const seenTitles = new Set<string>();
 
         // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加
         if (publicTasks && publicTasks.length > 0) {
-          publicTasks.forEach((pt: any) => {
-            const cleanPt = (pt.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+          publicTasks.forEach((pt: Record<string, unknown>) => {
+            const cleanPt = (String(pt.title || "")).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
             if (cleanPt && !seenTitles.has(cleanPt)) {
               seenTitles.add(cleanPt);
-              const stMatch = stData?.find((st: any) => {
-                const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+              const stMatch = stData?.find((st: Record<string, unknown>) => {
+                const cleanSt = (String(st.title || "")).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
                 return cleanSt && (cleanSt === cleanPt || cleanSt.includes(cleanPt) || cleanPt.includes(cleanSt));
               });
-
-              const isDone = stMatch ? stMatch.status === "completed" : false;
+              const stMatchTyped = stMatch as { id?: string; status?: string } | undefined;
+              const isDone = stMatchTyped ? stMatchTyped.status === "completed" : false;
 
               taskList.push({
-                id: stMatch ? stMatch.id : `task_${pt.id}`,
-                task_id: pt.id,
+                id: stMatchTyped?.id ? stMatchTyped.id : `task_${pt.id}`,
+                task_id: String(pt.id || ""),
                 status: isDone ? "completed" : "not_started",
                 tasks: {
                   id: pt.id,
@@ -164,14 +188,14 @@ export function useStudentDashboard() {
 
         // ② 生徒の個別割当タスク (student_tasks) に直接存在するタスクも漏れなく合流
         if (stData && stData.length > 0) {
-          stData.forEach((st: any) => {
-            const cleanSt = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
+          stData.forEach((st: Record<string, unknown>) => {
+            const cleanSt = (String(st.title || "")).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
             if (cleanSt && !seenTitles.has(cleanSt)) {
               seenTitles.add(cleanSt);
               const isDone = st.status === "completed";
               taskList.push({
-                id: st.id,
-                task_id: st.task_id || st.base_task_id || st.id,
+                id: String(st.id || ""),
+                task_id: String(st.task_id || st.base_task_id || st.id || ""),
                 status: isDone ? "completed" : "not_started",
                 tasks: {
                   id: st.task_id || st.base_task_id || st.id,
@@ -218,42 +242,106 @@ export function useStudentDashboard() {
         setTasks(taskList);
 
         // 3. journals 取得 (ログイン中の生徒自身の記録のみ厳密に取得)
-        let jData: any[] = [];
+        let jData: Record<string, unknown>[] = [];
         if (currentStudentId) {
           const { data } = await supabase
             .from("journals")
             .select("*")
             .eq("student_id", currentStudentId)
             .order("created_at", { ascending: false });
-          jData = data || [];
+          jData = (data as Record<string, unknown>[]) || [];
         }
 
         setJournals(jData);
 
-        // 全体お知らせ (broadcasts) のみ別途取得 (自農園スコープ)
-        let bcQuery = supabase
-          .from("journals")
-          .select("*")
-          .eq("student_id", "all_students");
+        // 全体お知らせ ＆ 生徒宛てお知らせ (broadcasts) を Supabase DB ＆ LocalStorage から確実・網羅的に取得
+        let bcData: Record<string, unknown>[] = [];
+        try {
+          let bcQuery = supabase
+            .from("journals")
+            .select("*")
+            .or(`student_id.eq.all_students${currentStudentId ? `,student_id.eq.${currentStudentId}` : ""}`)
+            .or("task_title.ilike.%📢%,task_title.ilike.%全体お知らせ%");
 
-        if (studentFarmId) {
-          bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+          if (studentFarmId) {
+            bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+          }
+
+          const { data } = await bcQuery.order("created_at", { ascending: false });
+          if (data) bcData = data;
+        } catch (e) {
+          console.warn("useStudentDashboard bcQuery error:", e);
+          try {
+            const { data } = await supabase
+              .from("journals")
+              .select("*")
+              .eq("student_id", "all_students")
+              .order("created_at", { ascending: false });
+            if (data) bcData = data;
+          } catch {}
         }
 
-        const { data: bcData } = await bcQuery.order("created_at", { ascending: false });
+        // LocalStorage からのアナウンスキャッシュ取得 (自農園キー ＆ 共通キー)
+        const bcFarmKey = studentFarmId ? `nouato_broadcast_announcements_${studentFarmId}` : "nouato_broadcast_announcements";
+        const savedBcAnnouncementsStr = typeof window !== "undefined"
+          ? (localStorage.getItem(bcFarmKey) || localStorage.getItem("nouato_broadcast_announcements"))
+          : null;
+        let localBcArr: BroadcastItem[] = [];
+        if (savedBcAnnouncementsStr) {
+          try { localBcArr = JSON.parse(savedBcAnnouncementsStr); } catch {}
+        }
 
+        const combinedBroadcasts: BroadcastItem[] = [];
+
+        // DB データを変換してアペンド
         if (bcData && bcData.length > 0) {
-          const dbBc = bcData.map((j: any) => ({
-            id: j.id,
-            title: j.task_title?.replace("📢 【全体お知らせ】", "") || "講師からのお知らせ",
-            content: j.content || j.reply || "",
-            sender: "講師",
-            created_at: j.created_at,
-          }));
-          setBroadcasts(dbBc);
-        } else {
-          setBroadcasts([]);
+          bcData.forEach((j: Record<string, unknown>) => {
+            const rawTitle = String(j.task_title || "講師からのお知らせ");
+            const cleanTitle = rawTitle.replace("📢 【全体お知らせ】", "").replace("📢", "").trim() || "講師からのお知らせ";
+            combinedBroadcasts.push({
+              id: String(j.id || ""),
+              title: cleanTitle,
+              content: String(j.content || j.reply || ""),
+              sender: "講師",
+              created_at: j.created_at ? String(j.created_at) : undefined,
+            });
+          });
         }
+
+        // LocalStorage キャッシュをアペンド
+        if (localBcArr && localBcArr.length > 0) {
+          localBcArr.forEach((item: BroadcastItem) => {
+            combinedBroadcasts.push({
+              id: item.id || `local_${item.created_at}`,
+              title: item.title?.replace("📢 【全体お知らせ】", "")?.replace("📢", "")?.trim() || "講師からのお知らせ",
+              content: item.content || "",
+              sender: item.sender || "講師",
+              created_at: item.created_at || new Date().toISOString(),
+            });
+          });
+        }
+
+        // 重複除去 (title + content サマリー)
+        const seenBcKeys = new Set<string>();
+        const uniqueBroadcasts: BroadcastItem[] = [];
+
+        combinedBroadcasts.forEach((bc) => {
+          const contentSnippet = (bc.content || "").slice(0, 30).trim();
+          const bcKey = `${bc.title}_${contentSnippet}`;
+          if (!seenBcKeys.has(bcKey)) {
+            seenBcKeys.add(bcKey);
+            uniqueBroadcasts.push(bc);
+          }
+        });
+
+        // 作成日時 (created_at) 降順ソート
+        uniqueBroadcasts.sort((a, b) => {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        setBroadcasts(uniqueBroadcasts);
       } catch (e) {
         console.error("useStudentDashboard fetchData error:", e);
         setTasks([]);
@@ -321,16 +409,16 @@ export function useStudentDashboard() {
   }, []);
 
   const completeTask = async (taskId: string) => {
-    const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || t.tasks?.id === taskId);
+    const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || (t.tasks as { id?: string })?.id === taskId);
     if (!targetTask) return;
 
-    const taskTitle = targetTask.tasks?.title || targetTask.title || "完了タスク";
+    const taskTitle = (targetTask.tasks as { title?: string })?.title || targetTask.title || "完了タスク";
     const currentStudentId = user?.id || "student_default";
 
     // 1. ローカル UI ステートを即時完了に変更
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === taskId || t.task_id === targetTask.task_id || t.tasks?.title === taskTitle
+        t.id === taskId || t.task_id === targetTask.task_id || (t.tasks as { title?: string })?.title === taskTitle
           ? { ...t, status: "completed" }
           : t
       )
@@ -380,21 +468,21 @@ export function useStudentDashboard() {
         const bc = new BroadcastChannel("nouato_farm_sync_channel");
         bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
   };
 
   const uncompleteTask = async (taskId: string) => {
-    const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || t.tasks?.id === taskId);
+    const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || (t.tasks as { id?: string })?.id === taskId);
     if (!targetTask) return;
 
-    const taskTitle = targetTask.tasks?.title || targetTask.title || "完了タスク";
+    const taskTitle = (targetTask.tasks as { title?: string })?.title || targetTask.title || "完了タスク";
     const currentStudentId = user?.id || "student_default";
 
     // 1. ローカル UI ステートを即時未完了に変更
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === taskId || t.task_id === targetTask.task_id || t.tasks?.title === taskTitle
+        t.id === taskId || t.task_id === targetTask.task_id || (t.tasks as { title?: string })?.title === taskTitle
           ? { ...t, status: "not_started" }
           : t
       )
@@ -443,7 +531,7 @@ export function useStudentDashboard() {
         const bc = new BroadcastChannel("nouato_farm_sync_channel");
         bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
   };
 
@@ -486,7 +574,7 @@ export function useStudentDashboard() {
         const bc = new BroadcastChannel("nouato_farm_sync_channel");
         bc.postMessage({ type: "JOURNALS_UPDATED", timestamp: Date.now() });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
 
     setNewJournal("");

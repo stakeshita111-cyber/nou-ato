@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MASTER_TASKS } from "@/lib/taskMaster";
 import Toast from "@/components/ui/Toast";
@@ -59,7 +59,7 @@ export default function TeacherStudentsView() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { activeFarmId, activeFarmName } = useFarmStore();
-  const [origin, setOrigin] = useState("http://localhost:3000");
+  const [origin] = useState(() => (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"));
   const [farmId, setFarmId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("nouato_active_farm_id") || "";
@@ -73,45 +73,246 @@ export default function TeacherStudentsView() {
     return "農園";
   });
 
-  useEffect(() => {
+  const effectiveFarmId = activeFarmId || farmId;
+  const effectiveFarmName = activeFarmName || farmName;
+
+  const fetchStudents = useCallback(async (targetFarmId?: string) => {
+    const currentFarmId = targetFarmId || effectiveFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
     if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+      try {
+        localStorage.removeItem("nouato_student_task_statuses");
+        localStorage.removeItem("nouato_takeshita_task_completed_flag");
+        localStorage.removeItem("nouato_takeshita_all_completed_flag");
+        localStorage.removeItem("nouato_student_all_completed_status");
+      } catch {}
     }
-    const targetId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : "") || "";
-    const targetName = activeFarmName || (typeof window !== "undefined" ? localStorage.getItem("nouato_current_farm_name") : "農園") || "農園";
-    if (targetId) {
-      setFarmId(targetId);
-      setFarmName(targetName);
-      fetchStudents(targetId);
-    } else {
-      fetchStudents();
+    try {
+      // 1. まず public.users (display_name) から受講生データを取得 (自農園限定・未退会のみ)
+      let usersQuery = supabase
+        .from("users")
+        .select("*")
+        .eq("role", "student")
+        .is("deleted_at", null);
+
+      if (currentFarmId) {
+        usersQuery = usersQuery.eq("farm_id", currentFarmId);
+      }
+
+      const { data: usersData, error: usersError } = await usersQuery;
+
+      // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
+      const bedMap: Record<string, string> = {};
+      try {
+        const { data: dbBeds } = await supabase.from("farm_beds").select("*");
+        if (dbBeds && dbBeds.length > 0) {
+          dbBeds.forEach((b: Record<string, unknown>) => {
+            const assignedUser = String(b.student_id || b.user_id || "");
+            const assignedName = String(b.student_name || b.user_name || "");
+            const plotLabel = b.plot_id ? String(b.plot_id).replace(/^plot_cell_/, "区画 ") : `畝 ${b.bed_number || 1}`;
+            if (assignedUser) bedMap[assignedUser] = plotLabel;
+            if (assignedName) bedMap[assignedName] = plotLabel;
+          });
+        }
+      } catch (err) {
+        console.warn("fetchStudents beds lookup info:", err);
+      }
+
+      const farmPlotKey = currentFarmId ? `nouato_farm_plots_${currentFarmId}` : "nouato_farm_plots";
+      const savedPlotsStr = typeof window !== "undefined" ? (localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots")) : null;
+      if (savedPlotsStr) {
+        try {
+          JSON.parse(savedPlotsStr);
+        } catch {}
+      }
+
+      // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
+      try {
+        let pTasksQuery = supabase
+          .from("tasks")
+          .select("*")
+          .eq("status", "todo")
+          .is("deleted_at", null);
+        if (currentFarmId) {
+          pTasksQuery = pTasksQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+        }
+        await pTasksQuery;
+      } catch {}
+
+      // Supabase の student_tasks 取得
+      let studentTasksRaw: Record<string, unknown>[] = [];
+      try {
+        const { data: stData } = await supabase.from("student_tasks").select("*, tasks(*)");
+        if (stData) studentTasksRaw = stData as Record<string, unknown>[];
+      } catch (err) {
+        console.warn("fetchStudents student_tasks lookup:", err);
+      }
+
+      // Supabase の journals 完了ノート取得
+      const journalCompletedTitlesMap: Record<string, Set<string>> = {};
+      const lastJournalMap: Record<string, { content?: string; photo_url?: string; created_at?: string }> = {};
+      const globalJournalCompletedTitles = new Set<string>();
+
+      try {
+        let jDataQuery = supabase
+          .from("journals")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (currentFarmId) {
+          jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+        }
+        const { data: jData } = await jDataQuery;
+        if (jData && jData.length > 0) {
+          jData.forEach((j: Record<string, unknown>) => {
+            const sid = String(j.student_id || "student_default");
+            if (!lastJournalMap[sid]) {
+              lastJournalMap[sid] = {
+                content: String(j.content || j.memo || ""),
+                photo_url: j.photo_url ? String(j.photo_url) : j.image_url ? String(j.image_url) : undefined,
+                created_at: j.created_at ? new Date(String(j.created_at)).toLocaleDateString("ja-JP") : "最近",
+              };
+            }
+            const journalText = String(j.content || j.task_title || "");
+            if (journalText && (journalText.includes("タスク完了") || journalText.includes("完了"))) {
+              if (!journalCompletedTitlesMap[sid]) {
+                journalCompletedTitlesMap[sid] = new Set();
+              }
+              const cleanedTitle = journalText.replace("✅【タスク完了】", "").trim();
+              journalCompletedTitlesMap[sid].add(cleanedTitle);
+              globalJournalCompletedTitles.add(cleanedTitle);
+            }
+          });
+        }
+      } catch {}
+
+      if (!usersError && usersData && usersData.length > 0) {
+        const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
+
+        // 同一受講生(多対1)のカード重複防止と名寄せグループ化
+        const uniqueUsers: Record<string, unknown>[] = [];
+        const seenNames = new Set<string>();
+        usersData.forEach((u: Record<string, unknown>) => {
+          const normName = String(u.display_name || u.name || "").replace(/\s+/g, "");
+          if (!seenNames.has(normName) && normName.length > 0) {
+            seenNames.add(normName);
+            uniqueUsers.push(u);
+          }
+        });
+
+        const formatted: StudentData[] = uniqueUsers.map((u: Record<string, unknown>, idx: number) => {
+          const studentName = String(u.display_name || u.name || `受講生 ${idx + 1}`);
+          const uId = String(u.id || "");
+          const plotName = String(u.plot || u.plot_name || u.assigned_plot || bedMap[uId] || bedMap[studentName] || "未割り当て");
+
+          // ゼロベース出題・完了計算ロジック (MASTER_TASKS 全5件に一元決定)
+          const activeAssignedTasks = MASTER_TASKS;
+          const totalTasks = activeAssignedTasks.length; // 厳密に 5件
+
+          // Supabase DB (student_tasks) レコードの集約
+          const userStRows = studentTasksRaw.filter((st: Record<string, unknown>) => st.student_id === uId);
+
+          let completedTasks = 0;
+          let uncompletedTaskObj: (typeof MASTER_TASKS)[0] | null = null;
+
+          const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
+
+          activeAssignedTasks.forEach((taskObj) => {
+            const taskTitle = taskObj.title || "";
+            const cTitle = cleanStr(taskTitle);
+
+            // Supabase DB (student_tasks) の status === "completed" のみを 100% 正解基準として照合
+            const isStDone = userStRows.some((st: Record<string, unknown>) => {
+              if (st.status !== "completed") return false;
+              const stTasks = st.tasks as { title?: string } | undefined;
+              const stClean = cleanStr(String(st.title || stTasks?.title || ""));
+              return st.task_id === taskObj.id || st.base_task_id === taskObj.id || (cTitle && stClean && (cTitle === stClean || cTitle.includes(stClean) || stClean.includes(cTitle)));
+            });
+
+            if (isStDone) {
+              completedTasks++;
+            } else if (!uncompletedTaskObj) {
+              uncompletedTaskObj = taskObj;
+            }
+          });
+
+          // 進捗率 (%) 算定
+          const calcProgress = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
+
+          let stepText = "受講開始";
+          if (calcProgress >= 100 && totalTasks > 0) stepText = "全課題完了 🏆";
+          else if (calcProgress >= 60) stepText = "応用作業中 🌱";
+          else if (calcProgress >= 20 || completedTasks > 0) stepText = "基礎作業中 🌿";
+
+          const activeTask = uncompletedTaskObj || activeAssignedTasks[0] || null;
+
+          return {
+            id: uId,
+            name: studentName,
+            avatar: studentName.slice(0, 2),
+            avatarBg: colors[idx % colors.length],
+            plot: plotName,
+            step: stepText,
+            progress: calcProgress,
+            completedCount: completedTasks,
+            totalTaskCount: totalTasks,
+            unreadCount: 0,
+            lastReport: u.created_at ? new Date(String(u.created_at)).toLocaleDateString("ja-JP") : "最近",
+            hasOverdue: false,
+            activeTask,
+            lastJournal: lastJournalMap[uId] || null,
+          };
+        });
+        setStudents(formatted);
+        return;
+      }
+
+      setStudents([]);
+    } catch (e) {
+      console.error("fetchStudents exception:", e);
+      setStudents([]);
+    } finally {
+      setLoading(false);
     }
-  }, [activeFarmId, activeFarmName]);
+  }, [effectiveFarmId]);
 
   useEffect(() => {
-    const handleFarmChanged = (e: any) => {
-      const newFarmId = e?.detail?.farmId;
-      const newFarmName = e?.detail?.farmName;
+    let isMounted = true;
+    const load = async () => {
+      await Promise.resolve();
+      if (isMounted) {
+        await fetchStudents();
+      }
+    };
+    void load();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchStudents]);
+
+  useEffect(() => {
+    const handleFarmChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ farmId?: string; farmName?: string }>;
+      const newFarmId = customEvent.detail?.farmId;
+      const newFarmName = customEvent.detail?.farmName;
       if (newFarmId) {
         setFarmId(newFarmId);
         if (newFarmName) setFarmName(newFarmName);
-        fetchStudents(newFarmId);
+        void fetchStudents(newFarmId);
       }
     };
     window.addEventListener("nouato_active_farm_changed", handleFarmChanged);
     return () => {
       window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
     };
-  }, []);
+  }, [fetchStudents]);
 
-  const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
+  const inviteUrl = `${origin}/invite?farm_id=${effectiveFarmId}`;
 
   const handleCopyInviteUrl = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setToastMessage("📋 招待URLをクリップボードにコピーしました！受講生へ共有してください");
       setShowToast(true);
-    } catch (err) {
+    } catch {
       setToastMessage("URLのコピーに失敗しました");
       setShowToast(true);
     }
@@ -129,33 +330,63 @@ export default function TeacherStudentsView() {
         id: `bc_${Date.now()}`,
         title: broadcastTitle.trim(),
         content: broadcastBody.trim(),
-        sender: `講師 (${farmName || "当農園"})`,
+        sender: `講師 (${effectiveFarmName || "当農園"})`,
         created_at: nowStr,
       };
 
       // 1. LocalStorageに一括配信リストをアペンド (農園IDスコープ)
-      const bcKey = farmId ? `nouato_broadcast_announcements_${farmId}` : "nouato_broadcast_announcements";
+      const bcKey = effectiveFarmId ? `nouato_broadcast_announcements_${effectiveFarmId}` : "nouato_broadcast_announcements";
       const existingStr = localStorage.getItem(bcKey);
       let list = [];
       if (existingStr) {
-        try { list = JSON.parse(existingStr); } catch (e) {}
+        try { list = JSON.parse(existingStr); } catch {}
       }
       list.unshift(broadcastObj);
       localStorage.setItem(bcKey, JSON.stringify(list));
       localStorage.setItem("nouato_broadcast_announcements", JSON.stringify(list));
 
-      // 2. Supabase の journals テーブルにも講師配信として保存
+      // 2. Supabase の journals テーブルにも講師配信として保存 (全体向け + 各登録生徒個別宛て)
       try {
-        await supabase.from("journals").insert([{
-          student_id: "all_students",
-          farm_id: farmId || null,
-          task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
-          content: broadcastBody.trim(),
-          reply: `講師配信: ${broadcastBody.trim()}`,
-          created_at: nowStr,
-        }]);
+        const journalInserts: Array<Record<string, unknown>> = [
+          {
+            student_id: "all_students",
+            farm_id: effectiveFarmId || null,
+            task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+            content: broadcastBody.trim(),
+            reply: `講師配信: ${broadcastBody.trim()}`,
+            created_at: nowStr,
+          },
+        ];
+
+        // 登録中の全生徒ID宛てにも個別レコードを作成（RLS制限回能力強化・受信確実化）
+        if (students && students.length > 0) {
+          students.forEach((s) => {
+            if (s.id && s.id !== "all_students") {
+              journalInserts.push({
+                student_id: s.id,
+                farm_id: effectiveFarmId || null,
+                task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+                content: broadcastBody.trim(),
+                reply: `講師配信: ${broadcastBody.trim()}`,
+                created_at: nowStr,
+              });
+            }
+          });
+        }
+
+        await supabase.from("journals").insert(journalInserts);
       } catch (err) {
         console.warn("Supabase broadcast insert warn:", err);
+      }
+
+      // 3. 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch {}
       }
 
       setToastMessage(`🎉 登録中 ${students.length} 名の受講生全員へ一括配信を完了しました！`);
@@ -196,13 +427,13 @@ export default function TeacherStudentsView() {
 
       // localStorage 内の farm_plots も同期更新
       if (typeof window !== "undefined") {
-        const farmPlotKey = farmId ? `nouato_farm_plots_${farmId}` : "nouato_farm_plots";
+        const farmPlotKey = effectiveFarmId ? `nouato_farm_plots_${effectiveFarmId}` : "nouato_farm_plots";
         const savedPlotsStr = localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots");
         if (savedPlotsStr) {
           try {
             const parsedPlots = JSON.parse(savedPlotsStr);
-            const updatedPlots = parsedPlots.map((plot: any) => {
-              const nextBeds = (plot.beds || []).map((bed: any) => {
+              const updatedPlots = parsedPlots.map((plot: Record<string, unknown>) => {
+                const nextBeds = ((plot.beds as Record<string, unknown>[]) || []).map((bed: Record<string, unknown>) => {
                 if (bed.student_id === studentId || bed.student_name === studentName) {
                   return { ...bed, student_id: null, student_name: null };
                 }
@@ -219,7 +450,7 @@ export default function TeacherStudentsView() {
             });
             localStorage.setItem(farmPlotKey, JSON.stringify(updatedPlots));
             localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
-          } catch (e) {}
+          } catch {}
         }
       }
 
@@ -230,9 +461,7 @@ export default function TeacherStudentsView() {
           await supabase.from("journals").delete().eq("student_id", studentId);
           // users テーブルからも削除
           await supabase.from("users").delete().eq("id", studentId);
-        } catch (err) {
-          console.warn("purge error:", err);
-        }
+        } catch {}
       } else {
         // アクセス遮断（推奨）モード: farm_id 解除 & deleted_at 記録
         try {
@@ -243,9 +472,7 @@ export default function TeacherStudentsView() {
               deleted_at: new Date().toISOString(),
             })
             .eq("id", studentId);
-        } catch (err) {
-          console.warn("deactivate error:", err);
-        }
+        } catch {}
       }
 
       // 画面とキャッシュの更新
@@ -262,10 +489,10 @@ export default function TeacherStudentsView() {
           const bc = new BroadcastChannel("nouato_farm_sync_channel");
           bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
 
-      await fetchStudents(farmId);
+      await fetchStudents(effectiveFarmId);
     } catch (e) {
       console.error("handleExecuteStudentDelete error:", e);
       setToastMessage("退会処理中にエラーが発生しました");
@@ -275,212 +502,10 @@ export default function TeacherStudentsView() {
     }
   };
 
-  const fetchStudents = async (targetFarmId?: string) => {
-    setLoading(true);
-    const effectiveFarmId = targetFarmId || farmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("nouato_student_task_statuses");
-        localStorage.removeItem("nouato_takeshita_task_completed_flag");
-        localStorage.removeItem("nouato_takeshita_all_completed_flag");
-        localStorage.removeItem("nouato_student_all_completed_status");
-      } catch (e) {}
-    }
-    try {
-      // 1. まず public.users (display_name) から受講生データを取得 (自農園限定・未退会のみ)
-      let usersQuery = supabase
-        .from("users")
-        .select("*")
-        .eq("role", "student")
-        .is("deleted_at", null);
-
-      if (effectiveFarmId) {
-        usersQuery = usersQuery.eq("farm_id", effectiveFarmId);
-      }
-
-      const { data: usersData, error: usersError } = await usersQuery;
-
-      // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
-      let bedMap: Record<string, string> = {};
-      try {
-        const { data: dbBeds } = await supabase.from("farm_beds").select("*");
-        if (dbBeds && dbBeds.length > 0) {
-          dbBeds.forEach((b: any) => {
-            const assignedUser = b.student_id || b.user_id;
-            const assignedName = b.student_name || b.user_name;
-            const plotLabel = b.plot_id ? b.plot_id.replace(/^plot_cell_/, "区画 ") : `畝 ${b.bed_number || 1}`;
-            if (assignedUser) bedMap[assignedUser] = plotLabel;
-            if (assignedName) bedMap[assignedName] = plotLabel;
-          });
-        }
-      } catch (err) {
-        console.warn("fetchStudents beds lookup info:", err);
-      }
-
-      let localPlots: any[] = [];
-      const farmPlotKey = effectiveFarmId ? `nouato_farm_plots_${effectiveFarmId}` : "nouato_farm_plots";
-      const savedPlotsStr = typeof window !== "undefined" ? (localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots")) : null;
-      if (savedPlotsStr) {
-        try {
-          localPlots = JSON.parse(savedPlotsStr);
-        } catch (e) {}
-      }
-
-      // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
-      let publicTodoTasks: any[] = [];
-      try {
-        let pTasksQuery = supabase
-          .from("tasks")
-          .select("*")
-          .eq("status", "todo")
-          .is("deleted_at", null);
-        if (effectiveFarmId) {
-          pTasksQuery = pTasksQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
-        }
-        const { data: pTasks } = await pTasksQuery;
-        if (pTasks) publicTodoTasks = pTasks;
-      } catch (e) {}
-
-      // Supabase の student_tasks 取得
-      let studentTasksRaw: any[] = [];
-      try {
-        const { data: stData } = await supabase.from("student_tasks").select("*, tasks(*)");
-        if (stData) studentTasksRaw = stData;
-      } catch (err) {
-        console.warn("fetchStudents student_tasks lookup:", err);
-      }
-
-      // Supabase の journals 完了ノート取得
-      let journalCompletedTitlesMap: Record<string, Set<string>> = {};
-      let lastJournalMap: Record<string, { content?: string; photo_url?: string; created_at?: string }> = {};
-      let globalJournalCompletedTitles = new Set<string>();
-
-      try {
-        let jDataQuery = supabase
-          .from("journals")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (effectiveFarmId) {
-          jDataQuery = jDataQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
-        }
-        const { data: jData } = await jDataQuery;
-        if (jData && jData.length > 0) {
-          jData.forEach((j: any) => {
-            const sid = j.student_id || "student_default";
-            if (!lastJournalMap[sid]) {
-              lastJournalMap[sid] = {
-                content: j.content || j.memo || "",
-                photo_url: j.photo_url || j.image_url || null,
-                created_at: j.created_at ? new Date(j.created_at).toLocaleDateString("ja-JP") : "最近",
-              };
-            }
-            const journalText = j.content || j.task_title || "";
-            if (journalText && (journalText.includes("タスク完了") || journalText.includes("完了"))) {
-              if (!journalCompletedTitlesMap[sid]) {
-                journalCompletedTitlesMap[sid] = new Set();
-              }
-              const cleanedTitle = journalText.replace("✅【タスク完了】", "").trim();
-              journalCompletedTitlesMap[sid].add(cleanedTitle);
-              globalJournalCompletedTitles.add(cleanedTitle);
-            }
-          });
-        }
-      } catch (e) {}
-
-      if (!usersError && usersData && usersData.length > 0) {
-        const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
-
-        // 同一受講生(多対1)のカード重複防止と名寄せグループ化
-        const uniqueUsers: any[] = [];
-        const seenNames = new Set<string>();
-        usersData.forEach((u: any) => {
-          const normName = (u.display_name || u.name || "").replace(/\s+/g, "");
-          if (!seenNames.has(normName) && normName.length > 0) {
-            seenNames.add(normName);
-            uniqueUsers.push(u);
-          }
-        });
-
-        const formatted: StudentData[] = uniqueUsers.map((u: any, idx: number) => {
-          const studentName = u.display_name || u.name || `受講生 ${idx + 1}`;
-          
-          let plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName] || "未割り当て";
-
-          // ゼロベース出題・完了計算ロジック (MASTER_TASKS 全5件に一元決定)
-          const activeAssignedTasks = MASTER_TASKS;
-          const totalTasks = activeAssignedTasks.length; // 厳密に 5件
-
-          // Supabase DB (student_tasks) レコードの集約
-          const userStRows = studentTasksRaw.filter((st: any) => st.student_id === u.id);
-
-          let completedTasks = 0;
-          let uncompletedTaskObj: any = null;
-
-          const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
-
-          activeAssignedTasks.forEach((taskObj: any) => {
-            const taskTitle = taskObj.title || "";
-            const cTitle = cleanStr(taskTitle);
-
-            // Supabase DB (student_tasks) の status === "completed" のみを 100% 正解基準として照合
-            const isStDone = userStRows.some((st: any) => {
-              if (st.status !== "completed") return false;
-              const stClean = cleanStr(st.title || st.tasks?.title || "");
-              return st.task_id === taskObj.id || st.base_task_id === taskObj.id || (cTitle && stClean && (cTitle === stClean || cTitle.includes(stClean) || stClean.includes(cTitle)));
-            });
-
-            if (isStDone) {
-              completedTasks++;
-            } else if (!uncompletedTaskObj) {
-              uncompletedTaskObj = taskObj;
-            }
-          });
-
-          // 進捗率 (%) 算定
-          const calcProgress = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
-
-          let stepText = "受講開始";
-          if (calcProgress >= 100 && totalTasks > 0) stepText = "全課題完了 🏆";
-          else if (calcProgress >= 60) stepText = "応用作業中 🌱";
-          else if (calcProgress >= 20 || completedTasks > 0) stepText = "基礎作業中 🌿";
-
-          const activeTask = uncompletedTaskObj || activeAssignedTasks[0] || null;
-
-          return {
-            id: u.id,
-            name: studentName,
-            avatar: studentName.slice(0, 2),
-            avatarBg: colors[idx % colors.length],
-            plot: plotName,
-            step: stepText,
-            progress: calcProgress,
-            completedCount: completedTasks,
-            totalTaskCount: totalTasks,
-            unreadCount: 0,
-            lastReport: u.created_at ? new Date(u.created_at).toLocaleDateString("ja-JP") : "最近",
-            hasOverdue: false,
-            activeTask,
-            lastJournal: lastJournalMap[u.id] || null,
-          };
-        });
-        setStudents(formatted);
-        return;
-      }
-
-      setStudents([]);
-    } catch (e) {
-      console.error("fetchStudents exception:", e);
-      setStudents([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchStudents();
-
     const handleSync = () => {
-      fetchStudents();
+      void fetchStudents();
     };
 
     if (typeof window !== "undefined") {
@@ -490,8 +515,8 @@ export default function TeacherStudentsView() {
 
     const stRealtime = supabase
       .channel("student_tasks_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => fetchStudents())
-      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => fetchStudents())
+      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => { void fetchStudents(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => { void fetchStudents(); })
       .subscribe();
 
     return () => {
@@ -501,7 +526,7 @@ export default function TeacherStudentsView() {
       }
       supabase.removeChannel(stRealtime);
     };
-  }, []);
+  }, [fetchStudents]);
 
   const filteredStudents = students.filter((s) => {
     if (filter === "unread") return s.unreadCount > 0;
@@ -756,7 +781,7 @@ export default function TeacherStudentsView() {
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
         inviteUrl={inviteUrl}
-        farmName={farmName}
+        farmName={effectiveFarmName}
       />
 
       {/* 個別タスク割り当て Modal */}
