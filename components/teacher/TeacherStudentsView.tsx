@@ -73,36 +73,7 @@ export default function TeacherStudentsView() {
     return "農園";
   });
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
-    }
-    const targetId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : "") || "";
-    const targetName = activeFarmName || (typeof window !== "undefined" ? localStorage.getItem("nouato_current_farm_name") : "農園") || "農園";
-    if (targetId) {
-      setFarmId(targetId);
-      setFarmName(targetName);
-      fetchStudents(targetId);
-    } else {
-      fetchStudents();
-    }
-  }, [activeFarmId, activeFarmName]);
 
-  useEffect(() => {
-    const handleFarmChanged = (e: any) => {
-      const newFarmId = e?.detail?.farmId;
-      const newFarmName = e?.detail?.farmName;
-      if (newFarmId) {
-        setFarmId(newFarmId);
-        if (newFarmName) setFarmName(newFarmName);
-        fetchStudents(newFarmId);
-      }
-    };
-    window.addEventListener("nouato_active_farm_changed", handleFarmChanged);
-    return () => {
-      window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
-    };
-  }, []);
 
   const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
 
@@ -301,7 +272,7 @@ export default function TeacherStudentsView() {
       const { data: usersData, error: usersError } = await usersQuery;
 
       // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
-      let bedMap: Record<string, string> = {};
+      const bedMap: Record<string, string> = {};
       try {
         const { data: dbBeds } = await supabase.from("farm_beds").select("*");
         if (dbBeds && dbBeds.length > 0) {
@@ -351,9 +322,9 @@ export default function TeacherStudentsView() {
       }
 
       // Supabase の journals 完了ノート取得
-      let journalCompletedTitlesMap: Record<string, Set<string>> = {};
-      let lastJournalMap: Record<string, { content?: string; photo_url?: string; created_at?: string }> = {};
-      let globalJournalCompletedTitles = new Set<string>();
+      const journalCompletedTitlesMap: Record<string, Set<string>> = {};
+      const lastJournalMap: Record<string, { content?: string; photo_url?: string; created_at?: string }> = {};
+      const globalJournalCompletedTitles = new Set<string>();
 
       try {
         let jDataQuery = supabase
@@ -404,7 +375,7 @@ export default function TeacherStudentsView() {
         const formatted: StudentData[] = uniqueUsers.map((u: any, idx: number) => {
           const studentName = u.display_name || u.name || `受講生 ${idx + 1}`;
           
-          let plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName] || "未割り当て";
+          const plotName = u.plot || u.plot_name || u.assigned_plot || bedMap[u.id] || bedMap[studentName] || "未割り当て";
 
           // ゼロベース出題・完了計算ロジック (MASTER_TASKS 全5件に一元決定)
           const activeAssignedTasks = MASTER_TASKS;
@@ -475,6 +446,37 @@ export default function TeacherStudentsView() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const handleFarmChanged = (e: any) => {
+      const newFarmId = e?.detail?.farmId;
+      const newFarmName = e?.detail?.farmName;
+      if (newFarmId) {
+        setFarmId(newFarmId);
+        if (newFarmName) setFarmName(newFarmName);
+        fetchStudents(newFarmId);
+      }
+    };
+    window.addEventListener("nouato_active_farm_changed", handleFarmChanged);
+    return () => {
+      window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+    const targetId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : "") || "";
+    const targetName = activeFarmName || (typeof window !== "undefined" ? localStorage.getItem("nouato_current_farm_name") : "農園") || "農園";
+    if (targetId) {
+      setFarmId(targetId);
+      setFarmName(targetName);
+      fetchStudents(targetId);
+    } else {
+      fetchStudents();
+    }
+  }, [activeFarmId, activeFarmName]);
 
   useEffect(() => {
     fetchStudents();

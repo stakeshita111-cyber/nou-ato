@@ -116,7 +116,7 @@ export function useStudentDashboard() {
 
         const { data: publicTasks } = await ptQuery.order("created_at", { ascending: false });
 
-        let taskList: any[] = [];
+        const taskList: any[] = [];
         const seenTitles = new Set<string>();
 
         // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加

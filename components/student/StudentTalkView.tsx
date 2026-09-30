@@ -220,19 +220,19 @@ export default function StudentTalkView({
       .map((m) => m.id);
   }, [messages, searchKeyword]);
 
-  useEffect(() => {
-    setCurrentMatchIndex(0);
-    if (matchedMessageIds.length > 0) {
-      jumpToMessage(matchedMessageIds[0]);
-    }
-  }, [searchKeyword, matchedMessageIds.length]);
-
   const jumpToMessage = (messageId: string) => {
     const el = messageRefs.current[messageId];
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
+
+  useEffect(() => {
+    setCurrentMatchIndex(0);
+    if (matchedMessageIds.length > 0) {
+      jumpToMessage(matchedMessageIds[0]);
+    }
+  }, [searchKeyword, matchedMessageIds.length]);
 
   const handlePrevMatch = () => {
     if (matchedMessageIds.length === 0) return;

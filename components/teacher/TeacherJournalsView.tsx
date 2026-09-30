@@ -195,7 +195,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       }
 
       const studentIds = Array.from(new Set(journalData.map((j: any) => j.student_id).filter(Boolean)));
-      let userMap: { [key: string]: string } = {};
+      const userMap: { [key: string]: string } = {};
 
       if (studentIds.length > 0) {
         const { data: usersData } = await supabase
@@ -521,7 +521,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         });
       }
 
-      let allRecords: SlideItemRecord[] = [];
+      const allRecords: SlideItemRecord[] = [];
 
       if (recData && recData.length > 0) {
         recData.forEach((r: any, idx: number) => {
