@@ -9,6 +9,7 @@ import BedCompletionModal from "@/components/farm/BedCompletionModal";
 import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { supabase } from "@/lib/supabase";
+import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
 
 interface StudentFarmRecordViewProps {
   studentId?: string;
@@ -627,7 +628,7 @@ export default function StudentFarmRecordView({
                 <div className="bg-gray-50/90 p-4 rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-700">
                   <div className="flex justify-between items-center border-b border-gray-200/80 pb-2">
                     <span className="font-black text-sm text-emerald-950">
-                      📅 {rec.date}
+                      📅 {formatDate(rec.date)}
                     </span>
                     <div className="flex items-center space-x-2">
                       <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full text-[11px]">
@@ -666,7 +667,7 @@ export default function StudentFarmRecordView({
                     {rec.harvest_amount && (
                       <div className="text-amber-800 font-black">
                         <span>成果: </span>
-                        <span>{rec.harvest_amount}</span>
+                        <span>{formatHarvestAmount(rec.harvest_amount)}</span>
                       </div>
                     )}
                   </div>

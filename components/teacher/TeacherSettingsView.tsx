@@ -8,21 +8,11 @@ import { formatDate, formatNumber } from "@/lib/utils/formatHelper";
 export default function TeacherSettingsView() {
   const { settings, updateSettings, resetSettings } = useThemeStore();
 
-  const [outdoorHighContrast, setOutdoorHighContrast] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  useEffect(() => {
-    const savedContrast = localStorage.getItem("nouato_outdoor_contrast") === "true";
-    setOutdoorHighContrast(savedContrast);
-  }, []);
-
   const handleToggleContrast = (enabled: boolean) => {
-    setOutdoorHighContrast(enabled);
-    localStorage.setItem("nouato_outdoor_contrast", String(enabled));
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-contrast", enabled ? "high" : "normal");
-    }
+    updateSettings({ outdoorHighContrast: enabled });
     setToastMessage(`✨ 高コントラスト表示を ${enabled ? "ON" : "OFF"} に切り替えました！`);
     setShowToast(true);
   };
@@ -59,7 +49,7 @@ export default function TeacherSettingsView() {
         <div className="max-w-4xl w-full pointer-events-auto">
           <div 
             className={`p-3.5 sm:p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all space-y-2.5 ${
-              outdoorHighContrast ? "bg-amber-50/95 border-amber-400 ring-2 ring-amber-300" : "bg-white/95 border-emerald-300 ring-1 ring-emerald-200"
+              settings.outdoorHighContrast ? "bg-amber-50/95 border-amber-400 ring-2 ring-amber-300" : "bg-white/95 border-emerald-300 ring-1 ring-emerald-200"
             }`}
             style={{ fontFamily: getFontFamilyCss(settings.fontFamily) }}
           >
@@ -364,7 +354,7 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => handleToggleContrast(false)}
                 className={`px-3.5 py-2 rounded-xl border transition ${
-                  !outdoorHighContrast
+                  !settings.outdoorHighContrast
                     ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
                     : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
                 }`}
@@ -375,7 +365,7 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => handleToggleContrast(true)}
                 className={`px-3.5 py-2 rounded-xl border transition ${
-                  outdoorHighContrast
+                  settings.outdoorHighContrast
                     ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
                     : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
                 }`}
@@ -448,22 +438,22 @@ export default function TeacherSettingsView() {
             </div>
           </div>
 
-          {/* 11. 講師画面: 売上管理メニューの表示 */}
+          {/* 11. 講師画面: 収支シミュレーションメニューの表示 */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">💳 講師画面: 売上管理メニューの表示</span>
-              <span className="text-[11px] text-gray-500 font-medium">左サイドバーの「売上」メニューの表示・非表示を切り替えます</span>
+              <span className="text-sm font-black text-gray-900 block">💳 講師画面: 収支シミュレーションメニューの表示</span>
+              <span className="text-[11px] text-gray-500 font-medium">左サイドバーの「収支シミュレーション」メニューの表示・非表示を切り替えます（基本は非表示）</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => {
                   updateSettings({ showPaymentsMenu: true });
-                  setToastMessage("💳 売上管理メニューを「表示 (ON)」に設定しました");
+                  setToastMessage("💳 収支シミュレーションメニューを「表示 (ON)」に設定しました");
                   setShowToast(true);
                 }}
                 className={`px-3.5 py-2 rounded-xl border transition ${
-                  settings.showPaymentsMenu !== false
+                  settings.showPaymentsMenu === true
                     ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
                     : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
                 }`}
@@ -474,11 +464,11 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => {
                   updateSettings({ showPaymentsMenu: false });
-                  setToastMessage("💳 売上管理メニューを「非表示 (OFF)」に設定しました");
+                  setToastMessage("💳 収支シミュレーションメニューを「非表示 (OFF)」に設定しました");
                   setShowToast(true);
                 }}
                 className={`px-3.5 py-2 rounded-xl border transition ${
-                  settings.showPaymentsMenu === false
+                  !settings.showPaymentsMenu
                     ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
                     : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
                 }`}

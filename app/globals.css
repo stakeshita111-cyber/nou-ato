@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -80,7 +81,7 @@
   --input-border: #c8dbc9;
 }
 
-/* ☀️ 屋外高コントラストモード */
+/* 屋外高コントラストモード */
 [data-contrast="high"] {
   --bg-main: #f8fafc !important;
   --bg-card: #ffffff !important;
@@ -95,15 +96,37 @@
   font-weight: 900 !important;
 }
 
-/* フォントサイズコントロール */
-[data-font-size="normal"] {
-  font-size: 14px;
+/* 書体動的継承（Tailwindの.font-sansや各種要素でも確実に反映） */
+body, .font-sans, button, input, select, textarea {
+  font-family: var(--font-family-base, var(--font-geist-sans), sans-serif);
 }
-[data-font-size="large"] {
-  font-size: 16px;
+
+/* 文字の太さ動的反映 */
+[data-font-weight="bold"] body,
+[data-font-weight="bold"] p,
+[data-font-weight="bold"] span,
+[data-font-weight="bold"] div,
+[data-font-weight="bold"] button,
+[data-font-weight="bold"] label {
+  font-weight: 700 !important;
 }
-[data-font-size="xlarge"] {
-  font-size: 18px;
+
+/* ボタン形状・サイズの動的反映 */
+[data-radius="none"] button,
+[data-radius="none"] .btn-farm,
+[data-radius="none"] .app-accent-btn {
+  border-radius: 0px !important;
+}
+
+[data-radius="full"] button.app-accent-btn,
+[data-radius="full"] button.btn-farm {
+  border-radius: 9999px !important;
+}
+
+[data-button-size="large"] button.app-accent-btn,
+[data-button-size="large"] button.btn-farm {
+  padding: 14px 28px !important;
+  font-size: 1.05em !important;
 }
 
 body {

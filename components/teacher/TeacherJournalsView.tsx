@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useFarmStore } from "@/store/useFarmStore";
 import Toast from "@/components/ui/Toast";
 import SlideSettingsModal, { SlideSettings } from "@/components/teacher/SlideSettingsModal";
+import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
 
 interface JournalItem {
   id: string;
@@ -63,7 +64,7 @@ const extractDateInfo = (dateStrOrIso?: string) => {
 
   const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
   const dayOfWeek = dayNames[validDate.getDay()];
-  const displayDate = `${validDate.getMonth() + 1}月${validDate.getDate()}日`;
+  const displayDate = formatDate(validDate);
 
   const todayObj = new Date();
   const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, "0")}-${String(todayObj.getDate()).padStart(2, "0")}`;
@@ -243,12 +244,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           studentName: name,
           studentAvatar: name.slice(0, 2).toUpperCase(),
           created_at: j.created_at
-            ? new Date(j.created_at).toLocaleString("ja-JP", {
-                month: "short",
-                day: "numeric",
+            ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString("ja-JP", {
                 hour: "2-digit",
                 minute: "2-digit",
-              })
+              })}`
             : "最近",
           taskTitle: j.task_title || "💡 気づきメモ・質問相談",
           content: cleanContent,
@@ -565,8 +564,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               : (r.crop_name && r.crop_name !== "未確定" ? r.crop_name : "観察記録"),
             content: cleanNotes,
             imageUrl: imgUrl,
-            harvestAmount: r.harvest_amount || undefined,
-            dateStr: dateKey,
+            harvestAmount: formatHarvestAmount(r.harvest_amount) || undefined,
+            dateStr: formatDate(rawDate),
             timeStr,
             timestamp,
             plotCode: derivedPlotCode,
@@ -614,7 +613,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 title: j.task_title || "💡 質問・相談日誌",
                 content: cleanContent,
                 imageUrl: imgUrl,
-                dateStr: dateKey,
+                dateStr: formatDate(rawDate),
                 timeStr,
                 timestamp,
                 plotCode: "B3",

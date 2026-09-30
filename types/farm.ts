@@ -46,6 +46,7 @@ export type FarmPlot = {
   farm_id: string;
   name: string;
   code: string;
+  description?: string;
   student_id?: string;
   student_name?: string;
   grid_index?: number;

@@ -9,6 +9,7 @@ import StudentPreviewModal from "@/components/teacher/StudentPreviewModal";
 import QRCodeModal from "@/components/ui/QRCodeModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { useFarmStore } from "@/store/useFarmStore";
+import { formatDate } from "@/lib/utils/formatHelper";
 
 interface StudentData {
   id: string;
@@ -196,7 +197,7 @@ export default function TeacherStudentsView() {
               lastJournalMap[sid] = {
                 content: String(j.content || j.memo || ""),
                 photo_url: j.photo_url ? String(j.photo_url) : j.image_url ? String(j.image_url) : undefined,
-                created_at: j.created_at ? new Date(String(j.created_at)).toLocaleDateString("ja-JP") : "最近",
+                created_at: j.created_at ? formatDate(String(j.created_at)) : "最近",
               };
             }
             const journalText = String(j.content || j.task_title || "");
@@ -283,7 +284,7 @@ export default function TeacherStudentsView() {
             completedCount: completedTasks,
             totalTaskCount: totalTasks,
             unreadCount: 0,
-            lastReport: u.created_at ? new Date(String(u.created_at)).toLocaleDateString("ja-JP") : "最近",
+            lastReport: u.created_at ? formatDate(String(u.created_at)) : "最近",
             hasOverdue: false,
             activeTask,
             lastJournal: lastJournalMap[uId] || null,

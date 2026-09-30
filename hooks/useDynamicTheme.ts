@@ -25,21 +25,26 @@ export const useDynamicTheme = () => {
     root.setAttribute("data-font-size", settings.fontSize);
 
     // 文字サイズの適用（シニア向け「極大」に対応）
+    // Tailwindの rem 基準を動的に拡大・縮小させるため html の fontSize 自体を変更
     const sizeMap = {
       small: '14px',
       medium: '16px',
-      large: '20px',
-      xlarge: '24px',
+      large: '18px',
+      xlarge: '22px',
     };
-    root.style.setProperty('--font-size-base', sizeMap[settings.fontSize] || '16px');
+    const targetFontSize = sizeMap[settings.fontSize] || '16px';
+    root.style.fontSize = targetFontSize;
+    root.style.setProperty('--font-size-base', targetFontSize);
 
     // フォントファミリー（M PLUS Roundedなど）
     const familyMap = {
-      sans: 'var(--font-geist-sans), sans-serif',
-      serif: 'var(--font-geist-serif), serif',
-      rounded: '"M PLUS Rounded 1c", sans-serif',
+      sans: 'var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      serif: 'Georgia, Cambria, "Hiragino Mincho ProN", "Yu Mincho", "Times New Roman", serif',
+      rounded: '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif',
     };
-    root.style.setProperty('--font-family-base', familyMap[settings.fontFamily] || familyMap.sans);
+    const targetFontFamily = familyMap[settings.fontFamily] || familyMap.sans;
+    root.style.setProperty('--font-family-base', targetFontFamily);
+    root.style.fontFamily = targetFontFamily;
 
     // 文字の太さ（日差しの反射で見えなくなるのを防止）
     const weightMap = {
@@ -48,6 +53,7 @@ export const useDynamicTheme = () => {
       bold: '700',
     };
     root.style.setProperty('--font-weight-base', weightMap[settings.fontWeight] || '500');
+    root.setAttribute("data-font-weight", settings.fontWeight);
 
     // 行間（誤読防止）
     const lineMap = {
@@ -64,13 +70,17 @@ export const useDynamicTheme = () => {
       full: '9999px',
     };
     root.style.setProperty('--border-radius-button', radiusMap[settings.borderRadius] || '8px');
+    root.setAttribute("data-radius", settings.borderRadius);
 
     // ボタンパディング（手袋用極大サイズ）
     const paddingMap = {
       normal: '8px 16px',
-      large: '16px 32px',
+      large: '14px 28px',
     };
     root.style.setProperty('--button-padding', paddingMap[settings.buttonPadding] || '8px 16px');
+    root.setAttribute("data-button-size", settings.buttonPadding);
 
+    // 屋外高コントラストモード
+    root.setAttribute("data-contrast", settings.outdoorHighContrast ? "high" : "normal");
   }, [settings]);
 };

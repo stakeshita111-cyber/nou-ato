@@ -186,7 +186,7 @@ export default function TeacherSidebar({
               <span>生徒一覧</span>
             </button>
 
-            {/* 2. 畑・区画 */}
+            {/* 2. 畑管理 */}
             <button
               onClick={() => handleItemClick("farm")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -197,7 +197,7 @@ export default function TeacherSidebar({
             >
               <div className="flex items-center space-x-3">
                 <span className="text-base">🌾</span>
-                <span>畑・区画</span>
+                <span>畑管理</span>
               </div>
               {/* 🌟 LINE風 未読・要承認件数バッジ 🌟 */}
               {pendingApprovalCount > 0 && (
@@ -207,7 +207,7 @@ export default function TeacherSidebar({
               )}
             </button>
 
-            {/* 3. 教材 */}
+            {/* 3. タスク管理 */}
             <button
               onClick={() => handleItemClick("tasks")}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -219,7 +219,7 @@ export default function TeacherSidebar({
               <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
-              <span>教材</span>
+              <span>タスク管理</span>
             </button>
 
             {/* 4. テンプレート */}
@@ -250,7 +250,7 @@ export default function TeacherSidebar({
               <span>相談・日誌</span>
             </button>
 
-            {/* 6. イベント・予約 */}
+            {/* 6. カレンダー */}
             <button
               onClick={() => handleItemClick("events")}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -260,11 +260,11 @@ export default function TeacherSidebar({
               }`}
             >
               <span className="text-base">📅</span>
-              <span>イベント・予約</span>
+              <span>カレンダー</span>
             </button>
 
-            {/* 7. 売上 */}
-            {settings.showPaymentsMenu !== false && (
+            {/* 7. 収支シミュレーション (基本非表示・設定でON可能) */}
+            {settings.showPaymentsMenu === true && (
               <button
                 onClick={() => handleItemClick("payments")}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
@@ -274,7 +274,7 @@ export default function TeacherSidebar({
                 }`}
               >
                 <span className="text-base">💳</span>
-                <span>売上</span>
+                <span>収支シミュレーション</span>
               </button>
             )}
 

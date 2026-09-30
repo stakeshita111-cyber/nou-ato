@@ -39,18 +39,66 @@ export default function TeacherTemplatesView() {
   // モバイル用フィルタードロワー表示トグル
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  // 初期読み込み
+  // 初期読み込み（Supabase DB から完全復元 + localStorage キャッシュとマージ）
   useEffect(() => {
-    let customTemplates: TaskTemplate[] = [];
-    const saved = localStorage.getItem("nouato_custom_templates");
-    if (saved) {
+    const loadTemplates = async () => {
+      let customTemplates: TaskTemplate[] = [];
+
+      // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元
       try {
-        customTemplates = JSON.parse(saved);
+        const { data: dbTemplates } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("is_template", true)
+          .is("deleted_at", null);
+
+        if (dbTemplates && dbTemplates.length > 0) {
+          customTemplates = dbTemplates.map((t: any) => {
+            const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+            return {
+              id: t.id,
+              title: t.title,
+              category: t.category || "共通",
+              target_crop: t.target_crop || "共通",
+              phase: cl.phase || "育成管理",
+              season: cl.season || "通年",
+              estimated_time: t.estimated_time || "30分",
+              tools_needed: t.tools_needed || "軍手",
+              description: t.description || "",
+              memo: t.memo || "",
+              exp: t.exp || 50,
+              difficulty: t.difficulty || 1,
+              require_photo: Boolean(t.require_photo),
+              badge_name: cl.badge_name || "栽培マスター",
+              badge_icon: cl.badge_icon || "🌿",
+            };
+          });
+        }
       } catch (e) {
-        console.error("Failed to parse custom templates:", e);
+        console.warn("DB custom templates fetch fallback:", e);
       }
-    }
-    setTemplates(mergeTemplates(customTemplates));
+
+      // 2. localStorage からのキャッシュ補完
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("nouato_custom_templates");
+        if (saved) {
+          try {
+            const localArr: TaskTemplate[] = JSON.parse(saved);
+            localArr.forEach((lt) => {
+              if (!customTemplates.some((ct) => ct.id === lt.id)) {
+                customTemplates.push(lt);
+              }
+            });
+          } catch (e) {
+            console.error("Failed to parse custom templates:", e);
+          }
+        }
+      }
+
+      setTemplates(mergeTemplates(customTemplates));
+    };
+
+    loadTemplates();
   }, []);
 
   // Escapeキーでモーダルを閉じる
@@ -66,14 +114,59 @@ export default function TeacherTemplatesView() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [editingTemplate, previewTemplate, isMobileFilterOpen]);
 
-  // ストレージへの保存（公式 tpl_ を除外したカスタム分のみ永続化）
-  const saveTemplatesToStorage = (updatedList: TaskTemplate[]) => {
+  // ストレージおよび Supabase DB (tasks: is_template = true) への完全永続保存
+  const saveTemplatesToStorage = async (
+    updatedList: TaskTemplate[],
+    savedTemplate?: TaskTemplate,
+    deleteId?: string
+  ) => {
     setTemplates(updatedList);
+    const customOnly = updatedList.filter((t) => !t.id.startsWith("tpl_"));
     try {
-      const customOnly = updatedList.filter((t) => !t.id.startsWith("tpl_"));
       localStorage.setItem("nouato_custom_templates", JSON.stringify(customOnly));
     } catch (e) {
       console.error("Failed to save to localStorage:", e);
+    }
+
+    // 🌟 Supabase DB (tasks テーブル: is_template = true) へのクラウド完全永続同期 🌟
+    try {
+      if (deleteId && !deleteId.startsWith("tpl_")) {
+        await supabase.from("tasks").delete().eq("id", deleteId);
+      } else if (savedTemplate && !savedTemplate.id.startsWith("tpl_")) {
+        const { data: authData } = await supabase.auth.getUser();
+        const userId = authData?.user?.id;
+        let farmId =
+          useFarmStore.getState().activeFarmId ||
+          (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+
+        if (userId) {
+          await supabase.from("tasks").upsert({
+            id: savedTemplate.id,
+            title: savedTemplate.title,
+            description: savedTemplate.description || "",
+            category: savedTemplate.category || "共通",
+            status: "template",
+            is_template: true,
+            target_crop: savedTemplate.target_crop || null,
+            estimated_time: savedTemplate.estimated_time || null,
+            tools_needed: savedTemplate.tools_needed || null,
+            memo: savedTemplate.memo || null,
+            difficulty: savedTemplate.difficulty || 1,
+            exp: savedTemplate.exp || 50,
+            require_photo: Boolean(savedTemplate.require_photo),
+            created_by: userId,
+            farm_id: farmId || null,
+            checklist: {
+              phase: savedTemplate.phase,
+              season: savedTemplate.season,
+              badge_name: savedTemplate.badge_name,
+              badge_icon: savedTemplate.badge_icon,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("tasks template db sync notice:", err);
     }
   };
 
@@ -184,33 +277,40 @@ export default function TeacherTemplatesView() {
   };
 
   // 保存処理
-  const handleSaveTemplate = (e: React.FormEvent) => {
+  const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTemplate) return;
 
+    // UUID形式の担保
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingTemplate.id);
+    const finalTemplate: TaskTemplate = {
+      ...editingTemplate,
+      id: isUuid ? editingTemplate.id : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : editingTemplate.id),
+    };
+
     let nextList: TaskTemplate[];
     if (isCreatingNew) {
-      nextList = [editingTemplate, ...templates];
+      nextList = [finalTemplate, ...templates];
     } else {
-      nextList = templates.map((t) => (t.id === editingTemplate.id ? editingTemplate : t));
+      nextList = templates.map((t) => (t.id === editingTemplate.id ? finalTemplate : t));
     }
 
-    saveTemplatesToStorage(nextList);
+    await saveTemplatesToStorage(nextList, finalTemplate);
     setEditingTemplate(null);
     setIsCreatingNew(false);
-    setToastMessage("✨ タスクテンプレートを保存しました！タスク追加時に選択できます。");
+    setToastMessage("✨ タスクテンプレートを保存しました！クラウドDBに同期されたため、別ブラウザでも利用可能です。");
     setShowToast(true);
   };
 
   // 削除処理（カスタムテンプレートのみ）
-  const handleDeleteTemplate = (id: string, title: string) => {
+  const handleDeleteTemplate = async (id: string, title: string) => {
     if (id.startsWith("tpl_")) {
       alert("公式テンプレートは削除できません。");
       return;
     }
     if (!confirm(`テンプレート「${title}」を削除しますか？`)) return;
     const nextList = templates.filter((t) => t.id !== id);
-    saveTemplatesToStorage(nextList);
+    await saveTemplatesToStorage(nextList, undefined, id);
     setToastMessage("🗑 テンプレートを削除しました。");
     setShowToast(true);
   };

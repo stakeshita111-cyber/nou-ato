@@ -364,35 +364,67 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     let currentLat = lat;
     let currentLon = lon;
     let currentName = municipalityName;
+    let foundFromDb = false;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("users")
-          .select("weather_location_name, weather_lat, weather_lon")
-          .eq("id", user.id)
-          .single();
+      // 1. Supabase DB (farm_plots) の description から農園の位置情報を取得
+      const { data: plotData } = await supabase
+        .from("farm_plots")
+        .select("id, code, description")
+        .limit(20);
 
-        if (profile && profile.weather_location_name && profile.weather_lat && profile.weather_lon) {
-          currentName = profile.weather_location_name;
-          currentLat = profile.weather_lat;
-          currentLon = profile.weather_lon;
+      if (plotData && plotData.length > 0) {
+        for (const p of plotData) {
+          if (p.description) {
+            try {
+              const meta = typeof p.description === "string" ? JSON.parse(p.description) : p.description;
+              const wLoc = meta?.farm_meta?.weather_location || meta?.weather_location;
+              if (wLoc?.name && wLoc?.lat && wLoc?.lon) {
+                currentName = wLoc.name;
+                currentLat = Number(wLoc.lat);
+                currentLon = Number(wLoc.lon);
+                foundFromDb = true;
+                break;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // 2. users テーブルからの取得（カラムが存在する場合の互換性フォールバック）
+      if (!foundFromDb) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("users")
+            .select("weather_location_name, weather_lat, weather_lon")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (profile && (profile as any).weather_location_name) {
+            currentName = (profile as any).weather_location_name;
+            currentLat = Number((profile as any).weather_lat);
+            currentLon = Number((profile as any).weather_lon);
+            foundFromDb = true;
+          }
         }
       }
     } catch (e) {
       console.log("DB location load fallback to localStorage", e);
     }
 
-    if (currentName === "千葉県千葉市") {
-      const savedName = localStorage.getItem("nouato_weather_city_name");
-      const savedLat = localStorage.getItem("nouato_weather_lat");
-      const savedLon = localStorage.getItem("nouato_weather_lon");
+    // 3. DBに見つからない場合のみ localStorage からフォールバック
+    if (!foundFromDb && (currentName === "千葉県千葉市" || !currentName)) {
+      if (typeof window !== "undefined") {
+        const savedName = localStorage.getItem("nouato_weather_city_name");
+        const savedLat = localStorage.getItem("nouato_weather_lat");
+        const savedLon = localStorage.getItem("nouato_weather_lon");
 
-      if (savedName) currentName = savedName;
-      if (savedLat && savedLon) {
-        currentLat = parseFloat(savedLat);
-        currentLon = parseFloat(savedLon);
+        if (savedName) currentName = savedName;
+        if (savedLat && savedLon) {
+          currentLat = parseFloat(savedLat);
+          currentLon = parseFloat(savedLon);
+        }
       }
     }
 
@@ -412,11 +444,52 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   }, []);
 
   const saveLocationToDBAndStorage = async (cityName: string, latitude: number, longitude: number) => {
-    localStorage.setItem("nouato_weather_city_name", cityName);
-    localStorage.setItem("nouato_weather_lat", latitude.toString());
-    localStorage.setItem("nouato_weather_lon", longitude.toString());
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nouato_weather_city_name", cityName);
+      localStorage.setItem("nouato_weather_lat", latitude.toString());
+      localStorage.setItem("nouato_weather_lon", longitude.toString());
+    }
 
     try {
+      // 1. farm_plots の起点プロット（A1 または先頭プロット）の description に位置情報を永続保存
+      const { data: plotData } = await supabase
+        .from("farm_plots")
+        .select("id, code, description, name, student_id")
+        .or("code.eq.A1,id.eq.plot_cell_A1")
+        .limit(1);
+
+      const targetPlot = plotData && plotData.length > 0 ? plotData[0] : null;
+      if (targetPlot) {
+        let existingMeta: any = {};
+        if (targetPlot.description) {
+          try {
+            existingMeta = typeof targetPlot.description === "string" ? JSON.parse(targetPlot.description) : targetPlot.description;
+          } catch {}
+        }
+        const updatedMeta = {
+          ...existingMeta,
+          weather_location: {
+            name: cityName,
+            lat: latitude,
+            lon: longitude,
+          },
+          farm_meta: {
+            ...(existingMeta.farm_meta || {}),
+            weather_location: {
+              name: cityName,
+              lat: latitude,
+              lon: longitude,
+            },
+          },
+        };
+
+        await supabase
+          .from("farm_plots")
+          .update({ description: JSON.stringify(updatedMeta) })
+          .eq("id", targetPlot.id);
+      }
+
+      // 2. users テーブルへの更新（カラムが存在する場合の互換性保持）
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase
@@ -425,11 +498,11 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             weather_location_name: cityName,
             weather_lat: latitude,
             weather_lon: longitude,
-          })
+          } as any)
           .eq("id", user.id);
       }
     } catch (e) {
-      console.log("Supabase location save sync error:", e);
+      console.log("Supabase location save sync notice:", e);
     }
   };
 

@@ -15,13 +15,14 @@ export interface ThemeSettings {
   // 3. ボタン・インタラクション
   borderRadius: 'none' | 'md' | 'full'; // ボタン形状（四角、角丸、丸）
   buttonPadding: 'normal' | 'large'; // 手袋をしたままでも押しやすい「極大」サイズ
+  outdoorHighContrast: boolean; // 日差しの白飛び防止用高コントラスト
 
   // 4. アプリ固有の表示形式
   dateFormat: 'slash' | 'japanese'; // 「2026/08/11」 or 「8月11日(火)」
   numberFormat: 'raw' | 'comma' | 'unit'; // 「1500」 or 「1,500」 or 「1,500g」
 
   // 5. 機能・画面表示ON/OFF設定
-  showPaymentsMenu: boolean;     // 講師画面: 売上画面メニューの表示ON/OFF
+  showPaymentsMenu: boolean;     // 講師画面: 収支シミュレーションメニューの表示ON/OFF (基本非表示)
   showStudentTalkTab: boolean;   // 生徒画面: 相談・質問タブの表示ON/OFF
 }
 
@@ -40,9 +41,10 @@ const defaultSettings: ThemeSettings = {
   lineHeight: 'relaxed',
   borderRadius: 'md',
   buttonPadding: 'normal',
+  outdoorHighContrast: false,
   dateFormat: 'japanese',
   numberFormat: 'unit',
-  showPaymentsMenu: true,
+  showPaymentsMenu: false, // 収支シミュレーションは基本非表示（設定でON可能）
   showStudentTalkTab: true,
 };
 
@@ -76,6 +78,10 @@ export const useThemeStore = create<ThemeState>()(
               if (newSettings.showStudentTalkTab !== undefined) {
                 localStorage.setItem('nouato_show_student_talk_tab', String(newSettings.showStudentTalkTab));
               }
+              if (newSettings.outdoorHighContrast !== undefined) {
+                localStorage.setItem('nouato_outdoor_contrast', String(newSettings.outdoorHighContrast));
+                document.documentElement.setAttribute('data-contrast', newSettings.outdoorHighContrast ? 'high' : 'normal');
+              }
               const bc = getBroadcastChannel();
               if (bc) {
                 bc.postMessage({ type: 'SETTINGS_UPDATED', settings: next });
@@ -92,6 +98,8 @@ export const useThemeStore = create<ThemeState>()(
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem('nouato_show_student_talk_tab', 'true');
+              localStorage.setItem('nouato_outdoor_contrast', 'false');
+              document.documentElement.setAttribute('data-contrast', 'normal');
               const bc = getBroadcastChannel();
               if (bc) {
                 bc.postMessage({ type: 'SETTINGS_UPDATED', settings: next });

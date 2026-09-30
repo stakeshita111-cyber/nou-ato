@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { VEGETABLE_TASK_TEMPLATES, TaskTemplate } from "@/lib/taskTemplates";
+import { supabase } from "@/lib/supabase";
 
 interface TaskTemplateModalProps {
   onClose: () => void;
@@ -15,19 +16,69 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
   const [allTemplates, setAllTemplates] = useState<TaskTemplate[]>(VEGETABLE_TASK_TEMPLATES);
 
   useEffect(() => {
-    let customTemplates: TaskTemplate[] = [];
-    const saved = localStorage.getItem("nouato_custom_templates");
-    if (saved) {
+    const loadAllTemplates = async () => {
+      let customTemplates: TaskTemplate[] = [];
+
+      // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元
       try {
-        customTemplates = JSON.parse(saved);
+        const { data: dbTemplates } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("is_template", true)
+          .is("deleted_at", null);
+
+        if (dbTemplates && dbTemplates.length > 0) {
+          customTemplates = dbTemplates.map((t: any) => {
+            const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+            return {
+              id: t.id,
+              title: t.title,
+              category: t.category || "共通",
+              target_crop: t.target_crop || "共通",
+              phase: cl.phase || "育成管理",
+              season: cl.season || "通年",
+              estimated_time: t.estimated_time || "30分",
+              tools_needed: t.tools_needed || "軍手",
+              description: t.description || "",
+              memo: t.memo || "",
+              exp: t.exp || 50,
+              difficulty: t.difficulty || 1,
+              require_photo: Boolean(t.require_photo),
+              badge_name: cl.badge_name || "栽培マスター",
+              badge_icon: cl.badge_icon || "🌿",
+            };
+          });
+        }
       } catch (e) {
-        console.error(e);
+        console.warn("TaskTemplateModal db load notice:", e);
       }
-    }
-    const map = new Map<string, TaskTemplate>();
-    VEGETABLE_TASK_TEMPLATES.forEach((tpl) => map.set(tpl.id, tpl));
-    customTemplates.forEach((tpl) => map.set(tpl.id, tpl));
-    setAllTemplates(Array.from(map.values()));
+
+      // 2. localStorage からのキャッシュ補完
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("nouato_custom_templates");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((lt) => {
+                if (!customTemplates.some((ct) => ct.id === lt.id)) {
+                  customTemplates.push(lt);
+                }
+              });
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+
+      const map = new Map<string, TaskTemplate>();
+      VEGETABLE_TASK_TEMPLATES.forEach((tpl) => map.set(tpl.id, tpl));
+      customTemplates.forEach((tpl) => map.set(tpl.id, tpl));
+      setAllTemplates(Array.from(map.values()));
+    };
+
+    loadAllTemplates();
   }, []);
 
   const categories = [

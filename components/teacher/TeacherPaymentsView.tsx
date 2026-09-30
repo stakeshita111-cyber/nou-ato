@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useFarmStore } from "@/store/useFarmStore";
 import Toast from "@/components/ui/Toast";
+import { formatMoney } from "@/lib/utils/formatHelper";
 
 interface PaymentRecord {
   id: string;
@@ -131,9 +132,9 @@ export default function TeacherPaymentsView() {
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       <div>
-        <h2 className="text-2xl font-black text-gray-900">💳 集金・月額会費・売上管理</h2>
+        <h2 className="text-2xl font-black text-gray-900">💳 収支シミュレーション・売上管理</h2>
         <p className="text-xs text-gray-500 mt-1">
-          受講生の月額区画料・資材代の決済状況、LINE催促、月次収支シミュレーションを一括管理します。
+          月次・年間の収支シミュレーション、受講生の月額区画料・決済状況、LINE催促を一括管理します。
         </p>
       </div>
 
@@ -215,7 +216,7 @@ export default function TeacherPaymentsView() {
             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-2.5">
               <div className="flex items-center justify-between text-xs font-bold">
                 <span className="text-gray-900 font-black flex items-center gap-1.5">
-                  <span>📈 収支内訳比率グラフ (想定総収入: ¥{grossRevenue.toLocaleString()})</span>
+                  <span>📈 収支内訳比率グラフ (想定総収入: {formatMoney(grossRevenue)})</span>
                 </span>
                 <span className="text-emerald-800 font-black bg-emerald-100 px-2.5 py-0.5 rounded-md">
                   純利益率: {grossRevenue > 0 ? Math.round((Math.max(0, netProfit) / grossRevenue) * 100) : 0}%
@@ -228,7 +229,7 @@ export default function TeacherPaymentsView() {
                   <div 
                     style={{ width: `${(netProfit / grossRevenue) * 100}%` }}
                     className="bg-emerald-600 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
-                    title={`純利益: ¥${netProfit.toLocaleString()}`}
+                    title={`純利益: ${formatMoney(netProfit)}`}
                   >
                     {Math.round((netProfit / grossRevenue) * 100)}% 純利益
                   </div>
@@ -237,7 +238,7 @@ export default function TeacherPaymentsView() {
                   <div 
                     style={{ width: `${(annualExpenses / grossRevenue) * 100}%` }}
                     className="bg-slate-600 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
-                    title={`年間経費: ¥${annualExpenses.toLocaleString()}`}
+                    title={`年間経費: ${formatMoney(annualExpenses)}`}
                   >
                     {Math.round((annualExpenses / grossRevenue) * 100)}% 経費
                   </div>
@@ -246,7 +247,7 @@ export default function TeacherPaymentsView() {
                   <div 
                     style={{ width: `${(systemFee / grossRevenue) * 100}%` }}
                     className="bg-amber-500 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
-                    title={`システム利用料: ¥${systemFee.toLocaleString()}`}
+                    title={`システム利用料: ${formatMoney(systemFee)}`}
                   >
                     1%
                   </div>
@@ -257,15 +258,15 @@ export default function TeacherPaymentsView() {
               <div className="flex flex-wrap items-center justify-between text-[11px] font-bold text-gray-600 pt-1">
                 <span className="flex items-center gap-1 text-emerald-900">
                   <span className="w-3 h-3 bg-emerald-600 rounded-sm inline-block" />
-                  🌟 手取り純利益: <strong>¥{netProfit.toLocaleString()}</strong>
+                  🌟 手取り純利益: <strong>{formatMoney(netProfit)}</strong>
                 </span>
                 <span className="flex items-center gap-1 text-slate-800">
                   <span className="w-3 h-3 bg-slate-600 rounded-sm inline-block" />
-                  🛠️ 想定経費: <strong>¥{annualExpenses.toLocaleString()}</strong>
+                  🛠️ 想定経費: <strong>{formatMoney(annualExpenses)}</strong>
                 </span>
                 <span className="flex items-center gap-1 text-amber-900">
                   <span className="w-3 h-3 bg-amber-500 rounded-sm inline-block" />
-                  ⚡ システム手数料(1%): <strong>¥{systemFee.toLocaleString()}</strong>
+                  ⚡ システム手数料(1%): <strong>{formatMoney(systemFee)}</strong>
                 </span>
               </div>
             </div>
@@ -276,29 +277,29 @@ export default function TeacherPaymentsView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-1">
             <span className="text-[11px] font-bold text-gray-500 block">💰 年間想定総収入</span>
-            <span className="text-2xl font-black text-gray-900">¥{grossRevenue.toLocaleString()}</span>
+            <span className="text-2xl font-black text-gray-900">{formatMoney(grossRevenue)}</span>
             <span className="text-[10px] text-gray-400 font-medium block">
-              {studentCount}名 × ¥{annualTuitionFee.toLocaleString()}
+              {studentCount}名 × {formatMoney(annualTuitionFee)}
             </span>
           </div>
 
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-1">
             <span className="text-[11px] font-bold text-gray-500 block">🛠️ 年間想定経費</span>
-            <span className="text-2xl font-black text-gray-700">¥{annualExpenses.toLocaleString()}</span>
+            <span className="text-2xl font-black text-gray-700">{formatMoney(annualExpenses)}</span>
             <span className="text-[10px] text-gray-400 font-medium block">手動設定分</span>
           </div>
 
           <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-1">
             <span className="text-[11px] font-bold text-amber-900 block">⚡ システム利用料 (1%)</span>
-            <span className="text-2xl font-black text-amber-900">¥{systemFee.toLocaleString()}</span>
+            <span className="text-2xl font-black text-amber-900">{formatMoney(systemFee)}</span>
             <span className="text-[10px] text-amber-700 font-medium block">総収入の 1.0% 仮設定</span>
           </div>
 
           <div className="bg-emerald-800 text-white p-4 rounded-2xl shadow-md space-y-1">
             <span className="text-[11px] font-bold text-emerald-200 block">🌟 年間手取り想定純利益</span>
-            <span className="text-2xl font-black text-white">¥{netProfit.toLocaleString()}</span>
+            <span className="text-2xl font-black text-white">{formatMoney(netProfit)}</span>
             <span className="text-[10px] text-emerald-100 font-medium block">
-              月換算: 約 ¥{Math.round(netProfit / 12).toLocaleString()}/月
+              月換算: 約 {formatMoney(Math.round(netProfit / 12))}/月
             </span>
           </div>
         </div>
@@ -308,19 +309,19 @@ export default function TeacherPaymentsView() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-gray-500 block">今月の総請求額</span>
-          <span className="text-2xl font-black text-gray-900">¥{totalRevenue.toLocaleString()}</span>
+          <span className="text-2xl font-black text-gray-900">{formatMoney(totalRevenue)}</span>
           <span className="text-[10px] text-gray-400 block">全 {payments.length} 件の請求</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-green-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-[#2e7d32] block">回収済み入金額</span>
-          <span className="text-2xl font-black text-[#2e7d32]">¥{paidRevenue.toLocaleString()}</span>
+          <span className="text-2xl font-black text-[#2e7d32]">{formatMoney(paidRevenue)}</span>
           <span className="text-[10px] text-green-700 font-bold block">回収率 {collectionRate}%</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-red-600 block">未回収・未払い金</span>
-          <span className="text-2xl font-black text-red-600">¥{unpaidRevenue.toLocaleString()}</span>
+          <span className="text-2xl font-black text-red-600">{formatMoney(unpaidRevenue)}</span>
           <span className="text-[10px] text-red-500 font-bold block">
             {payments.filter((p) => p.status !== "paid").length} 件 未完了
           </span>
@@ -382,7 +383,7 @@ export default function TeacherPaymentsView() {
                   </td>
 
                   <td className="py-4 px-6 font-extrabold text-gray-900">
-                    ¥{p.amount.toLocaleString()}
+                    {formatMoney(p.amount)}
                   </td>
 
                   <td className="py-4 px-6 text-xs">

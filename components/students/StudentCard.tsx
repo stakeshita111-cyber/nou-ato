@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { formatDate } from "@/lib/utils/formatHelper";
 
 export type StudentUser = {
   id: string;
@@ -62,7 +63,7 @@ export default function StudentCard({ student }: StudentCardProps) {
       {/* ステータスバッジ */}
       <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-100 text-xs font-bold text-gray-500">
         <span>登録日</span>
-        <span>{student.created_at ? new Date(student.created_at).toLocaleDateString() : "最近"}</span>
+        <span>{student.created_at ? formatDate(student.created_at) : "最近"}</span>
       </div>
     </div>
   );

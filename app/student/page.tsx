@@ -15,6 +15,7 @@ import Toast from "@/components/ui/Toast";
 import WeatherWidget from "@/components/ui/WeatherWidget";
 import EventCalendar from "@/components/ui/EventCalendar";
 import { SproutLoader } from "@/components/SproutLoader";
+import { formatDate } from "@/lib/utils/formatHelper";
 
 export default function StudentPage() {
   const router = useRouter();
@@ -537,13 +538,10 @@ export default function StudentPage() {
                         <span>👤 {bc.sender || "講師"}</span>
                       </span>
                       <span className="text-[10px] text-gray-500 font-semibold">
-                        {bc.created_at ? new Date(bc.created_at).toLocaleString("ja-JP", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
+                        {bc.created_at ? `${formatDate(bc.created_at)} ${new Date(bc.created_at).toLocaleTimeString("ja-JP", {
                           hour: "2-digit",
                           minute: "2-digit",
-                        }) : "最新"}
+                        })}` : "最新"}
                       </span>
                     </div>
                     <h4 className="font-extrabold text-sm text-gray-900 leading-snug">

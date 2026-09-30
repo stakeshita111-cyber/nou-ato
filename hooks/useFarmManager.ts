@@ -118,8 +118,48 @@ export function useFarmManager() {
   const [supabaseStudents, setSupabaseStudents] = useState<StudentProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // 🌟 畑サイズ（行列数）および未割当区画のデフォルト畝数の永続化State 🌟
+  const [gridCols, setGridCols] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nouato_grid_dimensions");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.cols) return Number(parsed.cols);
+        }
+      } catch (e) {}
+    }
+    return 6;
+  });
+
+  const [gridRows, setGridRows] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nouato_grid_dimensions");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.rows) return Number(parsed.rows);
+        }
+      } catch (e) {}
+    }
+    return 8;
+  });
+
+  const [unassignedBedsCount, setUnassignedBedsCount] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nouato_unassigned_beds_count");
+        if (saved) return Number(saved) || 7;
+      } catch (e) {}
+    }
+    return 7;
+  });
+
   // 🌟 連続操作・競合防止のための最新Ref & 保存ガード 🌟
   const plotsRef = useRef<FarmPlot[]>(plots);
+  const gridColsRef = useRef<number>(gridCols);
+  const gridRowsRef = useRef<number>(gridRows);
+  const unassignedBedsRef = useRef<number>(unassignedBedsCount);
   const isSavingRef = useRef<boolean>(false);
   const lastSaveTimeRef = useRef<number>(0);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
@@ -127,6 +167,18 @@ export function useFarmManager() {
   useEffect(() => {
     plotsRef.current = plots;
   }, [plots]);
+
+  useEffect(() => {
+    gridColsRef.current = gridCols;
+  }, [gridCols]);
+
+  useEffect(() => {
+    gridRowsRef.current = gridRows;
+  }, [gridRows]);
+
+  useEffect(() => {
+    unassignedBedsRef.current = unassignedBedsCount;
+  }, [unassignedBedsCount]);
 
   const reloadAllFromSupabase = useCallback(async () => {
     try {
@@ -311,10 +363,50 @@ export function useFarmManager() {
       // 🌟 セルアドレス (code) 絶対位置マップを動的サイズで構築 🌟
       let detectedCols = 6;
       let detectedRows = 8;
+      let detectedDefaultBeds = 7;
       let hasExplicitSavedDims = false;
-      if (typeof window !== "undefined") {
+
+      // ① Supabase DB (farm_plots) の description から保存された grid_dimensions を最優先で探索
+      if (dbPlots && dbPlots.length > 0) {
+        for (const dp of dbPlots) {
+          if (dp.description) {
+            try {
+              const meta = typeof dp.description === "string" ? JSON.parse(dp.description) : dp.description;
+              if (meta?.grid_dimensions?.cols && meta?.grid_dimensions?.rows) {
+                // 農園IDが一致するか、または同一システム内設定なら採用
+                if (!meta.grid_dimensions.farm_id || meta.grid_dimensions.farm_id === effectiveActiveId) {
+                  detectedCols = Number(meta.grid_dimensions.cols);
+                  detectedRows = Number(meta.grid_dimensions.rows);
+                  if (meta.grid_dimensions.unassigned_beds) {
+                    detectedDefaultBeds = Number(meta.grid_dimensions.unassigned_beds);
+                  }
+                  hasExplicitSavedDims = true;
+                }
+
+                // 🌟 農園住所 & 天気位置情報の自動復元 🌟
+                const farmMeta = meta.farm_meta || meta;
+                if (farmMeta.address && typeof window !== "undefined") {
+                  localStorage.setItem("nouato_farm_address", farmMeta.address);
+                }
+                const wLoc = farmMeta.weather_location || meta.weather_location;
+                if (wLoc?.name && wLoc?.lat && wLoc?.lon && typeof window !== "undefined") {
+                  localStorage.setItem("nouato_weather_city_name", wLoc.name);
+                  localStorage.setItem("nouato_weather_lat", String(wLoc.lat));
+                  localStorage.setItem("nouato_weather_lon", String(wLoc.lon));
+                }
+
+                if (hasExplicitSavedDims) break;
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      // ② DBにない場合: localStorage からの復元を試行
+      if (!hasExplicitSavedDims && typeof window !== "undefined") {
         try {
-          const savedDims = localStorage.getItem("nouato_grid_dimensions");
+          const farmDimsKey = `nouato_grid_dimensions_${effectiveActiveId}`;
+          const savedDims = localStorage.getItem(farmDimsKey) || localStorage.getItem("nouato_grid_dimensions");
           if (savedDims) {
             const parsed = JSON.parse(savedDims);
             if (parsed.cols) {
@@ -326,12 +418,17 @@ export function useFarmManager() {
               hasExplicitSavedDims = true;
             }
           }
+          const savedBedsStr = localStorage.getItem("nouato_unassigned_beds_count");
+          if (savedBedsStr) {
+            detectedDefaultBeds = Number(savedBedsStr) || 7;
+          }
         } catch (e) {}
       }
 
+      // ③ DBにもlocalStorageにもない場合: 既存プロットから非空き区画の最大列・行を検出
       if (!hasExplicitSavedDims) {
         loadedBasePlots.forEach((p) => {
-          if (p.code) {
+          if (p.code && !p.is_vacant) {
             const colChar = p.code.charAt(0).toUpperCase();
             const cNum = colChar.charCodeAt(0) - 64;
             const rNum = parseInt(p.code.slice(1), 10);
@@ -341,15 +438,23 @@ export function useFarmManager() {
         });
       }
 
-      let savedDefaultBeds = 4;
+      // 確定した行列数・畝数を最新State & Ref & localStorage へ完全同期
+      setGridCols(detectedCols);
+      setGridRows(detectedRows);
+      setUnassignedBedsCount(detectedDefaultBeds);
+      gridColsRef.current = detectedCols;
+      gridRowsRef.current = detectedRows;
+      unassignedBedsRef.current = detectedDefaultBeds;
+
       if (typeof window !== "undefined") {
         try {
-          const savedBedsStr = localStorage.getItem("nouato_unassigned_beds_count");
-          if (savedBedsStr) savedDefaultBeds = Number(savedBedsStr) || 4;
+          localStorage.setItem("nouato_grid_dimensions", JSON.stringify({ cols: detectedCols, rows: detectedRows }));
+          localStorage.setItem(`nouato_grid_dimensions_${effectiveActiveId}`, JSON.stringify({ cols: detectedCols, rows: detectedRows }));
+          localStorage.setItem("nouato_unassigned_beds_count", String(detectedDefaultBeds));
         } catch (e) {}
       }
 
-      const finalFixedPlots = buildFixedPlots(effectiveActiveId, loadedBasePlots, detectedCols, detectedRows, savedDefaultBeds);
+      const finalFixedPlots = buildFixedPlots(effectiveActiveId, loadedBasePlots, detectedCols, detectedRows, detectedDefaultBeds);
 
       // 🌟 1. journals からの未承認の収穫完了報告を「区画コード_畝番号」の完全一致で収集 🌟
       const pendingApprovalMap = new Map<string, {
@@ -432,7 +537,7 @@ export function useFarmManager() {
         rawActiveBeds.sort((a, b) => (parseInt(a.bed_number) || 0) - (parseInt(b.bed_number) || 0));
 
         // 🌟 登録されているベッド数を正確に反映 🌟
-        const defaultSlotCount = plot.beds?.length ? plot.beds.filter((b) => b.status !== "archived").length : savedDefaultBeds;
+        const defaultSlotCount = plot.beds?.length ? plot.beds.filter((b) => b.status !== "archived").length : detectedDefaultBeds;
         const activeCount = rawActiveBeds.length > 0 ? rawActiveBeds.length : defaultSlotCount;
         const bedList: FarmBed[] = [];
 
@@ -523,33 +628,37 @@ export function useFarmManager() {
     }
   }, [activeFarmId]);
 
-  // 🌟 D&D位置移動・スワップ結果を Supabase DB および localStorage へ完全永続保存する関数 🌟
-  const savePlotsGridIndicesToSupabase = async (updatedPlots: FarmPlot[]) => {
+  // 🌟 D&D位置移動・スワップ結果および畑サイズ設定を Supabase DB および localStorage へ完全永続保存する関数 🌟
+  const savePlotsGridIndicesToSupabase = async (
+    updatedPlots: FarmPlot[],
+    explicitDims?: { cols?: number; rows?: number; unassigned_beds?: number }
+  ) => {
     setPlots(updatedPlots);
     plotsRef.current = updatedPlots;
     isSavingRef.current = true;
     lastSaveTimeRef.current = Date.now();
 
+    const currentCols = explicitDims?.cols ?? gridColsRef.current ?? gridCols ?? 6;
+    const currentRows = explicitDims?.rows ?? gridRowsRef.current ?? gridRows ?? 8;
+    const currentBeds = explicitDims?.unassigned_beds ?? unassignedBedsRef.current ?? unassignedBedsCount ?? 7;
+
+    gridColsRef.current = currentCols;
+    gridRowsRef.current = currentRows;
+    unassignedBedsRef.current = currentBeds;
+
     try {
       localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
       localStorage.setItem(`nouato_farm_plots_${activeFarmId}`, JSON.stringify(updatedPlots));
+      localStorage.setItem("nouato_grid_dimensions", JSON.stringify({ cols: currentCols, rows: currentRows }));
+      localStorage.setItem(`nouato_grid_dimensions_${activeFarmId}`, JSON.stringify({ cols: currentCols, rows: currentRows }));
+      localStorage.setItem("nouato_unassigned_beds_count", String(currentBeds));
     } catch (e) {
       console.error(e);
     }
 
     // Supabase DB への超高速一括バルク保存/同期 (DBスキーマ適合)
     try {
-      // 1. farm_plots の一括 upsert (カラム: id, name, code, student_id, description のみ)
-      // localStorage へ全メタデータを即座に完全保存
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
-        } catch (e) {
-          console.error("localStorage save error:", e);
-        }
-      }
-
-      // 1. farm_plots の一括 upsert (description に is_vacant および beds_meta を安全に埋め込み)
+      // 1. farm_plots の一括 upsert (description に is_vacant, beds_meta, および grid_dimensions を完全埋め込み永続化)
       const plotsToUpsert = updatedPlots
         .filter((plot) => plot && !plot.id.startsWith("plot_placeholder_"))
         .map((plot) => {
@@ -573,12 +682,37 @@ export function useFarmManager() {
             }
           });
 
+          let farmAddress = "";
+          let weatherLocation: any = null;
+          if (typeof window !== "undefined") {
+            farmAddress = localStorage.getItem("nouato_farm_address") || "";
+            const wName = localStorage.getItem("nouato_weather_city_name");
+            const wLat = localStorage.getItem("nouato_weather_lat");
+            const wLon = localStorage.getItem("nouato_weather_lon");
+            if (wName && wLat && wLon) {
+              weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
+            }
+          }
+
           return {
             id: plot.id,
             name: plotName,
             code: plot.code,
             student_id: isVac ? null : (plot.student_id || null),
-            description: JSON.stringify({ is_vacant: isVac, beds_meta: bedsMeta }),
+            description: JSON.stringify({
+              is_vacant: isVac,
+              beds_meta: bedsMeta,
+              grid_dimensions: {
+                cols: currentCols,
+                rows: currentRows,
+                unassigned_beds: currentBeds,
+                farm_id: activeFarmId,
+              },
+              farm_meta: {
+                address: farmAddress,
+                weather_location: weatherLocation,
+              },
+            }),
           };
         });
 
@@ -1020,6 +1154,8 @@ export function useFarmManager() {
   };
   // 🌟【新機能 2.6】未割り当ての全区画の畝数を一括変更する関数 (Supabase DB 完全永続化) 🌟
   const updateAllUnassignedBedsCount = async (newCount: number) => {
+    setUnassignedBedsCount(newCount);
+    unassignedBedsRef.current = newCount;
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("nouato_unassigned_beds_count", String(newCount));
@@ -1046,7 +1182,7 @@ export function useFarmManager() {
     });
 
     setPlots(nextPlots);
-    await savePlotsGridIndicesToSupabase(nextPlots);
+    await savePlotsGridIndicesToSupabase(nextPlots, { unassigned_beds: newCount });
 
     // 不要な旧超過ベッドを DB から削除
     try {
@@ -1941,6 +2077,12 @@ export function useFarmManager() {
     setFarms,
     activeFarmId,
     setActiveFarmId,
+    gridCols,
+    setGridCols,
+    gridRows,
+    setGridRows,
+    unassignedBedsCount,
+    setUnassignedBedsCount,
     addFarm: async (name: string) => {
       const generatedId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `farm_${Date.now()}`;
       const newFarm: Farm = {

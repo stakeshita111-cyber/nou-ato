@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { FarmBed, FarmPlot } from "@/types/farm";
 import Toast from "@/components/ui/Toast";
-import { useTheme, ThemeColor, FontSize } from "@/context/ThemeContext";
+import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
 import BedApprovalNotificationBanner from "@/components/teacher/BedApprovalNotificationBanner";
 import BedApprovalModal from "@/components/farm/BedApprovalModal";
 import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
@@ -33,6 +33,12 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     setFarms,
     activeFarmId,
     setActiveFarmId,
+    gridCols,
+    setGridCols,
+    gridRows,
+    setGridRows,
+    unassignedBedsCount,
+    setUnassignedBedsCount,
     addFarm,
     plots,
     setPlots,
@@ -109,7 +115,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           if (isBedIdMatch || matchCodeAndBed) {
             combined.push({
               id: r.id,
-              date: r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString("ja-JP") : "記録日"),
+              date: r.date ? formatDate(r.date) : (r.created_at ? formatDate(r.created_at) : "記録日"),
               notes: r.notes || "観察記録",
               photo_url: r.photo_url || r.image_url,
               growth_stage: r.growth_stage || "作業記録",
@@ -130,7 +136,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
             if (hasBedHint) {
               combined.push({
                 id: j.id,
-                date: j.created_at ? new Date(j.created_at).toLocaleDateString("ja-JP") : "最近",
+                date: j.created_at ? formatDate(j.created_at) : "最近",
                 notes: content,
                 photo_url: j.image_url || j.photo_url,
                 growth_stage: j.task_title || "💡 質問・相談日誌",
@@ -212,8 +218,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
-  const { themeColor, fontSize, applyTheme } = useTheme();
-
   // 農園・代表者設定 Modal State (農園名・講師名・メールアドレス・住所)
   const [showFarmSettingsModal, setShowFarmSettingsModal] = useState(false);
   const [farmSettingsName, setFarmSettingsName] = useState("");
@@ -240,42 +244,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
   const [showGridlines, setShowGridlines] = useState<boolean>(true);
 
-  // 🌟 Excelスタイル正方形グリッド (初期値はlocalStorageまたはDBプロットから復元) 🌟
-  const [gridCols, setGridCols] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("nouato_grid_dimensions");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.cols) return Number(parsed.cols);
-        }
-      } catch (e) {}
-    }
-    return 6;
-  });
-
-  const [gridRows, setGridRows] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("nouato_grid_dimensions");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.rows) return Number(parsed.rows);
-        }
-      } catch (e) {}
-    }
-    return 8;
-  });
-
-  const [unassignedBedsCount, setUnassignedBedsCount] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("nouato_unassigned_beds_count");
-        if (saved) return Number(saved) || 7;
-      } catch (e) {}
-    }
-    return 7;
-  });
+  // 🌟 Excelスタイル正方形グリッド（useFarmManagerでDB・localStorage・農園設定と完全自動同期） 🌟
 
   const [draggedGridIndex, setDraggedGridIndex] = useState<number | null>(null);
   const [dragOverPlotCode, setDragOverPlotCode] = useState<string | null>(null);
@@ -552,7 +521,11 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
     setPlots(updatedPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
-    await savePlotsGridIndicesToSupabase(updatedPlots);
+    await savePlotsGridIndicesToSupabase(updatedPlots, {
+      cols: newCols,
+      rows: gridRows,
+      unassigned_beds: defaultBeds,
+    });
 
     if (releasedStudentCount > 0) {
       setToastMessage(`🎯 盤面を ${newCols} 列に変更し、非表示になった受講生（${releasedStudentCount}名）を未割り当て一覧に戻しました`);
@@ -648,7 +621,11 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
     setPlots(updatedPlots);
     localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
-    await savePlotsGridIndicesToSupabase(updatedPlots);
+    await savePlotsGridIndicesToSupabase(updatedPlots, {
+      cols: gridCols,
+      rows: newRows,
+      unassigned_beds: defaultBeds,
+    });
 
     if (releasedStudentCount > 0) {
       setToastMessage(`🎯 盤面を ${newRows} 行に変更し、非表示になった受講生（${releasedStudentCount}名）を未割り当て一覧に戻しました`);
@@ -678,6 +655,24 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
           if (uData?.display_name) setOwnerNameInput(uData.display_name);
           if (uData?.email) setEmailInput(uData.email);
+        }
+
+        // 🌟 DB plots の description から農園住所を完全復元 🌟
+        if (plots && plots.length > 0) {
+          for (const p of plots) {
+            if (p.description) {
+              try {
+                const meta = typeof p.description === "string" ? JSON.parse(p.description) : p.description;
+                if (meta?.farm_meta?.address) {
+                  setFarmAddressInput(meta.farm_meta.address);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("nouato_farm_address", meta.farm_meta.address);
+                  }
+                  break;
+                }
+              } catch {}
+            }
+          }
         }
       } catch (err) {
         console.error("fetchUserAndFarm error:", err);
@@ -716,6 +711,9 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
           .update({ name: cleanFarm, owner_id: authData.user.id })
           .eq("id", activeFarmId);
       }
+
+      // 🌟 農園住所を Supabase DB (farm_plots の farm_meta) へ完全永続保存 🌟
+      await savePlotsGridIndicesToSupabase(plots);
 
       setShowFarmSettingsModal(false);
       setToastMessage("✨ 農園設定（農園名・代表者氏名・メールアドレス・住所）を確定保存しました！");
@@ -1768,7 +1766,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
                                       <div className="flex items-center gap-1.5">
                                         {r.harvest_amount && (
                                           <span className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-black">
-                                            収穫: {r.harvest_amount}
+                                            収穫: {formatHarvestAmount(r.harvest_amount)}
                                           </span>
                                         )}
                                         {r.growth_stage && (

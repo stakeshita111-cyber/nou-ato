@@ -4,6 +4,7 @@ import { useState } from "react";
 import Toast from "@/components/ui/Toast";
 import EventCalendar from "@/components/ui/EventCalendar";
 import { useEvents } from "@/hooks/useEvents";
+import { formatDate } from "@/lib/utils/formatHelper";
 
 export default function TeacherEventsView() {
   const { events, addEvent, approveAttendee } = useEvents();
@@ -38,7 +39,7 @@ export default function TeacherEventsView() {
     await addEvent({
       title: newTitle,
       date: newDate,
-      dateDisplay: `${newDate} 開催`,
+      dateDisplay: `${formatDate(newDate)} 開催`,
       time: newTime,
       location: `${farmName} メインエリア`,
       capacity: newCapacity,

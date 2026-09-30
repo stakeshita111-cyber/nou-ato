@@ -1,6 +1,7 @@
 "use client";
 
 import { FarmPlot, FarmBed } from "@/types/farm";
+import { formatHarvestAmount } from "@/lib/utils/formatHelper";
 
 interface PendingApprovalItem {
   plot: FarmPlot;
@@ -80,7 +81,7 @@ export default function BedApprovalNotificationBanner({
                   </span>
                 </div>
                 <p className="text-xs text-gray-700 font-bold line-clamp-1">
-                  {bed.total_harvest ? "🧺 総収穫量: " + bed.total_harvest : "🎉 収穫完了"}
+                  {bed.total_harvest ? "🧺 総収穫量: " + formatHarvestAmount(bed.total_harvest) : "🎉 収穫完了"}
                   {bed.completion_notes ? " / 「" + bed.completion_notes + "」" : ""}
                 </p>
               </div>

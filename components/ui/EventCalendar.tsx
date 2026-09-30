@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { EventItem } from "@/types/event";
+import { formatDate } from "@/lib/utils/formatHelper";
 
 interface EventCalendarProps {
   events: EventItem[];
@@ -218,7 +219,7 @@ export default function EventCalendar({
                 >
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-black">
-                      📅 {ev.date} ({ev.time})
+                      📅 {formatDate(ev.date)} ({ev.time})
                     </span>
                     <h5 className="font-extrabold text-gray-900 text-sm mt-1">{ev.title}</h5>
                     <p className="text-gray-500 text-[11px]">📍 {ev.location}</p>
@@ -237,7 +238,7 @@ export default function EventCalendar({
           <div className="flex items-center space-x-2">
             <span className="text-base">📅</span>
             <h4 className="font-extrabold text-gray-900 text-sm">
-              選択日: {selectedDateStr} のイベント ({selectedDateEvents.length}件)
+              選択日: {formatDate(selectedDateStr)} のイベント ({selectedDateEvents.length}件)
             </h4>
           </div>
 
