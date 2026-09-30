@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -54,6 +54,29 @@ export default function StudentPage() {
     return "myfarm";
   });
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  // メニュー外（画面外）クリック・タッチ検知でアカウントメニューを閉じる
+  useEffect(() => {
+    if (!showAccountMenu) return;
+
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowAccountMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showAccountMenu]);
 
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
@@ -314,7 +337,7 @@ export default function StudentPage() {
         </div>
 
         {/* 右上アカウント・ドロップダウンボタン */}
-        <div className="relative">
+        <div className="relative" ref={accountMenuRef}>
           <button
             onClick={() => setShowAccountMenu(!showAccountMenu)}
             className="p-1.5 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100 transition flex items-center justify-center font-bold text-lg"
@@ -332,13 +355,17 @@ export default function StudentPage() {
 
               <Link
                 href="/login"
+                onClick={() => setShowAccountMenu(false)}
                 className="block px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-xl font-medium"
               >
                 ↩️ ログイン画面に戻る
               </Link>
 
               <button
-                onClick={handleLogout}
+                onClick={() => {
+                  setShowAccountMenu(false);
+                  handleLogout();
+                }}
                 className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 rounded-xl font-bold flex items-center space-x-1 transition cursor-pointer"
               >
                 <span>🚪 ログアウト</span>
