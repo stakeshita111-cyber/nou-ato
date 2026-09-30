@@ -366,6 +366,19 @@ export default function TeacherStudentsView() {
           },
         ];
 
+        // 農園未特定環境・デモ環境でも全受講生に確実に届くよう、farm_id: null の全体配信レコードも併せて追加
+        if (validFarmId) {
+          journalInserts.push({
+            role: "broadcast",
+            student_id: null,
+            farm_id: null,
+            text: broadcastTitle.trim(),
+            content: broadcastBody.trim(),
+            reply: `講師配信: ${effectiveFarmName || "当農園"}`,
+            created_at: nowStr,
+          });
+        }
+
         // 登録中の全生徒ID宛てにも個別レコードを作成（UUID形式のもののみ安全に追加）
         if (students && students.length > 0) {
           students.forEach((s) => {

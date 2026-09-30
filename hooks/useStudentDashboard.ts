@@ -259,20 +259,43 @@ export function useStudentDashboard() {
         try {
           const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
-          let bcQuery = supabase
-            .from("journals")
-            .select("*")
-            .or("role.eq.broadcast,role.eq.announcement")
-            .order("created_at", { ascending: false });
-
+          // 1. 対象範囲のOR条件を構築:
+          //    - ログイン生徒自身宛て (student_id.eq.currentStudentId)
+          //    - 自農園宛て (farm_id.eq.studentFarmId)
+          //    - 全農園・全体宛て (farm_id.is.null)
+          //    - 全生徒宛て (student_id.is.null)
+          const scopeConditions: string[] = ["farm_id.is.null", "student_id.is.null"];
+          if (currentStudentId && isUuid(currentStudentId)) {
+            scopeConditions.push(`student_id.eq.${currentStudentId}`);
+          }
           if (studentFarmId && isUuid(studentFarmId)) {
-            bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+            scopeConditions.push(`farm_id.eq.${studentFarmId}`);
           }
 
-          const { data, error } = await bcQuery;
+          // .in("role", ["broadcast", "announcement"]) を使い、.or() は scopeConditions のみで単一呼び出しにする
+          const { data, error } = await supabase
+            .from("journals")
+            .select("*")
+            .in("role", ["broadcast", "announcement"])
+            .or(scopeConditions.join(","))
+            .order("created_at", { ascending: false })
+            .limit(30);
+
           if (data && data.length > 0) {
             bcData = data as Record<string, unknown>[];
-          } else if (error) {
+          } else {
+            // フォールバック: テスト環境や農園ID未紐付け時でも配信を逃さないよう、直近の全体お知らせを確実に取得
+            const { data: fallbackData } = await supabase
+              .from("journals")
+              .select("*")
+              .in("role", ["broadcast", "announcement"])
+              .order("created_at", { ascending: false })
+              .limit(10);
+            if (fallbackData && fallbackData.length > 0) {
+              bcData = fallbackData as Record<string, unknown>[];
+            }
+          }
+          if (error) {
             console.warn("useStudentDashboard bcQuery error:", error);
           }
         } catch (e) {
@@ -399,7 +422,13 @@ export function useStudentDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => fetchData())
       .subscribe();
 
+    // 🌟 6. バックグラウンド定期ポーリング (10秒間隔: InPrivateモードや別ブラウザでのリアルタイム同期支援) 🌟
+    const pollInterval = setInterval(() => {
+      fetchData();
+    }, 10000);
+
     return () => {
+      clearInterval(pollInterval);
       if (bc) bc.close();
       window.removeEventListener("nouato_sync_event", handleCustomSync);
       window.removeEventListener("storage", handleStorage);
