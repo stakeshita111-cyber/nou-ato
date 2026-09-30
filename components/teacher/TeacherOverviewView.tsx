@@ -47,15 +47,6 @@ export default function TeacherOverviewView({
 
   const [origin, setOrigin] = useState("http://localhost:3000");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
-    }
-    fetchCounts(farmId);
-  }, [farmId]);
-
-  const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
-
   const fetchCounts = async (targetFarmId?: string) => {
     const currentFid = targetFarmId || farmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
 
@@ -129,6 +120,15 @@ export default function TeacherOverviewView({
       setUnrepliedCount(0);
     }
   };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+    fetchCounts(farmId);
+  }, [farmId]);
+
+  const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl);

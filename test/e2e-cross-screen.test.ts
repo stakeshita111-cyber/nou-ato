@@ -28,15 +28,15 @@ interface JournalEntry {
 describe("E2E Cross-Screen Flow Tests (画面横断・E2Eシナリオ検証)", () => {
   // 模擬データベース
   let currentSession: UserSession | null = null;
-  let tasks: TaskItem[] = [
+  const tasks: TaskItem[] = [
     { id: "task-1", title: "土作りと畝立て", status: "todo", category: "準備" },
     { id: "task-2", title: "トマトの苗植え", status: "todo", category: "定植" },
     { id: "task-3", title: "支柱立てと芽かき", status: "todo", category: "管理" },
     { id: "task-4", title: "追肥と土寄せ", status: "todo", category: "管理" },
     { id: "task-5", title: "収穫と片付け", status: "todo", category: "収穫" },
   ];
-  let journals: JournalEntry[] = [];
-  let broadcastAnnouncements: { id: string; title: string; content: string }[] = [];
+  const journals: JournalEntry[] = [];
+  const broadcastAnnouncements: { id: string; title: string; content: string }[] = [];
 
   describe("Scenario 1: ログイン ➔ ロール別画面ルーティング ➔ 権限制御", () => {
     it("未ログイン状態では画面アクセスが遮断されること", () => {

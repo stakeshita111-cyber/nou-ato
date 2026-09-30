@@ -449,10 +449,10 @@ export function useFarmManager() {
             status = "completed_pending";
           }
 
-          let total_harvest = pendingData?.total_harvest || ((status === "completed_pending" || status === "rejected") ? dbB?.total_harvest : undefined);
-          let completion_notes = pendingData?.completion_notes || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_notes : undefined);
-          let completion_image_url = pendingData?.completion_image_url || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_image_url : undefined);
-          let season = dbB?.season || "2026年 秋冬";
+          const total_harvest = pendingData?.total_harvest || ((status === "completed_pending" || status === "rejected") ? dbB?.total_harvest : undefined);
+          const completion_notes = pendingData?.completion_notes || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_notes : undefined);
+          const completion_image_url = pendingData?.completion_image_url || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_image_url : undefined);
+          const season = dbB?.season || "2026年 秋冬";
 
           // 最新の観察記録を取得 (該当スロットIDまたは元のdbB.id)
           let latest: CropRecord | undefined = undefined;

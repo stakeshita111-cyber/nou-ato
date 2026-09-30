@@ -175,251 +175,13 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     adviceShort: "🌱 作業好天！追肥・収穫・観察を進行してください。",
   });
 
-  useEffect(() => {
-    loadSavedLocation();
-  }, []);
-
-  const loadSavedLocation = async () => {
-    let currentLat = lat;
-    let currentLon = lon;
-    let currentName = municipalityName;
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("users")
-          .select("weather_location_name, weather_lat, weather_lon")
-          .eq("id", user.id)
-          .single();
-
-        if (profile && profile.weather_location_name && profile.weather_lat && profile.weather_lon) {
-          currentName = profile.weather_location_name;
-          currentLat = profile.weather_lat;
-          currentLon = profile.weather_lon;
-        }
-      }
-    } catch (e) {
-      console.log("DB location load fallback to localStorage", e);
-    }
-
-    if (currentName === "千葉県千葉市") {
-      const savedName = localStorage.getItem("nouato_weather_city_name");
-      const savedLat = localStorage.getItem("nouato_weather_lat");
-      const savedLon = localStorage.getItem("nouato_weather_lon");
-
-      if (savedName) currentName = savedName;
-      if (savedLat && savedLon) {
-        currentLat = parseFloat(savedLat);
-        currentLon = parseFloat(savedLon);
-      }
-    }
-
-    setMunicipalityName(currentName);
-    setLat(currentLat);
-    setLon(currentLon);
-
-    setSelectedMapLat(currentLat);
-    setSelectedMapLon(currentLon);
-    setSelectedMapCityName(currentName);
-
-    fetchLiveWeather(currentName, currentLat, currentLon);
-  };
-
-  const saveLocationToDBAndStorage = async (cityName: string, latitude: number, longitude: number) => {
-    localStorage.setItem("nouato_weather_city_name", cityName);
-    localStorage.setItem("nouato_weather_lat", latitude.toString());
-    localStorage.setItem("nouato_weather_lon", longitude.toString());
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from("users")
-          .update({
-            weather_location_name: cityName,
-            weather_lat: latitude,
-            weather_lon: longitude,
-          })
-          .eq("id", user.id);
-      }
-    } catch (e) {
-      console.log("Supabase location save sync error:", e);
-    }
-  };
-
-  const fetchMunicipalityNameFromCoords = async (latitude: number, longitude: number): Promise<string> => {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=ja`);
-      if (res.ok) {
-        const data = await res.json();
-        const addr = data.address;
-        if (addr) {
-          const province = addr.province || addr.state || "";
-          const city = addr.city || addr.town || addr.village || addr.county || addr.suburb || "";
-          const resultName = `${province}${city}`.trim();
-          if (resultName) return resultName;
-        }
-      }
-    } catch (err) {
-      console.error("Reverse geocoding error:", err);
-    }
-    return "指定地域の農園";
-  };
-
-  useEffect(() => {
-    if (isLocationModalOpen && mapContainerRef.current) {
-      if (!(window as any).L) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(link);
-
-        const script = document.createElement("script");
-        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        script.onload = () => initCenterPinMap();
-        document.body.appendChild(script);
-      } else {
-        initCenterPinMap();
-      }
-    }
-
-    return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-      }
-    };
-  }, [isLocationModalOpen]);
-
-  const initCenterPinMap = () => {
-    const L = (window as any).L;
-    if (!L || !mapContainerRef.current) return;
-
-    if (leafletMapRef.current) {
-      leafletMapRef.current.remove();
-    }
-
-    const map = L.map(mapContainerRef.current, {
-      zoomControl: true,
-    }).setView([selectedMapLat, selectedMapLon], 12);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
-
-    leafletMapRef.current = map;
-
-    let timer: any;
-    map.on("moveend", () => {
-      clearTimeout(timer);
-      timer = setTimeout(async () => {
-        const center = map.getCenter();
-        const cLat = Math.round(center.lat * 10000) / 10000;
-        const cLon = Math.round(center.lng * 10000) / 10000;
-
-        setSelectedMapLat(cLat);
-        setSelectedMapLon(cLon);
-
-        const cityName = await fetchMunicipalityNameFromCoords(cLat, cLon);
-        setSelectedMapCityName(cityName);
-      }, 300);
-    });
-  };
-
-  const handleSearchCity = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
-    try {
-      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery.trim())}&language=ja&count=5`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          const formatted = data.results.map((item: any) => ({
-            name: `${item.admin1 || ""} ${item.name}`.trim(),
-            lat: Math.round(item.latitude * 10000) / 10000,
-            lon: Math.round(item.longitude * 10000) / 10000,
-          }));
-          setSearchResults(formatted);
-
-          const first = formatted[0];
-          updateMapCenter(first.name, first.lat, first.lon);
-        } else {
-          setSearchResults([]);
-          setToastMessage("⚠️ 該当する市町村が見つかりませんでした。");
-          setShowToast(true);
-        }
-      }
-    } catch (err) {
-      console.error("City search error:", err);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const updateMapCenter = (cityName: string, latitude: number, longitude: number) => {
-    setSelectedMapCityName(cityName);
-    setSelectedMapLat(latitude);
-    setSelectedMapLon(longitude);
-
-    if (leafletMapRef.current) {
-      leafletMapRef.current.setView([latitude, longitude], 12);
-    }
-  };
-
-  const handleGetCurrentLocationInModal = () => {
-    if (!navigator.geolocation) {
-      setToastMessage("⚠️ お使いの端末の位置情報機能に対応していません");
-      setShowToast(true);
-      return;
-    }
-
-    setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const latitude = Math.round(pos.coords.latitude * 10000) / 10000;
-        const longitude = Math.round(pos.coords.longitude * 10000) / 10000;
-        
-        const cityName = await fetchMunicipalityNameFromCoords(latitude, longitude);
-
-        setMunicipalityName(cityName);
-        setLat(latitude);
-        setLon(longitude);
-
-        setSelectedMapCityName(cityName);
-        setSelectedMapLat(latitude);
-        setSelectedMapLon(longitude);
-
-        await saveLocationToDBAndStorage(cityName, latitude, longitude);
-        await fetchLiveWeather(cityName, latitude, longitude);
-        setIsLocationModalOpen(false);
-
-        setToastMessage(`✨ GPS現在地「${cityName}」の天気を取得し保存しました！`);
-        setShowToast(true);
-      },
-      (err) => {
-        console.error("GPS error:", err);
-        setLoading(false);
-        setToastMessage("⚠️ GPS位置情報の取得に失敗しました。マップ検索をお試しください。");
-        setShowToast(true);
-      }
-    );
-  };
-
-  const handleConfirmMapLocation = async () => {
-    setMunicipalityName(selectedMapCityName);
-    setLat(selectedMapLat);
-    setLon(selectedMapLon);
-
-    await saveLocationToDBAndStorage(selectedMapCityName, selectedMapLat, selectedMapLon);
-    await fetchLiveWeather(selectedMapCityName, selectedMapLat, selectedMapLon);
-    setIsLocationModalOpen(false);
-
-    setToastMessage(`✨ 地域を「${selectedMapCityName}」に確定更新・保存しました！`);
-    setShowToast(true);
+  const parseWeatherCode = (code: number): "sunny" | "cloudy" | "rainy" | "storm" => {
+    if (code === 0 || code === 1) return "sunny";
+    if (code === 2 || code === 3) return "cloudy";
+    if (code >= 51 && code <= 67) return "rainy";
+    if (code >= 80 && code <= 82) return "rainy";
+    if (code >= 95) return "storm";
+    return "cloudy";
   };
 
   const fetchLiveWeather = async (cityName: string, latitude: number, longitude: number) => {
@@ -462,7 +224,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             sunlightStatus = "normal";
           }
 
-          let spraying = {
+          const spraying = {
             status: todayWind > 5 ? ("danger" as SprayingStatus) : todayWind >= 3 ? ("warning" as SprayingStatus) : ("good" as SprayingStatus),
             shortLabel: todayWind > 5 ? "散布不可" : todayWind >= 3 ? "風注意" : "散布最適",
             detailedTooltip: todayWind > 5 ? `強風 (${todayWind}m/s) のため農薬・液肥のドリフト事故リスクがあります` : todayWind >= 3 ? `やや強風 (${todayWind}m/s)。散布時は風向きにご注意ください` : `微風 (${todayWind}m/s) で最適な散布日和です`,
@@ -470,7 +232,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             colorClass: todayWind > 5 ? "bg-red-500" : todayWind >= 3 ? "bg-amber-400" : "bg-emerald-400",
           };
 
-          let irrigation = {
+          const irrigation = {
             status: todayRainSum >= 5 || todayRainProb >= 70 ? ("skip" as IrrigationStatus) : todayTempMax >= 30 ? ("heavy" as IrrigationStatus) : ("normal" as IrrigationStatus),
             shortLabel: todayRainSum >= 5 || todayRainProb >= 70 ? "水やり不要" : todayTempMax >= 30 ? "給水必須" : "標準給水",
             detailedTooltip: todayRainSum >= 5 || todayRainProb >= 70 ? `十分な降雨 (${todayRainSum}mm) が見込まれるため水やり不要です` : todayTempMax >= 30 ? `最高気温${todayTempMax}℃につき十分な給水・灌水を行ってください` : "朝夕の標準的な水やりを行ってください",
@@ -488,7 +250,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
             for (let i = startIdx; i < startIdx + 24 && i < hourlyData.time.length; i++) {
               const hourNum = parseInt(hourlyData.time[i].split("T")[1]?.slice(0, 2) || "0", 10);
-              
+
               if (hourNum >= 0 && hourNum <= 23) {
                 const timeStr = hourNum < 10 ? `0${hourNum}` : `${hourNum}`;
                 const isPast = hourNum < currentHour;
@@ -598,14 +360,253 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     }
   };
 
-  const parseWeatherCode = (code: number): "sunny" | "cloudy" | "rainy" | "storm" => {
-    if (code === 0 || code === 1) return "sunny";
-    if (code === 2 || code === 3) return "cloudy";
-    if (code >= 51 && code <= 67) return "rainy";
-    if (code >= 80 && code <= 82) return "rainy";
-    if (code >= 95) return "storm";
-    return "cloudy";
+  const loadSavedLocation = async () => {
+    let currentLat = lat;
+    let currentLon = lon;
+    let currentName = municipalityName;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("weather_location_name, weather_lat, weather_lon")
+          .eq("id", user.id)
+          .single();
+
+        if (profile && profile.weather_location_name && profile.weather_lat && profile.weather_lon) {
+          currentName = profile.weather_location_name;
+          currentLat = profile.weather_lat;
+          currentLon = profile.weather_lon;
+        }
+      }
+    } catch (e) {
+      console.log("DB location load fallback to localStorage", e);
+    }
+
+    if (currentName === "千葉県千葉市") {
+      const savedName = localStorage.getItem("nouato_weather_city_name");
+      const savedLat = localStorage.getItem("nouato_weather_lat");
+      const savedLon = localStorage.getItem("nouato_weather_lon");
+
+      if (savedName) currentName = savedName;
+      if (savedLat && savedLon) {
+        currentLat = parseFloat(savedLat);
+        currentLon = parseFloat(savedLon);
+      }
+    }
+
+    setMunicipalityName(currentName);
+    setLat(currentLat);
+    setLon(currentLon);
+
+    setSelectedMapLat(currentLat);
+    setSelectedMapLon(currentLon);
+    setSelectedMapCityName(currentName);
+
+    fetchLiveWeather(currentName, currentLat, currentLon);
   };
+
+  useEffect(() => {
+    loadSavedLocation();
+  }, []);
+
+  const saveLocationToDBAndStorage = async (cityName: string, latitude: number, longitude: number) => {
+    localStorage.setItem("nouato_weather_city_name", cityName);
+    localStorage.setItem("nouato_weather_lat", latitude.toString());
+    localStorage.setItem("nouato_weather_lon", longitude.toString());
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from("users")
+          .update({
+            weather_location_name: cityName,
+            weather_lat: latitude,
+            weather_lon: longitude,
+          })
+          .eq("id", user.id);
+      }
+    } catch (e) {
+      console.log("Supabase location save sync error:", e);
+    }
+  };
+
+  const fetchMunicipalityNameFromCoords = async (latitude: number, longitude: number): Promise<string> => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=ja`);
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address;
+        if (addr) {
+          const province = addr.province || addr.state || "";
+          const city = addr.city || addr.town || addr.village || addr.county || addr.suburb || "";
+          const resultName = `${province}${city}`.trim();
+          if (resultName) return resultName;
+        }
+      }
+    } catch (err) {
+      console.error("Reverse geocoding error:", err);
+    }
+    return "指定地域の農園";
+  };
+
+  const initCenterPinMap = () => {
+    const L = (window as any).L;
+    if (!L || !mapContainerRef.current) return;
+
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+    }
+
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: true,
+    }).setView([selectedMapLat, selectedMapLon], 12);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    leafletMapRef.current = map;
+
+    let timer: any;
+    map.on("moveend", () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const center = map.getCenter();
+        const cLat = Math.round(center.lat * 10000) / 10000;
+        const cLon = Math.round(center.lng * 10000) / 10000;
+
+        setSelectedMapLat(cLat);
+        setSelectedMapLon(cLon);
+
+        const cityName = await fetchMunicipalityNameFromCoords(cLat, cLon);
+        setSelectedMapCityName(cityName);
+      }, 300);
+    });
+  };
+
+  useEffect(() => {
+    if (isLocationModalOpen && mapContainerRef.current) {
+      if (!(window as any).L) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => initCenterPinMap();
+        document.body.appendChild(script);
+      } else {
+        initCenterPinMap();
+      }
+    }
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, [isLocationModalOpen]);
+
+  const handleSearchCity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery.trim())}&language=ja&count=5`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          const formatted = data.results.map((item: any) => ({
+            name: `${item.admin1 || ""} ${item.name}`.trim(),
+            lat: Math.round(item.latitude * 10000) / 10000,
+            lon: Math.round(item.longitude * 10000) / 10000,
+          }));
+          setSearchResults(formatted);
+
+          const first = formatted[0];
+          updateMapCenter(first.name, first.lat, first.lon);
+        } else {
+          setSearchResults([]);
+          setToastMessage("⚠️ 該当する市町村が見つかりませんでした。");
+          setShowToast(true);
+        }
+      }
+    } catch (err) {
+      console.error("City search error:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const updateMapCenter = (cityName: string, latitude: number, longitude: number) => {
+    setSelectedMapCityName(cityName);
+    setSelectedMapLat(latitude);
+    setSelectedMapLon(longitude);
+
+    if (leafletMapRef.current) {
+      leafletMapRef.current.setView([latitude, longitude], 12);
+    }
+  };
+
+  const handleGetCurrentLocationInModal = () => {
+    if (!navigator.geolocation) {
+      setToastMessage("⚠️ お使いの端末の位置情報機能に対応していません");
+      setShowToast(true);
+      return;
+    }
+
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const latitude = Math.round(pos.coords.latitude * 10000) / 10000;
+        const longitude = Math.round(pos.coords.longitude * 10000) / 10000;
+        
+        const cityName = await fetchMunicipalityNameFromCoords(latitude, longitude);
+
+        setMunicipalityName(cityName);
+        setLat(latitude);
+        setLon(longitude);
+
+        setSelectedMapCityName(cityName);
+        setSelectedMapLat(latitude);
+        setSelectedMapLon(longitude);
+
+        await saveLocationToDBAndStorage(cityName, latitude, longitude);
+        await fetchLiveWeather(cityName, latitude, longitude);
+        setIsLocationModalOpen(false);
+
+        setToastMessage(`✨ GPS現在地「${cityName}」の天気を取得し保存しました！`);
+        setShowToast(true);
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        setLoading(false);
+        setToastMessage("⚠️ GPS位置情報の取得に失敗しました。マップ検索をお試しください。");
+        setShowToast(true);
+      }
+    );
+  };
+
+  const handleConfirmMapLocation = async () => {
+    setMunicipalityName(selectedMapCityName);
+    setLat(selectedMapLat);
+    setLon(selectedMapLon);
+
+    await saveLocationToDBAndStorage(selectedMapCityName, selectedMapLat, selectedMapLon);
+    await fetchLiveWeather(selectedMapCityName, selectedMapLat, selectedMapLon);
+    setIsLocationModalOpen(false);
+
+    setToastMessage(`✨ 地域を「${selectedMapCityName}」に確定更新・保存しました！`);
+    setShowToast(true);
+  };
+
 
   const handleSendBroadcast = () => {
     if (!broadcastMessage.trim()) return;

@@ -502,7 +502,6 @@ export default function TeacherStudentsView() {
     }
   };
 
-
   useEffect(() => {
     const handleSync = () => {
       void fetchStudents();

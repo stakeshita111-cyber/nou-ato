@@ -98,7 +98,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
         .select("*")
         .order("created_at", { ascending: false });
 
-      let combined: any[] = [];
+      const combined: any[] = [];
 
       if (cData && cData.length > 0) {
         cData.forEach((r: any) => {
