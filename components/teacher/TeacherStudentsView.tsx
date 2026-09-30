@@ -34,12 +34,16 @@ interface StudentData {
     photo_url?: string;
     created_at?: string;
   } | null;
+  createdAt?: string;
 }
 
 export default function TeacherStudentsView() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [sortOption, setSortOption] = useState<string>("name_asc");
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [assignModalStudent, setAssignModalStudent] = useState<StudentData | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -533,16 +537,79 @@ export default function TeacherStudentsView() {
     return true;
   });
 
+  // 🌟 並べ替え（ソート）ロジック 🌟
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
+    if (sortOption === "name_asc") {
+      return a.name.localeCompare(b.name, "ja");
+    }
+    if (sortOption === "name_desc") {
+      return b.name.localeCompare(a.name, "ja");
+    }
+    if (sortOption === "progress_desc") {
+      return b.progress - a.progress;
+    }
+    if (sortOption === "progress_asc") {
+      return a.progress - b.progress;
+    }
+    if (sortOption === "newest") {
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    }
+    return 0;
+  });
+
+  // 🌟 ページネーション計算 🌟
+  const totalCount = sortedStudents.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (validCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalCount);
+  const displayedStudents = sortedStudents.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* ヘッダー＆フィルター */}
+      {/* 🌟 1. 受講生招待＆QRコード共有バナー (上部に常設) 🌟 */}
+      <div className="bg-gradient-to-r from-emerald-50/90 via-teal-50/80 to-white p-5 rounded-3xl border border-emerald-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
+            🌱
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-black text-emerald-950">受講生を招待する</h3>
+              <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200/60">
+                LINE / QRコード対応
+              </span>
+            </div>
+            <p className="text-xs text-emerald-900/80 font-medium mt-0.5">
+              LINE招待URLまたはQRコードを共有して、受講生の登録・参加を案内できます。
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={handleCopyInviteUrl}
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <span>📋 LINE招待URLをコピー</span>
+          </button>
+          <button
+            onClick={() => setShowQRModal(true)}
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <span>📱 QRコード表示</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. ヘッダー＆フィルター */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-200 shadow-xs">
         <div>
           <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             <span>👥</span>
-            <span>受講生</span>
+            <span>受講生一覧</span>
             <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
               登録中 {students.length} 名
             </span>
@@ -561,13 +628,6 @@ export default function TeacherStudentsView() {
           </button>
 
           <button
-            onClick={() => setShowInviteModal(true)}
-            className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
-          >
-            <span>🟢 受講生を招待する</span>
-          </button>
-
-          <button
             onClick={() => {
               setAssignModalStudent(null);
               setShowAssignModal(true);
@@ -579,7 +639,10 @@ export default function TeacherStudentsView() {
 
           <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 text-xs font-bold">
             <button
-              onClick={() => setFilter("all")}
+              onClick={() => {
+                setFilter("all");
+                setCurrentPage(1);
+              }}
               className={`px-3.5 py-2 rounded-xl transition ${
                 filter === "all" ? "bg-white text-emerald-900 shadow-xs font-black" : "text-gray-600 hover:text-gray-900"
               }`}
@@ -587,7 +650,10 @@ export default function TeacherStudentsView() {
               全員
             </button>
             <button
-              onClick={() => setFilter("unread")}
+              onClick={() => {
+                setFilter("unread");
+                setCurrentPage(1);
+              }}
               className={`px-3.5 py-2 rounded-xl transition ${
                 filter === "unread" ? "bg-white text-emerald-900 shadow-xs font-black" : "text-gray-600 hover:text-gray-900"
               }`}
@@ -598,12 +664,66 @@ export default function TeacherStudentsView() {
         </div>
       </div>
 
+      {/* 3. 並べ替え＆表示件数切り替えバー */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-5 py-3.5 rounded-2xl border border-gray-200 shadow-2xs">
+        <div className="text-xs font-bold text-gray-500">
+          {totalCount > 0 ? (
+            <span>
+              全 <strong className="text-gray-900 font-black">{totalCount}</strong> 名中{" "}
+              <strong className="text-emerald-800 font-black">{startIndex + 1}〜{endIndex}</strong> 名を表示
+            </span>
+          ) : (
+            <span>0名</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* 並べ替えセレクト */}
+          <div className="flex items-center space-x-1.5 text-xs">
+            <label htmlFor="student-sort-select" className="text-gray-500 font-bold text-[11px] whitespace-nowrap">並べ替え:</label>
+            <select
+              id="student-sort-select"
+              value={sortOption}
+              onChange={(e) => {
+                setSortOption(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+            >
+              <option value="name_asc">名前順 (昇順: あ→ん)</option>
+              <option value="name_desc">名前順 (降順: ん→あ)</option>
+              <option value="progress_desc">タスク完了率 (高い順)</option>
+              <option value="progress_asc">タスク完了率 (低い順)</option>
+              <option value="newest">登録日 (新しい順)</option>
+            </select>
+          </div>
+
+          {/* 表示件数切り替えセレクト */}
+          <div className="flex items-center space-x-1.5 text-xs">
+            <label htmlFor="student-page-size-select" className="text-gray-500 font-bold text-[11px] whitespace-nowrap">表示件数:</label>
+            <select
+              id="student-page-size-select"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-gray-50 border border-gray-200 text-gray-800 font-bold text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+            >
+              <option value={10}>10人ずつ表示</option>
+              <option value={30}>30人ずつ表示</option>
+              <option value={50}>50人ずつ表示</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* 生徒カードグリッド */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
           <SproutLoader size={72} />
         </div>
-      ) : filteredStudents.length === 0 ? (
+      ) : sortedStudents.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center text-gray-500 font-bold text-sm border border-gray-200 space-y-4 shadow-xs">
           <span className="text-4xl block">🧑‍🌾</span>
           <div className="space-y-1">
@@ -627,94 +747,157 @@ export default function TeacherStudentsView() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredStudents.map((student) => (
-            <div
-              key={student.id}
-              className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs hover:shadow-lg transition space-y-4 group relative overflow-hidden flex flex-col justify-between"
-            >
-              <div className="space-y-4 cursor-pointer" onClick={() => setSelectedStudent(student)}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className={`w-12 h-12 rounded-2xl ${student.avatarBg} font-black text-sm flex items-center justify-center shadow-xs shrink-0`}
-                    >
-                      {student.avatar}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {displayedStudents.map((student) => (
+              <div
+                key={student.id}
+                className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs hover:shadow-lg transition space-y-4 group relative overflow-hidden flex flex-col justify-between"
+              >
+                <div className="space-y-4 cursor-pointer" onClick={() => setSelectedStudent(student)}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`w-12 h-12 rounded-2xl ${student.avatarBg} font-black text-sm flex items-center justify-center shadow-xs shrink-0`}
+                      >
+                        {student.avatar}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-gray-900 text-base group-hover:text-emerald-800 transition">
+                          {student.name}
+                        </h3>
+                        <p className="text-xs text-gray-500 font-bold">{student.plot}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-black text-gray-900 text-base group-hover:text-emerald-800 transition">
-                        {student.name}
-                      </h3>
-                      <p className="text-xs text-gray-500 font-bold">{student.plot}</p>
-                    </div>
+
+                    {student.unreadCount > 0 && (
+                      <span className="w-3 h-3 rounded-full bg-amber-500 ring-4 ring-amber-100 animate-pulse"></span>
+                    )}
                   </div>
 
-                  {student.unreadCount > 0 && (
-                    <span className="w-3 h-3 rounded-full bg-amber-500 ring-4 ring-amber-100 animate-pulse"></span>
-                  )}
+                  <div className="space-y-2 text-xs font-bold pt-2 border-t border-gray-100">
+                    <div className="flex justify-between text-gray-500">
+                      <span>現在のステップ:</span>
+                      <span className="text-emerald-950 font-black">{student.step}</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-gray-400">受講進捗 (完了/出題全数)</span>
+                        <span className="text-emerald-800 font-black">
+                          {student.progress}% ({student.completedCount ?? 0}/{student.totalTaskCount ?? 0}件完了)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                          style={{ width: `${student.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2 text-xs font-bold pt-2 border-t border-gray-100">
-                  <div className="flex justify-between text-gray-500">
-                    <span>現在のステップ:</span>
-                    <span className="text-emerald-950 font-black">{student.step}</span>
-                  </div>
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAssignModalStudent(student);
+                      setShowAssignModal(true);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-xl border border-emerald-200 transition flex items-center gap-1"
+                  >
+                    <span>🎯 タスク割り当て</span>
+                  </button>
 
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-gray-400">受講進捗 (完了/出題全数)</span>
-                      <span className="text-emerald-800 font-black">
-                        {student.progress}% ({student.completedCount ?? 0}/{student.totalTaskCount ?? 0}件完了)
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-                        style={{ width: `${student.progress}%` }}
-                      />
-                    </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      title="この受講生を退会・削除する"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTargetStudent(student);
+                        setShowDeleteConfirmModal(true);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-xs"
+                    >
+                      🗑️
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudent(student)}
+                      className="text-emerald-800 text-[11px] font-bold hover:underline"
+                    >
+                      詳細 →
+                    </button>
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+          {/* 4. ページネーションコントロール */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-2xs mt-4">
+              <div className="text-xs font-bold text-gray-500">
+                ページ <strong className="text-emerald-900 font-black">{validCurrentPage}</strong> / {totalPages}
+              </div>
+
+              <div className="flex items-center gap-1.5">
                 <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAssignModalStudent(student);
-                    setShowAssignModal(true);
-                  }}
-                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-xl border border-emerald-200 transition flex items-center gap-1"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={validCurrentPage <= 1}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs"
                 >
-                  <span>🎯 タスク割り当て</span>
+                  ← 前へ
                 </button>
 
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    title="この受講生を退会・削除する"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteTargetStudent(student);
-                      setShowDeleteConfirmModal(true);
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-xs"
-                  >
-                    🗑️
-                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                    if (
+                      totalPages > 7 &&
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - validCurrentPage) > 2
+                    ) {
+                      if (pageNum === 2 || pageNum === totalPages - 1) {
+                        return (
+                          <span key={pageNum} className="px-1 text-gray-400 text-xs">
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
+                    }
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedStudent(student)}
-                    className="text-emerald-800 text-[11px] font-bold hover:underline"
-                  >
-                    詳細 →
-                  </button>
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 rounded-xl text-xs font-black transition ${
+                          validCurrentPage === pageNum
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
+
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={validCurrentPage >= totalPages}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs"
+                >
+                  次へ →
+                </button>
               </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 

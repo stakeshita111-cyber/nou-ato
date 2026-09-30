@@ -6,7 +6,6 @@ import Toast from "@/components/ui/Toast";
 import QRCodeModal from "@/components/ui/QRCodeModal";
 import WeatherWidget from "@/components/ui/WeatherWidget";
 import { useFarmManager } from "@/hooks/useFarmManager";
-import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
 import { useFarmStore } from "@/store/useFarmStore";
 
 interface TeacherOverviewViewProps {
@@ -32,6 +31,7 @@ export default function TeacherOverviewView({
   const farmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") || "" : "");
   const farmName = activeFarmName || (typeof window !== "undefined" ? localStorage.getItem("nouato_current_farm_name") || "農園" : "農園");
 
+  const [studentsCount, setStudentsCount] = useState<number>(0);
   const [reportCount, setReportCount] = useState<number>(0);
   const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
@@ -119,6 +119,20 @@ export default function TeacherOverviewView({
     } else {
       setUnrepliedCount(0);
     }
+
+    // 4. 受講生数 (自農園スコープ)
+    let sQuery = supabase
+      .from("users")
+      .select("*", { count: "exact" })
+      .eq("role", "student")
+      .is("deleted_at", null);
+    if (currentFid) {
+      sQuery = sQuery.eq("farm_id", currentFid);
+    }
+    const { count: sCount } = await sQuery;
+    if (sCount !== null && sCount !== undefined) {
+      setStudentsCount(sCount);
+    }
   };
 
   useEffect(() => {
@@ -158,9 +172,36 @@ export default function TeacherOverviewView({
       </div>
 
       {/* 2. 🌟 統一デザインサマリーカード (左上:マーク / 右上:ステータス / 中央:数字 / 下部:説明) 🌟 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         
-        {/* カード 1: 🚜 農地・区画サマリー */}
+        {/* カード 1: 👥 受講生サマリー */}
+        <div
+          onClick={onNavigateToStudents}
+          className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-emerald-400 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
+        >
+          <div className="flex justify-between items-center w-full">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition">
+              👥
+            </div>
+            <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              受講中
+            </span>
+          </div>
+
+          <div className="my-auto py-1">
+            <span className="text-3xl font-black text-gray-900 tracking-tight">{studentsCount}</span>
+            <span className="text-xs font-bold text-gray-500 ml-1">名</span>
+          </div>
+
+          <div className="border-t border-gray-100 pt-2 w-full">
+            <span className="text-[11px] font-bold text-emerald-700 block">
+              受講生一覧・進捗を確認 →
+            </span>
+          </div>
+        </div>
+
+        {/* カード 2: 🚜 農地・区画サマリー */}
         <div
           onClick={onNavigateToFarm}
           className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-emerald-400 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
@@ -190,7 +231,7 @@ export default function TeacherOverviewView({
           </div>
         </div>
 
-        {/* カード 2: 📅 イベント・講習予約サマリー (生徒数より変更) */}
+        {/* カード 3: 📅 イベント・講習予約サマリー */}
         <div
           onClick={onNavigateToEvents}
           className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-blue-400 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
@@ -217,7 +258,7 @@ export default function TeacherOverviewView({
           </div>
         </div>
 
-        {/* カード 3: 🌾 作業記録報告サマリー */}
+        {/* カード 4: 🌾 作業記録報告サマリー */}
         <div
           onClick={onNavigateToFarm}
           className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-emerald-300 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
@@ -244,7 +285,7 @@ export default function TeacherOverviewView({
           </div>
         </div>
 
-        {/* カード 4: ❓ 未回答の質問サマリー */}
+        {/* カード 5: ❓ 未回答の質問サマリー */}
         <div
           onClick={onNavigateToJournals}
           className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-sm hover:border-red-300 cursor-pointer flex flex-col justify-between space-y-3 transition group text-center min-h-[160px]"
@@ -271,17 +312,6 @@ export default function TeacherOverviewView({
           </div>
         </div>
 
-      </div>
-
-      {/* 3. 受講生・生徒管理セクション (完全統合) */}
-      <div className="space-y-3 pt-1">
-        <div className="flex justify-between items-center px-1">
-          <span className="text-gray-900 font-black text-base flex items-center gap-2">
-            <span>👥</span>
-            <span>受講生</span>
-          </span>
-        </div>
-        <TeacherStudentsView />
       </div>
     </div>
   );

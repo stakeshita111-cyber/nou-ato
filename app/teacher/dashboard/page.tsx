@@ -15,6 +15,7 @@ import TeacherPaymentsView from "@/components/teacher/TeacherPaymentsView";
 import TeacherEventsView from "@/components/teacher/TeacherEventsView";
 import TeacherTemplatesView from "@/components/teacher/TeacherTemplatesView";
 import TeacherFarmCanvasView from "@/components/teacher/TeacherFarmCanvasView";
+import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
 
 import MobilePhonePreviewModal from "@/components/common/MobilePhonePreviewModal";
 import { SproutLoader } from "@/components/SproutLoader";
@@ -188,7 +189,7 @@ export default function TeacherDashboardPage() {
             activeMenu === "dashboard"
               ? "ダッシュボード"
               : activeMenu === "students"
-              ? "受講生"
+              ? "生徒一覧"
               : activeMenu === "farm"
               ? "畑区画管理"
               : activeMenu === "tasks"
@@ -209,16 +210,20 @@ export default function TeacherDashboardPage() {
 
         {/* ページコンテンツ */}
         <main className="p-4 sm:p-8 max-w-7xl w-full mx-auto flex-1 overflow-y-auto">
-          {(activeMenu === "dashboard" || activeMenu === "students") && (
+          {activeMenu === "dashboard" && (
             <TeacherOverviewView
               key={`overview_${activeFarmId}`}
               onAddNewTaskClick={handleAddNewTask}
-              onNavigateToStudents={() => handleMenuChange("dashboard")}
+              onNavigateToStudents={() => handleMenuChange("students")}
               onNavigateToJournals={() => handleMenuChange("journals")}
               onNavigateToFarm={() => handleNavigateToFarm()}
               onNavigateToTasks={() => handleMenuChange("tasks")}
               onNavigateToEvents={() => handleMenuChange("events")}
             />
+          )}
+
+          {activeMenu === "students" && (
+            <TeacherStudentsView key={`students_${activeFarmId}`} />
           )}
 
           {activeMenu === "farm" && (
