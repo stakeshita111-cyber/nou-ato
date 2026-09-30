@@ -450,6 +450,7 @@ export default function StudentFarmRecordView({
                   {/* 投稿画像プレビューサムネイル */}
                   {latestImg && (
                     <div className="w-full h-6 rounded-lg overflow-hidden mb-0.5 border border-white/30">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={latestImg} alt="投稿写真" className="w-full h-full object-cover" />
                     </div>
                   )}
@@ -786,6 +787,7 @@ export default function StudentFarmRecordView({
                   {imageUrl && (
                     <div className="mt-2 flex items-center gap-3">
                       <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-sm shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imageUrl} alt="添付写真プレビュー" className="w-full h-full object-cover" />
                       </div>
                       <button
