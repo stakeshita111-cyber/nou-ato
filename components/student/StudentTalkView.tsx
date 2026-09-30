@@ -10,7 +10,6 @@ import {
   isSecretTicketSpell,
   DEFAULT_DAILY_TICKETS,
   TicketPlanType,
-  getQuestionStock,
   addQuestionStock,
   clearQuestionStock,
   formatStockText,
