@@ -59,21 +59,21 @@ export default function StudentPage() {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("nouato_read_broadcast_ids");
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try { return JSON.parse(saved); } catch { return []; }
       }
     }
     return [];
   });
 
   // 未読お知らせの有無判定
-  const unreadBroadcasts = broadcasts.filter((b: any) => !readBroadcastIds.includes(b.id));
+  const unreadBroadcasts = broadcasts.filter((b: { id: string }) => !readBroadcastIds.includes(b.id));
   const hasUnreadBroadcasts = unreadBroadcasts.length > 0;
 
   // お知らせモーダルを開いた際の既読処理
   const handleOpenNotificationModal = () => {
     setShowNotificationModal(true);
     if (broadcasts && broadcasts.length > 0) {
-      const allIds = broadcasts.map((b: any) => b.id);
+      const allIds = broadcasts.map((b: { id: string }) => b.id);
       const updated = Array.from(new Set([...readBroadcastIds, ...allIds]));
       setReadBroadcastIds(updated);
       if (typeof window !== "undefined") {
@@ -553,7 +553,7 @@ export default function StudentPage() {
                   <p>現在届いているお知らせはありません</p>
                 </div>
               ) : (
-                broadcasts.map((bc: any) => (
+                broadcasts.map((bc: { id: string; sender?: string; created_at?: string; title: string; content: string }) => (
                   <div
                     key={bc.id}
                     className="bg-amber-50/70 border border-amber-200 p-4 rounded-2xl space-y-2 text-xs font-bold text-gray-800 shadow-2xs"
