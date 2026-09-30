@@ -91,7 +91,11 @@ function createInitialHourlyData(): HourlyPoint[] {
   return list;
 }
 
-export default function WeatherWidget() {
+interface WeatherWidgetProps {
+  hideBroadcastButton?: boolean;
+}
+
+export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWidgetProps = {}) {
   const [municipalityName, setMunicipalityName] = useState<string>("千葉県千葉市");
   const [lat, setLat] = useState<number>(35.6074);
   const [lon, setLon] = useState<number>(140.1065);
@@ -1234,13 +1238,15 @@ export default function WeatherWidget() {
             </button>
           </div>
 
-          <button
-            onClick={() => setIsBroadcastModalOpen(true)}
-            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-xs transition transform active:scale-95 flex items-center space-x-1"
-            title="受講生へ気象注意報・本日の一括アドバイスを配信"
-          >
-            <span>📢 一括配信</span>
-          </button>
+          {!hideBroadcastButton && (
+            <button
+              onClick={() => setIsBroadcastModalOpen(true)}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-xs transition transform active:scale-95 flex items-center space-x-1"
+              title="受講生へ気象注意報・本日の一括アドバイスを配信"
+            >
+              <span>📢 一括配信</span>
+            </button>
+          )}
         </div>
       </div>
 

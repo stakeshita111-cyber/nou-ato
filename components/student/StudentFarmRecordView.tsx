@@ -13,8 +13,8 @@ import { supabase } from "@/lib/supabase";
 interface StudentFarmRecordViewProps {
   studentId?: string;
   studentName?: string;
-  tasks?: any[];
-  onSelectTask?: (task: any) => void;
+  tasks?: Record<string, unknown>[];
+  onSelectTask?: (task: Record<string, unknown>) => void;
   onCompleteTask?: (id: string) => void;
   onUncompleteTask?: (id: string) => void;
   newJournal?: string;
@@ -246,7 +246,7 @@ export default function StudentFarmRecordView({
         try {
           const resolvedStudentId =
             studentId ||
-            (currentBed as any)?.student_id ||
+            (currentBed as { student_id?: string })?.student_id ||
             myPlot?.student_id ||
             null;
 
@@ -411,14 +411,13 @@ export default function StudentFarmRecordView({
             {activeBeds.map((bed) => {
               const isSelected = selectedBedId === bed.id;
               const isPending = bed.status === "completed_pending";
-    const isRejected = bed.status === "rejected";
 
               // 生徒の観察記録・投稿画像のサムネイル検索
               const bedRecs = records.filter((r) => r.bed_id === bed.id);
-              const latestImg = bedRecs.find((r: any) => r.image_url || r.photo_url)?.image_url || null;
+              const latestImg = bedRecs.find((r) => r.image_url || r.photo_url)?.image_url || null;
 
               // 成長段階・進捗率 (0〜100%) に応じた色の濃淡カラーマップ
-              const progress = (bed as any).progress_percent || 0;
+              const progress = (bed as { progress_percent?: number }).progress_percent || 0;
               let colorClasses = "bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100";
               let statusBadge = "🌱 初期";
 
@@ -746,7 +745,7 @@ export default function StudentFarmRecordView({
                 >
                   {activeBeds.map((b) => (
                     <option key={b.id} value={b.id}>
-                      畝 {b.bed_number} {(b as any).crop_name ? `(${(b as any).crop_name})` : ""}
+                      畝 {b.bed_number} {b.crop_name && b.crop_name !== "未確定 🌱" ? `(${b.crop_name})` : ""}
                     </option>
                   ))}
                 </select>
