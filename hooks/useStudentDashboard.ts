@@ -257,28 +257,26 @@ export function useStudentDashboard() {
         // 全体お知らせ ＆ 生徒宛てお知らせ (broadcasts) を Supabase DB ＆ LocalStorage から確実・網羅的に取得
         let bcData: Record<string, unknown>[] = [];
         try {
+          const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
           let bcQuery = supabase
             .from("journals")
             .select("*")
-            .or(`student_id.eq.all_students${currentStudentId ? `,student_id.eq.${currentStudentId}` : ""}`)
-            .or("task_title.ilike.%📢%,task_title.ilike.%全体お知らせ%");
+            .or("role.eq.broadcast,role.eq.announcement")
+            .order("created_at", { ascending: false });
 
-          if (studentFarmId) {
+          if (studentFarmId && isUuid(studentFarmId)) {
             bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
           }
 
-          const { data } = await bcQuery.order("created_at", { ascending: false });
-          if (data) bcData = data;
+          const { data, error } = await bcQuery;
+          if (data && data.length > 0) {
+            bcData = data as Record<string, unknown>[];
+          } else if (error) {
+            console.warn("useStudentDashboard bcQuery error:", error);
+          }
         } catch (e) {
-          console.warn("useStudentDashboard bcQuery error:", e);
-          try {
-            const { data } = await supabase
-              .from("journals")
-              .select("*")
-              .eq("student_id", "all_students")
-              .order("created_at", { ascending: false });
-            if (data) bcData = data;
-          } catch {}
+          console.warn("useStudentDashboard bcQuery exception:", e);
         }
 
         // LocalStorage からのアナウンスキャッシュ取得 (自農園キー ＆ 共通キー)
@@ -296,13 +294,15 @@ export function useStudentDashboard() {
         // DB データを変換してアペンド
         if (bcData && bcData.length > 0) {
           bcData.forEach((j: Record<string, unknown>) => {
-            const rawTitle = String(j.task_title || "講師からのお知らせ");
+            const rawTitle = String(j.text || j.content || "講師からのお知らせ");
             const cleanTitle = rawTitle.replace("📢 【全体お知らせ】", "").replace("📢", "").trim() || "講師からのお知らせ";
+            const bodyContent = String(j.content || j.text || "");
+            const senderName = String(j.reply || "講師");
             combinedBroadcasts.push({
               id: String(j.id || ""),
               title: cleanTitle,
-              content: String(j.content || j.reply || ""),
-              sender: "講師",
+              content: bodyContent,
+              sender: senderName.startsWith("講師配信:") ? senderName.replace("講師配信:", "").trim() : senderName,
               created_at: j.created_at ? String(j.created_at) : undefined,
             });
           });

@@ -351,36 +351,44 @@ export default function TeacherStudentsView() {
 
       // 2. Supabase の journals テーブルにも講師配信として保存 (全体向け + 各登録生徒個別宛て)
       try {
+        const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+
         const journalInserts: Array<Record<string, unknown>> = [
           {
-            student_id: "all_students",
-            farm_id: effectiveFarmId || null,
-            task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+            role: "broadcast",
+            student_id: null,
+            farm_id: validFarmId,
+            text: broadcastTitle.trim(),
             content: broadcastBody.trim(),
-            reply: `講師配信: ${broadcastBody.trim()}`,
+            reply: `講師配信: ${effectiveFarmName || "当農園"}`,
             created_at: nowStr,
           },
         ];
 
-        // 登録中の全生徒ID宛てにも個別レコードを作成（RLS制限回能力強化・受信確実化）
+        // 登録中の全生徒ID宛てにも個別レコードを作成（UUID形式のもののみ安全に追加）
         if (students && students.length > 0) {
           students.forEach((s) => {
-            if (s.id && s.id !== "all_students") {
+            if (s.id && isUuid(s.id)) {
               journalInserts.push({
+                role: "broadcast",
                 student_id: s.id,
-                farm_id: effectiveFarmId || null,
-                task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+                farm_id: validFarmId,
+                text: broadcastTitle.trim(),
                 content: broadcastBody.trim(),
-                reply: `講師配信: ${broadcastBody.trim()}`,
+                reply: `講師配信: ${effectiveFarmName || "当農園"}`,
                 created_at: nowStr,
               });
             }
           });
         }
 
-        await supabase.from("journals").insert(journalInserts);
+        const { error: insErr } = await supabase.from("journals").insert(journalInserts);
+        if (insErr) {
+          console.warn("Supabase broadcast insert warn:", insErr);
+        }
       } catch (err) {
-        console.warn("Supabase broadcast insert warn:", err);
+        console.warn("Supabase broadcast insert exception:", err);
       }
 
       // 3. 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
