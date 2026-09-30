@@ -144,18 +144,48 @@ export default function TeacherStudentsView() {
       localStorage.setItem(bcKey, JSON.stringify(list));
       localStorage.setItem("nouato_broadcast_announcements", JSON.stringify(list));
 
-      // 2. Supabase の journals テーブルにも講師配信として保存
+      // 2. Supabase の journals テーブルにも講師配信として保存 (全体向け + 各登録生徒個別宛て)
       try {
-        await supabase.from("journals").insert([{
-          student_id: "all_students",
-          farm_id: farmId || null,
-          task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
-          content: broadcastBody.trim(),
-          reply: `講師配信: ${broadcastBody.trim()}`,
-          created_at: nowStr,
-        }]);
+        const journalInserts: any[] = [
+          {
+            student_id: "all_students",
+            farm_id: farmId || null,
+            task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+            content: broadcastBody.trim(),
+            reply: `講師配信: ${broadcastBody.trim()}`,
+            created_at: nowStr,
+          },
+        ];
+
+        // 登録中の全生徒ID宛てにも個別レコードを作成（RLS制限回能力強化・受信確実化）
+        if (students && students.length > 0) {
+          students.forEach((s) => {
+            if (s.id && s.id !== "all_students") {
+              journalInserts.push({
+                student_id: s.id,
+                farm_id: farmId || null,
+                task_title: `📢 【全体お知らせ】${broadcastTitle.trim()}`,
+                content: broadcastBody.trim(),
+                reply: `講師配信: ${broadcastBody.trim()}`,
+                created_at: nowStr,
+              });
+            }
+          });
+        }
+
+        await supabase.from("journals").insert(journalInserts);
       } catch (err) {
         console.warn("Supabase broadcast insert warn:", err);
+      }
+
+      // 3. 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch (e) {}
       }
 
       setToastMessage(`🎉 登録中 ${students.length} 名の受講生全員へ一括配信を完了しました！`);

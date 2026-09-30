@@ -20,9 +20,8 @@ export function useStudentDashboard() {
       try {
         // 0. 一括配信 (broadcasts) を LocalStorage & DB からロード
         const savedBcStr = typeof window !== "undefined" ? localStorage.getItem("nouato_broadcast_announcements") : null;
-        let localBc: any[] = [];
         if (savedBcStr) {
-          try { localBc = JSON.parse(savedBcStr); } catch (e) {}
+          try { JSON.parse(savedBcStr); } catch {}
         }
 
         const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -116,7 +115,7 @@ export function useStudentDashboard() {
 
         const { data: publicTasks } = await ptQuery.order("created_at", { ascending: false });
 
-        let taskList: any[] = [];
+        const taskList: any[] = [];
         const seenTitles = new Set<string>();
 
         // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加
@@ -230,30 +229,94 @@ export function useStudentDashboard() {
 
         setJournals(jData);
 
-        // 全体お知らせ (broadcasts) のみ別途取得 (自農園スコープ)
-        let bcQuery = supabase
-          .from("journals")
-          .select("*")
-          .eq("student_id", "all_students");
+        // 全体お知らせ ＆ 生徒宛てお知らせ (broadcasts) を Supabase DB ＆ LocalStorage から確実・網羅的に取得
+        let bcData: any[] = [];
+        try {
+          let bcQuery = supabase
+            .from("journals")
+            .select("*")
+            .or(`student_id.eq.all_students${currentStudentId ? `,student_id.eq.${currentStudentId}` : ""}`)
+            .or("task_title.ilike.%📢%,task_title.ilike.%全体お知らせ%");
 
-        if (studentFarmId) {
-          bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+          if (studentFarmId) {
+            bcQuery = bcQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+          }
+
+          const { data } = await bcQuery.order("created_at", { ascending: false });
+          if (data) bcData = data;
+        } catch (e) {
+          console.warn("useStudentDashboard bcQuery error:", e);
+          try {
+            const { data } = await supabase
+              .from("journals")
+              .select("*")
+              .eq("student_id", "all_students")
+              .order("created_at", { ascending: false });
+            if (data) bcData = data;
+          } catch {}
         }
 
-        const { data: bcData } = await bcQuery.order("created_at", { ascending: false });
+        // LocalStorage からのアナウンスキャッシュ取得 (自農園キー ＆ 共通キー)
+        const bcFarmKey = studentFarmId ? `nouato_broadcast_announcements_${studentFarmId}` : "nouato_broadcast_announcements";
+        const savedBcAnnouncementsStr = typeof window !== "undefined"
+          ? (localStorage.getItem(bcFarmKey) || localStorage.getItem("nouato_broadcast_announcements"))
+          : null;
+        let localBcArr: any[] = [];
+        if (savedBcAnnouncementsStr) {
+          try { localBcArr = JSON.parse(savedBcAnnouncementsStr); } catch {}
+        }
 
+        const combinedBroadcasts: any[] = [];
+
+        // DB データを変換してアペンド
         if (bcData && bcData.length > 0) {
-          const dbBc = bcData.map((j: any) => ({
-            id: j.id,
-            title: j.task_title?.replace("📢 【全体お知らせ】", "") || "講師からのお知らせ",
-            content: j.content || j.reply || "",
-            sender: "講師",
-            created_at: j.created_at,
-          }));
-          setBroadcasts(dbBc);
-        } else {
-          setBroadcasts([]);
+          bcData.forEach((j: any) => {
+            const rawTitle = j.task_title || "講師からのお知らせ";
+            const cleanTitle = rawTitle.replace("📢 【全体お知らせ】", "").replace("📢", "").trim() || "講師からのお知らせ";
+            combinedBroadcasts.push({
+              id: j.id,
+              title: cleanTitle,
+              content: j.content || j.reply || "",
+              sender: "講師",
+              created_at: j.created_at,
+            });
+          });
         }
+
+        // LocalStorage キャッシュをアペンド
+        if (localBcArr && localBcArr.length > 0) {
+          localBcArr.forEach((item: any) => {
+            combinedBroadcasts.push({
+              id: item.id || `local_${item.created_at}`,
+              title: item.title?.replace("📢 【全体お知らせ】", "")?.replace("📢", "")?.trim() || "講師からのお知らせ",
+              content: item.content || item.body || "",
+              sender: item.sender || "講師",
+              created_at: item.created_at || new Date().toISOString(),
+            });
+          });
+        }
+
+        // 重複除去 (title + content サマリー)
+        const seenBcKeys = new Set<string>();
+        const uniqueBroadcasts: any[] = [];
+
+        combinedBroadcasts.forEach((bc) => {
+          const contentSnippet = (bc.content || "").slice(0, 30).trim();
+          const bcKey = `${bc.title}_${contentSnippet}`;
+          if (!seenBcKeys.has(bcKey)) {
+            seenBcKeys.add(bcKey);
+            uniqueBroadcasts.push(bc);
+          }
+        });
+
+        // 作成日時 (created_at) 降順ソート
+        uniqueBroadcasts.sort((a, b) => {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        setBroadcasts(uniqueBroadcasts);
       } catch (e) {
         console.error("useStudentDashboard fetchData error:", e);
         setTasks([]);
