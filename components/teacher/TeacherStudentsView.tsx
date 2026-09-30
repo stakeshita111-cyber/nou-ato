@@ -37,6 +37,18 @@ interface StudentData {
   createdAt?: string;
 }
 
+export interface BroadcastRecordItem {
+  id: string;
+  role: string;
+  student_id: string | null;
+  farm_id: string | null;
+  text: string | null;
+  content: string | null;
+  reply: string | null;
+  created_at: string;
+  targetName?: string;
+}
+
 export default function TeacherStudentsView() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +67,18 @@ export default function TeacherStudentsView() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  // 🌟 個別配信モーダル用ステート 🌟
+  const [individualStudent, setIndividualStudent] = useState<StudentData | null>(null);
+  const [showIndividualModal, setShowIndividualModal] = useState(false);
+  const [individualTitle, setIndividualTitle] = useState("");
+  const [individualBody, setIndividualBody] = useState("");
+  const [sendingIndividual, setSendingIndividual] = useState(false);
+
+  // 🌟 配信履歴・CRUD管理用ステート 🌟
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [broadcastHistory, setBroadcastHistory] = useState<BroadcastRecordItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // 🌟 受講生退会・削除確認モーダル用ステート 🌟
   const [deleteTargetStudent, setDeleteTargetStudent] = useState<StudentData | null>(null);
@@ -428,6 +452,144 @@ export default function TeacherStudentsView() {
     }
   };
 
+  // 💬 受講生への個別メッセージ配信処理 (Create)
+  const handleSendIndividual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!individualStudent || !individualTitle.trim() || !individualBody.trim()) return;
+
+    setSendingIndividual(true);
+    try {
+      const nowStr = new Date().toISOString();
+      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+
+      const { error: insErr } = await supabase.from("journals").insert([
+        {
+          role: "broadcast",
+          student_id: individualStudent.id,
+          farm_id: validFarmId,
+          text: individualTitle.trim(),
+          content: individualBody.trim(),
+          reply: `講師個別連絡: ${effectiveFarmName || "当農園"}`,
+          created_at: nowStr,
+        },
+      ]);
+
+      if (insErr) {
+        console.warn("Individual broadcast insert warn:", insErr);
+      }
+
+      // 配信完了時に同期イベントを発行
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+
+      setToastMessage(`🎉 ${individualStudent.name} さんへ個別連絡を配信しました！`);
+      setShowToast(true);
+      setShowIndividualModal(false);
+      setIndividualTitle("");
+      setIndividualBody("");
+      setIndividualStudent(null);
+    } catch (err) {
+      console.error("handleSendIndividual error:", err);
+      setToastMessage("個別配信中にエラーが発生しました");
+      setShowToast(true);
+    } finally {
+      setSendingIndividual(false);
+    }
+  };
+
+  // 📋 配信履歴の一覧取得 (Read - CRUD)
+  const fetchBroadcastHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+      let query = supabase
+        .from("journals")
+        .select("*")
+        .in("role", ["broadcast", "announcement"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (effectiveFarmId && isUuid(effectiveFarmId)) {
+        query = query.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (data) {
+        const seen = new Set<string>();
+        const list: BroadcastRecordItem[] = [];
+
+        data.forEach((item: Record<string, unknown>) => {
+          const key = `${item.text}_${item.content}_${item.created_at}_${item.student_id}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            let targetName = "受講生全員";
+            if (item.student_id) {
+              const matchedStudent = students.find((s) => s.id === item.student_id);
+              targetName = matchedStudent ? `${matchedStudent.name} さん（個別）` : "個別配信";
+            }
+            list.push({
+              id: String(item.id),
+              role: String(item.role || "broadcast"),
+              student_id: item.student_id ? String(item.student_id) : null,
+              farm_id: item.farm_id ? String(item.farm_id) : null,
+              text: item.text ? String(item.text) : "",
+              content: item.content ? String(item.content) : "",
+              reply: item.reply ? String(item.reply) : "",
+              created_at: String(item.created_at || ""),
+              targetName,
+            });
+          }
+        });
+        setBroadcastHistory(list);
+      }
+      if (error) {
+        console.warn("fetchBroadcastHistory error:", error);
+      }
+    } catch (e) {
+      console.error("fetchBroadcastHistory error:", e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [effectiveFarmId, students]);
+
+  // 🗑️ 配信履歴の削除処理 (Delete - CRUD)
+  const handleDeleteBroadcast = async (broadcastId: string) => {
+    if (!confirm("この配信を削除してもよろしいですか？受講生の通知一覧からも削除されます。")) return;
+    try {
+      const { error } = await supabase.from("journals").delete().eq("id", broadcastId);
+      if (error) {
+        setToastMessage(`削除に失敗しました: ${error.message}`);
+        setShowToast(true);
+        return;
+      }
+      setBroadcastHistory((prev) => prev.filter((b) => b.id !== broadcastId));
+      setToastMessage("🗑️ 配信メッセージを削除しました");
+      setShowToast(true);
+
+      // 受講生側の画面同期イベントを発行
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+    } catch (err) {
+      console.error("handleDeleteBroadcast error:", err);
+      setToastMessage("削除中にエラーが発生しました");
+      setShowToast(true);
+    }
+  };
+
   // 🌟 受講生の退会・データ削除の実行処理 🌟
   const handleExecuteStudentDelete = async () => {
     if (!deleteTargetStudent) return;
@@ -650,12 +812,12 @@ export default function TeacherStudentsView() {
 
           <button
             onClick={() => {
-              setAssignModalStudent(null);
-              setShowAssignModal(true);
+              void fetchBroadcastHistory();
+              setShowHistoryModal(true);
             }}
-            className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
+            className="px-4 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
           >
-            <span>🎯 生徒に個別タスクを割り当てる</span>
+            <span>📋 配信履歴・管理</span>
           </button>
 
           <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 text-xs font-bold">
@@ -819,18 +981,35 @@ export default function TeacherStudentsView() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAssignModalStudent(student);
-                      setShowAssignModal(true);
-                    }}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-xl border border-emerald-200 transition flex items-center gap-1"
-                  >
-                    <span>🎯 タスク割り当て</span>
-                  </button>
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAssignModalStudent(student);
+                        setShowAssignModal(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-xl border border-emerald-200 transition flex items-center gap-1"
+                    >
+                      <span>🎯 割当</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIndividualStudent(student);
+                        setIndividualTitle("");
+                        setIndividualBody("");
+                        setShowIndividualModal(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-[11px] rounded-xl border border-amber-200 transition flex items-center gap-1"
+                      title="この受講生へ個別メッセージを配信"
+                    >
+                      <span>💬 個別配信</span>
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-1">
                     <button
@@ -1075,6 +1254,188 @@ export default function TeacherStudentsView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 💬 受講生への個別配信 Modal */}
+      {showIndividualModal && individualStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-gray-200 relative">
+            <button
+              onClick={() => {
+                setShowIndividualModal(false);
+                setIndividualStudent(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+            >
+              ✕
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full">
+                  個別連絡
+                </span>
+                <span className="text-xs text-gray-500 font-bold">
+                  {individualStudent.plot || "区画未定"}
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-gray-900 mt-1 flex items-center gap-1.5">
+                <span>💬 {individualStudent.name} さんへ個別配信</span>
+              </h3>
+              <p className="text-xs text-gray-500 font-bold mt-0.5">
+                この受講生のアプリ画面（通知ベル🔔）に直接メッセージを届けることができます。他の受講生には表示されません。
+              </p>
+            </div>
+
+            <form onSubmit={handleSendIndividual} className="space-y-4 text-xs font-bold">
+              <div>
+                <label className="block text-gray-700 mb-1">配信タイトル (件名) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例: 【ご確認】区画の畝立て作業について"
+                  value={individualTitle}
+                  onChange={(e) => setIndividualTitle(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-1">個別メッセージ本文 *</label>
+                <textarea
+                  required
+                  rows={5}
+                  placeholder={`${individualStudent.name} さんへの個別指導や連絡事項を入力してください...`}
+                  value={individualBody}
+                  onChange={(e) => setIndividualBody(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-medium text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowIndividualModal(false);
+                    setIndividualStudent(null);
+                  }}
+                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingIndividual}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-md transition"
+                >
+                  {sendingIndividual ? "送信中..." : `${individualStudent.name} さんへ送信する 🚀`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 📋 配信履歴・CRUD管理 Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 border border-gray-200 relative max-h-[85vh] flex flex-col">
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+            >
+              ✕
+            </button>
+
+            <div className="border-b border-gray-100 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                  <span>📋 配信メッセージ履歴・管理</span>
+                </h3>
+                <span className="text-xs font-bold bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full">
+                  全 {broadcastHistory.length} 件
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 font-bold mt-1">
+                データベースに記録されている全員一括配信および個別配信の一覧です。不要になった配信は削除できます。
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
+              {loadingHistory ? (
+                <div className="py-12 text-center text-gray-400 font-bold text-xs">
+                  <span className="text-xl block animate-spin">🌀</span>
+                  <p className="mt-2">履歴を読み込み中...</p>
+                </div>
+              ) : broadcastHistory.length === 0 ? (
+                <div className="py-12 text-center text-gray-400 font-bold text-xs space-y-2">
+                  <span className="text-3xl block">📭</span>
+                  <p>送信済みの配信メッセージはありません</p>
+                </div>
+              ) : (
+                broadcastHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 rounded-2xl border border-gray-200 bg-gray-50/70 hover:bg-gray-50 transition space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
+                            item.student_id
+                              ? "bg-blue-100 text-blue-900"
+                              : "bg-amber-100 text-amber-900"
+                          }`}
+                        >
+                          {item.student_id ? "個別配信" : "📢 全員一括"}
+                        </span>
+                        <span className="font-bold text-gray-800 text-[11px]">
+                          宛先: {item.targetName}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-gray-400 font-semibold">
+                          {item.created_at ? new Date(item.created_at).toLocaleString("ja-JP", {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }) : ""}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBroadcast(item.id)}
+                          className="px-2 py-1 text-red-600 hover:bg-red-50 rounded-lg font-bold text-[11px] transition flex items-center gap-1 border border-red-200"
+                          title="この配信を削除"
+                        >
+                          <span>🗑️ 削除</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <h4 className="font-black text-sm text-gray-900 leading-snug">
+                      {item.text || "（タイトルなし）"}
+                    </h4>
+                    <p className="text-xs text-gray-700 font-medium whitespace-pre-wrap leading-relaxed bg-white p-3 rounded-xl border border-gray-200/60">
+                      {item.content}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-100 shrink-0 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="px-6 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl transition"
+              >
+                閉じる
+              </button>
+            </div>
           </div>
         </div>
       )}
