@@ -135,7 +135,7 @@ export default function TeacherTemplatesView() {
       } else if (savedTemplate && !savedTemplate.id.startsWith("tpl_")) {
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id;
-        let farmId =
+        const farmId =
           useFarmStore.getState().activeFarmId ||
           (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
 
