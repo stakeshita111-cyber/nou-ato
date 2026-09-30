@@ -421,41 +421,6 @@ export default function StudentPage() {
         {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
         {activeTab === "myfarm" && (
           <div className="space-y-4">
-            {/* 📢 畑タブ最上部のお知らせ注意喚起バナー */}
-            {broadcasts && broadcasts.length > 0 && (
-              <div
-                onClick={handleOpenNotificationModal}
-                className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 hover:border-amber-400 p-3 rounded-2xl shadow-2xs flex items-center justify-between text-xs text-amber-950 transition cursor-pointer active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="relative shrink-0">
-                    <span className="text-base leading-none">📢</span>
-                    {!readBroadcastIds.includes(broadcasts[0].id) && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-black text-amber-900 text-[11px] truncate">
-                        {broadcasts[0].title}
-                      </span>
-                      {!readBroadcastIds.includes(broadcasts[0].id) && (
-                        <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full shrink-0">
-                          新着
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-amber-800 font-medium truncate max-w-[230px]">
-                      {broadcasts[0].content}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-amber-700 shrink-0 ml-2">
-                  一覧 →
-                </span>
-              </div>
-            )}
-
             <StudentFarmRecordView
               studentId={user?.id}
               studentName={userAccountName}
@@ -473,25 +438,6 @@ export default function StudentPage() {
         {/* 🌟 2. 天気 タブ (天気予報ウィジェット ＆ 気象アドバイス) 🌟 */}
         {activeTab === "weather" && (
           <div className="space-y-5 animate-fade-in">
-            {/* 📢 講師からの全体一括配信・連絡カード */}
-            {broadcasts && broadcasts.length > 0 && (
-              <div className="bg-amber-500 text-amber-950 p-4 rounded-3xl shadow-md border-2 border-amber-400 space-y-2 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
-                    📢 講師からの全体一括配信
-                  </span>
-                  <span className="text-[10px] font-bold opacity-80">
-                    {broadcasts[0].created_at ? new Date(broadcasts[0].created_at).toLocaleDateString("ja-JP") : "最新"}
-                  </span>
-                </div>
-                <h3 className="font-extrabold text-sm text-gray-900 leading-snug">{broadcasts[0].title}</h3>
-                <p className="text-xs text-gray-900 font-medium whitespace-pre-wrap leading-relaxed bg-amber-400/50 p-3 rounded-2xl border border-amber-600/30">
-                  {broadcasts[0].content}
-                </p>
-              </div>
-            )}
-
             {/* 農園ピンポイント天気予報 ＆ 気象アドバイスウィジェット */}
             <WeatherWidget hideBroadcastButton />
           </div>
