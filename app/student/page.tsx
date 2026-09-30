@@ -432,7 +432,7 @@ export default function StudentPage() {
               studentId={user?.id}
               studentName={userAccountName}
               tasks={tasks}
-              onSelectTask={setSelectedTask}
+              onSelectTask={(task) => setSelectedTask(task as unknown as import("@/hooks/useStudentDashboard").StudentTaskItem)}
               onCompleteTask={handleCompleteTask}
               onUncompleteTask={handleUncompleteTask}
               newJournal={newJournal}
