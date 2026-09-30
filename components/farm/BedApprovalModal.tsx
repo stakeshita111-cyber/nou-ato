@@ -145,6 +145,7 @@ export default function BedApprovalModal({
           {/* 収穫写真 */}
           {bed.completion_image_url ? (
             <div className="rounded-2xl overflow-hidden border-2 border-emerald-300 shadow-md bg-black/5 aspect-video relative group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={bed.completion_image_url}
                 alt="収穫記念写真"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Toast from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
 import {
@@ -119,7 +119,7 @@ export default function StudentTalkView({
   }, [studentId, customDailyLimit, planType]);
 
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
-  const loadChatHistory = async () => {
+  const loadChatHistory = useCallback(async () => {
     try {
       let targetList: any[] = [];
 
@@ -195,21 +195,21 @@ export default function StudentTalkView({
     } catch (e) {
       console.error("loadChatHistory error:", e);
     }
-  };
+  }, [studentId, studentName, journals]);
 
   useEffect(() => {
     loadChatHistory();
-  }, [studentName, studentId]);
+  }, [loadChatHistory]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (!searchKeyword.trim() && !showSearch) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  };
+  }, [searchKeyword, showSearch]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isSending]);
+  }, [messages, isSending, scrollToBottom]);
 
   // 検索ロジック
   const matchedMessageIds = useMemo(() => {
@@ -220,19 +220,19 @@ export default function StudentTalkView({
       .map((m) => m.id);
   }, [messages, searchKeyword]);
 
-  const jumpToMessage = (messageId: string) => {
+  const jumpToMessage = useCallback((messageId: string) => {
     const el = messageRefs.current[messageId];
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  };
+  }, []);
 
   useEffect(() => {
     setCurrentMatchIndex(0);
     if (matchedMessageIds.length > 0) {
       jumpToMessage(matchedMessageIds[0]);
     }
-  }, [searchKeyword, matchedMessageIds.length]);
+  }, [searchKeyword, matchedMessageIds, jumpToMessage]);
 
   const handlePrevMatch = () => {
     if (matchedMessageIds.length === 0) return;

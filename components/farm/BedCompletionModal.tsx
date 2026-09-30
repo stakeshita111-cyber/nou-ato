@@ -35,7 +35,7 @@ export default function BedCompletionModal({
       setSeason(bed.season || "2026年 春夏");
       setImageUrl(bed.completion_image_url || "");
     }
-  }, [isOpen, bed?.id, bed?.total_harvest, bed?.completion_notes, bed?.completion_image_url]);
+  }, [isOpen, bed]);
 
   if (!isOpen || !bed) return null;
 
@@ -169,6 +169,7 @@ export default function BedCompletionModal({
             </label>
             {imageUrl ? (
               <div className="relative rounded-2xl overflow-hidden border border-emerald-200 mb-2 h-40 group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageUrl} alt="収穫写真" className="w-full h-full object-cover" />
                 <button
                   type="button"
