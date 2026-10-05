@@ -162,6 +162,7 @@ export function useFarmManager() {
   const unassignedBedsRef = useRef<number>(unassignedBedsCount);
   const isSavingRef = useRef<boolean>(false);
   const lastSaveTimeRef = useRef<number>(0);
+  const lastReloadTimeRef = useRef<number>(0);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -181,6 +182,7 @@ export function useFarmManager() {
   }, [unassignedBedsCount]);
 
   const reloadAllFromSupabase = useCallback(async () => {
+    lastReloadTimeRef.current = Date.now();
     try {
       // 0. ログイン中講師情報の取得
       const { data: authData } = await supabase.auth.getUser();
@@ -819,7 +821,7 @@ export function useFarmManager() {
       };
     }
 
-    const channelName = `db_sync_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channelName = "nouato_farm_manager_channel";
     const shouldSkipSync = () => {
       return isSavingRef.current || (Date.now() - lastSaveTimeRef.current < 2500);
     };
@@ -859,18 +861,19 @@ export function useFarmManager() {
     };
     window.addEventListener("storage", handleStorageSync);
 
-    // 🌟 タブがアクティブになった瞬間に自動再同期 (リロード不要) 🌟
-    const handleFocus = () => {
+    // 🌟 タブがアクティブになった瞬間に自動再同期 (30秒以内の連続発火を抑制) 🌟
+    const handleTabRevisit = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      if (Date.now() - lastReloadTimeRef.current < 30000) {
+        return;
+      }
       reloadAllFromSupabase();
     };
-    window.addEventListener("focus", handleFocus);
 
-    const handleVisibilityChange = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        reloadAllFromSupabase();
-      }
-    };
-    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleTabRevisit);
+    window.addEventListener("visibilitychange", handleTabRevisit);
 
     return () => {
       if (broadcastRef.current) {
@@ -880,8 +883,8 @@ export function useFarmManager() {
       window.removeEventListener("storage", handleStorageSync);
       window.removeEventListener("nouato_sync_event", handleCustomSync);
       window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleTabRevisit);
+      window.removeEventListener("visibilitychange", handleTabRevisit);
     };
   }, [reloadAllFromSupabase]);
 
