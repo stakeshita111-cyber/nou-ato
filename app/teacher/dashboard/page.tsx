@@ -107,7 +107,7 @@ export default function TeacherDashboardPage() {
           .from("users")
           .select("role")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
         if (userData?.role !== "teacher") {
           setToastMessage("🚫 講師専用画面です。生徒アカウントではアクセスできません。");

@@ -15,6 +15,8 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  const pathname = request.nextUrl.pathname;
+
   try {
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -38,32 +40,18 @@ export async function proxy(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser();
 
-    const pathname = request.nextUrl.pathname;
-
     // 1. 未認証アクセス制限 (TC-AUTH-004)
     if (authError || !user) {
       if (pathname.startsWith("/teacher") || pathname.startsWith("/student")) {
-        const loginUrl = new URL("/login", request.url);
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = "/login";
         loginUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(loginUrl);
-      }
-    } else {
-      // 2. 権限外アクセス防止 (TC-AUTH-003: 生徒による講師画面への侵入防止)
-      if (pathname.startsWith("/teacher")) {
-        const { data: userData } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (userData?.role !== "teacher") {
-          const redirectUrl = new URL("/student", request.url);
-          return NextResponse.redirect(redirectUrl);
-        }
       }
     }
   } catch (error) {
     console.error("Middleware error in proxy:", error);
+    return response;
   }
 
   return response;
