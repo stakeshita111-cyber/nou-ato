@@ -120,7 +120,7 @@ export default function TeacherSidebar({
 
       {/* サイドバー本体 */}
       <aside
-        className={`w-64 app-bg-card border-r app-border flex flex-col justify-between flex-shrink-0 h-screen transition-all duration-300 z-50 overflow-hidden
+        className={`w-64 app-bg-card border-r app-border flex flex-col justify-between flex-shrink-0 h-[100dvh] transition-all duration-300 z-50 overflow-hidden
           fixed inset-y-0 left-0 ${isOpenMobile ? "translate-x-0" : "-translate-x-full"}
           md:sticky md:top-0 md:translate-x-0 md:flex`}
       >
@@ -293,11 +293,23 @@ export default function TeacherSidebar({
               </svg>
               <span>画面設定</span>
             </button>
+
+            {/* モバイル限定: 直接ログアウトボタン (下部URLバーでアバターが押しにくい場合でも100%確実に押せる安全策) */}
+            <div className="pt-2 border-t border-gray-100 md:hidden">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm text-rose-600 hover:bg-rose-50 transition active:scale-[0.98]"
+              >
+                <span className="text-base">🚪</span>
+                <span>ログアウト</span>
+              </button>
+            </div>
           </nav>
         </div>
 
         {/* 🌟 サイドバー左下 ログインユーザープロファイル (人型マーク ＆ ポップアップメニュー) 🌟 */}
-        <div className="p-3 border-t border-emerald-100/60 relative shrink-0 bg-white/60 backdrop-blur-xs" ref={menuRef}>
+        <div className="p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-3 border-t border-emerald-100/60 relative shrink-0 bg-white/60 backdrop-blur-xs" ref={menuRef}>
           {/* 上展開ポップアップメニュー */}
           {isUserMenuOpen && (
             <div className="absolute bottom-full left-3 right-3 mb-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-emerald-200 p-2 space-y-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">

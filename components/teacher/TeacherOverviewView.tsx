@@ -37,13 +37,20 @@ export default function TeacherOverviewView({
   const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
 
-  // 🌟 全マスから空き地を除外した「稼働区画数」と「総畝数」 (未作成時は 0、未定義ガード徹底) 🌟
-  const activePlots = (plots || []).filter((p) => p && !p.is_vacant);
+  // 🌟 選択中農園の有効区画および実在する稼働畝数（archivedを除外）を正確に積算 🌟
+  const currentFarmPlots = (plots || []).filter((p) => {
+    if (!p) return false;
+    if (farmId && p.farm_id && p.farm_id !== farmId) return false;
+    return true;
+  });
+  const activePlots = currentFarmPlots.filter((p) => !p.is_vacant);
   const displayPlotsCount = activePlots.length;
-  const displayBedsCount = activePlots.reduce(
-    (sum, p) => sum + (p?.beds && p.beds.length > 0 ? p.beds.length : 3),
-    0
-  );
+
+  // 謎のフォールバック(+3)を完全撤廃し、各区画に実際に登録されているアクティブな畝数を正確に集計
+  const displayBedsCount = activePlots.reduce((sum, p) => {
+    const validBeds = (p?.beds || []).filter((b) => b && b.status !== "archived");
+    return sum + validBeds.length;
+  }, 0);
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");

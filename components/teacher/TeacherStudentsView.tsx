@@ -129,9 +129,29 @@ export default function TeacherStudentsView() {
 
       const { data: usersData, error: usersError } = await usersQuery;
 
-      // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
-      const bedMap: Record<string, string> = {};
+      // 2. 農地・区画・畝 (farm_plots / farm_beds) からユーザーの割り当て区画を取得
+      const plotMap: Record<string, string> = {};
       try {
+        // ① farm_plots (主たる区画割り当てテーブル) から取得
+        const { data: dbPlots } = await supabase
+          .from("farm_plots")
+          .select("id, code, student_id, student_name, name, description");
+        if (dbPlots && dbPlots.length > 0) {
+          dbPlots.forEach((p: Record<string, unknown>) => {
+            const sid = String(p.student_id || "");
+            const sname = String(p.student_name || "");
+            const code = String(p.code || "").toUpperCase();
+            const label = code ? `区画 ${code}` : String(p.name || "区画");
+            if (sid) plotMap[sid] = label;
+            if (sname) plotMap[sname] = label;
+          });
+        }
+      } catch (err) {
+        console.warn("fetchStudents plots lookup info:", err);
+      }
+
+      try {
+        // ② farm_beds (畝レベルの割当) からも取得して補完
         const { data: dbBeds } = await supabase
           .from("farm_beds")
           .select("id, student_id, user_id, student_name, user_name, plot_id, bed_number");
@@ -139,9 +159,10 @@ export default function TeacherStudentsView() {
           dbBeds.forEach((b: Record<string, unknown>) => {
             const assignedUser = String(b.student_id || b.user_id || "");
             const assignedName = String(b.student_name || b.user_name || "");
-            const plotLabel = b.plot_id ? String(b.plot_id).replace(/^plot_cell_/, "区画 ") : `畝 ${b.bed_number || 1}`;
-            if (assignedUser) bedMap[assignedUser] = plotLabel;
-            if (assignedName) bedMap[assignedName] = plotLabel;
+            const plotCellMatch = String(b.plot_id || "").match(/plot_cell_([A-Za-z0-9]+)/);
+            const plotLabel = plotCellMatch ? `区画 ${plotCellMatch[1].toUpperCase()}` : (b.plot_id ? String(b.plot_id).replace(/^plot_cell_/, "区画 ") : `畝 ${b.bed_number || 1}`);
+            if (assignedUser && !plotMap[assignedUser]) plotMap[assignedUser] = plotLabel;
+            if (assignedName && !plotMap[assignedName]) plotMap[assignedName] = plotLabel;
           });
         }
       } catch (err) {
@@ -240,13 +261,15 @@ export default function TeacherStudentsView() {
         const formatted: StudentData[] = uniqueUsers.map((u: Record<string, unknown>, idx: number) => {
           const studentName = String(u.display_name || u.name || `受講生 ${idx + 1}`);
           const uId = String(u.id || "");
-          const plotName = String(u.plot || u.plot_name || u.assigned_plot || bedMap[uId] || bedMap[studentName] || "未割り当て");
+          const plotName = String(plotMap[uId] || plotMap[studentName] || u.plot || u.plot_name || u.assigned_plot || "未割り当て");
 
           // 生徒画面 (useStudentDashboard) と完全に一致する教材タスク一覧を構築
           const baseTasks = publicTasks.length > 0 ? publicTasks : (MASTER_TASKS as unknown as Record<string, unknown>[]);
 
           // Supabase DB (student_tasks) レコードの集約
           const userStRows = studentTasksRaw.filter((st: Record<string, unknown>) => st.student_id === uId);
+          // 日誌 (journals) による完了タイトルの集約
+          const userJournalTitles = journalCompletedTitlesMap[uId] || journalCompletedTitlesMap[studentName] || new Set<string>();
 
           let completedTasks = 0;
           let uncompletedTaskObj: Record<string, unknown> | null = null;
@@ -257,7 +280,7 @@ export default function TeacherStudentsView() {
             const taskTitle = String(taskObj.title || "");
             const cTitle = cleanStr(taskTitle);
 
-            // Supabase DB (student_tasks) の status === "completed" を照合
+            // ① Supabase DB (student_tasks) の status === "completed" を照合
             const isStDone = userStRows.some((st: Record<string, unknown>) => {
               if (st.status !== "completed") return false;
               const stTasks = st.tasks as { title?: string } | undefined;
@@ -265,7 +288,13 @@ export default function TeacherStudentsView() {
               return st.task_id === taskObj.id || st.base_task_id === taskObj.id || (cTitle && stClean && (cTitle === stClean || cTitle.includes(stClean) || stClean.includes(cTitle)));
             });
 
-            if (isStDone) {
+            // ② 日誌 (journals) からの完了報告を照合
+            const isJournalDone = Array.from(userJournalTitles).some((jt) => {
+              const jClean = cleanStr(jt);
+              return cTitle && jClean && (cTitle === jClean || cTitle.includes(jClean) || jClean.includes(cTitle));
+            });
+
+            if (isStDone || isJournalDone) {
               completedTasks++;
             } else if (!uncompletedTaskObj) {
               uncompletedTaskObj = taskObj;
@@ -283,6 +312,22 @@ export default function TeacherStudentsView() {
               if (!alreadyCounted) {
                 completedTasks++;
               }
+            }
+          });
+
+          // 日誌で完了報告されたが baseTasks や student_tasks に未登録の個別タスクも加算
+          userJournalTitles.forEach((jt) => {
+            const jClean = cleanStr(jt);
+            const inBase = baseTasks.some((bt) => {
+              const bClean = cleanStr(String(bt.title || ""));
+              return bClean && jClean && (bClean === jClean || bClean.includes(jClean) || jClean.includes(bClean));
+            });
+            const inSt = userStRows.some((st: Record<string, unknown>) => {
+              const stClean = cleanStr(String(st.title || ""));
+              return st.status === "completed" && stClean && jClean && (stClean === jClean || stClean.includes(jClean) || jClean.includes(stClean));
+            });
+            if (!inBase && !inSt) {
+              completedTasks++;
             }
           });
 
