@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   sanitizePersonalNames,
   CROPS_LIST,
   STOP_WORDS,
+  searchSimilarKnowledge,
 } from "@/lib/rag/qaKnowledgeRetriever";
+import { supabase } from "@/lib/supabase";
 
 describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライバシー保護)", () => {
   describe("1. 個人名匿名化・プライバシー保護 (sanitizePersonalNames)", () => {
@@ -69,6 +71,50 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
 
       expect(keywords.some((k) => k.includes("トマト"))).toBe(true);
       expect(keywords.some((k) => k.includes("追肥"))).toBe(true);
+    });
+  });
+
+  describe("4. 過去ナレッジ検索とクエリ条件 (searchSimilarKnowledge)", () => {
+    it("journals テーブルから is_approved 降順・created_at 降順、LIMIT 50 でデータ取得し、類似Q&Aをソート抽出すること", async () => {
+      const mockData = [
+        {
+          id: "1",
+          content: "トマトの追肥タイミングを教えてください",
+          reply: "トマトの追肥は植え付けから3週間後に行います。",
+          is_approved: true,
+          student_id: "s1",
+        },
+        {
+          id: "2",
+          content: "トマトの追肥方法について",
+          reply: "株元から少し離れた場所に肥料をあげてください。",
+          is_approved: false,
+          student_id: "s2",
+        },
+      ];
+
+      const limitMock = vi.fn().mockResolvedValue({ data: mockData, error: null });
+      const order2Mock = vi.fn().mockReturnValue({ limit: limitMock });
+      const order1Mock = vi.fn().mockReturnValue({ order: order2Mock });
+      const neqMock = vi.fn().mockReturnValue({ order: order1Mock });
+      const notMock = vi.fn().mockReturnValue({ neq: neqMock });
+      const selectMock = vi.fn().mockReturnValue({ not: notMock });
+      const fromMock = vi.spyOn(supabase, "from").mockReturnValue({ select: selectMock } as any);
+
+      const result = await searchSimilarKnowledge("トマト 追肥");
+
+      expect(fromMock).toHaveBeenCalledWith("journals");
+      expect(selectMock).toHaveBeenCalledWith("id, content, reply, is_approved, student_id");
+      expect(notMock).toHaveBeenCalledWith("reply", "is", null);
+      expect(neqMock).toHaveBeenCalledWith("reply", "");
+      expect(order1Mock).toHaveBeenCalledWith("is_approved", { ascending: false });
+      expect(order2Mock).toHaveBeenCalledWith("created_at", { ascending: false });
+      expect(limitMock).toHaveBeenCalledWith(50);
+
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].question).toContain("トマトの追肥");
+
+      fromMock.mockRestore();
     });
   });
 });

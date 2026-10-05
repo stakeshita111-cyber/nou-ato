@@ -61,7 +61,10 @@ export async function searchSimilarKnowledge(
       .from("journals")
       .select("id, content, reply, is_approved, student_id")
       .not("reply", "is", null)
-      .neq("reply", "");
+      .neq("reply", "")
+      .order("is_approved", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (error || !dbData || dbData.length === 0) {
       return [];
