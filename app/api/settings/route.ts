@@ -6,7 +6,7 @@ interface ServerSettings {
   [key: string]: unknown;
 }
 
-let globalServerSettings: ServerSettings = {
+const DEFAULT_SETTINGS: ServerSettings = {
   showStudentTalkTab: true,
 };
 
@@ -14,8 +14,8 @@ export async function GET() {
   try {
     logger.info("Fetching global server settings", "api/settings");
     return ApiResponse.success({
-      settings: globalServerSettings,
-      showStudentTalkTab: globalServerSettings.showStudentTalkTab !== false,
+      settings: DEFAULT_SETTINGS,
+      showStudentTalkTab: DEFAULT_SETTINGS.showStudentTalkTab !== false,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "設定の取得に失敗しました";
@@ -27,23 +27,25 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Partial<ServerSettings>;
-    if (!body || typeof body !== "object") {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
       return ApiResponse.badRequest("リクエストボディが不正です");
     }
 
-    globalServerSettings = {
-      ...globalServerSettings,
+    const settings: ServerSettings = {
+      ...DEFAULT_SETTINGS,
       ...body,
     };
 
+    const showStudentTalkTab = settings.showStudentTalkTab !== false;
+
     logger.info("Updated global server settings", "api/settings", {
-      showStudentTalkTab: globalServerSettings.showStudentTalkTab,
+      showStudentTalkTab,
     });
 
     return ApiResponse.success({
       success: true,
-      settings: globalServerSettings,
-      showStudentTalkTab: globalServerSettings.showStudentTalkTab !== false,
+      settings,
+      showStudentTalkTab,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "設定の更新に失敗しました";
