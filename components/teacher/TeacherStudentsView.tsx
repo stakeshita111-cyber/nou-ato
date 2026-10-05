@@ -132,7 +132,9 @@ export default function TeacherStudentsView() {
       // 2. 農地・畝 (farm_beds / farm_plots) や割当ストレージからユーザーの割り当て区画を取得
       const bedMap: Record<string, string> = {};
       try {
-        const { data: dbBeds } = await supabase.from("farm_beds").select("*");
+        const { data: dbBeds } = await supabase
+          .from("farm_beds")
+          .select("id, student_id, user_id, student_name, user_name, plot_id, bed_number");
         if (dbBeds && dbBeds.length > 0) {
           dbBeds.forEach((b: Record<string, unknown>) => {
             const assignedUser = String(b.student_id || b.user_id || "");
@@ -176,7 +178,9 @@ export default function TeacherStudentsView() {
       // Supabase の student_tasks 取得
       let studentTasksRaw: Record<string, unknown>[] = [];
       try {
-        const { data: stData } = await supabase.from("student_tasks").select("*, tasks(*)");
+        const { data: stData } = await supabase
+          .from("student_tasks")
+          .select("id, student_id, status, task_id, base_task_id, title, tasks(id, title)");
         if (stData) studentTasksRaw = stData as Record<string, unknown>[];
       } catch (err) {
         console.warn("fetchStudents student_tasks lookup:", err);
@@ -190,7 +194,7 @@ export default function TeacherStudentsView() {
       try {
         let jDataQuery = supabase
           .from("journals")
-          .select("*")
+          .select("id, student_id, farm_id, content, memo, task_title, photo_url, image_url, created_at")
           .order("created_at", { ascending: false });
         if (currentFarmId) {
           jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
@@ -368,6 +372,7 @@ export default function TeacherStudentsView() {
       window.addEventListener("nouato_tasks_updated", handleSync);
       window.addEventListener("nouato_task_completed", handleSync);
       window.addEventListener("nouato_sync_event", handleSync);
+      window.addEventListener("storage", handleSync);
     }
 
     return () => {
@@ -377,6 +382,7 @@ export default function TeacherStudentsView() {
         window.removeEventListener("nouato_tasks_updated", handleSync);
         window.removeEventListener("nouato_task_completed", handleSync);
         window.removeEventListener("nouato_sync_event", handleSync);
+        window.removeEventListener("storage", handleSync);
       }
     };
   }, [fetchStudents]);
@@ -754,30 +760,6 @@ export default function TeacherStudentsView() {
     }
   };
 
-  useEffect(() => {
-    const handleSync = () => {
-      void fetchStudents();
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("nouato_sync_event", handleSync);
-      window.addEventListener("storage", handleSync);
-    }
-
-    const stRealtime = supabase
-      .channel("student_tasks_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => { void fetchStudents(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => { void fetchStudents(); })
-      .subscribe();
-
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("nouato_sync_event", handleSync);
-        window.removeEventListener("storage", handleSync);
-      }
-      supabase.removeChannel(stRealtime);
-    };
-  }, [fetchStudents]);
 
   const filteredStudents = students.filter((s) => {
     if (filter === "unread") return s.unreadCount > 0;
