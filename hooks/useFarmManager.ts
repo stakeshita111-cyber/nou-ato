@@ -40,6 +40,120 @@ export function checkBoundingBoxOverlap(
   );
 }
 
+export interface PlotUpsertPayload {
+  id: string;
+  name: string;
+  code: string;
+  student_id: string | null;
+  student_name: string | null;
+  is_vacant: boolean;
+  farm_id: string | null;
+  description: string;
+}
+
+export interface BedUpsertPayload {
+  id: string;
+  plot_id: string;
+  bed_number: string;
+  crop_name: string;
+  student_id: string | null;
+  student_name: string | null;
+  progress_percent: number;
+  status: string;
+  season: string;
+  harvested_at: string | null;
+  completion_notes: string | null;
+  total_harvest: string | null;
+  completion_image_url: string | null;
+}
+
+export function buildPlotUpsertPayload(
+  plot: FarmPlot,
+  activeFarmId: string,
+  dims: { cols: number; rows: number; unassigned_beds: number },
+  farmMeta: { address?: string; weatherLocation?: any }
+): PlotUpsertPayload {
+  const isVac = Boolean(plot.is_vacant);
+  const plotName = plot.student_name
+    ? `区画 ${plot.code} - ${plot.student_name}`
+    : `区画 ${plot.code}`;
+
+  const bedsMeta: { [bed_id: string]: any } = {};
+  (plot.beds || []).forEach((b) => {
+    if (b.status === "completed_pending" || b.status === "archived" || b.completion_notes || b.completion_image_url || b.total_harvest) {
+      bedsMeta[b.id] = {
+        status: b.status,
+        season: b.season,
+        harvested_at: b.harvested_at,
+        completion_notes: b.completion_notes,
+        total_harvest: b.total_harvest,
+        completion_image_url: b.completion_image_url,
+      };
+    }
+  });
+
+  const validStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
+  const validFarmId = (activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId)) ? activeFarmId : null;
+
+  return {
+    id: plot.id,
+    name: plotName,
+    code: plot.code,
+    student_id: isVac ? null : validStudentId,
+    student_name: isVac ? null : (plot.student_name || null),
+    is_vacant: isVac,
+    farm_id: validFarmId,
+    description: JSON.stringify({
+      is_vacant: isVac,
+      beds_meta: bedsMeta,
+      grid_dimensions: {
+        cols: dims.cols,
+        rows: dims.rows,
+        unassigned_beds: dims.unassigned_beds,
+        farm_id: activeFarmId,
+      },
+      farm_meta: {
+        address: farmMeta.address || "",
+        weather_location: farmMeta.weatherLocation || null,
+      },
+    }),
+  };
+}
+
+export function buildBedUpsertPayloadsForPlot(
+  plot: FarmPlot
+): BedUpsertPayload[] {
+  if (!plot || plot.id.startsWith("plot_placeholder_")) return [];
+  const bedsToUpsert: BedUpsertPayload[] = [];
+  const isVac = Boolean(plot.is_vacant);
+  if (plot.beds && plot.beds.length > 0) {
+    const activeOnlyBeds = plot.beds.filter(b => b.status !== "archived" && !b.id?.startsWith("archived_"));
+    for (let bIdx = 0; bIdx < activeOnlyBeds.length; bIdx++) {
+      const b = activeOnlyBeds[bIdx];
+      const bedNumber = String(b.bed_number || bIdx + 1);
+      const plotCode = plot.code || "C3";
+      const bedId = `plot_cell_${plotCode}_bed_${bedNumber}`;
+      const validBedStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
+      bedsToUpsert.push({
+        id: bedId,
+        plot_id: plot.id,
+        bed_number: bedNumber,
+        crop_name: b.crop_name || "未確定 🌱",
+        student_id: isVac ? null : validBedStudentId,
+        student_name: isVac ? null : (plot.student_name || null),
+        progress_percent: b.progress_percent || 0,
+        status: b.status || "active",
+        season: b.season || "2026年 秋冬",
+        harvested_at: b.harvested_at || null,
+        completion_notes: b.completion_notes || null,
+        total_harvest: b.total_harvest || null,
+        completion_image_url: b.completion_image_url || null,
+      });
+    }
+  }
+  return bedsToUpsert;
+}
+
 // 🌟【新設計】全マス100%独立構造・セルアドレス(code: A1, B2, D1, D2...)基準の絶対固定マップ生成関数 🌟
 export const buildFixedPlots = (
   activeFarmId: string,
@@ -163,6 +277,10 @@ export function useFarmManager() {
   const isSavingRef = useRef<boolean>(false);
   const lastSaveTimeRef = useRef<number>(0);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
+
+  // 🌟 Supabase差分更新（UPSERT抑制）のための直近保存済みスナップショットマップ 🌟
+  const lastSavedPlotsMapRef = useRef<Map<string, string>>(new Map());
+  const lastSavedBedsMapRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     plotsRef.current = plots;
@@ -634,6 +752,38 @@ export function useFarmManager() {
         plotsRef.current = plotsWithRecords;
         localStorage.setItem("nouato_farm_plots", JSON.stringify(plotsWithRecords));
         localStorage.setItem(`nouato_farm_plots_${effectiveActiveId}`, JSON.stringify(plotsWithRecords));
+
+        // 🌟 直近の保存状態スナップショットを初期化 (初回/同期時) 🌟
+        let farmAddress = "";
+        let weatherLocation: any = null;
+        if (typeof window !== "undefined") {
+          farmAddress = localStorage.getItem("nouato_farm_address") || "";
+          const wName = localStorage.getItem("nouato_weather_city_name");
+          const wLat = localStorage.getItem("nouato_weather_lat");
+          const wLon = localStorage.getItem("nouato_weather_lon");
+          if (wName && wLat && wLon) {
+            weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
+          }
+        }
+        const farmMeta = { address: farmAddress, weatherLocation };
+        const dims = { cols: detectedCols, rows: detectedRows, unassigned_beds: detectedDefaultBeds };
+
+        const newPlotMap = new Map<string, string>();
+        const newBedMap = new Map<string, string>();
+
+        for (const plot of plotsWithRecords) {
+          if (!plot || plot.id.startsWith("plot_placeholder_")) continue;
+          const pPayload = buildPlotUpsertPayload(plot, effectiveActiveId, dims, farmMeta);
+          newPlotMap.set(pPayload.id, JSON.stringify(pPayload));
+
+          const bPayloads = buildBedUpsertPayloadsForPlot(plot);
+          for (const bPayload of bPayloads) {
+            newBedMap.set(bPayload.id, JSON.stringify(bPayload));
+          }
+        }
+
+        lastSavedPlotsMapRef.current = newPlotMap;
+        lastSavedBedsMapRef.current = newBedMap;
       }
     } catch (e) {
       console.error("reloadAllFromSupabase error:", e);
@@ -670,110 +820,62 @@ export function useFarmManager() {
       console.error(e);
     }
 
-    // Supabase DB への超高速一括バルク保存/同期 (DBスキーマ適合)
+    // Supabase DB への超高速一括バルク保存/同期 (差分検出による過剰UPSERT抑制)
     try {
-      // 1. farm_plots の一括 upsert (description に is_vacant, beds_meta, および grid_dimensions を完全埋め込み永続化)
-      const plotsToUpsert = updatedPlots
+      let farmAddress = "";
+      let weatherLocation: any = null;
+      if (typeof window !== "undefined") {
+        farmAddress = localStorage.getItem("nouato_farm_address") || "";
+        const wName = localStorage.getItem("nouato_weather_city_name");
+        const wLat = localStorage.getItem("nouato_weather_lat");
+        const wLon = localStorage.getItem("nouato_weather_lon");
+        if (wName && wLat && wLon) {
+          weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
+        }
+      }
+      const farmMeta = { address: farmAddress, weatherLocation };
+      const dims = { cols: currentCols, rows: currentRows, unassigned_beds: currentBeds };
+
+      // 1. farm_plots の差分 upsert
+      const allPlotPayloads = updatedPlots
         .filter((plot) => plot && !plot.id.startsWith("plot_placeholder_"))
-        .map((plot) => {
-          const isVac = Boolean(plot.is_vacant);
-          const plotName = plot.student_name
-            ? `区画 ${plot.code} - ${plot.student_name}`
-            : `区画 ${plot.code}`;
+        .map((plot) => buildPlotUpsertPayload(plot, activeFarmId, dims, farmMeta));
 
-          // 拡張メタデータを JSON として description に埋め込み
-          const bedsMeta: { [bed_id: string]: any } = {};
-          (plot.beds || []).forEach((b) => {
-            if (b.status === "completed_pending" || b.status === "archived" || b.completion_notes || b.completion_image_url || b.total_harvest) {
-              bedsMeta[b.id] = {
-                status: b.status,
-                season: b.season,
-                harvested_at: b.harvested_at,
-                completion_notes: b.completion_notes,
-                total_harvest: b.total_harvest,
-                completion_image_url: b.completion_image_url,
-              };
-            }
-          });
-
-          let farmAddress = "";
-          let weatherLocation: any = null;
-          if (typeof window !== "undefined") {
-            farmAddress = localStorage.getItem("nouato_farm_address") || "";
-            const wName = localStorage.getItem("nouato_weather_city_name");
-            const wLat = localStorage.getItem("nouato_weather_lat");
-            const wLon = localStorage.getItem("nouato_weather_lon");
-            if (wName && wLat && wLon) {
-              weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
-            }
-          }
-
-          const validStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
-          const validFarmId = (activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId)) ? activeFarmId : null;
-
-          return {
-            id: plot.id,
-            name: plotName,
-            code: plot.code,
-            student_id: isVac ? null : validStudentId,
-            student_name: isVac ? null : (plot.student_name || null),
-            is_vacant: isVac,
-            farm_id: validFarmId,
-            description: JSON.stringify({
-              is_vacant: isVac,
-              beds_meta: bedsMeta,
-              grid_dimensions: {
-                cols: currentCols,
-                rows: currentRows,
-                unassigned_beds: currentBeds,
-                farm_id: activeFarmId,
-              },
-              farm_meta: {
-                address: farmAddress,
-                weather_location: weatherLocation,
-              },
-            }),
-          };
-        });
+      const plotsToUpsert: PlotUpsertPayload[] = [];
+      for (const payload of allPlotPayloads) {
+        const jsonStr = JSON.stringify(payload);
+        if (lastSavedPlotsMapRef.current.get(payload.id) !== jsonStr) {
+          plotsToUpsert.push(payload);
+        }
+      }
 
       if (plotsToUpsert.length > 0) {
         for (let i = 0; i < plotsToUpsert.length; i += 50) {
           const chunk = plotsToUpsert.slice(i, i + 50);
           const { error: plotsError } = await supabase.from("farm_plots").upsert(chunk);
-          if (plotsError) console.error("farm_plots bulk upsert error:", plotsError);
+          if (plotsError) {
+            console.error("farm_plots bulk upsert error:", plotsError);
+          } else {
+            for (const p of chunk) {
+              lastSavedPlotsMapRef.current.set(p.id, JSON.stringify(p));
+            }
+          }
         }
       }
 
-      // 2. farm_beds の一括バルク upsert
-      const bedsToUpsert: any[] = [];
+      // 2. farm_beds の差分 upsert
+      const allBedPayloads: BedUpsertPayload[] = [];
       for (const plot of updatedPlots) {
         if (!plot || plot.id.startsWith("plot_placeholder_")) continue;
-        const isVac = Boolean(plot.is_vacant);
-        if (plot.beds && plot.beds.length > 0) {
-          // 稼働中ベッドのみを抽出して整然と upsert
-          const activeOnlyBeds = plot.beds.filter(b => b.status !== "archived" && !b.id?.startsWith("archived_"));
-          for (let bIdx = 0; bIdx < activeOnlyBeds.length; bIdx++) {
-            const b = activeOnlyBeds[bIdx];
-            const bedNumber = String(b.bed_number || bIdx + 1);
-            const plotCode = plot.code || "C3";
-            const bedId = `plot_cell_${plotCode}_bed_${bedNumber}`;
-            const validBedStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
-            bedsToUpsert.push({
-              id: bedId,
-              plot_id: plot.id,
-              bed_number: bedNumber,
-              crop_name: b.crop_name || "未確定 🌱",
-              student_id: isVac ? null : validBedStudentId,
-              student_name: isVac ? null : (plot.student_name || null),
-              progress_percent: b.progress_percent || 0,
-              status: b.status || "active",
-              season: b.season || "2026年 秋冬",
-              harvested_at: b.harvested_at || null,
-              completion_notes: b.completion_notes || null,
-              total_harvest: b.total_harvest || null,
-              completion_image_url: b.completion_image_url || null,
-            });
-          }
+        const beds = buildBedUpsertPayloadsForPlot(plot);
+        allBedPayloads.push(...beds);
+      }
+
+      const bedsToUpsert: BedUpsertPayload[] = [];
+      for (const payload of allBedPayloads) {
+        const jsonStr = JSON.stringify(payload);
+        if (lastSavedBedsMapRef.current.get(payload.id) !== jsonStr) {
+          bedsToUpsert.push(payload);
         }
       }
 
@@ -783,6 +885,10 @@ export function useFarmManager() {
           const { error: bedsError } = await supabase.from("farm_beds").upsert(chunk);
           if (bedsError) {
             console.warn("farm_beds upsert notice:", bedsError.message || bedsError);
+          } else {
+            for (const b of chunk) {
+              lastSavedBedsMapRef.current.set(b.id, JSON.stringify(b));
+            }
           }
         }
       }
