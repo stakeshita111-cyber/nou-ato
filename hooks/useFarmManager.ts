@@ -927,26 +927,33 @@ export function useFarmManager() {
       };
     }
 
-    const channelName = "nouato_farm_manager_channel";
+    // 各フックインスタンスごとにユニークなチャンネル名を発行して衝突・多重登録例外を 100% 回避
+    const uniqueChannelId = Math.random().toString(36).substring(2, 9);
+    const channelName = `nouato_farm_manager_${Date.now()}_${uniqueChannelId}`;
     const shouldSkipSync = () => {
       return isSavingRef.current || (Date.now() - lastSaveTimeRef.current < 2500);
     };
 
-    const realtimeChannel = supabase
-      .channel(channelName)
-      .on("postgres_changes", { event: "*", schema: "public", table: "crop_records" }, () => {
-        if (!shouldSkipSync()) reloadAllFromSupabase();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => {
-        if (!shouldSkipSync()) reloadAllFromSupabase();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "farm_plots" }, () => {
-        if (!shouldSkipSync()) reloadAllFromSupabase();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => {
-        if (!shouldSkipSync()) reloadAllFromSupabase();
-      })
-      .subscribe();
+    let realtimeChannel: any = null;
+    try {
+      realtimeChannel = supabase
+        .channel(channelName)
+        .on("postgres_changes", { event: "*", schema: "public", table: "crop_records" }, () => {
+          if (!shouldSkipSync()) reloadAllFromSupabase();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => {
+          if (!shouldSkipSync()) reloadAllFromSupabase();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "farm_plots" }, () => {
+          if (!shouldSkipSync()) reloadAllFromSupabase();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => {
+          if (!shouldSkipSync()) reloadAllFromSupabase();
+        })
+        .subscribe();
+    } catch (realtimeErr) {
+      console.warn("Realtime subscription notice:", realtimeErr);
+    }
 
     const handleCustomSync = () => reloadAllFromSupabase();
     window.addEventListener("nouato_sync_event", handleCustomSync);
@@ -983,9 +990,15 @@ export function useFarmManager() {
 
     return () => {
       if (broadcastRef.current) {
-        broadcastRef.current.close();
+        try {
+          broadcastRef.current.close();
+        } catch (e) {}
       }
-      supabase.removeChannel(realtimeChannel);
+      if (realtimeChannel) {
+        try {
+          supabase.removeChannel(realtimeChannel);
+        } catch (e) {}
+      }
       window.removeEventListener("storage", handleStorageSync);
       window.removeEventListener("nouato_sync_event", handleCustomSync);
       window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
