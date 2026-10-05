@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
+import { uploadImageToStorage } from "@/lib/storage";
 
 interface TaskDetailModelProps {
   task: any;
@@ -131,7 +132,12 @@ export default function TaskDetailModel({
     }
   };
 
-  const handleReportComplete = () => {
+  const handleReportComplete = async () => {
+    let finalPhotoUrl = photoPreview;
+    if (photoPreview && photoPreview.startsWith("data:")) {
+      finalPhotoUrl = await uploadImageToStorage(photoPreview, "tasks");
+    }
+
     const targetBed = myBeds.find((b) => b.id === selectedBedId) || myBeds[0];
 
     // 対象の畝ベッドへ作業記録・現場写真を送信保存
@@ -148,14 +154,14 @@ export default function TaskDetailModel({
         height_cm: 75,
         work_types: [t.title],
         notes: reportMemo.trim() || "作業を完了しました。",
-        harvest_amount: photoPreview ? "📷 現場写真あり" : undefined,
-        image_url: photoPreview || undefined,
-        photo_url: photoPreview || undefined,
+        harvest_amount: finalPhotoUrl ? "📷 現場写真あり" : undefined,
+        image_url: finalPhotoUrl || undefined,
+        photo_url: finalPhotoUrl || undefined,
       });
     }
 
     if (onComplete) {
-      onComplete(task.id, selectedBedId, photoPreview || undefined, reportMemo);
+      onComplete(task.id, selectedBedId, finalPhotoUrl || undefined, reportMemo);
     }
     onClose();
   };

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FarmBed } from "@/types/farm";
+import { uploadImageToStorage } from "@/lib/storage";
 
 interface BedCompletionModalProps {
   isOpen: boolean;
@@ -158,13 +159,17 @@ export default function BedCompletionModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    let finalImageUrl = imageUrl;
+    if (imageUrl && imageUrl.startsWith("data:")) {
+      finalImageUrl = await uploadImageToStorage(imageUrl, "beds");
+    }
     onComplete({
       totalHarvest: totalHarvest.trim() || undefined,
       completionNotes: completionNotes.trim() || undefined,
-      imageUrl: imageUrl || undefined,
+      imageUrl: finalImageUrl || undefined,
       season: season,
     });
     setIsSubmitting(false);

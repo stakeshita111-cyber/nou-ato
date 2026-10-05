@@ -10,6 +10,7 @@ import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { supabase } from "@/lib/supabase";
 import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
+import { uploadImageToStorage } from "@/lib/storage";
 
 interface StudentFarmRecordViewProps {
   studentId?: string;
@@ -205,6 +206,11 @@ export default function StudentFarmRecordView({
 
     setIsSubmittingRecord(true);
     try {
+      let finalImageUrl = imageUrl;
+      if (imageUrl && imageUrl.startsWith("data:")) {
+        finalImageUrl = await uploadImageToStorage(imageUrl, "records");
+      }
+
       // 🌟 生徒が入力した品種名 (未入力時は既存品種を引き継ぐ) 🌟
       const finalCrop = customCropName.trim() || (currentBed.crop_name !== "未確定 🌱" ? currentBed.crop_name : "") || "未確定 🌱";
       const cleanNotes = notes.replace(/\[IMG:[\s\S]+?\]/g, "").replace(/【.*?】/g, "").trim();
@@ -228,7 +234,7 @@ export default function StudentFarmRecordView({
           work_types: selectedWorks,
           notes: taggedNotes,
           harvest_amount: harvestAmount.trim() || undefined,
-          image_url: imageUrl || undefined,
+          image_url: finalImageUrl || undefined,
         });
         setToastMessage("✏️ 過去の観察記録を更新しました！");
       } else {
@@ -241,7 +247,7 @@ export default function StudentFarmRecordView({
           work_types: selectedWorks,
           notes: taggedNotes,
           harvest_amount: harvestAmount.trim() || undefined,
-          image_url: imageUrl || undefined,
+          image_url: finalImageUrl || undefined,
         });
 
         // 講師の相談日誌・スライドカード用に journals へも自動連動保存
@@ -252,17 +258,16 @@ export default function StudentFarmRecordView({
             myPlot?.student_id ||
             null;
 
-          // 🌟 journals.image_url は VARCHAR(255) のため、Base64画像は content に [IMG:...] 形式で安全に埋め込む 🌟
-          const hasHttpImg = imageUrl && imageUrl.startsWith("http");
-          const journalContent = imageUrl && !hasHttpImg
-            ? `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}\n[IMG:${imageUrl}]`
+          const hasHttpImg = finalImageUrl && finalImageUrl.startsWith("http");
+          const journalContent = finalImageUrl && !hasHttpImg
+            ? `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}\n[IMG:${finalImageUrl}]`
             : `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`;
 
           const { error: jErr } = await supabase.from("journals").insert([
             {
               student_id: resolvedStudentId,
               content: journalContent,
-              image_url: hasHttpImg ? imageUrl : null,
+              image_url: hasHttpImg ? finalImageUrl : null,
               role: "student",
             },
           ]);

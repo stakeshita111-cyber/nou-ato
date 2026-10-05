@@ -85,6 +85,24 @@ const extractDateInfo = (dateStrOrIso?: string) => {
   };
 };
 
+// 🌟 ただの記録（質問・SOSではない日常の畝作業・観察記録）判定ヘルパー 🌟
+export const isRegularRecord = (content?: string): boolean => {
+  if (!content) return false;
+  const trimmed = content.trim();
+  // 【畝...】で始まる記録
+  if (trimmed.startsWith("【畝")) {
+    const hasQuestion = /[?？]/.test(trimmed) || 
+      trimmed.includes("教えて") || 
+      trimmed.includes("どうすれば") || 
+      trimmed.includes("どうしたら") ||
+      trimmed.includes("相談");
+    const hasUrgent = ["枯れ", "病", "害虫", "元気がない", "しおれ", "異変", "カビ"].some((k) => trimmed.includes(k));
+    // 質問やSOSが含まれていなければ「ただの記録」
+    return !hasQuestion && !hasUrgent;
+  }
+  return false;
+};
+
 export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournalsViewProps) {
   const activeFarmId = useFarmStore((state) => state.activeFarmId);
   const [journals, setJournals] = useState<JournalItem[]>([]);
@@ -98,7 +116,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [toastMessage, setToastMessage] = useState("");
 
   // 🌟【100人規模対応】スマートフィルター State 🌟
-  const [filterTab, setFilterTab] = useState<"unreplied" | "all" | "ai_answered" | "approved">("unreplied");
+  const [filterTab, setFilterTab] = useState<"unreplied" | "records" | "all" | "ai_answered" | "approved">("unreplied");
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [approveOnReply, setApproveOnReply] = useState<{ [key: string]: boolean }>({});
@@ -249,7 +267,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 minute: "2-digit",
               })}`
             : "最近",
-          taskTitle: j.task_title || "💡 気づきメモ・質問相談",
+          taskTitle: j.task_title || (isRegularRecord(cleanContent) ? "🌱 畝の観察記録" : "💡 気づきメモ・質問相談"),
           content: cleanContent,
           imageUrl: imgUrl,
           reply: j.reply || "",
@@ -369,7 +387,12 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const filteredJournals = journals.filter((j) => {
     // 1. タブフィルター
     if (filterTab === "unreplied") {
+      // 🌟 返信済み、および「ただの記録（観察・作業記録）」は要対応から除外 🌟
       if (j.reply && j.reply.trim().length > 0) return false;
+      if (isRegularRecord(j.content)) return false;
+    } else if (filterTab === "records") {
+      // 🌟 生徒の日常の観察・作業記録のみを一覧表示 🌟
+      if (!isRegularRecord(j.content)) return false;
     } else if (filterTab === "ai_answered") {
       if (!j.reply || j.reply.trim().length === 0) return false;
     } else if (filterTab === "approved") {
@@ -396,8 +419,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     return true;
   });
 
-  // 未返信件数のカウント（バッジ用）
-  const unrepliedCount = journals.filter((j) => !j.reply || !j.reply.trim()).length;
+  // 未返信（要対応）件数のカウント: ただの記録を除外
+  const unrepliedCount = journals.filter(
+    (j) => (!j.reply || !j.reply.trim()) && !isRegularRecord(j.content)
+  ).length;
+  // 観察・作業記録件数
+  const regularRecordsCount = journals.filter((j) => isRegularRecord(j.content)).length;
+  // 回答・対応済み件数
+  const repliedCount = journals.filter((j) => j.reply && j.reply.trim().length > 0).length;
   const approvedCount = journals.filter((j) => j.is_approved).length;
 
   // ページめくり処理 (フィルタリング後のリストに連動)
@@ -830,7 +859,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         )}
       </div>
 
-      {/* 🌟 2. 状態別スマートフィルタータブ (未返信・AI対応済み・承認ナレッジ・すべて) 🌟 */}
+      {/* 🌟 2. 状態別スマートフィルタータブ (未返信・観察記録・AI対応済み・承認ナレッジ・すべて) 🌟 */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200/90 text-xs font-bold">
         {/* 🔴 未返信（要対応） */}
         <button
@@ -852,7 +881,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           </span>
         </button>
 
-        {/* 🟢 AI対応済み */}
+        {/* 🌱 観察・作業記録 */}
+        <button
+          type="button"
+          onClick={() => setFilterTab("records")}
+          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+            filterTab === "records"
+              ? "bg-white text-blue-700 shadow-xs border border-gray-200"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <span>🌱 観察・作業記録</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800">
+            {regularRecordsCount}
+          </span>
+        </button>
+
+        {/* 🟢 AI対応済み / 回答済み */}
         <button
           type="button"
           onClick={() => setFilterTab("ai_answered")}
@@ -864,7 +909,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         >
           <span>🟢 回答・対応済み</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
-            {journals.length - unrepliedCount}
+            {repliedCount}
           </span>
         </button>
 
@@ -949,6 +994,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           <h3 className="font-bold text-gray-800 text-sm">
             {filterTab === "unreplied"
               ? "現在、未返信の日記・相談はありません！"
+              : filterTab === "records"
+              ? "まだ観察・作業記録はありません"
               : filterTab === "approved"
               ? "承認済みのAIナレッジはまだありません"
               : "条件に一致する交換日記は見つかりませんでした"}
@@ -956,6 +1003,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           <p className="text-xs text-gray-400 max-w-sm mx-auto">
             {filterTab === "unreplied"
               ? "生徒からの質問にはすべて回答済みです。お疲れ様でした✨"
+              : filterTab === "records"
+              ? "生徒が畝の観察ノートや作業記録を投稿するとここに表示されます。"
               : "上部のフィルター条件や検索キーワードを変更してお試しください。"}
           </p>
         </div>
@@ -1021,7 +1070,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     <div>
                       <div className="flex items-center space-x-2 flex-wrap gap-1">
                         <h3 className="font-extrabold text-gray-900 text-base">{currentJournal.studentName}</h3>
-                        <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        <span
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                            isRegularRecord(currentJournal.content)
+                              ? "bg-blue-100 text-blue-800 border border-blue-200"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
                           {currentJournal.taskTitle}
                         </span>
                         {/* 🚨 緊急度・要注意キーワードバッジ */}
@@ -1084,8 +1139,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 {/* 講師からの回答・返信＆編集エリア (返信と同時にナレッジ承認も可能) */}
                 <div className="border-t border-gray-100 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm app-text-main flex items-center space-x-1.5">
+                    <h4 className="font-bold text-sm app-text-main flex items-center space-x-1.5 flex-wrap gap-1">
                       <span>💬 講師からのアドバイス・回答</span>
+                      {isRegularRecord(currentJournal.content) && (
+                        <span className="text-[11px] font-normal text-gray-500">
+                          (※日常の観察記録です。必要に応じて励ましやアドバイスを返信できます)
+                        </span>
+                      )}
                     </h4>
 
                     {currentJournal.reply && editingReplyId !== currentJournal.id && (
@@ -1358,6 +1418,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                       {j.reply ? (
                         <span className="text-[9px] bg-green-100 text-green-800 px-1.5 py-0.2 rounded font-bold">
                           回答済み
+                        </span>
+                      ) : isRegularRecord(j.content) ? (
+                        <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold">
+                          🌱 記録
                         </span>
                       ) : (
                         <span className="text-[9px] bg-red-100 text-red-800 px-1.5 py-0.2 rounded font-black animate-pulse">
