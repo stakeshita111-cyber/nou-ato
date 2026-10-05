@@ -31,8 +31,8 @@ jobs:
       - name: Production Build for Vercel/Edge
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://rarwrsrmkubhcndfpokl.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_fxOlNtgJTxAZNzP6QxN-Uw_8SwxpgIe' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://xejkbgbfktvvcfehjwsg.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlamtiZ2Jma3R2dmNmZWhqd3NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNjgwNjksImV4cCI6MjEwNjc0NDA2OX0.Y0OhIrlizZczqdIPkmEex1UzsmKqj6IH4W3wHT8vuyg' }}
 
       - name: Deployment Success Notification
         run: echo "🎉 Build & Deployment pipeline verified successfully!"
