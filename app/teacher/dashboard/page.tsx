@@ -8,12 +8,15 @@ import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import TeacherHeader from "@/components/teacher/TeacherHeader";
-import TeacherOverviewView from "@/components/teacher/TeacherOverviewView";
 import { SproutLoader } from "@/components/SproutLoader";
 import { useFarmStore } from "@/store/useFarmStore";
 
 // 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
 // これにより、初回アクセス時の React 19 Hydration クラッシュやモバイル端末での初期化エラーを 100% 防止します
+const TeacherOverviewView = dynamic(
+  () => import("@/components/teacher/TeacherOverviewView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
 const TeacherTaskBoardView = dynamic(
   () => import("@/components/teacher/TeacherTaskBoardView"),
   { ssr: false, loading: () => <SproutLoader /> }

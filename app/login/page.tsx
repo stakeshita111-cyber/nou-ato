@@ -55,7 +55,7 @@ export default function UnifiedLoginPage() {
           .from("users")
           .select("role, display_name")
           .eq("id", userId)
-          .single();
+          .maybeSingle();
 
         if (userData?.role === "teacher") {
           destination = "/teacher/dashboard";

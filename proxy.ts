@@ -40,12 +40,14 @@ export async function proxy(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser();
 
-    // 1. 未認証アクセス制限 (TC-AUTH-004)
+    // 1. 未認証アクセス制限 (TC-AUTH-004: 未ログイン時は即座にサーバー側でログイン画面へ誘導)
     if (authError || !user) {
-      if (pathname.startsWith("/teacher") || pathname.startsWith("/student")) {
+      if (pathname === "/" || pathname.startsWith("/teacher") || pathname.startsWith("/student")) {
         const loginUrl = request.nextUrl.clone();
         loginUrl.pathname = "/login";
-        loginUrl.searchParams.set("redirect", pathname);
+        if (pathname !== "/") {
+          loginUrl.searchParams.set("redirect", pathname);
+        }
         return NextResponse.redirect(loginUrl);
       }
     }

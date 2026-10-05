@@ -7,7 +7,7 @@ import QRCodeModal from "@/components/ui/QRCodeModal";
 import WeatherWidget from "@/components/ui/WeatherWidget";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { useFarmStore } from "@/store/useFarmStore";
-import { isRegularRecord } from "@/components/teacher/TeacherJournalsView";
+import { isRegularRecord } from "@/lib/utils/journalHelper";
 
 interface TeacherOverviewViewProps {
   onAddNewTaskClick: () => void;
@@ -37,10 +37,13 @@ export default function TeacherOverviewView({
   const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
 
-  // 🌟 全マスから空き地を除外した「稼働区画数」と「総畝数」 (未作成時は 0) 🌟
-  const activePlots = plots.filter((p) => !p.is_vacant);
+  // 🌟 全マスから空き地を除外した「稼働区画数」と「総畝数」 (未作成時は 0、未定義ガード徹底) 🌟
+  const activePlots = (plots || []).filter((p) => p && !p.is_vacant);
   const displayPlotsCount = activePlots.length;
-  const displayBedsCount = activePlots.reduce((sum, p) => sum + (p.beds && p.beds.length > 0 ? p.beds.length : 3), 0);
+  const displayBedsCount = activePlots.reduce(
+    (sum, p) => sum + (p?.beds && p.beds.length > 0 ? p.beds.length : 3),
+    0
+  );
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
