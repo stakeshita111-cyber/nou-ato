@@ -196,13 +196,17 @@ export default function TeacherStudentsView() {
         console.warn("fetchStudents public tasks lookup:", err);
       }
 
-      // Supabase の student_tasks 取得
+      // Supabase の student_tasks 取得 (実在するカラムのみクエリしエラーを防止)
       let studentTasksRaw: Record<string, unknown>[] = [];
       try {
-        const { data: stData } = await supabase
+        const { data: stData, error: stErr } = await supabase
           .from("student_tasks")
-          .select("id, student_id, status, task_id, base_task_id, title, tasks(id, title)");
-        if (stData) studentTasksRaw = stData as Record<string, unknown>[];
+          .select("id, student_id, status, base_task_id, title");
+        if (stErr) {
+          console.warn("fetchStudents student_tasks query notice:", stErr);
+        } else if (stData) {
+          studentTasksRaw = stData as Record<string, unknown>[];
+        }
       } catch (err) {
         console.warn("fetchStudents student_tasks lookup:", err);
       }

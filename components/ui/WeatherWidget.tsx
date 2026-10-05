@@ -195,10 +195,18 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         const hourlyData = data.hourly;
 
         if (daily && daily.weathercode && daily.time) {
-          const todayStr = new Date().toISOString().split("T")[0];
+          // 🌟 日本時間 (Asia/Tokyo) で正確に本日の日付文字列 (YYYY-MM-DD) を取得 🌟
+          // ※ UTC 変換 (new Date().toISOString()) を使うと、日本時間の早朝 (00:00〜08:59) に前日扱いになるバグを根絶
+          const todayStr = new Intl.DateTimeFormat("ja-JP", {
+            timeZone: "Asia/Tokyo",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(new Date()).replace(/\//g, "-");
+
           const todayIdx = daily.time.findIndex((t: string) => t.startsWith(todayStr)) !== -1
             ? daily.time.findIndex((t: string) => t.startsWith(todayStr))
-            : 1;
+            : 0;
 
           const todayCode = daily.weathercode[todayIdx] ?? daily.weathercode[0];
           const todayWeather = parseWeatherCode(todayCode);
@@ -240,13 +248,21 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             colorClass: todayRainSum >= 5 || todayRainProb >= 70 ? "bg-cyan-400" : todayTempMax >= 30 ? "bg-amber-400" : "bg-blue-400",
           };
 
-          const currentHour = new Date().getHours();
+          // 日本時間の現在時刻 (0〜23) を取得
+          const currentHour = parseInt(
+            new Intl.DateTimeFormat("ja-JP", {
+              timeZone: "Asia/Tokyo",
+              hour: "numeric",
+              hour12: false,
+            }).format(new Date()),
+            10
+          );
           const parsedHourly: HourlyPoint[] = [];
 
           if (hourlyData && hourlyData.time) {
             const startIdx = hourlyData.time.findIndex((t: string) => t.startsWith(todayStr)) !== -1
               ? hourlyData.time.findIndex((t: string) => t.startsWith(todayStr))
-              : 24;
+              : 0;
 
             for (let i = startIdx; i < startIdx + 24 && i < hourlyData.time.length; i++) {
               const hourNum = parseInt(hourlyData.time[i].split("T")[1]?.slice(0, 2) || "0", 10);
