@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { supabase } from "@/lib/supabase";
@@ -8,67 +9,104 @@ import Toast from "@/components/ui/Toast";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import TeacherHeader from "@/components/teacher/TeacherHeader";
 import TeacherOverviewView from "@/components/teacher/TeacherOverviewView";
-import TeacherTaskBoardView from "@/components/teacher/TeacherTaskBoardView";
-import TeacherJournalsView from "@/components/teacher/TeacherJournalsView";
-import TeacherSettingsView from "@/components/teacher/TeacherSettingsView";
-import TeacherPaymentsView from "@/components/teacher/TeacherPaymentsView";
-import TeacherEventsView from "@/components/teacher/TeacherEventsView";
-import TeacherTemplatesView from "@/components/teacher/TeacherTemplatesView";
-import TeacherFarmCanvasView from "@/components/teacher/TeacherFarmCanvasView";
-import TeacherStudentsView from "@/components/teacher/TeacherStudentsView";
-
-import MobilePhonePreviewModal from "@/components/common/MobilePhonePreviewModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { useFarmStore } from "@/store/useFarmStore";
+
+// 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
+// これにより、初回アクセス時の React 19 Hydration クラッシュやモバイル端末での初期化エラーを 100% 防止します
+const TeacherTaskBoardView = dynamic(
+  () => import("@/components/teacher/TeacherTaskBoardView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherFarmCanvasView = dynamic(
+  () => import("@/components/teacher/TeacherFarmCanvasView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherStudentsView = dynamic(
+  () => import("@/components/teacher/TeacherStudentsView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherJournalsView = dynamic(
+  () => import("@/components/teacher/TeacherJournalsView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherTemplatesView = dynamic(
+  () => import("@/components/teacher/TeacherTemplatesView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherPaymentsView = dynamic(
+  () => import("@/components/teacher/TeacherPaymentsView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherEventsView = dynamic(
+  () => import("@/components/teacher/TeacherEventsView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const TeacherSettingsView = dynamic(
+  () => import("@/components/teacher/TeacherSettingsView"),
+  { ssr: false, loading: () => <SproutLoader /> }
+);
+const MobilePhonePreviewModal = dynamic(
+  () => import("@/components/common/MobilePhonePreviewModal"),
+  { ssr: false }
+);
+
+const VALID_TEACHER_MENUS = [
+  "dashboard",
+  "farm",
+  "tasks",
+  "templates",
+  "journals",
+  "events",
+  "payments",
+  "settings",
+  "students",
+];
 
 export default function TeacherDashboardPage() {
   const router = useRouter();
   const { activeFarmId, fetchTeacherFarms } = useFarmStore();
   const { plots } = useFarmManager();
 
-  // 🌟 畑管理の未承認収穫完了報告（要承認）の総数を算出 (LINE風バッジ用) 🌟
+  // 🌟 畑管理の未承認収穫完了報告（要承認）の総数を算出 (未定義ガード徹底) 🌟
   let pendingApprovalCount = 0;
-  plots.forEach((p) => {
-    (p.beds || []).forEach((b) => {
-      if (b.status === "completed_pending") {
+  (plots || []).forEach((p) => {
+    (p?.beds || []).forEach((b) => {
+      if (b?.status === "completed_pending") {
         pendingApprovalCount++;
       }
     });
   });
-  const VALID_TEACHER_MENUS = [
-    "dashboard",
-    "farm",
-    "tasks",
-    "templates",
-    "journals",
-    "events",
-    "payments",
-    "settings",
-    "students",
-  ];
 
-  const [activeMenu, setActiveMenu] = useState<string>(() => {
+  // 🌟 Hydration Mismatch 防止: 初期値は常に "dashboard"、マウント後にストレージから安全に復元 🌟
+  const [activeMenu, setActiveMenu] = useState<string>("dashboard");
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get("tab");
       if (tabParam && VALID_TEACHER_MENUS.includes(tabParam)) {
-        return tabParam;
+        setActiveMenu(tabParam);
+        return;
       }
       const savedMenu = sessionStorage.getItem("nouato_teacher_active_menu");
       if (savedMenu && VALID_TEACHER_MENUS.includes(savedMenu)) {
-        return savedMenu;
+        setActiveMenu(savedMenu);
       }
     }
-    return "dashboard";
-  });
+  }, []);
 
   const handleMenuChange = (menu: string) => {
     setActiveMenu(menu);
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("nouato_teacher_active_menu", menu);
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", menu);
-      window.history.replaceState(null, "", url.toString());
+      try {
+        sessionStorage.setItem("nouato_teacher_active_menu", menu);
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", menu);
+        window.history.replaceState(null, "", url.toString());
+      } catch (e) {
+        console.error("Storage error:", e);
+      }
     }
   };
 
@@ -165,11 +203,13 @@ export default function TeacherDashboardPage() {
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* 📱 超美麗スマホ実機プレビューモーダル 📱 */}
-      <MobilePhonePreviewModal
-        isOpen={showMobilePreviewModal}
-        onClose={() => setShowMobilePreviewModal(false)}
-        initialUrl="/teacher/dashboard"
-      />
+      {showMobilePreviewModal && (
+        <MobilePhonePreviewModal
+          isOpen={showMobilePreviewModal}
+          onClose={() => setShowMobilePreviewModal(false)}
+          initialUrl="/teacher/dashboard"
+        />
+      )}
 
       {/* 1. 左サイドバー */}
       <TeacherSidebar
