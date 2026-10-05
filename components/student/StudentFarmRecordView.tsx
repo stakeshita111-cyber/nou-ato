@@ -142,7 +142,8 @@ export default function StudentFarmRecordView({
       const rawResult = readerEvent.target?.result as string;
       const img = new Image();
       img.onload = () => {
-        const maxDim = 800;
+        // 🌟 画像をカード・一覧表示に最適なサイズ（最大480px / 品質0.5）に自動圧縮し転送量を最小化 🌟
+        const maxDim = 480;
         let w = img.width;
         let h = img.height;
         if (w > maxDim || h > maxDim) {
@@ -160,12 +161,12 @@ export default function StudentFarmRecordView({
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const compressed = canvas.toDataURL("image/jpeg", 0.65);
+          const compressed = canvas.toDataURL("image/jpeg", 0.5);
           setImageUrl(compressed);
         } else {
           setImageUrl(rawResult);
         }
-        setToastMessage("📸 写真・画像を添付しました！");
+        setToastMessage("📸 写真・画像を最適化して添付しました！");
         setShowToast(true);
       };
       img.src = rawResult;

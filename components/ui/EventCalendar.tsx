@@ -12,6 +12,7 @@ interface EventCalendarProps {
   onReserveEvent?: (eventId: string) => void;
   onApproveAttendee?: (eventId: string, attendeeName: string) => void;
   onAddNewEventClick?: (dateStr: string) => void;
+  onDeleteEvent?: (eventId: string) => void;
 }
 
 export default function EventCalendar({
@@ -22,6 +23,7 @@ export default function EventCalendar({
   onReserveEvent,
   onApproveAttendee,
   onAddNewEventClick,
+  onDeleteEvent,
 }: EventCalendarProps) {
   // 表示年月の State (初期値: 今日の日付を含む年月)
   const today = new Date();
@@ -33,6 +35,22 @@ export default function EventCalendar({
   const [currentMonth, setCurrentMonth] = useState(todayMonth);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateFormatted);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // 現在表示されている年月以外の月にある予定をチェック
+  const currentMonthPrefix = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
+  const otherMonthEvents = events.filter((e) => !e.date.startsWith(currentMonthPrefix));
+  const upcomingOtherEvent = otherMonthEvents
+    .filter((e) => e.date > currentMonthPrefix)
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
+
+  const navigateToDate = (targetDateStr: string) => {
+    const parts = targetDateStr.split("-");
+    if (parts.length >= 2) {
+      setCurrentYear(Number(parts[0]));
+      setCurrentMonth(Number(parts[1]));
+      setSelectedDateStr(targetDateStr);
+    }
+  };
 
   // 月変更操作
   const handlePrevMonth = () => {
@@ -131,6 +149,24 @@ export default function EventCalendar({
           </button>
         </div>
       </div>
+
+      {/* 他月の予定案内バナー */}
+      {upcomingOtherEvent && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs animate-fade-in">
+          <div className="flex items-center space-x-2 text-amber-900 font-bold">
+            <span className="text-base">💡</span>
+            <span>
+              次の予定: <b>{formatDate(upcomingOtherEvent.date)}</b> 「{upcomingOtherEvent.title}」があります
+            </span>
+          </div>
+          <button
+            onClick={() => navigateToDate(upcomingOtherEvent.date)}
+            className="self-end sm:self-auto px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs transition shadow-2xs"
+          >
+            この予定を表示 ▶
+          </button>
+        </div>
+      )}
 
       {/* 2. 7列 カレンダーグリッド (viewMode === 'grid') */}
       {viewMode === "grid" ? (
@@ -329,6 +365,21 @@ export default function EventCalendar({
                           <span>🙋‍♂️ このイベントに参加予約する</span>
                         </button>
                       )}
+                    </div>
+                  )}
+                  {/* 講師モード: 削除ボタン */}
+                  {mode === "teacher" && onDeleteEvent && (
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`「${ev.title}」をカレンダーから削除してもよろしいですか？`)) {
+                            onDeleteEvent(ev.id);
+                          }
+                        }}
+                        className="text-[11px] font-bold text-red-500 hover:text-red-700 hover:underline flex items-center space-x-1"
+                      >
+                        <span>🗑️ イベントを削除</span>
+                      </button>
                     </div>
                   )}
                 </div>

@@ -333,7 +333,21 @@ export function useFarmManager() {
             seenStudentIds.add(sId);
           }
 
-          const isVac = Boolean(dp.is_vacant) || dp.description === "vacant";
+          let isVac = false;
+          if (dp.description === "vacant") {
+            isVac = true;
+          } else if (dp.description) {
+            try {
+              const meta = typeof dp.description === "string" ? JSON.parse(dp.description) : dp.description;
+              if (typeof meta?.is_vacant === "boolean") {
+                isVac = meta.is_vacant;
+              }
+            } catch (e) {}
+          }
+          // 生徒が割り当てられている場合は絶対に空き地ではない
+          if (sId || sName) {
+            isVac = false;
+          }
 
           return {
             id: dp.id,
@@ -694,11 +708,17 @@ export function useFarmManager() {
             }
           }
 
+          const validStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
+          const validFarmId = (activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId)) ? activeFarmId : null;
+
           return {
             id: plot.id,
             name: plotName,
             code: plot.code,
-            student_id: isVac ? null : (plot.student_id || null),
+            student_id: isVac ? null : validStudentId,
+            student_name: isVac ? null : (plot.student_name || null),
+            is_vacant: isVac,
+            farm_id: validFarmId,
             description: JSON.stringify({
               is_vacant: isVac,
               beds_meta: bedsMeta,
@@ -737,12 +757,13 @@ export function useFarmManager() {
             const bedNumber = String(b.bed_number || bIdx + 1);
             const plotCode = plot.code || "C3";
             const bedId = `plot_cell_${plotCode}_bed_${bedNumber}`;
+            const validBedStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
             bedsToUpsert.push({
               id: bedId,
               plot_id: plot.id,
               bed_number: bedNumber,
               crop_name: b.crop_name || "未確定 🌱",
-              student_id: isVac ? null : (plot.student_id || null),
+              student_id: isVac ? null : validBedStudentId,
               student_name: isVac ? null : (plot.student_name || null),
               progress_percent: b.progress_percent || 0,
               status: b.status || "active",
@@ -851,13 +872,6 @@ export function useFarmManager() {
     };
     window.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 🌟 10秒ごとの自動バックグラウンドポーリング (WebSocket切断や別端末操作も完全カバー) 🌟
-    const pollInterval = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        reloadAllFromSupabase();
-      }
-    }, 10000);
-
     return () => {
       if (broadcastRef.current) {
         broadcastRef.current.close();
@@ -868,7 +882,6 @@ export function useFarmManager() {
       window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(pollInterval);
     };
   }, [reloadAllFromSupabase]);
 
@@ -1756,10 +1769,19 @@ export function useFarmManager() {
 
     // journals テーブルへの insert (1件のみ厳密登録)
     try {
+      const validStudentId = (targetStudentId && /^[0-9a-fA-F-]{36}$/.test(targetStudentId)) ? targetStudentId : null;
+      const validFarmId = (activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId)) ? activeFarmId : null;
+      const hasHttpImg = details.imageUrl && details.imageUrl.startsWith("http");
+      const baseContent = `【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum} (${targetCropName}) の収穫が完了しました！\n収穫量: ${details.totalHarvest || "未記載"}\n振り返り: ${details.completionNotes || "順調に収穫できました"}`;
+      const journalContent = (details.imageUrl && !hasHttpImg)
+        ? `${baseContent}\n[IMG:${details.imageUrl}]`
+        : baseContent;
+
       await supabase.from("journals").insert([
         {
-          student_id: targetStudentId,
-          content: `【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum} (${targetCropName}) の収穫が完了しました！\n収穫量: ${details.totalHarvest || "未記載"}\n振り返り: ${details.completionNotes || "順調に収穫できました"}`,
+          student_id: validStudentId,
+          farm_id: validFarmId,
+          content: journalContent,
           image_url: details.imageUrl || null,
           role: "student",
           is_approved: false,

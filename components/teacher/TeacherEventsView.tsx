@@ -7,11 +7,16 @@ import { useEvents } from "@/hooks/useEvents";
 import { formatDate } from "@/lib/utils/formatHelper";
 
 export default function TeacherEventsView() {
-  const { events, addEvent, approveAttendee } = useEvents();
+  const { events, addEvent, approveAttendee, deleteEvent } = useEvents();
+
+  const getTodayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [newDate, setNewDate] = useState("2026-05-24");
+  const [newDate, setNewDate] = useState(getTodayStr());
   const [newTime, setNewTime] = useState("10:00 - 12:30");
   const [newCapacity, setNewCapacity] = useState(10);
   const [newDescription, setNewDescription] = useState("");
@@ -62,6 +67,13 @@ export default function TeacherEventsView() {
     setShowToast(true);
   };
 
+  // イベント削除
+  const handleDelete = async (eventId: string) => {
+    await deleteEvent(eventId);
+    setToastMessage("🗑️ イベントをカレンダーから削除しました");
+    setShowToast(true);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
@@ -89,6 +101,7 @@ export default function TeacherEventsView() {
         mode="teacher"
         onApproveAttendee={handleApprove}
         onAddNewEventClick={handleOpenAddModalForDate}
+        onDeleteEvent={handleDelete}
       />
 
       {/* 新規イベント登録モーダル */}

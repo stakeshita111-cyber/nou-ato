@@ -10,8 +10,12 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./test/setup.ts"],
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: "https://rarwrsrmkubhcndfpokl.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_fxOlNtgJTxAZNzP6QxN-Uw_8SwxpgIe",
+      // 新環境: nou-ato DB2
+      NEXT_PUBLIC_SUPABASE_URL: "https://xejkbgbfktvvcfehjwsg.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlamtiZ2Jma3R2dmNmZWhqd3NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNjgwNjksImV4cCI6MjEwNjc0NDA2OX0.Y0OhIrlizZczqdIPkmEex1UzsmKqj6IH4W3wHT8vuyg",
+      // 旧環境 (バックアップ)
+      // NEXT_PUBLIC_SUPABASE_URL: "https://rarwrsrmkubhcndfpokl.supabase.co",
+      // NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_fxOlNtgJTxAZNzP6QxN-Uw_8SwxpgIe",
     },
     coverage: {
       provider: "v8",

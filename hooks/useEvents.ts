@@ -86,6 +86,10 @@ export function useEvents(farmId?: string) {
           attendees: d.attendees || [],
         }));
         setEvents(formatted);
+        try {
+          localStorage.setItem(eventKey, JSON.stringify(formatted));
+          localStorage.setItem("nouato_shared_events", JSON.stringify(formatted));
+        } catch (_) {}
       } else if (!saved) {
         setEvents([]);
       }
@@ -98,6 +102,35 @@ export function useEvents(farmId?: string) {
 
   useEffect(() => {
     fetchEvents();
+
+    // Supabase Realtime でイベント変更を全端末・全画面に即座に同期
+    const channel = supabase
+      .channel("events_realtime_channel")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "events" },
+        () => {
+          fetchEvents();
+        }
+      )
+      .subscribe();
+
+    if (typeof window !== "undefined") {
+      const handleSync = () => {
+        fetchEvents();
+      };
+      window.addEventListener("nouato_events_updated", handleSync);
+      window.addEventListener("nouato_sync_event", handleSync);
+      return () => {
+        window.removeEventListener("nouato_events_updated", handleSync);
+        window.removeEventListener("nouato_sync_event", handleSync);
+        supabase.removeChannel(channel);
+      };
+    }
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [farmId]);
 
   // ローカル更新・共有保存ヘルパー
@@ -116,6 +149,7 @@ export function useEvents(farmId?: string) {
   // 講師: イベント新規登録
   const addEvent = async (eventData: Omit<EventItem, "id" | "reservedCount" | "attendees">) => {
     const fid = getEffectiveFarmId();
+    const validFarmId = (fid && /^[0-9a-fA-F-]{36}$/.test(fid)) ? fid : null;
     const newEv: EventItem = {
       ...eventData,
       id: `ev_${Date.now()}`,
@@ -127,7 +161,7 @@ export function useEvents(farmId?: string) {
     saveSharedEvents(nextEvents);
 
     try {
-      await supabase.from("events").insert([
+      const { error: insErr } = await supabase.from("events").insert([
         {
           id: newEv.id,
           title: newEv.title,
@@ -141,11 +175,18 @@ export function useEvents(farmId?: string) {
           description: newEv.description,
           reserved_count: 0,
           attendees: [],
-          farm_id: fid || null,
+          farm_id: validFarmId,
         },
       ]);
+      if (insErr) {
+        console.error("addEvent DB error:", insErr);
+      }
     } catch (e) {
       console.warn("addEvent DB warning:", e);
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("nouato_events_updated"));
     }
     return newEv;
   };
@@ -210,6 +251,35 @@ export function useEvents(farmId?: string) {
     });
 
     saveSharedEvents(updatedEvents);
+
+    try {
+      const target = updatedEvents.find((e) => e.id === eventId);
+      if (target) {
+        await supabase
+          .from("events")
+          .update({ attendees: target.attendees })
+          .eq("id", eventId);
+      }
+    } catch (e) {
+      console.warn("approveAttendee DB warning:", e);
+    }
+    return true;
+  };
+
+  // イベント削除
+  const deleteEvent = async (eventId: string) => {
+    const nextEvents = events.filter((ev) => ev.id !== eventId);
+    saveSharedEvents(nextEvents);
+
+    try {
+      await supabase.from("events").delete().eq("id", eventId);
+    } catch (e) {
+      console.warn("deleteEvent DB warning:", e);
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("nouato_events_updated"));
+    }
     return true;
   };
 
@@ -219,6 +289,7 @@ export function useEvents(farmId?: string) {
     addEvent,
     reserveEvent,
     approveAttendee,
+    deleteEvent,
     refetchEvents: fetchEvents,
   };
 }

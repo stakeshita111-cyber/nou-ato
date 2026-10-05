@@ -422,13 +422,7 @@ export function useStudentDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => fetchData())
       .subscribe();
 
-    // 🌟 6. バックグラウンド定期ポーリング (10秒間隔: InPrivateモードや別ブラウザでのリアルタイム同期支援) 🌟
-    const pollInterval = setInterval(() => {
-      fetchData();
-    }, 10000);
-
     return () => {
-      clearInterval(pollInterval);
       if (bc) bc.close();
       window.removeEventListener("nouato_sync_event", handleCustomSync);
       window.removeEventListener("storage", handleStorage);

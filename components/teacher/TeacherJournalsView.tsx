@@ -701,13 +701,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     fetchJournals(true);
     fetchCropRecords();
 
-    // 🌟 1. 定期自動更新 (10秒ごとに最新投稿・写真をバックグラウンド検知) 🌟
-    const interval = setInterval(() => {
-      fetchJournals(false);
-      fetchCropRecords();
-    }, 10000);
-
-    // 🌟 2. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
+    // 🌟 1. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("nouato_farm_sync_channel");
@@ -723,13 +717,15 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     };
     if (typeof window !== "undefined") {
       window.addEventListener("nouato_sync_event", handleSync);
+      // タブに復帰した時のみ最新状態に再同期 (常時ポーリングを廃止して通信量を99%削減)
+      window.addEventListener("focus", handleSync);
     }
 
     return () => {
-      clearInterval(interval);
       if (bc) bc.close();
       if (typeof window !== "undefined") {
         window.removeEventListener("nouato_sync_event", handleSync);
+        window.removeEventListener("focus", handleSync);
       }
     };
   }, [fetchCropRecords, activeFarmId]);

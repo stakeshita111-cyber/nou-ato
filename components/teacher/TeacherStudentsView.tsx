@@ -155,6 +155,7 @@ export default function TeacherStudentsView() {
       }
 
       // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
+      let publicTasks: Record<string, unknown>[] = [];
       try {
         let pTasksQuery = supabase
           .from("tasks")
@@ -164,8 +165,13 @@ export default function TeacherStudentsView() {
         if (currentFarmId) {
           pTasksQuery = pTasksQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
         }
-        await pTasksQuery;
-      } catch {}
+        const { data: ptData } = await pTasksQuery.order("created_at", { ascending: true });
+        if (ptData && ptData.length > 0) {
+          publicTasks = ptData as Record<string, unknown>[];
+        }
+      } catch (err) {
+        console.warn("fetchStudents public tasks lookup:", err);
+      }
 
       // Supabase の student_tasks 取得
       let studentTasksRaw: Record<string, unknown>[] = [];
@@ -232,23 +238,22 @@ export default function TeacherStudentsView() {
           const uId = String(u.id || "");
           const plotName = String(u.plot || u.plot_name || u.assigned_plot || bedMap[uId] || bedMap[studentName] || "未割り当て");
 
-          // ゼロベース出題・完了計算ロジック (MASTER_TASKS 全5件に一元決定)
-          const activeAssignedTasks = MASTER_TASKS;
-          const totalTasks = activeAssignedTasks.length; // 厳密に 5件
+          // 生徒画面 (useStudentDashboard) と完全に一致する教材タスク一覧を構築
+          const baseTasks = publicTasks.length > 0 ? publicTasks : (MASTER_TASKS as unknown as Record<string, unknown>[]);
 
           // Supabase DB (student_tasks) レコードの集約
           const userStRows = studentTasksRaw.filter((st: Record<string, unknown>) => st.student_id === uId);
 
           let completedTasks = 0;
-          let uncompletedTaskObj: (typeof MASTER_TASKS)[0] | null = null;
+          let uncompletedTaskObj: Record<string, unknown> | null = null;
 
           const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
 
-          activeAssignedTasks.forEach((taskObj) => {
-            const taskTitle = taskObj.title || "";
+          baseTasks.forEach((taskObj) => {
+            const taskTitle = String(taskObj.title || "");
             const cTitle = cleanStr(taskTitle);
 
-            // Supabase DB (student_tasks) の status === "completed" のみを 100% 正解基準として照合
+            // Supabase DB (student_tasks) の status === "completed" を照合
             const isStDone = userStRows.some((st: Record<string, unknown>) => {
               if (st.status !== "completed") return false;
               const stTasks = st.tasks as { title?: string } | undefined;
@@ -263,6 +268,23 @@ export default function TeacherStudentsView() {
             }
           });
 
+          // 生徒個別追加タスク（baseTasks にないもの）で完了しているものも合流
+          userStRows.forEach((st: Record<string, unknown>) => {
+            if (st.status === "completed") {
+              const stTitle = cleanStr(String(st.title || ""));
+              const alreadyCounted = baseTasks.some((bt) => {
+                const btTitle = cleanStr(String(bt.title || ""));
+                return bt.id === st.task_id || bt.id === st.base_task_id || (stTitle && btTitle && (stTitle === btTitle || stTitle.includes(btTitle) || btTitle.includes(stTitle)));
+              });
+              if (!alreadyCounted) {
+                completedTasks++;
+              }
+            }
+          });
+
+          // 出題全数: baseTasks の件数（完了数が多い場合は完了数以上）
+          const totalTasks = Math.max(baseTasks.length, completedTasks);
+
           // 進捗率 (%) 算定
           const calcProgress = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
 
@@ -271,7 +293,13 @@ export default function TeacherStudentsView() {
           else if (calcProgress >= 60) stepText = "応用作業中 🌱";
           else if (calcProgress >= 20 || completedTasks > 0) stepText = "基礎作業中 🌿";
 
-          const activeTask = uncompletedTaskObj || activeAssignedTasks[0] || null;
+          const activeTaskRaw = uncompletedTaskObj || baseTasks[0] || null;
+          const activeTask = activeTaskRaw ? {
+            title: String(activeTaskRaw.title || ""),
+            description: String(activeTaskRaw.description || ""),
+            target_crop: String(activeTaskRaw.target_crop || ""),
+            exp: Number(activeTaskRaw.exp || 50),
+          } : null;
 
           return {
             id: uId,
@@ -312,8 +340,44 @@ export default function TeacherStudentsView() {
       }
     };
     void load();
+
+    // 🌟 Supabase Realtime で生徒のタスク完了・畝変更・日誌提出を検知し即時自動反映 🌟
+    const channel = supabase
+      .channel("teacher_students_realtime_channel")
+      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => {
+        if (isMounted) void fetchStudents();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        if (isMounted) void fetchStudents();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => {
+        if (isMounted) void fetchStudents();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => {
+        if (isMounted) void fetchStudents();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
+        if (isMounted) void fetchStudents();
+      })
+      .subscribe();
+
+    const handleSync = () => {
+      if (isMounted) void fetchStudents();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_tasks_updated", handleSync);
+      window.addEventListener("nouato_task_completed", handleSync);
+      window.addEventListener("nouato_sync_event", handleSync);
+    }
+
     return () => {
       isMounted = false;
+      supabase.removeChannel(channel);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_tasks_updated", handleSync);
+        window.removeEventListener("nouato_task_completed", handleSync);
+        window.removeEventListener("nouato_sync_event", handleSync);
+      }
     };
   }, [fetchStudents]);
 

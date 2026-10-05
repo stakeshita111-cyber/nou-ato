@@ -180,7 +180,12 @@ export default function StudentPage() {
     };
 
     fetchServerSettings();
-    const pollInterval = setInterval(fetchServerSettings, 2000);
+
+    // タブに復帰した時のみ最新状態を取得 (高頻度ポーリングによるVercel実行枠消費を防止)
+    const handleFocusSync = () => {
+      fetchServerSettings();
+    };
+    window.addEventListener("focus", handleFocusSync);
 
     let bc: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
@@ -235,7 +240,7 @@ export default function StudentPage() {
     window.addEventListener("message", handleWindowMessage);
 
     return () => {
-      clearInterval(pollInterval);
+      window.removeEventListener("focus", handleFocusSync);
       if (bc) bc.close();
       window.removeEventListener("nouato_settings_updated", handleCustom);
       window.removeEventListener("nouato_talk_tab_toggled", handleTalkToggle);
