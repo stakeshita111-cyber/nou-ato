@@ -1636,7 +1636,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
             <div className="flex justify-end space-x-2 pt-2 border-t">
               <button
-                onClick={() => setIsLocationModalOpen(false)}
+                onClick={() => setIsBroadcastModalOpen(false)}
                 className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-xs"
               >
                 キャンセル

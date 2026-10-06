@@ -12,7 +12,6 @@ interface TeacherSidebarProps {
   onMenuClick: (menu: string) => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
-  onOpenMobilePreview?: () => void;
   pendingApprovalCount?: number;
 }
 
@@ -21,7 +20,6 @@ export default function TeacherSidebar({
   onMenuClick,
   isOpenMobile = false,
   onCloseMobile,
-  onOpenMobilePreview,
   pendingApprovalCount = 0,
 }: TeacherSidebarProps) {
   const { settings } = useThemeStore();
@@ -293,18 +291,6 @@ export default function TeacherSidebar({
               </svg>
               <span>画面設定</span>
             </button>
-
-            {/* モバイル限定: 直接ログアウトボタン (下部URLバーでアバターが押しにくい場合でも100%確実に押せる安全策) */}
-            <div className="pt-2 border-t border-gray-100 md:hidden">
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm text-rose-600 hover:bg-rose-50 transition active:scale-[0.98]"
-              >
-                <span className="text-base">🚪</span>
-                <span>ログアウト</span>
-              </button>
-            </div>
           </nav>
         </div>
 
@@ -332,21 +318,7 @@ export default function TeacherSidebar({
                 <span className="ml-auto text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">別窓</span>
               </Link>
 
-              {/* 2. 📱 スマホビュー表示 (プレビューモーダル) */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsUserMenuOpen(false);
-                  if (onOpenMobilePreview) onOpenMobilePreview();
-                }}
-                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-black text-teal-900 hover:bg-teal-50 transition duration-150 text-left"
-              >
-                <span className="text-sm">📱</span>
-                <span>スマホビュー表示</span>
-                <span className="ml-auto text-[9px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded-full font-bold">プレビュー</span>
-              </button>
-
-              {/* 3. 🚪 ログアウト */}
+              {/* 2. 🚪 ログアウト */}
               <button
                 type="button"
                 onClick={handleLogout}

@@ -91,13 +91,13 @@ export default function TeacherSettingsView() {
               <span className="text-[10px] text-gray-400 font-bold">
                 ✨ 下の設定ボタンを押すと各項目がプレビューにリアルタイム反映されます
               </span>
-              <button
-                type="button"
-                className={`text-white font-bold transition-all shadow-xs ${getBorderRadiusClass(settings.borderRadius)} ${getButtonPaddingClass(settings.buttonPadding)}`}
+              <div
+                aria-hidden="true"
+                className={`text-white font-bold transition-all shadow-xs pointer-events-none select-none ${getBorderRadiusClass(settings.borderRadius)} ${getButtonPaddingClass(settings.buttonPadding)}`}
                 style={{ backgroundColor: settings.primaryColor }}
               >
-                ＋ サンプルボタン (保存・追加)
-              </button>
+                ＋ サンプルボタン (見た目プレビュー)
+              </div>
             </div>
 
           </div>
