@@ -49,10 +49,6 @@ const TeacherSettingsView = dynamic(
   () => import("@/components/teacher/TeacherSettingsView"),
   { ssr: false, loading: () => <SproutLoader /> }
 );
-const MobilePhonePreviewModal = dynamic(
-  () => import("@/components/common/MobilePhonePreviewModal"),
-  { ssr: false }
-);
 
 const VALID_TEACHER_MENUS = [
   "dashboard",
@@ -119,7 +115,6 @@ export default function TeacherDashboardPage() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showMobilePreviewModal, setShowMobilePreviewModal] = useState(false);
   const [targetPlotCode, setTargetPlotCode] = useState<string | undefined>(undefined);
   const [targetFarmId, setTargetFarmId] = useState<string | undefined>(undefined);
   const [targetApprovalBedId] = useState<string | undefined>(undefined);
@@ -205,22 +200,12 @@ export default function TeacherDashboardPage() {
     <div className="h-screen w-full app-bg-main flex app-text-main font-sans transition-colors duration-300 overflow-hidden">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* 📱 超美麗スマホ実機プレビューモーダル 📱 */}
-      {showMobilePreviewModal && (
-        <MobilePhonePreviewModal
-          isOpen={showMobilePreviewModal}
-          onClose={() => setShowMobilePreviewModal(false)}
-          initialUrl="/teacher/dashboard"
-        />
-      )}
-
       {/* 1. 左サイドバー */}
       <TeacherSidebar
         activeMenu={activeMenu}
         onMenuClick={handleMenuChange}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
-        onOpenMobilePreview={() => setShowMobilePreviewModal(true)}
         pendingApprovalCount={pendingApprovalCount}
       />
 
