@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Task } from "@/types/task";
+import Toast from "@/components/ui/Toast";
+import { supabase } from "@/lib/supabase";
+import { useFarmStore } from "@/store/useFarmStore";
+import { TaskTemplate, TaskCategory } from "@/lib/taskTemplates";
 
 type TaskEditModalProps = {
   task: Task;
@@ -11,19 +15,119 @@ type TaskEditModalProps = {
 
 export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalProps) {
   const [editData, setEditData] = useState<Task>({ ...task });
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   const handleSave = () => {
     onSave(editData);
   };
 
+  const handleSaveAsTemplate = async () => {
+    setIsSavingTemplate(true);
+    try {
+      const templateId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `custom_tpl_${Date.now()}`;
+
+      const category = (editData.category as TaskCategory) || "共通";
+
+      const newTemplate: TaskTemplate = {
+        id: templateId,
+        title: editData.title || "無題のテンプレート",
+        category: category,
+        target_crop: editData.target_crop || "共通",
+        estimated_time: editData.estimated_time || "30分",
+        tools_needed: editData.tools_needed || "",
+        description: editData.description || "",
+        memo: editData.memo || "",
+        exp: editData.exp ?? 50,
+        difficulty: editData.difficulty ?? 1,
+        require_photo: Boolean(editData.require_photo),
+        badge_name: editData.badge_name || "栽培マスター",
+        badge_icon: editData.badge_icon || "🌿",
+        season: "通年",
+        phase: "育成・管理",
+      };
+
+      // 1. LocalStorage (nouato_custom_templates) に追加保存
+      if (typeof window !== "undefined") {
+        let currentList: TaskTemplate[] = [];
+        const saved = localStorage.getItem("nouato_custom_templates");
+        if (saved) {
+          try {
+            currentList = JSON.parse(saved);
+          } catch (e) {
+            console.error("Failed to parse custom templates:", e);
+          }
+        }
+        currentList.unshift(newTemplate);
+        localStorage.setItem("nouato_custom_templates", JSON.stringify(currentList));
+      }
+
+      // 2. Supabase DB (tasks テーブル: is_template = true, status = 'template') に保存
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      const farmId =
+        useFarmStore.getState().activeFarmId ||
+        (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+
+      const { error } = await supabase.from("tasks").insert([
+        {
+          id: newTemplate.id,
+          title: newTemplate.title,
+          description: newTemplate.description || "",
+          category: newTemplate.category || "共通",
+          status: "template",
+          is_template: true,
+          target_crop: newTemplate.target_crop || null,
+          estimated_time: newTemplate.estimated_time || null,
+          tools_needed: newTemplate.tools_needed || null,
+          memo: newTemplate.memo || null,
+          difficulty: newTemplate.difficulty || 1,
+          exp: newTemplate.exp || 50,
+          require_photo: Boolean(newTemplate.require_photo),
+          created_by: userId || null,
+          farm_id: farmId || null,
+          checklist: {
+            phase: newTemplate.phase,
+            season: newTemplate.season,
+            badge_name: newTemplate.badge_name,
+            badge_icon: newTemplate.badge_icon,
+          },
+        },
+      ]);
+
+      if (error) {
+        console.warn("Supabase insert template notice:", error);
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_tasks_updated"));
+        window.dispatchEvent(new Event("nouato_custom_templates_updated"));
+      }
+
+      setToastMessage("📋 テンプレートに追加しました！");
+      setShowToast(true);
+    } catch (err: any) {
+      console.error("Failed to save as template:", err);
+      setToastMessage(`❌ テンプレートの追加に失敗しました: ${err?.message || "不明なエラー"}`);
+      setShowToast(true);
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 text-gray-800 animate-fade-in">
+      <Toast isOpen={showToast} message={toastMessage} onClose={() => setShowToast(false)} />
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col border border-gray-200">
         
         {/* ヘッダー */}
         <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 flex justify-between items-center">
           <h2 className="text-xl font-black text-gray-900">クエスト・教材詳細設定</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 font-bold text-xl p-1">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 font-bold text-xl p-1 cursor-pointer">✕</button>
         </div>
         
         {/* 内容 */}
@@ -153,8 +257,16 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
 
         {/* フッター */}
         <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-3xl flex justify-end gap-3 sticky bottom-0">
-          <button onClick={onClose} className="px-5 py-2 bg-white border text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-100">キャンセル</button>
-          <button onClick={handleSave} className="px-6 py-2 app-accent-btn font-bold text-xs rounded-xl shadow">設定を保存する</button>
+          <button onClick={onClose} className="px-5 py-2 bg-white border text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-100 cursor-pointer">キャンセル</button>
+          <button
+            type="button"
+            onClick={handleSaveAsTemplate}
+            disabled={isSavingTemplate}
+            className="px-4 py-2 border border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+          >
+            <span>📋 テンプレートに追加</span>
+          </button>
+          <button onClick={handleSave} className="px-6 py-2 app-accent-btn font-bold text-xs rounded-xl shadow cursor-pointer">設定を保存する</button>
         </div>
 
       </div>
