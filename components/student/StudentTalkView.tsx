@@ -785,80 +785,82 @@ export default function StudentTalkView({
         ))}
       </div>
 
-      {/* 🌟 ナレッジ共有許可トグル (オプトアウト UI) 🌟 */}
-      <div className="px-3.5 py-1.5 bg-emerald-50/70 border-t border-emerald-100 flex items-center justify-between text-xs shrink-0">
-        <label className="flex items-center space-x-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={allowKnowledgeShare}
-            onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
-            className="w-4 h-4 text-emerald-700 bg-white border-emerald-300 rounded focus:ring-emerald-600 cursor-pointer"
-          />
-          <span className="text-[11px] font-bold text-emerald-950">
-            💡 この相談内容を農園ナレッジ（匿名FAQ）として共有することを許可する
-          </span>
-        </label>
-        <span className={"text-[9.5px] font-black px-2 py-0.5 rounded-md shrink-0 " + (
-          allowKnowledgeShare ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-amber-100 text-amber-900 border border-amber-300"
-        )}>
-          {allowKnowledgeShare ? "共有許可 ON" : "非公開相談 OFF"}
-        </span>
-      </div>
-
-      {/* 🌟 5. 入力バー ＆ 送信ボタン ＆ 丸3つ残数インジケーター 🌟 */}
+      {/* 🌟 5. 入力バー ＆ ナレッジ共有許可トグル ＆ 送信ボタン 🌟 */}
       <form
         onSubmit={handleOpenConfirm}
-        className="p-2 bg-white border-t border-gray-200 flex items-center gap-2 shrink-0"
+        className="p-2.5 bg-white border-t border-gray-200 flex flex-col gap-2 shrink-0"
       >
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder={
-            ticketState.isUnlimited || ticketState.count > 0
-              ? "栽培の質問や相談を入力..."
-              : "次回質問用のメモを入力 (ストックに追記)..."
-          }
-          disabled={isSending || isCheckingKnowledge}
-          className="flex-1 min-w-0 px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 focus:bg-white border border-gray-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] transition placeholder-gray-400"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder={
+              ticketState.isUnlimited || ticketState.count > 0
+                ? "栽培の質問や相談を入力..."
+                : "次回質問用のメモを入力 (ストックに追記)..."
+            }
+            disabled={isSending || isCheckingKnowledge}
+            className="flex-1 min-w-0 px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 focus:bg-white border border-gray-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] transition placeholder-gray-400"
+          />
 
-        <div className="flex flex-col items-center justify-center space-y-1 shrink-0">
-          <button
-            type="submit"
-            disabled={!inputText.trim() || isSending || isCheckingKnowledge}
-            className={"w-9 h-9 rounded-2xl font-black transition flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 " + (
-              !inputText.trim() || isSending || isCheckingKnowledge
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : ticketState.isUnlimited || ticketState.count > 0
-                ? "bg-[#1c4d21] text-white hover:bg-[#153e19]"
-                : "bg-amber-700 text-white hover:bg-amber-800"
-            )}
-            title="相談内容を確認して送信"
-          >
-            {isCheckingKnowledge ? (
-              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-            ) : (
-              <svg className="w-4 h-4 fill-current transform rotate-45 -translate-y-0.5 translate-x-0.5" viewBox="0 0 24 24">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            )}
-          </button>
+          <div className="flex flex-col items-center justify-center space-y-1 shrink-0">
+            <button
+              type="submit"
+              disabled={!inputText.trim() || isSending || isCheckingKnowledge}
+              className={"w-9 h-9 rounded-2xl font-black transition flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 " + (
+                !inputText.trim() || isSending || isCheckingKnowledge
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : ticketState.isUnlimited || ticketState.count > 0
+                  ? "bg-[#1c4d21] text-white hover:bg-[#153e19]"
+                  : "bg-amber-700 text-white hover:bg-amber-800"
+              )}
+              title="相談内容を確認して送信"
+            >
+              {isCheckingKnowledge ? (
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <svg className="w-4 h-4 fill-current transform rotate-45 -translate-y-0.5 translate-x-0.5" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              )}
+            </button>
 
-          <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / 3 回"}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <span
-                key={i}
-                className={"w-1.5 h-1.5 rounded-full transition-all " + (
-                  ticketState.isUnlimited
-                    ? "bg-emerald-600 scale-110"
-                    : i < ticketState.count
-                    ? "bg-emerald-600 shadow-2xs scale-110"
-                    : "bg-gray-300"
-                )}
-              ></span>
-            ))}
+            <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / 3 回"}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <span
+                  key={i}
+                  className={"w-1.5 h-1.5 rounded-full transition-all " + (
+                    ticketState.isUnlimited
+                      ? "bg-emerald-600 scale-110"
+                      : i < ticketState.count
+                      ? "bg-emerald-600 shadow-2xs scale-110"
+                      : "bg-gray-300"
+                  )}
+                ></span>
+              ))}
+            </div>
           </div>
+        </div>
+
+        {/* 🌟 チャット入力フォーム直下の共有許可トグル常時表示 (デフォルトON) 🌟 */}
+        <div className="px-3 py-1.5 bg-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between text-xs">
+          <label className="flex items-center space-x-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allowKnowledgeShare}
+              onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
+              className="w-4 h-4 text-emerald-700 bg-white border-emerald-300 rounded focus:ring-emerald-600 cursor-pointer"
+            />
+            <span className="text-[11px] font-bold text-emerald-950">
+              💡 相談内容を農園ナレッジ（匿名FAQ）として共有許可（デフォルトON）
+            </span>
+          </label>
+          <span className={"text-[9.5px] font-black px-2 py-0.5 rounded-md shrink-0 " + (
+            allowKnowledgeShare ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-amber-100 text-amber-900 border border-amber-300"
+          )}>
+            {allowKnowledgeShare ? "共有許可 ON" : "非公開相談 OFF"}
+          </span>
         </div>
       </form>
 
@@ -919,8 +921,20 @@ export default function StudentTalkView({
                   ))}
                 </div>
 
-                {/* 下部のアクションボタン */}
+                {/* モーダル内ナレッジ共有許可トグル (パターンA) ＆ 下部のアクションボタン */}
                 <div className="pt-2 border-t border-gray-100 space-y-2 shrink-0">
+                  <label className="flex items-center space-x-2 cursor-pointer select-none bg-emerald-50/80 p-2.5 rounded-2xl border border-emerald-200/90">
+                    <input
+                      type="checkbox"
+                      checked={allowKnowledgeShare}
+                      onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
+                      className="w-4 h-4 text-emerald-700 bg-white border-gray-300 rounded focus:ring-emerald-600 cursor-pointer"
+                    />
+                    <span className="text-[10.5px] font-extrabold text-emerald-950 leading-tight">
+                      💡 相談内容を農園ナレッジ（匿名FAQ）として共有許可
+                    </span>
+                  </label>
+
                   <button
                     type="button"
                     onClick={() => executeSendMessage(true)}
