@@ -103,7 +103,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   const [loading, setLoading] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-  const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const [showMobileDetails, setShowMobileDetails] = useState(true);
 
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
