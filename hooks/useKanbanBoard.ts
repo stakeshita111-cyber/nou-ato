@@ -145,6 +145,13 @@ export function useKanbanBoard(columns: ColumnType[]) {
     }
 
     try {
+      const existingChecklist = (options as any)?.checklist && typeof (options as any)?.checklist === "object" ? (options as any).checklist : {};
+      const newTaskChecklist = {
+        ...existingChecklist,
+        badge_name: options?.badge_name || null,
+        badge_icon: options?.badge_icon || null,
+      };
+
       const newTaskData = { 
         title, 
         status: options?.status || "pool", 
@@ -158,6 +165,9 @@ export function useKanbanBoard(columns: ColumnType[]) {
         exp: options?.exp || 10,
         difficulty: options?.difficulty || 1,
         estimated_time: options?.estimated_time || null,
+        badge_name: options?.badge_name || null,
+        badge_icon: options?.badge_icon || null,
+        checklist: newTaskChecklist,
         created_by: userId,
         farm_id: effectiveFarmId 
       };
@@ -198,6 +208,14 @@ export function useKanbanBoard(columns: ColumnType[]) {
   // タスクの更新（Update：詳細設定の保存）
   const saveTaskDetails = async (updatedTask: Task) => {
     try {
+      const existingTask = tasks.find((t) => t.id === updatedTask.id);
+      const existingChecklist = (existingTask as any)?.checklist && typeof (existingTask as any)?.checklist === "object" ? (existingTask as any).checklist : {};
+      const updatedChecklist = {
+        ...existingChecklist,
+        badge_name: updatedTask.badge_name || null,
+        badge_icon: updatedTask.badge_icon || null,
+      };
+
       const { error } = await supabase
         .from("tasks")
         .update({
@@ -210,7 +228,10 @@ export function useKanbanBoard(columns: ColumnType[]) {
           target_crop: updatedTask.target_crop,
           require_photo: updatedTask.require_photo,
           exp: updatedTask.exp,
-          difficulty: updatedTask.difficulty
+          difficulty: updatedTask.difficulty,
+          badge_name: updatedTask.badge_name || null,
+          badge_icon: updatedTask.badge_icon || null,
+          checklist: updatedChecklist,
         })
         .eq("id", updatedTask.id);
 
@@ -218,7 +239,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         console.warn("saveTaskDetails DB保存警告:", error.message);
       }
 
-      setTasks(tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+      setTasks(tasks.map((t) => (t.id === updatedTask.id ? { ...updatedTask, checklist: updatedChecklist } : t)));
       setEditingTask(null);
     } catch (e) {
       console.error("saveTaskDetails 実行中に例外が発生しました:", e);
