@@ -371,12 +371,11 @@ export default function StudentFarmRecordView({
   }, [fetchStudentJournals]);
 
   // 選択した畝(ベッド)の時系列記録 (該当区画および選択した畝のみに厳密絞り込み)
-  const currentBedRecords = records
-    .filter((r) => {
-      if (!currentBed) return false;
-      return r.bed_id === currentBed.id;
-    })
-    .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+  const currentBedRecords = currentBed
+    ? records
+        .filter((r) => r.bed_id === currentBed.id)
+        .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())
+    : [];
 
   // 観察記録 (cropRecords) と 講師からの返信 (journals) を合成したタイムラインリスト
   type ObservationTimelineItem = {
@@ -400,7 +399,7 @@ export default function StudentFarmRecordView({
 
   const bedNumberStr = currentBed ? String(currentBed.bed_number) : "";
 
-  const synthesizedTimelineItems = useMemo(() => {
+  const synthesizedTimelineItems = (() => {
     if (!currentBed) return [];
 
     const observationItems: CombinedTimelineItem[] = currentBedRecords.map((rec) => ({
@@ -460,7 +459,7 @@ export default function StudentFarmRecordView({
     });
 
     return [...observationItems, ...replyItems].sort((a, b) => b.timestamp - a.timestamp);
-  }, [currentBed, currentBedRecords, studentJournals, bedNumberStr]);
+  })();
 
   if (isLoading || plots.length === 0) {
     return (
