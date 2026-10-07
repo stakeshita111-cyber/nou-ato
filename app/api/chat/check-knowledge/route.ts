@@ -1,6 +1,6 @@
 import {
   searchSimilarKnowledge,
-  sanitizePersonalNames,
+  sanitizePiiText,
   CROPS_LIST,
   STOP_WORDS,
 } from "@/lib/rag/qaKnowledgeRetriever";
@@ -96,8 +96,8 @@ export async function POST(request: Request) {
 
             // 意味のあるキーワードがヒットしている場合のみ追加
             if (uniqueHits.length > 0) {
-              const cleanQ = sanitizePersonalNames(k.question);
-              const cleanA = sanitizePersonalNames(k.answer);
+              const cleanQ = sanitizePiiText(k.question);
+              const cleanA = sanitizePiiText(k.answer);
               matches.push({
                 id: `db_${k.id || Math.random().toString(36).slice(2)}`,
                 question: cleanQ,
