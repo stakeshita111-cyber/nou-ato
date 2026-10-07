@@ -78,6 +78,7 @@ export async function POST(request: Request) {
 
     // 2. Supabase の journals テーブルに対話履歴・質問メモを確実に保存
     try {
+      const isPrivate = message.trim().startsWith("【非公開相談】");
       const { error: insertErr } = await supabase.from("journals").insert([
         {
           student_id: effectiveStudentId,
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
           // メモ専用の場合は講師の対応待ちとするため、replyをnullにして講師未回答扱いにする（生徒画面には上記案内を即時表示）
           reply: isMemoOnly ? null : reply,
           role: "student",
+          is_approved: false, // デフォルトで未承認（非公開相談タグがある場合は確実に承認対象外）
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
