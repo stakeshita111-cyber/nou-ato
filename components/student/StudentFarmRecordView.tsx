@@ -416,11 +416,34 @@ export default function StudentFarmRecordView({
       const content = String(j.content || j.text || "");
       const replyText = String(j.reply || "").trim();
 
-      // 他の畝向けの特定タグ（例: 【畝 2】）がある場合はスキップ
+      // 送信元の畝・作物の厳密一致判定
       const bedTagMatch = content.match(/【畝\s*([0-9]+)/) || content.match(/畝\s*([0-9]+)/);
       if (bedTagMatch) {
         const taggedBedNum = bedTagMatch[1];
         if (taggedBedNum !== bedNumberStr) {
+          return;
+        }
+      } else {
+        // 畝指定がない場合、現在選択されている畝の作物品種名で厳密判定
+        const currentCrop = currentBed.crop_name ? currentBed.crop_name.replace(/🌱/g, "").trim() : "";
+        const isValidCurrentCrop = Boolean(currentCrop && currentCrop !== "未確定");
+
+        let isCropMatched = false;
+        if (isValidCurrentCrop) {
+          if (content.includes(currentCrop)) {
+            isCropMatched = true;
+          } else {
+            const bracketMatches = Array.from(content.matchAll(/【([^】]+)】/g)).map((m) => m[1].trim());
+            for (const tag of bracketMatches) {
+              if (tag && (currentCrop.includes(tag) || tag.includes(currentCrop))) {
+                isCropMatched = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!isCropMatched) {
           return;
         }
       }
