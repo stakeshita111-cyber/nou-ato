@@ -81,6 +81,17 @@ function sanitizePersonalNames(text: string): string {
   return clean || text.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "").trim();
 }
 
+function formatQuestionTopic(item: MatchedKnowledgeItem): string {
+  if (item.matchedKeywords && item.matchedKeywords.length > 0) {
+    return `【${item.matchedKeywords.join("・")}】に関する栽培相談`;
+  }
+  const cleanQ = sanitizePersonalNames(item.question);
+  if (cleanQ) {
+    return cleanQ.length > 35 ? cleanQ.slice(0, 35) + "..." : cleanQ;
+  }
+  return "【農園トピック】に関する栽培相談";
+}
+
 export default function StudentTalkView({
   journals = [],
   studentName = "受講生",
@@ -100,6 +111,9 @@ export default function StudentTalkView({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isCheckingKnowledge, setIsCheckingKnowledge] = useState(false);
   const [matchedKnowledgeList, setMatchedKnowledgeList] = useState<MatchedKnowledgeItem[]>([]);
+
+  // 💡 ナレッジ共有許可 (オプトアウト) State (デフォルト: ON)
+  const [allowKnowledgeShare, setAllowKnowledgeShare] = useState(true);
 
   // 検索機能 State
   const [showSearch, setShowSearch] = useState(false);
@@ -332,8 +346,13 @@ export default function StudentTalkView({
   // 🌟 4. 新しくチケットを使ってAIに送信する 🌟
   const executeSendMessage = async (forceAi: boolean = false) => {
     setShowConfirmModal(false);
-    const text = inputText.trim();
-    if (!text || isSending) return;
+    const rawInput = inputText.trim();
+    if (!rawInput || isSending) return;
+
+    // オプトアウト (非公開指定) の場合は 【非公開相談】 タグを先頭に付与
+    const text = allowKnowledgeShare || rawInput.startsWith("【非公開相談】")
+      ? rawInput
+      : `【非公開相談】${rawInput}`;
 
     const timeStr = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
     const userMsgId = "user_" + Date.now();
@@ -716,7 +735,7 @@ export default function StudentTalkView({
                       <div className="mt-2.5 pt-2 border-t border-gray-100 text-[10.5px] text-emerald-800 bg-emerald-50/80 p-2 rounded-xl">
                         <span className="font-bold block mb-0.5">💡 参考にした過去の講師回答 (重み1.2):</span>
                         <p className="text-gray-600 font-normal italic">
-                          「{msg.referencedQa[0].answer.length > 60 ? msg.referencedQa[0].answer.slice(0, 60) + "..." : msg.referencedQa[0].answer}」
+                          「{sanitizePersonalNames(msg.referencedQa[0].answer).length > 60 ? sanitizePersonalNames(msg.referencedQa[0].answer).slice(0, 60) + "..." : sanitizePersonalNames(msg.referencedQa[0].answer)}」
                         </p>
                       </div>
                     )}
@@ -764,6 +783,26 @@ export default function StudentTalkView({
             <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded-full font-bold">無料</span>
           </button>
         ))}
+      </div>
+
+      {/* 🌟 ナレッジ共有許可トグル (オプトアウト UI) 🌟 */}
+      <div className="px-3.5 py-1.5 bg-emerald-50/70 border-t border-emerald-100 flex items-center justify-between text-xs shrink-0">
+        <label className="flex items-center space-x-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={allowKnowledgeShare}
+            onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
+            className="w-4 h-4 text-emerald-700 bg-white border-emerald-300 rounded focus:ring-emerald-600 cursor-pointer"
+          />
+          <span className="text-[11px] font-bold text-emerald-950">
+            💡 この相談内容を農園ナレッジ（匿名FAQ）として共有することを許可する
+          </span>
+        </label>
+        <span className={"text-[9.5px] font-black px-2 py-0.5 rounded-md shrink-0 " + (
+          allowKnowledgeShare ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-amber-100 text-amber-900 border border-amber-300"
+        )}>
+          {allowKnowledgeShare ? "共有許可 ON" : "非公開相談 OFF"}
+        </span>
       </div>
 
       {/* 🌟 5. 入力バー ＆ 送信ボタン ＆ 丸3つ残数インジケーター 🌟 */}
@@ -854,10 +893,10 @@ export default function StudentTalkView({
                         </span>
                       </div>
 
-                      {/* 過去質問 */}
+                      {/* 過去質問トピック (他生徒原文の非表示化) */}
                       <div className="text-xs">
-                        <span className="text-[10px] font-bold text-gray-500 block">Q. 過去の質問:</span>
-                        <p className="font-extrabold text-gray-900 line-clamp-2">「{item.question}」</p>
+                        <span className="text-[10px] font-bold text-gray-500 block">Q. 質問トピック:</span>
+                        <p className="font-extrabold text-gray-900 line-clamp-2">{formatQuestionTopic(item)}</p>
                       </div>
 
                       {/* 回答プレビュー */}
@@ -919,11 +958,26 @@ export default function StudentTalkView({
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-[10.5px] font-bold text-gray-500 block">📝 相談内容:</span>
-                  <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-200/80 text-xs text-gray-800 max-h-36 overflow-y-auto whitespace-pre-wrap font-medium leading-relaxed">
-                    {inputText}
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <span className="text-[10.5px] font-bold text-gray-500 block">📝 相談内容:</span>
+                    <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-200/80 text-xs text-gray-800 max-h-36 overflow-y-auto whitespace-pre-wrap font-medium leading-relaxed">
+                      {inputText}
+                    </div>
                   </div>
+
+                  {/* モーダル内ナレッジ共有許可トグル */}
+                  <label className="flex items-center space-x-2 cursor-pointer select-none bg-emerald-50/80 p-2.5 rounded-2xl border border-emerald-200/90">
+                    <input
+                      type="checkbox"
+                      checked={allowKnowledgeShare}
+                      onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
+                      className="w-4 h-4 text-emerald-700 bg-white border-gray-300 rounded focus:ring-emerald-600 cursor-pointer"
+                    />
+                    <span className="text-[10.5px] font-extrabold text-emerald-950 leading-tight">
+                      💡 相談内容を農園ナレッジ（匿名FAQ）として共有許可
+                    </span>
+                  </label>
                 </div>
 
                 <div className="flex items-center space-x-2 pt-1 shrink-0">
