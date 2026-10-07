@@ -162,7 +162,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
         </div>
       </div>
 
-      {/* 2. 獲得スキル・バッジコレクション (記号のみ表示＋タップ確認＆ゆっくり回転アニメーション) */}
+      {/* 2. 獲得スキル・バッジコレクション (記号のみ表示＋タップ確認＆3D奥回転アニメーション) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-gray-900 text-sm">🏆 獲得農作業バッジ</h3>
@@ -200,17 +200,17 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                       aria-label={badge.title}
                       title={badge.title}
                       onClick={() => setSelectedBadge(isSelected ? null : badge)}
-                      className={`relative aspect-square p-3 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer select-none outline-none focus:ring-2 focus:ring-green-500 ${
+                      className={`relative aspect-square p-3 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer select-none outline-none focus:ring-2 focus:ring-green-500 [perspective:400px] [transform-style:preserve-3d] ${
                         badge.unlocked
                           ? "bg-white border-green-200 shadow-sm hover:border-green-400 hover:shadow-md"
                           : "bg-gray-100/70 border-gray-200 opacity-60 grayscale hover:opacity-80"
                       } ${isSelected ? "ring-2 ring-green-500 border-green-500 bg-green-50/50" : ""}`}
                     >
-                      {/* バッジアイコン (獲得済みはゆっくり回転アニメーション) */}
+                      {/* バッジアイコン (獲得済みは3D奥回転アニメーション) */}
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner transition-transform ${
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner transition-transform [transform-style:preserve-3d] ${
                           badge.unlocked
-                            ? "bg-gradient-to-br from-green-50 to-emerald-100 animate-spin-slow"
+                            ? "bg-gradient-to-br from-green-50 to-emerald-100 animate-flip-x-slow"
                             : "bg-gray-200"
                         }`}
                       >
@@ -238,11 +238,11 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
 
             {/* タップ確認詳細カード (ポップオーバー) */}
             {selectedBadge && (
-              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 border border-green-200 shadow-md animate-fade-in relative flex items-center space-x-4">
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 border border-green-200 shadow-md animate-fade-in relative flex items-center space-x-4 [perspective:400px]">
                 <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner ${
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner [transform-style:preserve-3d] ${
                     selectedBadge.unlocked
-                      ? "bg-white text-green-700 animate-spin-slow"
+                      ? "bg-white text-green-700 animate-flip-x-slow"
                       : "bg-gray-200 text-gray-500 grayscale"
                   }`}
                 >
