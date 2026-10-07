@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import StudentSkillBoardView from "../components/student/StudentSkillBoardView";
 
 describe("StudentSkillBoardView", () => {
-  it("renders correctly with published task badges, 3D rotateX animations, and pagination", () => {
+  it("renders correctly with published task badges, 3D rotateY spin animations, and pagination", () => {
     const mockTasks = [
       {
         id: "t1",
@@ -54,8 +54,8 @@ describe("StudentSkillBoardView", () => {
     // バッジ総数 & 獲得数表示
     expect(html).toContain("1 / 3 獲得");
 
-    // 獲得済みバッジの3D奥回転アニメーションクラス
-    expect(html).toContain("animate-flip-x-slow");
+    // 獲得済みバッジの3Dコイン縦軸回転アニメーションクラス
+    expect(html).toContain("animate-spin-3d-slow");
 
     // 未獲得バッジのグレーアウト状態
     expect(html).toContain("grayscale");
@@ -86,7 +86,7 @@ describe("StudentSkillBoardView", () => {
 
     expect(html).toContain('aria-label="芽かきマスター"');
     expect(html).toContain("✂️");
-    expect(html).toContain("animate-flip-x-slow");
+    expect(html).toContain("animate-spin-3d-slow");
   });
 
   it("handles empty tasks gracefully", () => {

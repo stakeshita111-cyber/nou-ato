@@ -210,7 +210,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                       <div
                         className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner transition-transform [transform-style:preserve-3d] ${
                           badge.unlocked
-                            ? "bg-gradient-to-br from-green-50 to-emerald-100 animate-flip-x-slow"
+                            ? "bg-gradient-to-br from-green-50 to-emerald-100 animate-spin-3d-slow"
                             : "bg-gray-200"
                         }`}
                       >
@@ -242,7 +242,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 <div
                   className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner [transform-style:preserve-3d] ${
                     selectedBadge.unlocked
-                      ? "bg-white text-green-700 animate-flip-x-slow"
+                      ? "bg-white text-green-700 animate-spin-3d-slow"
                       : "bg-gray-200 text-gray-500 grayscale"
                   }`}
                 >

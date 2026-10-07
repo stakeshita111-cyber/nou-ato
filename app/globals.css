@@ -237,27 +237,21 @@ select:focus {
   animation: marquee 25s linear infinite;
 }
 
-/* 🌀 バッジ3D奥回転アニメーション (rotateX) 🌀 */
-@keyframes flip-x-slow {
+/* 🌀 バッジ3Dコイン縦軸回転アニメーション (rotateY) 🌀 */
+@keyframes spin-3d-y {
   0% {
-    transform: perspective(400px) rotateX(0deg);
-  }
-  25% {
-    transform: perspective(400px) rotateX(90deg);
+    transform: perspective(400px) rotateY(0deg);
   }
   50% {
-    transform: perspective(400px) rotateX(180deg);
-  }
-  75% {
-    transform: perspective(400px) rotateX(270deg);
+    transform: perspective(400px) rotateY(180deg);
   }
   100% {
-    transform: perspective(400px) rotateX(360deg);
+    transform: perspective(400px) rotateY(360deg);
   }
 }
 
-.animate-flip-x-slow {
-  animation: flip-x-slow 8s linear infinite;
+.animate-spin-3d-slow {
+  animation: spin-3d-y 8s linear infinite;
   transform-style: preserve-3d;
 }
 
