@@ -1055,11 +1055,6 @@ export default function TeacherStudentsView() {
                   </div>
 
                   <div className="space-y-2 text-xs font-bold pt-2 border-t border-gray-100">
-                    <div className="flex justify-between text-gray-500">
-                      <span>現在のステップ:</span>
-                      <span className="text-emerald-950 font-black">{student.step}</span>
-                    </div>
-
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px]">
                         <span className="text-gray-400">受講進捗 (完了/出題全数)</span>

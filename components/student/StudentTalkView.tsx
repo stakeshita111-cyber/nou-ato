@@ -843,7 +843,7 @@ export default function StudentTalkView({
           </div>
         </div>
 
-        {/* 🌟 チャット入力フォーム直下の共有許可トグル常時表示 (デフォルトON) 🌟 */}
+        {/* 🌟 チャット入力フォーム直下の共有許可トグル (Yes/No) 🌟 */}
         <div className="px-3 py-1.5 bg-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between text-xs">
           <label className="flex items-center space-x-2 cursor-pointer select-none">
             <input
@@ -853,14 +853,9 @@ export default function StudentTalkView({
               className="w-4 h-4 text-emerald-700 bg-white border-emerald-300 rounded focus:ring-emerald-600 cursor-pointer"
             />
             <span className="text-[11px] font-bold text-emerald-950">
-              💡 相談内容を農園ナレッジ（匿名FAQ）として共有許可（デフォルトON）
+              共有許可 ({allowKnowledgeShare ? "Yes" : "No"})
             </span>
           </label>
-          <span className={"text-[9.5px] font-black px-2 py-0.5 rounded-md shrink-0 " + (
-            allowKnowledgeShare ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-amber-100 text-amber-900 border border-amber-300"
-          )}>
-            {allowKnowledgeShare ? "共有許可 ON" : "非公開相談 OFF"}
-          </span>
         </div>
       </form>
 
@@ -988,8 +983,8 @@ export default function StudentTalkView({
                       onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
                       className="w-4 h-4 text-emerald-700 bg-white border-gray-300 rounded focus:ring-emerald-600 cursor-pointer"
                     />
-                    <span className="text-[10.5px] font-extrabold text-emerald-950 leading-tight">
-                      💡 相談内容を農園ナレッジ（匿名FAQ）として共有許可
+                    <span className="text-[11px] font-bold text-emerald-950 leading-tight">
+                      共有許可 ({allowKnowledgeShare ? "Yes" : "No"})
                     </span>
                   </label>
                 </div>

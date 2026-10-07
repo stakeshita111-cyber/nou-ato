@@ -581,20 +581,15 @@ export default function StudentFarmRecordView({
               // 成長段階・進捗率 (0〜100%) に応じた色の濃淡カラーマップ
               const progress = (bed as { progress_percent?: number }).progress_percent || 0;
               let colorClasses = "bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100";
-              let statusBadge = "🌱 初期";
 
               if (isPending) {
                 colorClasses = "bg-gradient-to-br from-amber-100 to-orange-100 text-amber-950 border-amber-400 ring-2 ring-amber-400 shadow-xs";
-                statusBadge = "⏳ 講師確認中";
               } else if (progress >= 80) {
                 colorClasses = "bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 border-emerald-900 shadow-sm";
-                statusBadge = "🏆 収穫期";
               } else if (progress >= 50) {
                 colorClasses = "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-xs";
-                statusBadge = "🌿 成長中";
               } else if (progress >= 25) {
                 colorClasses = "bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200";
-                statusBadge = "🌱 発芽";
               }
 
               return (
@@ -602,7 +597,7 @@ export default function StudentFarmRecordView({
                   key={bed.id || `bed_${bed.bed_number}`}
                   type="button"
                   onClick={() => setSelectedBedId(selectedBedId === bed.id ? null : bed.id)}
-                  className={`relative p-2.5 rounded-2xl border-2 transition font-black text-xs text-center flex flex-col items-center justify-between space-y-1 min-h-[85px] overflow-hidden cursor-pointer ${colorClasses} ${
+                  className={`relative py-2 px-2.5 rounded-2xl border-2 transition font-black text-xs text-center flex flex-col items-center justify-center space-y-0.5 overflow-hidden cursor-pointer ${colorClasses} ${
                     isSelected
                       ? "ring-4 ring-amber-400 border-amber-400 scale-105 shadow-md z-10"
                       : "opacity-90 hover:opacity-100 hover:scale-[1.02]"
@@ -610,23 +605,15 @@ export default function StudentFarmRecordView({
                 >
                   {/* 投稿画像プレビューサムネイル */}
                   {latestImg && (
-                    <div className="w-full h-6 rounded-lg overflow-hidden mb-0.5 border border-white/30">
+                    <div className="w-full h-5 rounded-md overflow-hidden mb-0.5 border border-white/30">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={latestImg} alt="投稿写真" className="w-full h-full object-cover" />
                     </div>
                   )}
 
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs font-black">畝 {bed.bed_number}</span>
-                    <span className="text-[10px] opacity-80 font-bold max-w-[65px] truncate">
-                      {bed.crop_name || "未設定"}
-                    </span>
-                  </div>
-
-                  <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isSelected ? "bg-amber-400 text-amber-950" : isPending ? "bg-amber-600 text-white" : "bg-black/20 text-white/90"
-                  }`}>
-                    {statusBadge}
+                  <span className="text-xs font-black leading-tight">畝 {bed.bed_number}</span>
+                  <span className="text-[10.5px] opacity-80 font-bold max-w-[70px] truncate leading-tight">
+                    {bed.crop_name || "未設定"}
                   </span>
                 </button>
               );
