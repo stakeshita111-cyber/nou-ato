@@ -14,11 +14,16 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletedList, setShowCompletedList] = useState(false);
 
-  // フリック（スワイプ）操作用ステート
+  // フリック（スワイプ）およびカードスタックアニメーション用ステート
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // スタック切り替えアニメーション用ステート
+  const [isAnimating, setIsAnimating] = useState<boolean>(false);
+  const [animType, setAnimType] = useState<"next" | "prev" | null>(null);
+  const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(null);
 
   const animTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -34,39 +39,50 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   const activeTasks = tasks.filter((t) => t.status !== "completed");
   const completedTasks = tasks.filter((t) => t.status === "completed");
 
-  const validIndex = currentIndex >= activeTasks.length ? 0 : currentIndex;
-  const currentTask = activeTasks[validIndex] || activeTasks[0];
+  const validIndex = activeTasks.length === 0 ? 0 : currentIndex % activeTasks.length;
 
-  const triggerSlideAnimation = (initialOffset: number) => {
+  const triggerNext = (direction: "left" | "right" = "left") => {
+    if (activeTasks.length <= 1 || isAnimating) return;
+    setIsAnimating(true);
+    setAnimType("next");
+    setExitDirection(direction);
+
     if (animTimeoutRef.current) {
       clearTimeout(animTimeoutRef.current);
     }
-    setDragOffset(initialOffset);
+
     animTimeoutRef.current = setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % activeTasks.length);
+      setIsAnimating(false);
+      setAnimType(null);
+      setExitDirection(null);
       setDragOffset(0);
-    }, 20);
+    }, 350);
   };
 
-  const handlePrev = (fromSwipe = false) => {
-    if (activeTasks.length <= 1) return;
-    setCurrentIndex((prev) => (prev === 0 ? activeTasks.length - 1 : prev - 1));
-    if (!fromSwipe) {
-      triggerSlideAnimation(50);
-    }
-  };
+  const triggerPrev = (direction: "left" | "right" = "right") => {
+    if (activeTasks.length <= 1 || isAnimating) return;
+    setIsAnimating(true);
+    setAnimType("prev");
+    setExitDirection(direction);
 
-  const handleNext = (fromSwipe = false) => {
-    if (activeTasks.length <= 1) return;
-    setCurrentIndex((prev) => (prev === activeTasks.length - 1 ? 0 : prev + 1));
-    if (!fromSwipe) {
-      triggerSlideAnimation(-50);
+    if (animTimeoutRef.current) {
+      clearTimeout(animTimeoutRef.current);
     }
+
+    animTimeoutRef.current = setTimeout(() => {
+      setCurrentIndex((prev) => (prev - 1 + activeTasks.length) % activeTasks.length);
+      setIsAnimating(false);
+      setAnimType(null);
+      setExitDirection(null);
+      setDragOffset(0);
+    }, 350);
   };
 
   const SWIPE_THRESHOLD = 50;
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (activeTasks.length <= 1) return;
+    if (activeTasks.length <= 1 || isAnimating) return;
     const touch = e.touches[0];
     setTouchStartX(touch.clientX);
     setTouchStartY(touch.clientY);
@@ -74,7 +90,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || touchStartX === null || touchStartY === null) return;
+    if (!isDragging || touchStartX === null || touchStartY === null || isAnimating) return;
     const touch = e.touches[0];
     const deltaX = touch.clientX - touchStartX;
     const deltaY = touch.clientY - touchStartY;
@@ -86,17 +102,17 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
 
   const handleTouchEnd = () => {
     if (!isDragging) return;
-
-    if (dragOffset < -SWIPE_THRESHOLD) {
-      handleNext(true);
-    } else if (dragOffset > SWIPE_THRESHOLD) {
-      handlePrev(true);
-    }
-
-    setDragOffset(0);
     setIsDragging(false);
     setTouchStartX(null);
     setTouchStartY(null);
+
+    if (dragOffset < -SWIPE_THRESHOLD) {
+      triggerNext("left");
+    } else if (dragOffset > SWIPE_THRESHOLD) {
+      triggerPrev("right");
+    } else {
+      setDragOffset(0);
+    }
   };
 
   if (tasks.length === 0) {
@@ -108,6 +124,111 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
     );
   }
 
+  // スタックカードのインデックス決定
+  const n = activeTasks.length;
+  const topTask = activeTasks[validIndex];
+
+  let card2Task: any = null;
+  let card2Index = -1;
+  let card3Task: any = null;
+  let card3Index = -1;
+
+  if (n >= 2) {
+    if (animType === "prev") {
+      card2Index = (validIndex - 1 + n) % n;
+    } else {
+      card2Index = (validIndex + 1) % n;
+    }
+    card2Task = activeTasks[card2Index];
+  }
+
+  if (n >= 3) {
+    if (animType === "prev") {
+      card3Index = validIndex;
+    } else {
+      card3Index = (validIndex + 2) % n;
+    }
+    card3Task = activeTasks[card3Index];
+  }
+
+  // スワイプ進行度 (0 ~ 1)
+  const dragProgress = Math.min(Math.abs(dragOffset) / 150, 1);
+
+  // 最前面カードのスタイル
+  const getTopCardStyle = () => {
+    if (isAnimating) {
+      const xPercent = exitDirection === "left" ? "-120%" : "120%";
+      const rotateDeg = exitDirection === "left" ? -15 : 15;
+      return {
+        transform: `translateX(${xPercent}) rotate(${rotateDeg}deg)`,
+        opacity: 0,
+        transition: "transform 0.35s ease-out, opacity 0.35s ease-out",
+      };
+    }
+    if (isDragging) {
+      return {
+        transform: `translateX(${dragOffset}px) rotate(${dragOffset * 0.05}deg)`,
+        opacity: 1,
+        transition: "none",
+      };
+    }
+    return {
+      transform: "translateX(0px) rotate(0deg)",
+      opacity: 1,
+      transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+    };
+  };
+
+  // 2枚目カードのスタイル
+  const getCard2Style = () => {
+    if (isAnimating) {
+      return {
+        transform: "scale(1) translateY(0px)",
+        opacity: 1,
+        transition: "transform 0.35s ease-out, opacity 0.35s ease-out",
+      };
+    }
+    if (isDragging) {
+      const scale = 0.95 + 0.05 * dragProgress;
+      const translateY = 10 - 10 * dragProgress;
+      return {
+        transform: `scale(${scale}) translateY(${translateY}px)`,
+        opacity: 0.95,
+        transition: "none",
+      };
+    }
+    return {
+      transform: "scale(0.95) translateY(10px)",
+      opacity: 0.9,
+      transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+    };
+  };
+
+  // 3枚目カードのスタイル
+  const getCard3Style = () => {
+    if (isAnimating) {
+      return {
+        transform: "scale(0.95) translateY(10px)",
+        opacity: 0.9,
+        transition: "transform 0.35s ease-out, opacity 0.35s ease-out",
+      };
+    }
+    if (isDragging) {
+      const scale = 0.90 + 0.05 * dragProgress;
+      const translateY = 20 - 10 * dragProgress;
+      return {
+        transform: `scale(${scale}) translateY(${translateY}px)`,
+        opacity: 0.8,
+        transition: "none",
+      };
+    }
+    return {
+      transform: "scale(0.90) translateY(20px)",
+      opacity: 0.7,
+      transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+    };
+  };
+
   return (
     <div className="space-y-4">
       {/* 完了済み切り替えボタン */}
@@ -118,7 +239,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
         {completedTasks.length > 0 && (
           <button
             onClick={() => setShowCompletedList(!showCompletedList)}
-            className="text-xs font-bold text-[#1d5c23] hover:underline"
+            className="text-xs font-bold text-[#1d5c23] hover:underline cursor-pointer"
           >
             {showCompletedList ? "未完了タスクに戻る" : `完了済みを表示 (${completedTasks.length})`}
           </button>
@@ -133,77 +254,145 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
             <p className="text-xs text-gray-500">お疲れ様でした。講師からのフィードバックをお待ちください。</p>
           </div>
         ) : (
-          <div className="relative">
+          <div className="relative pb-6">
             {/* 左右ナビゲーションアローボタン */}
             {activeTasks.length > 1 && (
               <>
                 <button
-                  onClick={() => handlePrev()}
-                  className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition"
+                  onClick={() => triggerPrev("right")}
+                  disabled={isAnimating}
+                  className="absolute -left-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                  aria-label="前のタスク"
                 >
                   ‹
                 </button>
                 <button
-                  onClick={() => handleNext()}
-                  className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition"
+                  onClick={() => triggerNext("left")}
+                  disabled={isAnimating}
+                  className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                  aria-label="次のタスク"
                 >
                   ›
                 </button>
               </>
             )}
 
-            {/* メインカード (1枚固定表示 & スワイプ・スライドアニメーション対応) */}
-            <div className="overflow-hidden py-1 px-0.5">
+            {/* カードスタック（デッキ風）領域 */}
+            <div className="overflow-hidden py-1 px-0.5 relative">
               <div
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
-                style={{
-                  transform: `translateX(${dragOffset}px)`,
-                  transition: isDragging ? "none" : "transform 0.3s ease-out",
-                  touchAction: "pan-y",
-                }}
-                className="bg-white p-6 rounded-3xl shadow-md border border-green-100 border-l-4 border-l-[#1d5c23] space-y-4 select-none"
+                className="relative min-h-[190px] touch-pan-y select-none"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-400">
-                    {validIndex + 1} / {activeTasks.length}
-                  </span>
-                  <Badge type="crop">
-                    {currentTask.tasks?.target_crop || currentTask.target_crop || "春野菜"}
-                  </Badge>
-                </div>
-
-                <div className="space-y-1">
-                  <h3 className="text-xl font-black text-gray-900 leading-snug">
-                    {currentTask.tasks?.title || currentTask.title || "タスク"}
-                  </h3>
-                  <p className="text-xs text-gray-500 line-clamp-2">
-                    {currentTask.tasks?.description || currentTask.description || "しっかり観察して作業を進めましょう。"}
-                  </p>
-                </div>
-
-                {/* アクションボタン: 詳細展開ボタンに一本化（完了報告は展開後モーダル内でのみ受付） */}
-                <div className="pt-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => onSelect(currentTask)}
-                    className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                {/* 3枚目カード（最背面） */}
+                {card3Task && (
+                  <div
+                    style={{
+                      ...getCard3Style(),
+                      transformOrigin: "top center",
+                    }}
+                    className="absolute inset-0 z-0 pointer-events-none bg-white p-6 rounded-3xl shadow-xs border border-gray-200 border-l-4 border-l-[#1d5c23]/40 space-y-4"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <span>📖 詳細・手順を確認して作業する</span>
-                  </button>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {card3Index + 1} / {activeTasks.length}
+                      </span>
+                      <Badge type="crop">
+                        {card3Task.tasks?.target_crop || card3Task.target_crop || "春野菜"}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-black text-gray-900 leading-snug">
+                        {card3Task.tasks?.title || card3Task.title || "タスク"}
+                      </h3>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        {card3Task.tasks?.description || card3Task.description || "しっかり観察して作業を進めましょう。"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2枚目カード（中間） */}
+                {card2Task && (
+                  <div
+                    style={{
+                      ...getCard2Style(),
+                      transformOrigin: "top center",
+                    }}
+                    className="absolute inset-0 z-10 pointer-events-none bg-white p-6 rounded-3xl shadow-sm border border-gray-200 border-l-4 border-l-[#1d5c23]/60 space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {card2Index + 1} / {activeTasks.length}
+                      </span>
+                      <Badge type="crop">
+                        {card2Task.tasks?.target_crop || card2Task.target_crop || "春野菜"}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-black text-gray-900 leading-snug">
+                        {card2Task.tasks?.title || card2Task.title || "タスク"}
+                      </h3>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        {card2Task.tasks?.description || card2Task.description || "しっかり観察して作業を進めましょう。"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 最前面カード */}
+                {topTask && (
+                  <div
+                    style={{
+                      ...getTopCardStyle(),
+                      transformOrigin: "bottom center",
+                    }}
+                    className="relative z-20 bg-white p-6 rounded-3xl shadow-md border border-green-100 border-l-4 border-l-[#1d5c23] space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {validIndex + 1} / {activeTasks.length}
+                      </span>
+                      <Badge type="crop">
+                        {topTask.tasks?.target_crop || topTask.target_crop || "春野菜"}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-black text-gray-900 leading-snug">
+                        {topTask.tasks?.title || topTask.title || "タスク"}
+                      </h3>
+                      <p className="text-xs text-gray-500 line-clamp-2">
+                        {topTask.tasks?.description || topTask.description || "しっかり観察して作業を進めましょう。"}
+                      </p>
+                    </div>
+
+                    {/* アクションボタン: 詳細展開 */}
+                    <div className="pt-2 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => onSelect(topTask)}
+                        className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        <span>📖 詳細・手順を確認して作業する</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )
       ) : (
-        /* 完了済みタスク一覧（要件1: 詳細確認＆未完了戻し） */
+        /* 完了済みタスク一覧 */
         <div className="space-y-3">
           {completedTasks.map((ct) => (
             <div key={ct.id} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs space-y-3">
@@ -217,11 +406,11 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 <Badge type="crop">{ct.tasks?.target_crop || ct.target_crop || "完了作業"}</Badge>
               </div>
 
-              {/* 完了タスク用操作ボタン (要件1) */}
+              {/* 完了タスク用操作ボタン */}
               <div className="flex justify-end space-x-2 pt-2 border-t border-gray-100">
                 <button
                   onClick={() => onSelect(ct)}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition flex items-center space-x-1"
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition flex items-center space-x-1 cursor-pointer"
                 >
                   <span>👁 詳細を見る</span>
                 </button>
@@ -232,7 +421,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                       onUncomplete(ct.id);
                       setShowCompletedList(false);
                     }}
-                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs rounded-lg transition flex items-center space-x-1"
+                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs rounded-lg transition flex items-center space-x-1 cursor-pointer"
                   >
                     <span>↩️ 未完了に戻す</span>
                   </button>
