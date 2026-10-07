@@ -14,7 +14,8 @@ export const CROPS_LIST = [
   "ジャガイモ", "じゃがいも", "馬鈴薯", "サツマイモ", "さつまいも",
   "枝豆", "えだまめ", "エダマメ", "インゲン", "いんげん", "オクラ", "おくら",
   "キャベツ", "レタス", "白菜", "ハクサイ", "ほうれん草", "小松菜",
-  "大根", "ダイコン", "人参", "ニンジン", "カブ", "イチゴ", "いちご", "スイカ", "ネギ", "ねぎ"
+  "大根", "ダイコン", "人参", "ニンジン", "カブ", "イチゴ", "いちご", "スイカ", "ネギ", "ねぎ",
+  "カボチャ", "かぼちゃ", "南瓜"
 ];
 
 // 一般的すぎてマッチングに使ってはいけない動詞・副詞・助詞
@@ -23,7 +24,8 @@ export const STOP_WORDS = [
   "ある", "いる", "も", "する", "から", "な", "こと", "として", "について",
   "教えて", "ください", "どうすれば", "いいですか", "方法", "どう",
   "たくさん", "いっぱい", "育てる", "育て方", "栽培", "収穫", "収穫した", "採れた", "とれた",
-  "コツ", "ポイント", "時期", "タイミング", "おすすめ", "やり方", "仕方", "大きく", "美味しく"
+  "コツ", "ポイント", "時期", "タイミング", "おすすめ", "やり方", "仕方", "大きく", "美味しく",
+  "相談", "質問", "おねがい", "お願い"
 ];
 
 /**
@@ -85,7 +87,39 @@ export function sanitizePersonalNames(text: string): string {
 }
 
 /**
+ * AI回答または講師回答（reply）からサニタイズされた【相談トピック】を抽出
+ * 回答内に【相談トピック: 〇〇】等があればそれを抽出し、なければ本文の冒頭見出しまたは一般化見出しを返す
+ */
+export function extractTopicFromReply(reply: string): string {
+  if (!reply) return "【相談トピック: 野菜の栽培・管理について】";
+
+  // 1. 【相談トピック: ...】または【相談概要: ...】のパターンを抽出
+  const topicMatch = reply.match(/【(?:相談トピック|相談概要|トピック|概要)[：:]\s*([^】\n\r]+)】/);
+  if (topicMatch && topicMatch[1]) {
+    return `【相談トピック: ${topicMatch[1].trim()}】`;
+  }
+
+  // 2. 【農園アドバイス: ...】などのパターンがある場合
+  const adviceMatch = reply.match(/【(?:農園アドバイス|アドバイス)[：:]\s*([^】\n\r]+)】/);
+  if (adviceMatch && adviceMatch[1]) {
+    const cleanAdv = adviceMatch[1].replace(/[🌱🍅🐛💧✨🧑‍🌾]/g, "").trim();
+    return `【相談トピック: ${cleanAdv}】`;
+  }
+
+  // 3. 回答の1行目に【...】で囲まれた見出しがある場合
+  const firstLine = reply.split(/[\n\r]+/)[0].trim();
+  const headerMatch = firstLine.match(/^【([^】]+)】/);
+  if (headerMatch && headerMatch[1]) {
+    return `【相談トピック: ${headerMatch[1].trim()}】`;
+  }
+
+  // 4. フォールバック
+  return "【相談トピック: 野菜の栽培・管理について】";
+}
+
+/**
  * ユーザーの質問と過去のナレッジを比較し、関連性の高い順にソートして抽出
+ * 🌟 生徒の生相談文(content)の参照を完全廃止し、サニタイズされたreply(回答・トピック)のみから照合 🌟
  */
 export async function searchSimilarKnowledge(
   userQuestion: string
@@ -93,7 +127,7 @@ export async function searchSimilarKnowledge(
   try {
     const { data: dbData, error } = await supabase
       .from("journals")
-      .select("id, content, reply, is_approved, student_id")
+      .select("id, reply, is_approved, student_id")
       .eq("is_approved", true)
       .not("reply", "is", null)
       .neq("reply", "")
@@ -132,16 +166,14 @@ export async function searchSimilarKnowledge(
     });
 
     dbData.forEach((item: any) => {
-      if (!item.content || !item.reply) return;
+      if (!item.reply) return;
 
-      const itemContent = item.content.toLowerCase();
       const itemReply = item.reply.toLowerCase();
-      const fullText = itemContent + " " + itemReply;
 
       // 🌟【重要】作物の厳格チェック: ユーザーが作物を指定している場合、他作物のノウハウは除外 🌟
       if (queryCrops.length > 0) {
-        // このQ&Aに対象作物が含まれているか？
-        const containsTargetCrop = queryCrops.some((crop) => fullText.includes(crop.toLowerCase()));
+        // この回答（および相談トピック）に対象作物が含まれているか？
+        const containsTargetCrop = queryCrops.some((crop) => itemReply.includes(crop.toLowerCase()));
         if (!containsTargetCrop) {
           return; // 対象作物が含まれていなければスキップ（枝豆の質問にピーマンやジャガイモを出さない）
         }
@@ -149,12 +181,10 @@ export async function searchSimilarKnowledge(
 
       let score = 0;
 
-      // 1. 重要キーワードの一致
+      // 1. 重要キーワードの一致 (生徒の生質問文contentは完全未参照・replyのみから照合)
       questionKeywords.forEach((kw) => {
-        if (itemContent.includes(kw)) {
-          score += kw.length >= 3 ? 6 : 4; // 質問文にキーワードが含まれる場合は高スコア
-        } else if (fullText.includes(kw)) {
-          score += kw.length >= 3 ? 3 : 1.5;
+        if (itemReply.includes(kw)) {
+          score += kw.length >= 3 ? 6 : 4;
         }
       });
 
@@ -165,9 +195,10 @@ export async function searchSimilarKnowledge(
 
       // スコアが十分に高い（明確な重要語一致がある）ものだけ抽出
       if (score >= 4) {
+        const extractedTopic = extractTopicFromReply(item.reply);
         pastQa.push({
           id: (item.id || "").toString(),
-          question: sanitizePiiText(item.content),
+          question: extractedTopic,
           answer: sanitizePiiText(item.reply),
           similarityScore: score,
         });
@@ -220,7 +251,7 @@ export async function getAnswerWithRag(
           referencedQa
             .map(
               (qa, i) =>
-                `[事例${i + 1}] 過去の質問:「${sanitizePiiText(qa.question)}」➔ 講師の回答:「${sanitizePiiText(qa.answer)}」 (関連度スコア: ${
+                `[事例${i + 1}] 過去の相談トピック:「${sanitizePiiText(qa.question)}」➔ 講師の回答:「${sanitizePiiText(qa.answer)}」 (関連度スコア: ${
                   qa.similarityScore?.toFixed(1) || 1.2
                 })`
             )
@@ -236,8 +267,14 @@ export async function getAnswerWithRag(
 体験農園の受講生から相談・メッセージが届きました。
 
 【⚠️ 最重要：プライバシー保護とナレッジ共有の絶対ルール】
-回答文の中に、生徒の個人名（「〇〇さん」など）を絶対に含めないでください。
-この回答は将来、他の受講生が同じ悩みを抱えた際にも共有ナレッジとして参照されるため、名前を呼ばずに「こんにちは！🌱」「ご質問ありがとうございます！」のように温かく親身なトーンで回答してください。
+1. **回答の冒頭フォーマット (必須):**
+   回答の1行目（冒頭）には、生徒の生テキストから個人情報を排除し、相談テーマを一般化した見出しを『【相談トピック: 〇〇について】』という形式で必ず記載してください。
+   例: 【相談トピック: トマトの葉の黄変と追肥について】
+   その後、改行を入れてから回答本文を開始してください。
+
+2. **個人情報の排除:**
+   回答文の中に、生徒の個人名（「〇〇さん」など）や電話番号、住所等の個人情報を絶対に含めないでください。
+   この回答は将来、他の受講生が同じ悩みを抱えた際にも共有ナレッジとして参照されるため、名前を呼ばずに「こんにちは！🌱」「ご質問ありがとうございます！」のように温かく親身なトーンで回答してください。
 
 【対話の基本指針】
 1. **普段の気軽な日常会話・挨拶:**
