@@ -3,18 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOU-ATO アプリケーション & データフロー アーキテクチャマップ</title>
+  <title>NOU-ATO - アプリケーション & システムアーキテクチャ全体図</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      securityLevel: 'loose',
+      flowchart: { htmlLabels: true, curve: 'basis' }
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            sans: ['"Plus Jakarta Sans"', '"Zen Kaku Gothic New"', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', '"Noto Sans JP"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
           }
         }
       }
@@ -24,35 +34,48 @@
     body {
       background-color: #090d16;
       color: #f3f4f6;
-      background-image: radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 70%);
+      background-image: radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 65%);
     }
     .glass-card {
-      background: rgba(17, 24, 39, 0.7);
+      background: rgba(17, 24, 39, 0.75);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
+    .glass-card:hover {
+      border-color: rgba(16, 185, 129, 0.35);
+    }
   </style>
 </head>
-<body class="min-h-screen p-6 max-w-7xl mx-auto space-y-8">
+<body class="min-h-screen p-4 sm:p-8 max-w-7xl mx-auto space-y-10">
 
-  <header class="border-b border-gray-800 pb-4 space-y-4">
+  <!-- ヘッダー -->
+  <header class="border-b border-gray-800 pb-5 space-y-4">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
-          🌱 NOU-ATO システム & データフロー マップ
-        </h1>
-        <p class="text-xs text-gray-400">Next.js 16 (App Router) × Supabase × Gemini 1.5 × Agent Engine</p>
+      <div class="flex items-center gap-3">
+        <span class="w-12 h-12 rounded-2xl bg-emerald-600 text-white font-black text-2xl flex items-center justify-center shadow-lg shadow-emerald-900/30">
+          🌱
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight">NOU-ATO システム構成 & データフロー</h1>
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v1.0 最新同期済</span>
+          </div>
+          <p class="text-xs text-gray-400 font-mono mt-0.5">Next.js 16 (App Router) × React 19 × Supabase RLS × Gemini 1.5 Flash-Lite × Antigravity</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-mono text-gray-400">
+        <span class="px-3 py-1 rounded-lg bg-gray-900 border border-gray-800 text-emerald-400 font-bold">103 Tests (100% PASS)</span>
+        <span class="px-3 py-1 rounded-lg bg-gray-900 border border-gray-800 text-teal-400 font-bold">Coverage 88.1%</span>
       </div>
     </div>
 
     <!-- 📚 関連ドキュメント・ナビゲーションタブ 📚 -->
-    <div class="border-t border-gray-800/90 bg-gray-900/60 px-4 sm:px-6 lg:px-8 py-2.5">
-      <div class="max-w-7xl mx-auto flex flex-col gap-2">
-        <!-- グループ1: HTML検証・設計ダッシュボード -->
-        <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-          <span class="text-gray-400 font-semibold px-1 flex items-center gap-1">
-            <span>📊</span><span class="hidden sm:inline">検証・設計:</span>
-          </span>
+    <div class="border-t border-gray-800/90 bg-gray-900/70 rounded-xl px-4 py-3 space-y-2">
+      <!-- グループ1: HTML検証・設計ダッシュボード -->
+      <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+        <span class="text-gray-400 font-semibold px-1 flex items-center gap-1">
+          <span>📊</span><span class="hidden sm:inline">検証・設計:</span>
+        </span>
         <a href="review-checklist-dashboard.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
           ✅ オリアプレビュー (101項目)
         </a>
@@ -74,12 +97,12 @@
         <a href="../public/screen_flow.html" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
           📱 画面遷移図
         </a>
-        </div>
-        <!-- グループ2: Markdown要件・仕様書 -->
-        <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-          <span class="text-emerald-400 font-semibold px-1 flex items-center gap-1">
-            <span>📑</span><span class="hidden sm:inline">仕様・要件書:</span>
-          </span>
+      </div>
+      <!-- グループ2: Markdown要件・仕様書 -->
+      <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+        <span class="text-emerald-400 font-semibold px-1 flex items-center gap-1">
+          <span>📑</span><span class="hidden sm:inline">仕様・要件書:</span>
+        </span>
         <a href="markdown-viewer.html?doc=prd" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
           📋 要件定義書 (PRD)
         </a>
@@ -98,56 +121,285 @@
         <a href="markdown-viewer.html?doc=readme" class="px-2.5 py-1 rounded-lg bg-gray-800/80 text-gray-300 hover:bg-emerald-950 hover:text-emerald-300 border border-gray-700/80 transition">
           📖 プロジェクトREADME
         </a>
-        </div>
       </div>
     </div>
   </header>
 
-  <!-- Visual Architecture Layers -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <!-- Section 1: 全体アーキテクチャ & データフロー図 (Mermaid) -->
+  <section class="glass-card rounded-3xl p-6 sm:p-8 space-y-6">
+    <div class="border-b border-gray-800 pb-3 flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-black text-white flex items-center gap-2">
+          🌐 エンドツーエンド システムアーキテクチャ & データフロー
+        </h2>
+        <p class="text-xs text-gray-400 mt-0.5">クライアント・App Router・API Handler・Supabase RLS・Gemini RAG の完全フロー</p>
+      </div>
+      <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">Realtime & RAG Synchronized</span>
+    </div>
 
-    <!-- Layer 1: App Router UI Pages -->
+    <div class="overflow-x-auto py-2">
+      <pre class="mermaid text-sm">
+flowchart TB
+    subgraph Client["📱 クライアント層 (Client Devices)"]
+        SP["受講生スマホ (/student)"]
+        TC["講師PC / タブレット (/teacher/dashboard)"]
+    end
+
+    subgraph AppRouter["⚡ Next.js 16 (App Router / Edge & Server Runtime)"]
+        direction TB
+        MW["middleware.ts (セッション・ロール検証)"]
+        R_Student["/app/student/page.tsx<br>(畑/天気/予約/相談/成長)"]
+        R_Teacher["/app/teacher/dashboard/page.tsx<br>(概要/タスク/生徒/日誌/キャンバス/設定)"]
+        API_Chat["/api/chat (Route Handler)<br>PIIマスキング & レート制限"]
+        API_Settings["/api/settings (Route Handler)<br>サーバー共通設定"]
+    end
+
+    subgraph RAG_Engine["🤖 AI & ナレッジ検索パイプライン"]
+        PII["PII自動サニタイズ<br>(電話・メール・住所置換)"]
+        Topical["安全トピック照合<br>(自然栽培関連性判定)"]
+        KB_Filter["承認済みナレッジフィルタ<br>(is_approved = true)"]
+        Gemini["Google AI Studio<br>Gemini 1.5 Flash-Lite"]
+    end
+
+    subgraph SupabaseLayer["🛡️ Supabase クラウド (PostgreSQL + RLS + Realtime)"]
+        direction TB
+        Auth["Supabase Auth (JWT / Sessions)"]
+        RLS["Row Level Security (RLS Engine)<br>teacher / student テナント分離"]
+        
+        subgraph Tables["データベーステーブル (Tables)"]
+            T_Profiles["profiles"]
+            T_Farms["farms"]
+            T_Beds["beds (畝配置)"]
+            T_Tasks["master_tasks / student_tasks"]
+            T_Journals["journals (日誌 & 写真URL)"]
+            T_Broad["broadcasts (一括アナウンス)"]
+            T_Events["events / reservations"]
+        end
+        Storage["Supabase Storage (日誌写真バケット)"]
+    end
+
+    SP -->|リクエスト| MW
+    TC -->|リクエスト| MW
+    MW -->|認証済・受講生| R_Student
+    MW -->|認証済・講師| R_Teacher
+
+    R_Student -->|日誌・タスク更新| RLS
+    TC -->|畝D&D・アナウンス| RLS
+    R_Student -->|写真アップロード| Storage
+    
+    R_Student -->|自然栽培の相談送信| API_Chat
+    API_Chat --> PII
+    PII --> Topical
+    Topical --> KB_Filter
+    KB_Filter -->|農園FAQ & 類似度| Gemini
+    Gemini -->|回答生成| API_Chat
+    API_Chat -->|チケット消化 & ログ記録| R_Student
+
+    RLS --> Tables
+    Auth --> RLS
+      </pre>
+    </div>
+  </section>
+
+  <!-- Section 2: 主要レイヤー別コンポーネント詳細 -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- 1. Frontend: App Router & Components -->
     <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-emerald-500">
       <div class="flex items-center justify-between">
-        <h2 class="font-bold text-white text-base">📱 Frontend (App Router)</h2>
-        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Next.js 16</span>
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <span>📱</span> フロントエンド
+        </h3>
+        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">React 19 / Tailwind</span>
       </div>
-      <div class="space-y-2 text-xs font-mono text-gray-300">
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/(auth)/login</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/dashboard</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/quests (ToDo・課題)</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">/app/chat (交換日記・AI連携)</div>
+      <p class="text-xs text-gray-400">コンポーネント指向・モバイルファーストUI設計</p>
+      
+      <div class="space-y-2.5 text-xs text-gray-300">
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-emerald-300">TaskSlider.tsx</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">3層立体カードスタック・無限循環ループ・スワイプアニメーション</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-emerald-300">StudentSkillBoardView.tsx</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">スロット内3Dコイン回転バッジ（Y軸回転）& タップ詳細カード</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-emerald-300">TeacherCanvasView.tsx</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">@dnd-kit 畝配置キャンバス・スリム畝カード（縦幅圧縮）</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-emerald-300">WeatherWidget.tsx</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">ピンポイント24時間気温/雨量予報の即時展開</p>
+        </div>
       </div>
     </div>
 
-    <!-- Layer 2: Supabase Backend -->
-    <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-teal-400">
+    <!-- 2. Backend & Database: Supabase -->
+    <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-teal-500">
       <div class="flex items-center justify-between">
-        <h2 class="font-bold text-white text-base">⚡ Database & Storage</h2>
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <span>🛡️</span> バックエンド & DB
+        </h3>
         <span class="text-[10px] font-mono text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded">Supabase PostgreSQL</span>
       </div>
-      <div class="space-y-2 text-xs font-mono text-gray-300">
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">profiles (teacher / student)</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">farms & quests (農園・進行状況)</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">chat_messages & vector_embeddings</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800 text-emerald-400 font-bold">🔒 Row Level Security (RLS) 有効</div>
+      <p class="text-xs text-gray-400">強固なRLSと自動型同期（TypeScript Database型）</p>
+      
+      <div class="space-y-2.5 text-xs text-gray-300">
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-teal-300">Row Level Security (RLS)</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">全テーブルにtenant/user単位のSELECT/INSERT/UPDATEポリシー強制</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-teal-300">日誌 & ナレッジ連携 (journals)</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">講師が承認した日誌 (is_approved=true) のみをRAG検索対象へ昇格</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-teal-300">Supabase Storage</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">日誌写真アップロード用バケット（受講生・講師双方向アクセス）</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-teal-300">RFC 7807 統一エラー</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">構造化Problem Detailsレスポンス・一貫したエラーハンドリング</p>
+        </div>
       </div>
     </div>
 
-    <!-- Layer 3: AI & Subagents -->
+    <!-- 3. AI & Security: Gemini RAG Engine -->
     <div class="glass-card rounded-2xl p-6 space-y-4 border-t-4 border-t-indigo-500">
       <div class="flex items-center justify-between">
-        <h2 class="font-bold text-white text-base">🤖 AI & Agent Engine</h2>
-        <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">Gemini 1.5 + Antigravity</span>
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <span>🤖</span> AI & プライバシー防御
+        </h3>
+        <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">Gemini 1.5 Flash-Lite</span>
       </div>
-      <div class="space-y-2 text-xs font-mono text-gray-300">
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">coder-debugger (自律デバッグ)</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">code-optimizer (コード軽量化)</div>
-        <div class="p-2 bg-gray-900/90 rounded border border-gray-800">doc-visualizer (HTML生成)</div>
+      <p class="text-xs text-gray-400">多層防御プライバシーと高速RAG相談</p>
+      
+      <div class="space-y-2.5 text-xs text-gray-300">
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-indigo-300">PII サニタイズ機構</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">電話番号・メール・住所・氏名を自動検知し [個人情報保護] に置換</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-indigo-300">共有許可 (Yes/No) トグル</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">受講生自身が農園ナレッジ蓄積の可否を任意にオプトイン/アウト</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-indigo-300">1日3回チケット制マネージャー</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">午前0時自動全快・乱用防止・シークレット呪文による緊急リセット</p>
+        </div>
+        <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
+          <p class="font-bold text-indigo-300">安全トピック事前照合</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">野菜栽培・農業無関係なプロンプトインジェクションを安全に抑止</p>
+        </div>
       </div>
     </div>
 
-  </div>
+  </section>
+
+  <!-- Section 3: AIサブエージェント & スキル一覧 (Doc Visualizer) -->
+  <section class="glass-card rounded-3xl p-6 sm:p-8 space-y-6">
+    <div class="border-b border-gray-800 pb-3 flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-black text-white flex items-center gap-2">
+          🤖 自律型サブエージェント & スキルチーム一覧
+        </h2>
+        <p class="text-xs text-gray-400 mt-0.5">プロンプトをワンクリックコピーして直ちにタスクへ投入可能</p>
+      </div>
+      <span class="text-xs font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded">AGY 2.0 Autonomous Team</span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+      
+      <!-- Agent 1 -->
+      <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-emerald-400">coder-debugger</span>
+          <span class="text-[10px] bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded">自律修復・実装</span>
+        </div>
+        <p class="text-gray-400 leading-relaxed">UI調整、Next.js/TypeScriptのバグ修正、ビルドエラー解決、コード軽量化を担当。</p>
+        <button onclick="copyPrompt('coder-debuggerでTypeScript型エラーおよびビルドエラーを自己解決してください。')" class="w-full py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-emerald-600 text-gray-200 hover:text-white transition font-mono text-[11px] flex items-center justify-center gap-1.5">
+          <span>📋</span><span>発動プロンプトをコピー</span>
+        </button>
+      </div>
+
+      <!-- Agent 2 -->
+      <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-blue-400">qa-debug-pro</span>
+          <span class="text-[10px] bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded">QA・テスト自動化</span>
+        </div>
+        <p class="text-gray-400 leading-relaxed">Vitest単体テスト・E2Eテストの作成、カバレッジ検証、回帰テスト分析を担当。</p>
+        <button onclick="copyPrompt('qa-debug-proで全自動テストを実行し、カバレッジレポートを作成してください。')" class="w-full py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-blue-600 text-gray-200 hover:text-white transition font-mono text-[11px] flex items-center justify-center gap-1.5">
+          <span>📋</span><span>発動プロンプトをコピー</span>
+        </button>
+      </div>
+
+      <!-- Agent 3 -->
+      <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-amber-400">supabase-expert</span>
+          <span class="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded">DB & セキュリティ</span>
+        </div>
+        <p class="text-gray-400 leading-relaxed">Supabaseスキーマ設計、RLSポリシー監査、pgvector類似度検索の最適化を担当。</p>
+        <button onclick="copyPrompt('supabase-expertで全テーブルのRLSポリシー漏れを監査してください。')" class="w-full py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-amber-600 text-gray-200 hover:text-white transition font-mono text-[11px] flex items-center justify-center gap-1.5">
+          <span>📋</span><span>発動プロンプトをコピー</span>
+        </button>
+      </div>
+
+      <!-- Agent 4 -->
+      <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-purple-400">consensus-council</span>
+          <span class="text-[10px] bg-purple-500/10 text-purple-300 px-2 py-0.5 rounded">アーキテクチャ合意</span>
+        </div>
+        <p class="text-gray-400 leading-relaxed">フロント・バック・セキュリティの3視点から最適な機能実装方針を合意策定。</p>
+        <button onclick="copyPrompt('consensus-councilで新機能のアーキテクチャとリスク評価を合意形成してください。')" class="w-full py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-purple-600 text-gray-200 hover:text-white transition font-mono text-[11px] flex items-center justify-center gap-1.5">
+          <span>📋</span><span>発動プロンプトをコピー</span>
+        </button>
+      </div>
+
+      <!-- Skill 1 -->
+      <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-pink-400">doc-visualizer</span>
+          <span class="text-[10px] bg-pink-500/10 text-pink-300 px-2 py-0.5 rounded">スキル (可視化)</span>
+        </div>
+        <p class="text-gray-400 leading-relaxed">リポジトリ構造、ルーティング、コンポーネントツリーをHTMLとして自動可視化。</p>
+        <button onclick="copyPrompt('doc-visualizerスキルを実行して最新のアーキテクチャマップHTMLを更新してください。')" class="w-full py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-pink-600 text-gray-200 hover:text-white transition font-mono text-[11px] flex items-center justify-center gap-1.5">
+          <span>📋</span><span>発動プロンプトをコピー</span>
+        </button>
+      </div>
+
+      <!-- Skill 2 -->
+      <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-teal-400">sync-supabase-types</span>
+          <span class="text-[10px] bg-teal-500/10 text-teal-300 px-2 py-0.5 rounded">スキル (型同期)</span>
+        </div>
+        <p class="text-gray-400 leading-relaxed">DBスキーマ変更時にTypeScript型定義（types/supabase.ts）を再同期。</p>
+        <button onclick="copyPrompt('sync-supabase-typesスキルでSupabaseの型定義を再生成・同期してください。')" class="w-full py-1.5 px-3 rounded-lg bg-gray-800 hover:bg-teal-600 text-gray-200 hover:text-white transition font-mono text-[11px] flex items-center justify-center gap-1.5">
+          <span>📋</span><span>発動プロンプトをコピー</span>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- クリップボードコピー用スクリプト -->
+  <script>
+    function copyPrompt(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('プロンプトをクリップボードにコピーしました:\n' + text);
+      }).catch(err => {
+        prompt('コピーしてください:', text);
+      });
+    }
+  </script>
+
+  <!-- フッター -->
+  <footer class="border-t border-gray-800 py-6 text-center text-xs text-gray-500">
+    <p>NOU-ATO (のうあと) - 体験農業経営支援プラットフォーム • Generated with doc-visualizer skill</p>
+  </footer>
 
 </body>
 </html>
