@@ -8,6 +8,7 @@ interface BadgeItem {
   icon: string;
   desc: string;
   unlocked: boolean;
+  taskTitle: string;
 }
 
 interface StudentSkillBoardViewProps {
@@ -57,6 +58,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
         icon: badgeIcon,
         desc: `${taskTitle} クリア`,
         unlocked,
+        taskTitle,
       };
     });
 
@@ -200,18 +202,18 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                       aria-label={badge.title}
                       title={badge.title}
                       onClick={() => setSelectedBadge(isSelected ? null : badge)}
-                      className={`relative aspect-square p-3 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer select-none outline-none focus:ring-2 focus:ring-green-500 [perspective:400px] [transform-style:preserve-3d] ${
+                      className={`relative aspect-square p-3 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer select-none outline-none focus:ring-2 focus:ring-green-500 ${
                         badge.unlocked
-                          ? "bg-white border-green-200 shadow-sm hover:border-green-400 hover:shadow-md"
+                          ? "bg-white border-green-200 shadow-xs hover:border-green-400 hover:shadow-md"
                           : "bg-gray-100/70 border-gray-200 opacity-60 grayscale hover:opacity-80"
                       } ${isSelected ? "ring-2 ring-green-500 border-green-500 bg-green-50/50" : ""}`}
                     >
-                      {/* バッジアイコン (獲得済みは3D奥回転アニメーション) */}
+                      {/* バッジアイコン (一覧スロットでは静止表示) */}
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner transition-transform [transform-style:preserve-3d] ${
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner ${
                           badge.unlocked
-                            ? "bg-gradient-to-br from-green-50 to-emerald-100 animate-spin-3d-slow"
-                            : "bg-gray-200"
+                            ? "bg-gradient-to-br from-green-50 to-emerald-100 text-green-800"
+                            : "bg-gray-200 text-gray-500"
                         }`}
                       >
                         {badge.icon}
@@ -238,23 +240,27 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
 
             {/* タップ確認詳細カード (ポップオーバー) */}
             {selectedBadge && (
-              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 border border-green-200 shadow-md animate-fade-in relative flex items-center space-x-4 [perspective:400px]">
-                <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner [transform-style:preserve-3d] ${
-                    selectedBadge.unlocked
-                      ? "bg-white text-green-700 animate-spin-3d-slow"
-                      : "bg-gray-200 text-gray-500 grayscale"
-                  }`}
-                >
-                  {selectedBadge.icon}
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 sm:p-5 border border-green-200 shadow-md animate-fade-in relative flex items-center space-x-4 overflow-visible">
+                {/* メイン3D回転表示アイコン */}
+                <div className="p-1 shrink-0 [perspective:600px] flex items-center justify-center">
+                  <div
+                    className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl shadow-inner border transition-all animate-spin-3d-slow ${
+                      selectedBadge.unlocked
+                        ? "bg-white text-green-700 border-green-200"
+                        : "bg-gray-200 text-gray-500 grayscale border-gray-300"
+                    }`}
+                  >
+                    {selectedBadge.icon}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-extrabold text-sm text-gray-900 truncate">
+
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                    <h4 className="font-extrabold text-base sm:text-lg text-gray-900 truncate">
                       {selectedBadge.title}
                     </h4>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      className={`text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full ${
                         selectedBadge.unlocked
                           ? "bg-green-100 text-green-800 border border-green-300"
                           : "bg-gray-200 text-gray-600 border border-gray-300"
@@ -263,12 +269,25 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                       {selectedBadge.unlocked ? "獲得済み" : "未獲得"}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-600 line-clamp-2">{selectedBadge.desc}</p>
+
+                  {/* クリアタスク名 / 獲得条件の明示 */}
+                  <p className="text-xs sm:text-sm font-bold text-gray-800 leading-snug">
+                    {selectedBadge.unlocked ? (
+                      <span className="text-green-800">
+                        ✅ クリアタスク: 「<span className="underline decoration-green-400 decoration-2">{selectedBadge.taskTitle}</span>」
+                      </span>
+                    ) : (
+                      <span className="text-amber-800">
+                        🔒 獲得条件: 「<span className="font-extrabold">{selectedBadge.taskTitle}</span>」をクリアする
+                      </span>
+                    )}
+                  </p>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => setSelectedBadge(null)}
-                  className="text-gray-400 hover:text-gray-700 font-bold text-lg px-2 py-1 rounded-lg hover:bg-black/5 cursor-pointer"
+                  className="text-gray-400 hover:text-gray-700 font-bold text-lg px-2 py-1 rounded-lg hover:bg-black/5 cursor-pointer self-start"
                   aria-label="閉じる"
                 >
                   ✕

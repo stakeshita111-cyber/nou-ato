@@ -240,19 +240,21 @@ select:focus {
 /* 🌀 バッジ3Dコイン縦軸回転アニメーション (rotateY) 🌀 */
 @keyframes spin-3d-y {
   0% {
-    transform: perspective(400px) rotateY(0deg);
+    transform: perspective(600px) rotateY(0deg);
   }
   50% {
-    transform: perspective(400px) rotateY(180deg);
+    transform: perspective(600px) rotateY(180deg);
   }
   100% {
-    transform: perspective(400px) rotateY(360deg);
+    transform: perspective(600px) rotateY(360deg);
   }
 }
 
 .animate-spin-3d-slow {
   animation: spin-3d-y 8s linear infinite;
   transform-style: preserve-3d;
+  transform-origin: center center;
+  backface-visibility: visible;
 }
 
 /* ↔️ スライド（スワイプ）ページ切り替えアニメーション ↔️ */
