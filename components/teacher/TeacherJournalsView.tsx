@@ -507,12 +507,35 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       // 4. 区画情報 (farm_plots) を取得
       const { data: plotsData } = await supabase
         .from("farm_plots")
-        .select("id, code, student_id");
+        .select("id, code, student_id, farm_id");
 
       const plotMap: { [id: string]: any } = {};
+      const studentPlotMap: { [studentId: string]: { plotCode: string; farmId?: string } } = {};
+
       if (plotsData) {
         plotsData.forEach((p: any) => {
           if (p.id) plotMap[p.id] = p;
+          if (p.student_id && p.code) {
+            studentPlotMap[p.student_id] = {
+              plotCode: p.code,
+              farmId: p.farm_id,
+            };
+          }
+        });
+      }
+
+      if (bedsData) {
+        bedsData.forEach((b: any) => {
+          if (b.student_id && b.plot_id && !studentPlotMap[b.student_id]) {
+            const plotInfo = plotMap[b.plot_id];
+            const code = plotInfo?.code || b.plot_id.replace(/^plot_cell_/, "");
+            if (code) {
+              studentPlotMap[b.student_id] = {
+                plotCode: code,
+                farmId: plotInfo?.farm_id,
+              };
+            }
+          }
         });
       }
 
@@ -563,10 +586,20 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
           }
 
+          const studentMapped = resolvedStudentId ? studentPlotMap[resolvedStudentId] : null;
+
           const derivedPlotCode =
             r.plot_code ||
             plotInfo?.code ||
-            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : "B3");
+            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : undefined) ||
+            studentMapped?.plotCode;
+
+          const derivedFarmId =
+            r.farm_id ||
+            plotInfo?.farm_id ||
+            studentMapped?.farmId ||
+            farmId ||
+            undefined;
 
           allRecords.push({
             itemType: "record",
@@ -583,7 +616,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             timeStr,
             timestamp,
             plotCode: derivedPlotCode,
-            farmId: farmId || undefined,
+            farmId: derivedFarmId,
           });
         });
       }
@@ -618,6 +651,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
             }
 
+            const studentMapped = j.student_id ? studentPlotMap[j.student_id] : null;
+            const derivedPlotCode = j.plot_code || studentMapped?.plotCode;
+            const derivedFarmId = j.farm_id || studentMapped?.farmId || farmId || undefined;
+
             if (!allRecords.some((r) => r.content === cleanContent)) {
               allRecords.push({
                 itemType: "record",
@@ -630,7 +667,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 dateStr: formatDate(rawDate),
                 timeStr,
                 timestamp,
-                plotCode: "B3",
+                plotCode: derivedPlotCode,
+                farmId: derivedFarmId,
               });
             }
           });
@@ -1294,10 +1332,15 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     <div
                       key={`rec_${item.id}_${colIdx}_${rowIdx}`}
                       onClick={() => {
-                        if (onNavigateToFarm) {
-                          onNavigateToFarm(item.plotCode, item.farmId);
+                        if (item.plotCode) {
+                          if (onNavigateToFarm) {
+                            onNavigateToFarm(item.plotCode, item.farmId);
+                          } else {
+                            setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
+                            setShowToast(true);
+                          }
                         } else {
-                          setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
+                          setToastMessage(`⚠️ ${item.studentName} さんは担当区画が未設定です`);
                           setShowToast(true);
                         }
                       }}
