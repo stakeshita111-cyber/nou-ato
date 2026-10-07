@@ -56,6 +56,27 @@ describe("StudentSkillBoardView", () => {
     expect(html).toContain("土作りタスク");
   });
 
+  it("extracts badges correctly when badge info is in nested tasks or direct properties", () => {
+    const mockTasks = [
+      {
+        id: "t10",
+        status: "completed",
+        tasks: {
+          title: "芽かき作業",
+          badge_name: "芽かきマスター",
+          badge_icon: "✂️",
+        },
+      },
+    ];
+
+    const html = renderToStaticMarkup(
+      React.createElement(StudentSkillBoardView, { tasks: mockTasks, user: { name: "テスト生徒" } })
+    );
+
+    expect(html).toContain("芽かきマスター");
+    expect(html).toContain("✂️");
+  });
+
   it("handles empty tasks gracefully", () => {
     const html = renderToStaticMarkup(
       React.createElement(StudentSkillBoardView, { tasks: [], user: null })

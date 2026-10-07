@@ -156,6 +156,10 @@ export function useStudentDashboard() {
               const stMatchTyped = stMatch as { id?: string; status?: string } | undefined;
               const isDone = stMatchTyped ? stMatchTyped.status === "completed" : false;
 
+              const cl = (pt.checklist as Record<string, unknown>) || {};
+              const resolvedBadgeName = (pt.badge_name as string) || (cl.badge_name as string) || "";
+              const resolvedBadgeIcon = (pt.badge_icon as string) || (cl.badge_icon as string) || "🏆";
+
               taskList.push({
                 id: stMatchTyped?.id ? stMatchTyped.id : `task_${pt.id}`,
                 task_id: String(pt.id || ""),
@@ -174,8 +178,8 @@ export function useStudentDashboard() {
                   tools_needed: pt.tools_needed || "",
                   memo: pt.memo || "",
                   difficulty: pt.difficulty || 2,
-                  badge_name: pt.badge_name || "",
-                  badge_icon: pt.badge_icon || "🌱",
+                  badge_name: resolvedBadgeName,
+                  badge_icon: resolvedBadgeIcon,
                   require_photo: pt.require_photo ?? true,
                   reference_links: pt.reference_links || "",
                   source: pt.source || "",
@@ -193,6 +197,11 @@ export function useStudentDashboard() {
             if (cleanSt && !seenTitles.has(cleanSt)) {
               seenTitles.add(cleanSt);
               const isDone = st.status === "completed";
+
+              const cl = (st.checklist as Record<string, unknown>) || {};
+              const resolvedBadgeName = (st.badge_name as string) || (cl.badge_name as string) || "";
+              const resolvedBadgeIcon = (st.badge_icon as string) || (cl.badge_icon as string) || "🏆";
+
               taskList.push({
                 id: String(st.id || ""),
                 task_id: String(st.task_id || st.base_task_id || st.id || ""),
@@ -211,8 +220,8 @@ export function useStudentDashboard() {
                   tools_needed: st.tools_needed || "",
                   memo: st.memo || "",
                   difficulty: st.difficulty || 2,
-                  badge_name: st.badge_name || "",
-                  badge_icon: st.badge_icon || "🌱",
+                  badge_name: resolvedBadgeName,
+                  badge_icon: resolvedBadgeIcon,
                   require_photo: st.require_photo ?? true,
                   reference_links: st.reference_links || "",
                   source: st.source || "",
