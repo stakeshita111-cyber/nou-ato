@@ -50,6 +50,53 @@ describe("TaskSlider Component", () => {
     expect(html).toContain("›");
   });
 
+  it("renders card stack (deck style) UI with background card", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(TaskSlider, {
+        tasks: mockTasks,
+        onSelect: vi.fn(),
+        onComplete: vi.fn(),
+      })
+    );
+
+    // Top card: トマトの芽かき (1 / 2)
+    expect(html).toContain("トマトの芽かき");
+    expect(html).toContain("1 / 2");
+
+    // 2nd stacked card: ナスへの水やり (2 / 2)
+    expect(html).toContain("ナスへの水やり");
+    expect(html).toContain("2 / 2");
+
+    // 2nd card stacked transform style scale(0.95)
+    expect(html).toContain("scale(0.95)");
+    expect(html).toContain("translateY(10px)");
+  });
+
+  it("renders 3-card stack when 3 or more active tasks exist", () => {
+    const threeActiveTasks = [
+      { id: "t1", title: "タスク1", status: "in_progress" },
+      { id: "t2", title: "タスク2", status: "in_progress" },
+      { id: "t3", title: "タスク3", status: "in_progress" },
+    ];
+
+    const html = renderToStaticMarkup(
+      React.createElement(TaskSlider, {
+        tasks: threeActiveTasks,
+        onSelect: vi.fn(),
+        onComplete: vi.fn(),
+      })
+    );
+
+    expect(html).toContain("1 / 3");
+    expect(html).toContain("2 / 3");
+    expect(html).toContain("3 / 3");
+
+    // Check stacked card transforms
+    expect(html).toContain("scale(0.95)");
+    expect(html).toContain("scale(0.90)");
+    expect(html).toContain("translateY(20px)");
+  });
+
   it("renders empty state when tasks list is empty", () => {
     const html = renderToStaticMarkup(
       React.createElement(TaskSlider, {
