@@ -50,7 +50,17 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       const { data: tasksData } = await tasksQuery.order("created_at", { ascending: false });
-      if (tasksData) setTasks(tasksData);
+      if (tasksData) {
+        const mappedTasks: Task[] = tasksData.map((t: any) => {
+          const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+          return {
+            ...t,
+            badge_name: t.badge_name || cl.badge_name || null,
+            badge_icon: t.badge_icon || cl.badge_icon || null,
+          };
+        });
+        setTasks(mappedTasks);
+      }
 
       // 2. ゴミ箱内のタスク (deleted_at IS NOT NULL)
       let trashQuery = supabase
@@ -63,7 +73,17 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       const { data: trashData } = await trashQuery.order("deleted_at", { ascending: false });
-      if (trashData) setTrashTasks(trashData);
+      if (trashData) {
+        const mappedTrash: Task[] = trashData.map((t: any) => {
+          const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+          return {
+            ...t,
+            badge_name: t.badge_name || cl.badge_name || null,
+            badge_icon: t.badge_icon || cl.badge_icon || null,
+          };
+        });
+        setTrashTasks(mappedTrash);
+      }
     } catch (e) {
       console.error("fetchTasks 中に例外が発生しました:", e);
     } finally {
@@ -165,8 +185,6 @@ export function useKanbanBoard(columns: ColumnType[]) {
         exp: options?.exp || 10,
         difficulty: options?.difficulty || 1,
         estimated_time: options?.estimated_time || null,
-        badge_name: options?.badge_name || null,
-        badge_icon: options?.badge_icon || null,
         checklist: newTaskChecklist,
         created_by: userId,
         farm_id: effectiveFarmId 
@@ -180,15 +198,26 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (error) {
         console.warn("タスクDB追加警告:", error.message);
-        const tempTask: Task = { id: `temp_${Date.now()}`, ...newTaskData };
+        const tempTask: Task = {
+          id: `temp_${Date.now()}`,
+          ...newTaskData,
+          badge_name: options?.badge_name || null,
+          badge_icon: options?.badge_icon || null,
+        };
         setTasks((prev) => [tempTask, ...prev]);
         return tempTask;
       }
 
       if (data) {
-        setTasks((prev) => [data, ...prev]);
+        const cl = data.checklist && typeof data.checklist === "object" ? data.checklist : {};
+        const createdTask: Task = {
+          ...data,
+          badge_name: data.badge_name || cl.badge_name || options?.badge_name || null,
+          badge_icon: data.badge_icon || cl.badge_icon || options?.badge_icon || null,
+        };
+        setTasks((prev) => [createdTask, ...prev]);
         notifyTaskSync();
-        return data;
+        return createdTask;
       }
     } catch (e) {
       console.error("addTask 実行中に例外が発生しました:", e);
@@ -229,8 +258,6 @@ export function useKanbanBoard(columns: ColumnType[]) {
           require_photo: updatedTask.require_photo,
           exp: updatedTask.exp,
           difficulty: updatedTask.difficulty,
-          badge_name: updatedTask.badge_name || null,
-          badge_icon: updatedTask.badge_icon || null,
           checklist: updatedChecklist,
         })
         .eq("id", updatedTask.id);
@@ -239,7 +266,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         console.warn("saveTaskDetails DB保存警告:", error.message);
       }
 
-      setTasks(tasks.map((t) => (t.id === updatedTask.id ? { ...updatedTask, checklist: updatedChecklist } : t)));
+      setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? { ...updatedTask, checklist: updatedChecklist } : t)));
       setEditingTask(null);
     } catch (e) {
       console.error("saveTaskDetails 実行中に例外が発生しました:", e);
