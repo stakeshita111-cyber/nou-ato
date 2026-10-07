@@ -1,11 +1,19 @@
 "use client";
 
+import { useState } from "react";
+
 interface StudentSkillBoardViewProps {
   tasks: any[];
   user: any;
 }
 
 export default function StudentSkillBoardView({ tasks, user: _user }: StudentSkillBoardViewProps) {
+  const [badgePage, setBadgePage] = useState(1);
+  const [footprintPage, setFootprintPage] = useState(1);
+
+  const BADGES_PER_PAGE = 6;
+  const FOOTPRINTS_PER_PAGE = 5;
+
   const completedTasks = tasks.filter((t) => t.status === "completed");
 
   // 経験値計算
@@ -13,26 +21,41 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
   const level = Math.floor(totalExp / 100) + 1;
   const expProgress = totalExp % 100;
 
-  // デフォルトバッジリスト
-  const defaultBadges = [
-    { id: "b1", title: "農の跡・第一歩", icon: "🌱", desc: "受講登録完了", unlocked: true },
-    { id: "b2", title: "土作りマスター", icon: "🚜", desc: "土作り・畝立て完了", unlocked: completedTasks.length >= 1 },
-    { id: "b3", title: "芽かきプロ", icon: "✂️", desc: "芽かき作業をマスター", unlocked: completedTasks.length >= 2 },
-    { id: "b4", title: "収穫の喜び", icon: "🧺", desc: "収穫・報告完了", unlocked: completedTasks.length >= 3 },
-  ];
+  // 講師がタスク設定で指定したバッジを公開中タスクから抽出
+  const allBadges = tasks
+    .filter((t) => {
+      const badgeName = t.tasks?.badge_name || t.badge_name;
+      return typeof badgeName === "string" && badgeName.trim() !== "";
+    })
+    .map((t, idx) => {
+      const badgeTitle = (t.tasks?.badge_name || t.badge_name) as string;
+      const badgeIcon = ((t.tasks?.badge_icon || t.badge_icon) as string) || "🏆";
+      const taskTitle = (t.tasks?.title || t.title || "タスク") as string;
+      const unlocked = t.status === "completed";
+      return {
+        id: t.id || `badge_${idx}`,
+        title: badgeTitle,
+        icon: badgeIcon,
+        desc: `${taskTitle} クリア`,
+        unlocked,
+      };
+    });
 
-  // 講師がタスク設定で指定したバッジを動的統合
-  const customBadges = completedTasks
-    .filter((ct) => ct.tasks?.badge_name || ct.badge_name)
-    .map((ct, idx) => ({
-      id: `custom_b_${idx}`,
-      title: ct.tasks?.badge_name || ct.badge_name,
-      icon: ct.tasks?.badge_icon || ct.badge_icon || "🏆",
-      desc: `${ct.tasks?.title || ct.title} クリア`,
-      unlocked: true,
-    }));
+  // バッジページネーション計算
+  const totalBadgePages = Math.max(1, Math.ceil(allBadges.length / BADGES_PER_PAGE));
+  const currentBadgePage = Math.min(Math.max(1, badgePage), totalBadgePages);
+  const pagedBadges = allBadges.slice(
+    (currentBadgePage - 1) * BADGES_PER_PAGE,
+    currentBadgePage * BADGES_PER_PAGE
+  );
 
-  const allBadges = [...customBadges, ...defaultBadges];
+  // 足跡ページネーション計算
+  const totalFootprintPages = Math.max(1, Math.ceil(completedTasks.length / FOOTPRINTS_PER_PAGE));
+  const currentFootprintPage = Math.min(Math.max(1, footprintPage), totalFootprintPages);
+  const pagedFootprints = completedTasks.slice(
+    (currentFootprintPage - 1) * FOOTPRINTS_PER_PAGE,
+    currentFootprintPage * FOOTPRINTS_PER_PAGE
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -70,37 +93,71 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
         </div>
       </div>
 
-      {/* 2. 獲得スキル・バッジコレクション (講師設定バッジを動的表示) */}
+      {/* 2. 獲得スキル・バッジコレクション (公開中タスク連動) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-gray-900 text-sm">🏆 獲得農作業バッジ</h3>
           <span className="text-xs font-bold text-gray-500">
-            {allBadges.filter((b) => b.unlocked).length} 獲得
+            {allBadges.filter((b) => b.unlocked).length} / {allBadges.length} 獲得
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {allBadges.map((badge) => (
-            <div
-              key={badge.id}
-              className={`p-3.5 rounded-2xl border transition flex items-center space-x-3 ${
-                badge.unlocked
-                  ? "bg-white border-green-200 shadow-xs"
-                  : "bg-gray-100/70 border-gray-200 opacity-50"
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${
-                badge.unlocked ? "bg-green-50" : "bg-gray-200"
-              }`}>
-                {badge.icon}
-              </div>
-              <div>
-                <h4 className="font-bold text-xs text-gray-900">{badge.title}</h4>
-                <p className="text-[10px] text-gray-500">{badge.desc}</p>
-              </div>
+        {allBadges.length === 0 ? (
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 text-center space-y-1 text-xs text-gray-400">
+            <p className="font-bold text-gray-700">現在公開中のバッジはありません</p>
+            <p>講師がバッジ付きタスクを配信すると表示されます</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {pagedBadges.map((badge) => (
+                <div
+                  key={badge.id}
+                  className={`p-3.5 rounded-2xl border transition flex items-center space-x-3 ${
+                    badge.unlocked
+                      ? "bg-white border-green-200 shadow-xs"
+                      : "bg-gray-100/70 border-gray-200 opacity-50 grayscale"
+                  }`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${
+                      badge.unlocked ? "bg-green-50" : "bg-gray-200"
+                    }`}
+                  >
+                    {badge.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-xs text-gray-900 truncate">{badge.title}</h4>
+                    <p className="text-[10px] text-gray-500 truncate">{badge.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+
+            {/* バッジ ページネーションUI */}
+            {totalBadgePages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => setBadgePage((p) => Math.max(1, p - 1))}
+                  disabled={currentBadgePage === 1}
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  ◀ 前へ
+                </button>
+                <span className="text-xs font-bold text-gray-600">
+                  {currentBadgePage} / {totalBadgePages}
+                </span>
+                <button
+                  onClick={() => setBadgePage((p) => Math.min(totalBadgePages, p + 1))}
+                  disabled={currentBadgePage === totalBadgePages}
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  次へ ▶
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* 3. 成長の足跡・完了済みクエストログ */}
@@ -113,29 +170,56 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
             <p>Questsタブからタスクを完了して、足跡を刻みましょう！</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {completedTasks.map((ct) => (
-              <div
-                key={ct.id}
-                className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-start space-x-3"
-              >
-                <div className="w-8 h-8 rounded-full bg-green-100 text-[#1d5c23] font-black flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
-                  ✓
-                </div>
-                <div className="space-y-0.5 flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-gray-900 text-xs">{ct.tasks?.title || ct.title}</h4>
-                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                      +50 EXP
-                    </span>
+          <>
+            <div className="space-y-3">
+              {pagedFootprints.map((ct) => (
+                <div
+                  key={ct.id}
+                  className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-start space-x-3"
+                >
+                  <div className="w-8 h-8 rounded-full bg-green-100 text-[#1d5c23] font-black flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                    ✓
                   </div>
-                  <p className="text-[11px] text-gray-500 line-clamp-1">
-                    {ct.tasks?.description || "無事に作業完了を報告しました。"}
-                  </p>
+                  <div className="space-y-0.5 flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-gray-900 text-xs truncate">
+                        {ct.tasks?.title || ct.title}
+                      </h4>
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                        +50 EXP
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 line-clamp-1">
+                      {ct.tasks?.description || "無事に作業完了を報告しました。"}
+                    </p>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* 足跡 ページネーションUI */}
+            {totalFootprintPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => setFootprintPage((p) => Math.max(1, p - 1))}
+                  disabled={currentFootprintPage === 1}
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  ◀ 前へ
+                </button>
+                <span className="text-xs font-bold text-gray-600">
+                  {currentFootprintPage} / {totalFootprintPages}
+                </span>
+                <button
+                  onClick={() => setFootprintPage((p) => Math.min(totalFootprintPages, p + 1))}
+                  disabled={currentFootprintPage === totalFootprintPages}
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  次へ ▶
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
