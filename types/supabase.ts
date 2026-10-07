@@ -235,6 +235,7 @@ export interface Database {
           student_id: string
           base_task_id: string | null
           title: string
+          description: string | null
           category: string | null
           status: string
           completed_at: string | null
@@ -256,6 +257,7 @@ export interface Database {
           student_id: string
           base_task_id?: string | null
           title: string
+          description?: string | null
           category?: string | null
           status?: string
           completed_at?: string | null
@@ -277,6 +279,7 @@ export interface Database {
           student_id?: string
           base_task_id?: string | null
           title?: string
+          description?: string | null
           category?: string | null
           status?: string
           completed_at?: string | null

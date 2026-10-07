@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import Toast from "@/components/ui/Toast";
 
@@ -34,6 +34,8 @@ export default function IndividualTaskAssignModal({
     targetStudent?.id || ""
   );
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCrop, setSelectedCrop] = useState("all");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [toastMessage, setToastMessage] = useState("");
@@ -61,11 +63,13 @@ export default function IndividualTaskAssignModal({
           }
         }
 
-        // 2. 利用可能なタスク一覧の取得
+        // 2. 公開中のタスク一覧の取得 (status = 'todo', deleted_at is null, is_template != true)
         const { data: tasksData } = await supabase
           .from("tasks")
           .select("id, title, target_crop, exp, description")
+          .eq("status", "todo")
           .is("deleted_at", null)
+          .or("is_template.eq.false,is_template.is.null")
           .order("created_at", { ascending: false });
 
         if (tasksData) {
@@ -80,6 +84,52 @@ export default function IndividualTaskAssignModal({
 
     loadOptions();
   }, [selectedStudentId]);
+
+  // 作物タグ一覧の抽出
+  const cropOptions = useMemo(() => {
+    const cropSet = new Set<string>();
+    tasks.forEach((t) => {
+      if (t.target_crop && t.target_crop.trim()) {
+        cropSet.add(t.target_crop.trim());
+      }
+    });
+    return ["all", ...Array.from(cropSet)];
+  }, [tasks]);
+
+  // フィルタリングされたタスク一覧
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      // 1. 作物絞り込み
+      if (selectedCrop !== "all" && task.target_crop !== selectedCrop) {
+        return false;
+      }
+      // 2. キーワード部分一致（title, target_crop, description）
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const matchesTitle = task.title?.toLowerCase().includes(query);
+        const matchesCrop = task.target_crop?.toLowerCase().includes(query);
+        const matchesDesc = task.description?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesCrop && !matchesDesc) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [tasks, selectedCrop, searchQuery]);
+
+  const isAllFilteredSelected =
+    filteredTasks.length > 0 &&
+    filteredTasks.every((t) => selectedTaskIds.includes(t.id));
+
+  const toggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      const filteredIds = new Set(filteredTasks.map((t) => t.id));
+      setSelectedTaskIds((prev) => prev.filter((id) => !filteredIds.has(id)));
+    } else {
+      const filteredIds = filteredTasks.map((t) => t.id);
+      setSelectedTaskIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
 
   const toggleTaskSelect = (taskId: string) => {
     setSelectedTaskIds((prev) =>
@@ -104,9 +154,14 @@ export default function IndividualTaskAssignModal({
 
     setLoading(true);
     try {
-      const inserts = selectedTaskIds.map((taskId) => ({
+      const selectedTasks = tasks.filter((t) => selectedTaskIds.includes(t.id));
+      const inserts = selectedTasks.map((task) => ({
         student_id: selectedStudentId,
-        task_id: taskId,
+        base_task_id: task.id,
+        title: task.title,
+        target_crop: task.target_crop || null,
+        description: task.description || null,
+        exp: task.exp || 50,
         status: "not_started",
       }));
 
@@ -186,37 +241,78 @@ export default function IndividualTaskAssignModal({
           </div>
 
           {/* 2. タスク一覧選択 */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-gray-700">
                 📋 割り当てるタスクを選択 ({selectedTaskIds.length}件選択中)
               </label>
-              {tasks.length > 0 && (
+              {filteredTasks.length > 0 && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setSelectedTaskIds(
-                      selectedTaskIds.length === tasks.length
-                        ? []
-                        : tasks.map((t) => t.id)
-                    )
-                  }
+                  onClick={toggleSelectAllFiltered}
                   className="text-xs text-emerald-700 font-bold hover:underline"
                 >
-                  {selectedTaskIds.length === tasks.length ? "選択解除" : "すべて選択"}
+                  {isAllFilteredSelected ? "表示中を全解除" : "表示中をすべて選択"}
                 </button>
               )}
             </div>
+
+            {/* 検索バー ＆ 作物タグ絞り込み */}
+            {tasks.length > 0 && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="🔍 タスク名・作物名・概要で検索..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2 border rounded-xl bg-gray-50 text-xs font-bold text-gray-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {cropOptions.length > 1 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    {cropOptions.map((crop) => (
+                      <button
+                        key={crop}
+                        type="button"
+                        onClick={() => setSelectedCrop(crop)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                          selectedCrop === crop
+                            ? "bg-emerald-700 text-white shadow-xs"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {crop === "all" ? "すべて" : crop}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {fetching ? (
               <div className="py-8 text-center text-xs text-gray-400 font-bold">タスクを読み込み中...</div>
             ) : tasks.length === 0 ? (
               <div className="p-6 bg-gray-50 border rounded-2xl text-center text-xs text-gray-500 font-bold">
-                割り当て可能なタスクが登録されていません。看板ボードよりタスクを作成してください。
+                割り当て可能な公開中タスクがありません。看板ボードよりタスクを「配信中」に移動してください。
+              </div>
+            ) : filteredTasks.length === 0 ? (
+              <div className="p-6 bg-gray-50 border rounded-2xl text-center text-xs text-gray-500 font-bold">
+                検索条件に一致するタスクが見つかりませんでした。
               </div>
             ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {tasks.map((task) => {
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {filteredTasks.map((task) => {
                   const isChecked = selectedTaskIds.includes(task.id);
                   return (
                     <div
