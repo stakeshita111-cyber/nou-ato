@@ -79,7 +79,7 @@ describe("StudentTalkView Privacy Features", () => {
   });
 
   it("synchronizes allowKnowledgeShare state across form toggle and modals", () => {
-    let state = { allowKnowledgeShare: true };
+    const state = { allowKnowledgeShare: true };
 
     // 1. フォーム直下のトグル操作で OFF に切り替え
     state.allowKnowledgeShare = false;
