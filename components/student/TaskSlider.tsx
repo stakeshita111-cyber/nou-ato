@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Badge from "@/components/ui/Badge";
 
 interface TaskSliderProps {
@@ -14,20 +14,89 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletedList, setShowCompletedList] = useState(false);
 
+  // フリック（スワイプ）操作用ステート
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  const animTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (animTimeoutRef.current) {
+        clearTimeout(animTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // 未完了タスクと完了済みタスクの分離
   const activeTasks = tasks.filter((t) => t.status !== "completed");
   const completedTasks = tasks.filter((t) => t.status === "completed");
 
-  const currentTask = activeTasks[currentIndex] || activeTasks[0];
+  const validIndex = currentIndex >= activeTasks.length ? 0 : currentIndex;
+  const currentTask = activeTasks[validIndex] || activeTasks[0];
 
-  const handlePrev = () => {
-    if (activeTasks.length === 0) return;
-    setCurrentIndex((prev) => (prev === 0 ? activeTasks.length - 1 : prev - 1));
+  const triggerSlideAnimation = (initialOffset: number) => {
+    if (animTimeoutRef.current) {
+      clearTimeout(animTimeoutRef.current);
+    }
+    setDragOffset(initialOffset);
+    animTimeoutRef.current = setTimeout(() => {
+      setDragOffset(0);
+    }, 20);
   };
 
-  const handleNext = () => {
-    if (activeTasks.length === 0) return;
+  const handlePrev = (fromSwipe = false) => {
+    if (activeTasks.length <= 1) return;
+    setCurrentIndex((prev) => (prev === 0 ? activeTasks.length - 1 : prev - 1));
+    if (!fromSwipe) {
+      triggerSlideAnimation(50);
+    }
+  };
+
+  const handleNext = (fromSwipe = false) => {
+    if (activeTasks.length <= 1) return;
     setCurrentIndex((prev) => (prev === activeTasks.length - 1 ? 0 : prev + 1));
+    if (!fromSwipe) {
+      triggerSlideAnimation(-50);
+    }
+  };
+
+  const SWIPE_THRESHOLD = 50;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (activeTasks.length <= 1) return;
+    const touch = e.touches[0];
+    setTouchStartX(touch.clientX);
+    setTouchStartY(touch.clientY);
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || touchStartX === null || touchStartY === null) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      setDragOffset(deltaX);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+
+    if (dragOffset < -SWIPE_THRESHOLD) {
+      handleNext(true);
+    } else if (dragOffset > SWIPE_THRESHOLD) {
+      handlePrev(true);
+    }
+
+    setDragOffset(0);
+    setIsDragging(false);
+    setTouchStartX(null);
+    setTouchStartY(null);
   };
 
   if (tasks.length === 0) {
@@ -69,13 +138,13 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
             {activeTasks.length > 1 && (
               <>
                 <button
-                  onClick={handlePrev}
+                  onClick={() => handlePrev()}
                   className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition"
                 >
                   ‹
                 </button>
                 <button
-                  onClick={handleNext}
+                  onClick={() => handleNext()}
                   className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition"
                 >
                   ›
@@ -83,39 +152,52 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
               </>
             )}
 
-            {/* メインカード (1枚固定表示) */}
-            <div className="bg-white p-6 rounded-3xl shadow-md border border-green-100 border-l-4 border-l-[#1d5c23] space-y-4 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-400">
-                  {currentIndex + 1} / {activeTasks.length}
-                </span>
-                <Badge type="crop">
-                  {currentTask.tasks?.target_crop || currentTask.target_crop || "春野菜"}
-                </Badge>
-              </div>
+            {/* メインカード (1枚固定表示 & スワイプ・スライドアニメーション対応) */}
+            <div className="overflow-hidden py-1 px-0.5">
+              <div
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                style={{
+                  transform: `translateX(${dragOffset}px)`,
+                  transition: isDragging ? "none" : "transform 0.3s ease-out",
+                  touchAction: "pan-y",
+                }}
+                className="bg-white p-6 rounded-3xl shadow-md border border-green-100 border-l-4 border-l-[#1d5c23] space-y-4 select-none"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-400">
+                    {validIndex + 1} / {activeTasks.length}
+                  </span>
+                  <Badge type="crop">
+                    {currentTask.tasks?.target_crop || currentTask.target_crop || "春野菜"}
+                  </Badge>
+                </div>
 
-              <div className="space-y-1">
-                <h3 className="text-xl font-black text-gray-900 leading-snug">
-                  {currentTask.tasks?.title || currentTask.title || "タスク"}
-                </h3>
-                <p className="text-xs text-gray-500 line-clamp-2">
-                  {currentTask.tasks?.description || currentTask.description || "しっかり観察して作業を進めましょう。"}
-                </p>
-              </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black text-gray-900 leading-snug">
+                    {currentTask.tasks?.title || currentTask.title || "タスク"}
+                  </h3>
+                  <p className="text-xs text-gray-500 line-clamp-2">
+                    {currentTask.tasks?.description || currentTask.description || "しっかり観察して作業を進めましょう。"}
+                  </p>
+                </div>
 
-              {/* アクションボタン: 詳細展開ボタンに一本化（完了報告は展開後モーダル内でのみ受付） */}
-              <div className="pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => onSelect(currentTask)}
-                  className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  <span>📖 詳細・手順を確認して作業する</span>
-                </button>
+                {/* アクションボタン: 詳細展開ボタンに一本化（完了報告は展開後モーダル内でのみ受付） */}
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(currentTask)}
+                    className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <span>📖 詳細・手順を確認して作業する</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
