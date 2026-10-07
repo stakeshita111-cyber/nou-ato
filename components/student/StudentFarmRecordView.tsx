@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { GrowthStage, WorkType, CropRecord, FarmBed } from "@/types/farm";
 import Toast from "@/components/ui/Toast";
@@ -321,13 +321,145 @@ export default function StudentFarmRecordView({
     }
   };
 
+  // 生徒の日誌・返信データ (journals) の取得とリアルタイム同期
+  const [studentJournals, setStudentJournals] = useState<any[]>([]);
+
+  const fetchStudentJournals = useCallback(async () => {
+    const targetStudentId = studentId || myPlot?.student_id;
+    if (!targetStudentId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("journals")
+        .select("*")
+        .eq("student_id", targetStudentId)
+        .order("created_at", { ascending: false });
+
+      if (data && !error) {
+        setStudentJournals(data);
+      }
+    } catch (err) {
+      console.warn("fetchStudentJournals error:", err);
+    }
+  }, [studentId, myPlot?.student_id]);
+
+  useEffect(() => {
+    fetchStudentJournals();
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc.onmessage = () => {
+        fetchStudentJournals();
+      };
+    } catch (e) {}
+
+    const handleSync = () => {
+      fetchStudentJournals();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_sync_event", handleSync);
+    }
+
+    return () => {
+      if (bc) bc.close();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_sync_event", handleSync);
+      }
+    };
+  }, [fetchStudentJournals]);
+
   // 選択した畝(ベッド)の時系列記録 (該当区画および選択した畝のみに厳密絞り込み)
-  const currentBedRecords = records
-    .filter((r) => {
-      if (!currentBed) return false;
-      return r.bed_id === currentBed.id;
-    })
-    .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+  const currentBedRecords = currentBed
+    ? records
+        .filter((r) => r.bed_id === currentBed.id)
+        .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())
+    : [];
+
+  // 観察記録 (cropRecords) と 講師からの返信 (journals) を合成したタイムラインリスト
+  type ObservationTimelineItem = {
+    id: string;
+    type: "observation";
+    timestamp: number;
+    record: CropRecord;
+  };
+
+  type TeacherReplyTimelineItem = {
+    id: string;
+    type: "teacher_reply";
+    timestamp: number;
+    dateStr: string;
+    teacherName: string;
+    replyContent: string;
+    originalQuestion?: string;
+  };
+
+  type CombinedTimelineItem = ObservationTimelineItem | TeacherReplyTimelineItem;
+
+  const bedNumberStr = currentBed ? String(currentBed.bed_number) : "";
+
+  const synthesizedTimelineItems = (() => {
+    if (!currentBed) return [];
+
+    const observationItems: CombinedTimelineItem[] = currentBedRecords.map((rec) => ({
+      id: `rec_${rec.id}`,
+      type: "observation",
+      timestamp: new Date(rec.created_at || rec.date).getTime(),
+      record: rec,
+    }));
+
+    const replyItems: TeacherReplyTimelineItem[] = [];
+    const seenReplyTexts = new Set<string>();
+
+    studentJournals.forEach((j) => {
+      const content = String(j.content || j.text || "");
+      const replyText = String(j.reply || "").trim();
+
+      // 他の畝向けの特定タグ（例: 【畝 2】）がある場合はスキップ
+      const bedTagMatch = content.match(/【畝\s*([0-9]+)/) || content.match(/畝\s*([0-9]+)/);
+      if (bedTagMatch) {
+        const taggedBedNum = bedTagMatch[1];
+        if (taggedBedNum !== bedNumberStr) {
+          return;
+        }
+      }
+
+      if (replyText && replyText !== "講師からの返信") {
+        if (!seenReplyTexts.has(replyText)) {
+          seenReplyTexts.add(replyText);
+          const dateObj = j.updated_at ? new Date(j.updated_at) : j.created_at ? new Date(j.created_at) : new Date();
+          const timeStr = dateObj.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+          replyItems.push({
+            id: `reply_${j.id}`,
+            type: "teacher_reply",
+            timestamp: dateObj.getTime(),
+            dateStr: `${formatDate(dateObj.toISOString())} ${timeStr}`,
+            teacherName: "講師",
+            replyContent: replyText,
+            originalQuestion: content,
+          });
+        }
+      } else if (j.role === "broadcast" && (j.text === "【返信】講師から相談への回答が届きました" || j.reply === "講師からの返信")) {
+        const bContent = String(j.content || "").trim();
+        if (bContent && !seenReplyTexts.has(bContent)) {
+          seenReplyTexts.add(bContent);
+          const dateObj = j.created_at ? new Date(j.created_at) : new Date();
+          const timeStr = dateObj.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+          replyItems.push({
+            id: `reply_bc_${j.id}`,
+            type: "teacher_reply",
+            timestamp: dateObj.getTime(),
+            dateStr: `${formatDate(dateObj.toISOString())} ${timeStr}`,
+            teacherName: "講師",
+            replyContent: bContent,
+          });
+        }
+      }
+    });
+
+    return [...observationItems, ...replyItems].sort((a, b) => b.timestamp - a.timestamp);
+  })();
 
   if (isLoading || plots.length === 0) {
     return (
@@ -611,7 +743,7 @@ export default function StudentFarmRecordView({
             </div>
           )}
 
-        {currentBedRecords.length === 0 ? (
+        {synthesizedTimelineItems.length === 0 ? (
           <div className="py-12 text-center text-gray-400 font-bold text-sm space-y-3">
             <p>この畝にはまだ記録が登録されていません。</p>
             {currentBed.status !== "completed_pending" && (
@@ -628,63 +760,101 @@ export default function StudentFarmRecordView({
           </div>
         ) : (
           <div className="relative border-l-2 border-emerald-200 ml-4 pl-6 space-y-6 my-2">
-            {currentBedRecords.map((rec) => (
-              <div key={rec.id} className="relative group">
-                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-emerald-600 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
+            {synthesizedTimelineItems.map((item) => {
+              if (item.type === "teacher_reply") {
+                return (
+                  <div key={item.id} className="relative group">
+                    <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-amber-500 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
 
-                <div className="bg-gray-50/90 p-4 rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-700">
-                  <div className="flex justify-between items-center border-b border-gray-200/80 pb-2">
-                    <span className="font-black text-sm text-emerald-950">
-                      📅 {formatDate(rec.date)}
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full text-[11px]">
-                        {rec.growth_stage || "作業完了"}
+                    <div className="bg-amber-50/90 p-4 rounded-2xl border-2 border-amber-300 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-800">
+                      <div className="flex justify-between items-center border-b border-amber-200/80 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black text-[11px] flex items-center gap-1">
+                            <span>💬 講師からの返信</span>
+                          </span>
+                          <span className="font-extrabold text-xs text-gray-800">
+                            {item.teacherName}
+                          </span>
+                        </div>
+                        <span className="font-bold text-[11px] text-gray-500">
+                          📅 {item.dateStr}
+                        </span>
+                      </div>
+
+                      {item.originalQuestion && (
+                        <div className="text-[11px] text-gray-600 bg-white/70 p-2.5 rounded-xl border border-amber-200/60 font-medium">
+                          <span className="text-[10px] text-amber-900 font-bold block mb-0.5">📌 対象の相談・質問:</span>
+                          <p className="line-clamp-2 leading-relaxed">{item.originalQuestion}</p>
+                        </div>
+                      )}
+
+                      <div className="bg-white p-3.5 rounded-xl border border-amber-200 text-gray-900 font-medium leading-relaxed whitespace-pre-wrap text-xs shadow-2xs">
+                        {item.replyContent}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              const rec = item.record;
+              return (
+                <div key={rec.id} className="relative group">
+                  <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-emerald-600 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
+
+                  <div className="bg-gray-50/90 p-4 rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-700">
+                    <div className="flex justify-between items-center border-b border-gray-200/80 pb-2">
+                      <span className="font-black text-sm text-emerald-950">
+                        📅 {formatDate(rec.date)}
                       </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full text-[11px]">
+                          {rec.growth_stage || "作業完了"}
+                        </span>
 
-                      {/* 🌟 承認待ち以外の場合のみ「✏️ 編集」「🗑️ 削除」を表示 🌟 */}
-                      {currentBed.status !== "completed_pending" && (
-                        <>
-                          <button
-                            onClick={() => handleOpenEditModal(rec)}
-                            className="px-2 py-1 bg-gray-200 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 rounded-lg text-[10px] font-extrabold transition"
-                          >
-                            ✏️ 編集
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRecord(rec.id)}
-                            className="px-2 py-1 bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-700 rounded-lg text-[10px] font-extrabold transition"
-                          >
-                            🗑️ 削除
-                          </button>
-                        </>
+                        {/* 🌟 承認待ち以外の場合のみ「✏️ 編集」「🗑️ 削除」を表示 🌟 */}
+                        {currentBed.status !== "completed_pending" && (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditModal(rec)}
+                              className="px-2 py-1 bg-gray-200 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 rounded-lg text-[10px] font-extrabold transition"
+                            >
+                              ✏️ 編集
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRecord(rec.id)}
+                              className="px-2 py-1 bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-700 rounded-lg text-[10px] font-extrabold transition"
+                            >
+                              🗑️ 削除
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1 text-[11px]">
+                      <div>
+                        <span className="text-gray-400">草丈: </span>
+                        <span className="text-gray-800 font-black">{rec.height_cm || 75} cm</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">実施内容: </span>
+                        <span className="text-emerald-900 font-black">{rec.work_types?.join(", ") || "観察・手入れ"}</span>
+                      </div>
+                      {rec.harvest_amount && (
+                        <div className="text-amber-800 font-black">
+                          <span>成果: </span>
+                          <span>{formatHarvestAmount(rec.harvest_amount)}</span>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1 text-[11px]">
-                    <div>
-                      <span className="text-gray-400">草丈: </span>
-                      <span className="text-gray-800 font-black">{rec.height_cm || 75} cm</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">実施内容: </span>
-                      <span className="text-emerald-900 font-black">{rec.work_types?.join(", ") || "観察・手入れ"}</span>
-                    </div>
-                    {rec.harvest_amount && (
-                      <div className="text-amber-800 font-black">
-                        <span>成果: </span>
-                        <span>{formatHarvestAmount(rec.harvest_amount)}</span>
-                      </div>
-                    )}
+                    <p className="bg-white p-3 rounded-xl border text-gray-800 font-medium leading-relaxed">
+                      {rec.notes}
+                    </p>
                   </div>
-
-                  <p className="bg-white p-3 rounded-xl border text-gray-800 font-medium leading-relaxed">
-                    {rec.notes}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

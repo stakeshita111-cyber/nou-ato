@@ -276,12 +276,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     const text = replyInput[id];
     if (!text?.trim()) return;
 
+    const targetJournal = journals.find((j) => j.id === id);
+
     const shouldApprove = approveOnReply[id] || false;
 
     const { error } = await supabase
       .from("journals")
       .update({
-        reply: text,
+        reply: text.trim(),
         ...(shouldApprove ? { is_approved: true } : {}),
       })
       .eq("id", id);
@@ -289,10 +291,47 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     if (error) {
       setToastMessage("返信の保存に失敗しました: " + error.message);
     } else {
+      // 生徒宛ての個別通知レコードを insert
+      try {
+        const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        const effectiveFarmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+        const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+        const validStudentId = targetJournal?.student_id && isUuid(targetJournal.student_id) ? targetJournal.student_id : (targetJournal?.student_id || null);
+
+        if (validStudentId) {
+          const { error: insErr } = await supabase.from("journals").insert([
+            {
+              role: "broadcast",
+              student_id: validStudentId,
+              farm_id: validFarmId,
+              text: "【返信】講師から相談への回答が届きました",
+              content: text.trim(),
+              reply: "講師からの返信",
+              created_at: new Date().toISOString(),
+            },
+          ]);
+          if (insErr) {
+            console.warn("Reply broadcast insert warn:", insErr);
+          }
+        }
+      } catch (e) {
+        console.warn("Reply broadcast insert exception:", e);
+      }
+
+      // 送信後、BroadcastChannel 及び nouato_sync_event を送信
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+
       setJournals(
         journals.map((j) =>
           j.id === id
-            ? { ...j, reply: text, ...(shouldApprove ? { is_approved: true } : {}) }
+            ? { ...j, reply: text.trim(), ...(shouldApprove ? { is_approved: true } : {}) }
             : j
         )
       );
