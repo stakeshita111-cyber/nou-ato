@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 
+interface BadgeItem {
+  id: string;
+  title: string;
+  icon: string;
+  desc: string;
+  unlocked: boolean;
+}
+
 interface StudentSkillBoardViewProps {
   tasks: any[];
   user: any;
@@ -10,6 +18,17 @@ interface StudentSkillBoardViewProps {
 export default function StudentSkillBoardView({ tasks, user: _user }: StudentSkillBoardViewProps) {
   const [badgePage, setBadgePage] = useState(1);
   const [footprintPage, setFootprintPage] = useState(1);
+  const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
+
+  // ページ切り替えスライドアニメーション方向
+  const [badgeSlideDir, setBadgeSlideDir] = useState<"left" | "right">("left");
+  const [footprintSlideDir, setFootprintSlideDir] = useState<"left" | "right">("left");
+
+  // スワイプ操作用のタッチ座標状態
+  const [badgeTouchStart, setBadgeTouchStart] = useState<number | null>(null);
+  const [badgeTouchEnd, setBadgeTouchEnd] = useState<number | null>(null);
+  const [footprintTouchStart, setFootprintTouchStart] = useState<number | null>(null);
+  const [footprintTouchEnd, setFootprintTouchEnd] = useState<number | null>(null);
 
   const BADGES_PER_PAGE = 6;
   const FOOTPRINTS_PER_PAGE = 5;
@@ -22,7 +41,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
   const expProgress = totalExp % 100;
 
   // 講師がタスク設定で指定したバッジを公開中タスクから抽出
-  const allBadges = tasks
+  const allBadges: BadgeItem[] = tasks
     .filter((t) => {
       const badgeName = t.tasks?.badge_name || t.badge_name;
       return typeof badgeName === "string" && badgeName.trim() !== "";
@@ -56,6 +75,56 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
     (currentFootprintPage - 1) * FOOTPRINTS_PER_PAGE,
     currentFootprintPage * FOOTPRINTS_PER_PAGE
   );
+
+  // バッジ スワイプ処理
+  const handleBadgeTouchStart = (e: React.TouchEvent) => {
+    setBadgeTouchEnd(null);
+    setBadgeTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleBadgeTouchMove = (e: React.TouchEvent) => {
+    setBadgeTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleBadgeTouchEnd = () => {
+    if (badgeTouchStart === null || badgeTouchEnd === null) return;
+    const distance = badgeTouchStart - badgeTouchEnd;
+    const MIN_SWIPE_DISTANCE = 40;
+
+    if (distance > MIN_SWIPE_DISTANCE && currentBadgePage < totalBadgePages) {
+      // 次のページへスライド
+      setBadgeSlideDir("left");
+      setBadgePage((p) => Math.min(totalBadgePages, p + 1));
+    } else if (distance < -MIN_SWIPE_DISTANCE && currentBadgePage > 1) {
+      // 前のページへスライド
+      setBadgeSlideDir("right");
+      setBadgePage((p) => Math.max(1, p - 1));
+    }
+  };
+
+  // 足跡 スワイプ処理
+  const handleFootprintTouchStart = (e: React.TouchEvent) => {
+    setFootprintTouchEnd(null);
+    setFootprintTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleFootprintTouchMove = (e: React.TouchEvent) => {
+    setFootprintTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleFootprintTouchEnd = () => {
+    if (footprintTouchStart === null || footprintTouchEnd === null) return;
+    const distance = footprintTouchStart - footprintTouchEnd;
+    const MIN_SWIPE_DISTANCE = 40;
+
+    if (distance > MIN_SWIPE_DISTANCE && currentFootprintPage < totalFootprintPages) {
+      setFootprintSlideDir("left");
+      setFootprintPage((p) => Math.min(totalFootprintPages, p + 1));
+    } else if (distance < -MIN_SWIPE_DISTANCE && currentFootprintPage > 1) {
+      setFootprintSlideDir("right");
+      setFootprintPage((p) => Math.max(1, p - 1));
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -93,7 +162,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
         </div>
       </div>
 
-      {/* 2. 獲得スキル・バッジコレクション (公開中タスク連動) */}
+      {/* 2. 獲得スキル・バッジコレクション (記号のみ表示＋タップ確認＆ゆっくり回転アニメーション) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-gray-900 text-sm">🏆 獲得農作業バッジ</h3>
@@ -108,37 +177,114 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
             <p>講師がバッジ付きタスクを配信すると表示されます</p>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              {pagedBadges.map((badge) => (
+          <div className="space-y-3">
+            {/* バッジ一覧グリッド (スワイプ操作エリア) */}
+            <div
+              className="touch-pan-y overflow-hidden"
+              onTouchStart={handleBadgeTouchStart}
+              onTouchMove={handleBadgeTouchMove}
+              onTouchEnd={handleBadgeTouchEnd}
+            >
+              <div
+                key={`badge-page-${currentBadgePage}`}
+                className={`grid grid-cols-3 sm:grid-cols-6 gap-3 ${
+                  badgeSlideDir === "left" ? "animate-slide-left" : "animate-slide-right"
+                }`}
+              >
+                {pagedBadges.map((badge) => {
+                  const isSelected = selectedBadge?.id === badge.id;
+                  return (
+                    <button
+                      key={badge.id}
+                      type="button"
+                      aria-label={badge.title}
+                      title={badge.title}
+                      onClick={() => setSelectedBadge(isSelected ? null : badge)}
+                      className={`relative aspect-square p-3 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer select-none outline-none focus:ring-2 focus:ring-green-500 ${
+                        badge.unlocked
+                          ? "bg-white border-green-200 shadow-sm hover:border-green-400 hover:shadow-md"
+                          : "bg-gray-100/70 border-gray-200 opacity-60 grayscale hover:opacity-80"
+                      } ${isSelected ? "ring-2 ring-green-500 border-green-500 bg-green-50/50" : ""}`}
+                    >
+                      {/* バッジアイコン (獲得済みはゆっくり回転アニメーション) */}
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner transition-transform ${
+                          badge.unlocked
+                            ? "bg-gradient-to-br from-green-50 to-emerald-100 animate-spin-slow"
+                            : "bg-gray-200"
+                        }`}
+                      >
+                        {badge.icon}
+                      </div>
+
+                      {/* 未獲得ロックバッジマーク */}
+                      {!badge.unlocked && (
+                        <div className="absolute top-1.5 right-1.5 bg-gray-400/80 text-white rounded-full p-0.5 text-[10px] w-4 h-4 flex items-center justify-center shadow-xs">
+                          🔒
+                        </div>
+                      )}
+
+                      {/* 獲得済みチェックマーク */}
+                      {badge.unlocked && (
+                        <div className="absolute top-1.5 right-1.5 bg-green-500 text-white rounded-full p-0.5 text-[9px] w-4 h-4 flex items-center justify-center shadow-xs font-bold">
+                          ✓
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* タップ確認詳細カード (ポップオーバー) */}
+            {selectedBadge && (
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 border border-green-200 shadow-md animate-fade-in relative flex items-center space-x-4">
                 <div
-                  key={badge.id}
-                  className={`p-3.5 rounded-2xl border transition flex items-center space-x-3 ${
-                    badge.unlocked
-                      ? "bg-white border-green-200 shadow-xs"
-                      : "bg-gray-100/70 border-gray-200 opacity-50 grayscale"
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner ${
+                    selectedBadge.unlocked
+                      ? "bg-white text-green-700 animate-spin-slow"
+                      : "bg-gray-200 text-gray-500 grayscale"
                   }`}
                 >
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${
-                      badge.unlocked ? "bg-green-50" : "bg-gray-200"
-                    }`}
-                  >
-                    {badge.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-xs text-gray-900 truncate">{badge.title}</h4>
-                    <p className="text-[10px] text-gray-500 truncate">{badge.desc}</p>
-                  </div>
+                  {selectedBadge.icon}
                 </div>
-              ))}
-            </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="font-extrabold text-sm text-gray-900 truncate">
+                      {selectedBadge.title}
+                    </h4>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        selectedBadge.unlocked
+                          ? "bg-green-100 text-green-800 border border-green-300"
+                          : "bg-gray-200 text-gray-600 border border-gray-300"
+                      }`}
+                    >
+                      {selectedBadge.unlocked ? "獲得済み" : "未獲得"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 line-clamp-2">{selectedBadge.desc}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBadge(null)}
+                  className="text-gray-400 hover:text-gray-700 font-bold text-lg px-2 py-1 rounded-lg hover:bg-black/5 cursor-pointer"
+                  aria-label="閉じる"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* バッジ ページネーションUI */}
             {totalBadgePages > 1 && (
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center justify-between pt-1">
                 <button
-                  onClick={() => setBadgePage((p) => Math.max(1, p - 1))}
+                  type="button"
+                  onClick={() => {
+                    setBadgeSlideDir("right");
+                    setBadgePage((p) => Math.max(1, p - 1));
+                  }}
                   disabled={currentBadgePage === 1}
                   className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                 >
@@ -148,7 +294,11 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                   {currentBadgePage} / {totalBadgePages}
                 </span>
                 <button
-                  onClick={() => setBadgePage((p) => Math.min(totalBadgePages, p + 1))}
+                  type="button"
+                  onClick={() => {
+                    setBadgeSlideDir("left");
+                    setBadgePage((p) => Math.min(totalBadgePages, p + 1));
+                  }}
                   disabled={currentBadgePage === totalBadgePages}
                   className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                 >
@@ -156,11 +306,11 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* 3. 成長の足跡・完了済みクエストログ */}
+      {/* 3. 成長の足跡・完了済みクエストログ (スライド/スワイプ対応) */}
       <div className="space-y-3">
         <h3 className="font-bold text-gray-900 text-sm">📜 クエスト達成の足跡</h3>
 
@@ -170,38 +320,55 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
             <p>Questsタブからタスクを完了して、足跡を刻みましょう！</p>
           </div>
         ) : (
-          <>
-            <div className="space-y-3">
-              {pagedFootprints.map((ct) => (
-                <div
-                  key={ct.id}
-                  className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-start space-x-3"
-                >
-                  <div className="w-8 h-8 rounded-full bg-green-100 text-[#1d5c23] font-black flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
-                    ✓
-                  </div>
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-gray-900 text-xs truncate">
-                        {ct.tasks?.title || ct.title}
-                      </h4>
-                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0 ml-2">
-                        +50 EXP
-                      </span>
+          <div className="space-y-3">
+            {/* 足跡一覧リスト (スワイプ操作エリア) */}
+            <div
+              className="touch-pan-y overflow-hidden"
+              onTouchStart={handleFootprintTouchStart}
+              onTouchMove={handleFootprintTouchMove}
+              onTouchEnd={handleFootprintTouchEnd}
+            >
+              <div
+                key={`footprint-page-${currentFootprintPage}`}
+                className={`space-y-3 ${
+                  footprintSlideDir === "left" ? "animate-slide-left" : "animate-slide-right"
+                }`}
+              >
+                {pagedFootprints.map((ct) => (
+                  <div
+                    key={ct.id}
+                    className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-start space-x-3"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-green-100 text-[#1d5c23] font-black flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                      ✓
                     </div>
-                    <p className="text-[11px] text-gray-500 line-clamp-1">
-                      {ct.tasks?.description || "無事に作業完了を報告しました。"}
-                    </p>
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-gray-900 text-xs truncate">
+                          {ct.tasks?.title || ct.title}
+                        </h4>
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                          +50 EXP
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 line-clamp-1">
+                        {ct.tasks?.description || "無事に作業完了を報告しました。"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             {/* 足跡 ページネーションUI */}
             {totalFootprintPages > 1 && (
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center justify-between pt-1">
                 <button
-                  onClick={() => setFootprintPage((p) => Math.max(1, p - 1))}
+                  type="button"
+                  onClick={() => {
+                    setFootprintSlideDir("right");
+                    setFootprintPage((p) => Math.max(1, p - 1));
+                  }}
                   disabled={currentFootprintPage === 1}
                   className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                 >
@@ -211,7 +378,11 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                   {currentFootprintPage} / {totalFootprintPages}
                 </span>
                 <button
-                  onClick={() => setFootprintPage((p) => Math.min(totalFootprintPages, p + 1))}
+                  type="button"
+                  onClick={() => {
+                    setFootprintSlideDir("left");
+                    setFootprintPage((p) => Math.min(totalFootprintPages, p + 1));
+                  }}
                   disabled={currentFootprintPage === totalFootprintPages}
                   className="px-3 py-1.5 text-xs font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                 >
@@ -219,7 +390,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

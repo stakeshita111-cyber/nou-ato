@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import StudentSkillBoardView from "../components/student/StudentSkillBoardView";
 
 describe("StudentSkillBoardView", () => {
-  it("renders correctly with published task badges and pagination for badges and footprints", () => {
+  it("renders correctly with published task badges, slow spin animations, and pagination", () => {
     const mockTasks = [
       {
         id: "t1",
@@ -41,16 +41,27 @@ describe("StudentSkillBoardView", () => {
       React.createElement(StudentSkillBoardView, { tasks: mockTasks, user: { name: "テスト生徒" } })
     );
 
-    // バッジ連動確認
-    expect(html).toContain("土作り名人");
-    expect(html).toContain("種まきビギナー");
-    expect(html).toContain("水やりマスター");
+    // バッジ連動およびaria-label/title設定の確認
+    expect(html).toContain('aria-label="土作り名人"');
+    expect(html).toContain('aria-label="種まきビギナー"');
+    expect(html).toContain('aria-label="水やりマスター"');
+
+    // バッジ記号（アイコン）の確認
+    expect(html).toContain("🚜");
+    expect(html).toContain("🌱");
+    expect(html).toContain("💧");
 
     // バッジ総数 & 獲得数表示
     expect(html).toContain("1 / 3 獲得");
 
-    // ロック/アンロック状態（アンロックは white / カラー、未達成は opacity-50 grayscale）
-    expect(html).toContain("opacity-50 grayscale");
+    // 獲得済みバッジのゆっくり回転アニメーションクラス
+    expect(html).toContain("animate-spin-slow");
+
+    // 未獲得バッジのグレーアウト状態
+    expect(html).toContain("grayscale");
+
+    // スライドアニメーションクラス
+    expect(html).toContain("animate-slide-left");
 
     // 成長の足跡確認
     expect(html).toContain("土作りタスク");
@@ -73,8 +84,9 @@ describe("StudentSkillBoardView", () => {
       React.createElement(StudentSkillBoardView, { tasks: mockTasks, user: { name: "テスト生徒" } })
     );
 
-    expect(html).toContain("芽かきマスター");
+    expect(html).toContain('aria-label="芽かきマスター"');
     expect(html).toContain("✂️");
+    expect(html).toContain("animate-spin-slow");
   });
 
   it("handles empty tasks gracefully", () => {
