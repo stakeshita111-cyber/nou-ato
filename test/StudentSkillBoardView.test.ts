@@ -56,8 +56,8 @@ describe("StudentSkillBoardView", () => {
     // バッジ総数 & 獲得数表示
     expect(html).toContain("1 / 3 獲得");
 
-    // 一覧スロットではアイコンは静止表示（initial static view does not contain animate-spin-3d-slow in list）
-    expect(html).not.toContain("animate-spin-3d-slow");
+    // 一覧スロットの獲得済みバッジアイコンは3Dコイン回転表示
+    expect(html).toContain("animate-spin-3d-slow");
 
     // 未獲得バッジのグレーアウト状態
     expect(html).toContain("grayscale");
@@ -77,22 +77,20 @@ describe("StudentSkillBoardView", () => {
     fireEvent.click(unlockedBadgeBtn);
 
     // Detail card renders badge title, status badge, and clear task name
-    expect(screen.getByText("土作り名人")).not.toBeNull();
+    expect(screen.getByText(/土作り名人/)).not.toBeNull();
     expect(screen.getByText("獲得済み")).not.toBeNull();
     expect(screen.getByText(/✅ クリアタスク:/)).not.toBeNull();
     expect(screen.getAllByText("土作りタスク").length).toBeGreaterThan(0);
 
-    // Check main 3D rotation animation class in expanded detail card
-    const detailCard = screen.getByText("土作り名人").closest("div.bg-gradient-to-r");
-    expect(detailCard).not.toBeNull();
-    expect(detailCard?.querySelector(".animate-spin-3d-slow")).not.toBeNull();
+    // Check that unlocked badge in slot grid has 3D rotation animation class
+    expect(unlockedBadgeBtn.querySelector(".animate-spin-3d-slow")).not.toBeNull();
 
     // Click on unearned badge ("種まきビギナー")
     const unearnedBadgeBtn = screen.getByRole("button", { name: "種まきビギナー" });
     fireEvent.click(unearnedBadgeBtn);
 
     // Detail card renders unearned badge title, status badge, and acquisition condition
-    expect(screen.getByText("種まきビギナー")).not.toBeNull();
+    expect(screen.getByText(/種まきビギナー/)).not.toBeNull();
     expect(screen.getByText("未獲得")).not.toBeNull();
     expect(screen.getByText(/🔒 獲得条件:/)).not.toBeNull();
     expect(screen.getByText("種まきタスク")).not.toBeNull();
@@ -119,7 +117,7 @@ describe("StudentSkillBoardView", () => {
 
     fireEvent.click(badgeBtn);
 
-    expect(screen.getByText("芽かきマスター")).not.toBeNull();
+    expect(screen.getByText(/芽かきマスター/)).not.toBeNull();
     expect(screen.getByText("獲得済み")).not.toBeNull();
     expect(screen.getAllByText("芽かき作業").length).toBeGreaterThan(0);
   });

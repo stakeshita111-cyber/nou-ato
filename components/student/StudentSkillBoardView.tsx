@@ -208,15 +208,21 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                           : "bg-gray-100/70 border-gray-200 opacity-60 grayscale hover:opacity-80"
                       } ${isSelected ? "ring-2 ring-green-500 border-green-500 bg-green-50/50" : ""}`}
                     >
-                      {/* バッジアイコン (一覧スロットでは静止表示) */}
+                      {/* バッジアイコン (獲得済みは3Dコイン回転表示) */}
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner ${
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner transition-all ${
                           badge.unlocked
-                            ? "bg-gradient-to-br from-green-50 to-emerald-100 text-green-800"
+                            ? "bg-gradient-to-br from-green-50 to-emerald-100 text-green-800 border border-green-200/80"
                             : "bg-gray-200 text-gray-500"
                         }`}
                       >
-                        {badge.icon}
+                        <span
+                          className={`inline-flex items-center justify-center transition-transform [transform-style:preserve-3d] ${
+                            badge.unlocked ? "animate-spin-3d-slow" : ""
+                          }`}
+                        >
+                          {badge.icon}
+                        </span>
                       </div>
 
                       {/* 未獲得ロックバッジマーク */}
@@ -238,26 +244,13 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
               </div>
             </div>
 
-            {/* タップ確認詳細カード (ポップオーバー) */}
+            {/* タップ確認詳細カード (文字説明のみ) */}
             {selectedBadge && (
-              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 sm:p-5 border border-green-200 shadow-md animate-fade-in relative flex items-center space-x-4 overflow-visible">
-                {/* メイン3D回転表示アイコン */}
-                <div className="p-1 shrink-0 [perspective:600px] flex items-center justify-center">
-                  <div
-                    className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl shadow-inner border transition-all animate-spin-3d-slow ${
-                      selectedBadge.unlocked
-                        ? "bg-white text-green-700 border-green-200"
-                        : "bg-gray-200 text-gray-500 grayscale border-gray-300"
-                    }`}
-                  >
-                    {selectedBadge.icon}
-                  </div>
-                </div>
-
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-4 sm:p-5 border border-green-200 shadow-md animate-fade-in relative flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                     <h4 className="font-extrabold text-base sm:text-lg text-gray-900 truncate">
-                      {selectedBadge.title}
+                      {selectedBadge.icon} {selectedBadge.title}
                     </h4>
                     <span
                       className={`text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full ${
