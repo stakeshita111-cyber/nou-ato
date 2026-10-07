@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { render, fireEvent, act, screen } from "@testing-library/react";
 import TaskSlider from "../components/student/TaskSlider";
 
 describe("TaskSlider Component", () => {
@@ -129,5 +131,163 @@ describe("TaskSlider Component", () => {
 
     expect(html).toContain("すべてのタスクを完了しました！");
     expect(html).toContain("完了済みを表示 (1)");
+  });
+
+  describe("Interactive Touch Flick & Swipe Tests", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("switches to the next task on quick left flick (<= 300ms, >= 25px offset)", () => {
+      const { container } = render(
+        <TaskSlider
+          tasks={mockTasks}
+          onSelect={vi.fn()}
+          onComplete={vi.fn()}
+        />
+      );
+
+      // Top card initially shows task 1
+      expect(screen.getByText("1 / 2")).not.toBeNull();
+      expect(screen.getByText("トマトの芽かき")).not.toBeNull();
+
+      const touchArea = container.querySelector(".touch-pan-y");
+      expect(touchArea).not.toBeNull();
+
+      // Quick flick left (30px move in 100ms)
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      fireEvent.touchStart(touchArea!, {
+        touches: [{ clientX: 200, clientY: 100 }],
+      });
+
+      fireEvent.touchMove(touchArea!, {
+        touches: [{ clientX: 170, clientY: 100 }],
+      });
+
+      vi.setSystemTime(now + 100);
+
+      fireEvent.touchEnd(touchArea!);
+
+      // Advance timers by 350ms animation duration
+      act(() => {
+        vi.advanceTimersByTime(350);
+      });
+
+      // Now top task should be task 2 ("ナスへの水やり")
+      expect(screen.getByText("2 / 2")).not.toBeNull();
+      expect(screen.getByText("ナスへの水やり")).not.toBeNull();
+    });
+
+    it("switches to the next task on normal left swipe (>= 35px offset)", () => {
+      const { container } = render(
+        <TaskSlider
+          tasks={mockTasks}
+          onSelect={vi.fn()}
+          onComplete={vi.fn()}
+        />
+      );
+
+      const touchArea = container.querySelector(".touch-pan-y");
+
+      // Slow swipe left (40px move in 500ms)
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      fireEvent.touchStart(touchArea!, {
+        touches: [{ clientX: 200, clientY: 100 }],
+      });
+
+      fireEvent.touchMove(touchArea!, {
+        touches: [{ clientX: 160, clientY: 100 }],
+      });
+
+      vi.setSystemTime(now + 500);
+
+      fireEvent.touchEnd(touchArea!);
+
+      act(() => {
+        vi.advanceTimersByTime(350);
+      });
+
+      expect(screen.getByText("2 / 2")).not.toBeNull();
+      expect(screen.getByText("ナスへの水やり")).not.toBeNull();
+    });
+
+    it("switches to the previous task on quick right flick (looping to last active task)", () => {
+      const { container } = render(
+        <TaskSlider
+          tasks={mockTasks}
+          onSelect={vi.fn()}
+          onComplete={vi.fn()}
+        />
+      );
+
+      const touchArea = container.querySelector(".touch-pan-y");
+
+      // Quick flick right (30px move in 100ms) from task 1 -> loops to task 2
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      fireEvent.touchStart(touchArea!, {
+        touches: [{ clientX: 100, clientY: 100 }],
+      });
+
+      fireEvent.touchMove(touchArea!, {
+        touches: [{ clientX: 130, clientY: 100 }],
+      });
+
+      vi.setSystemTime(now + 100);
+
+      fireEvent.touchEnd(touchArea!);
+
+      act(() => {
+        vi.advanceTimersByTime(350);
+      });
+
+      expect(screen.getByText("2 / 2")).not.toBeNull();
+      expect(screen.getByText("ナスへの水やり")).not.toBeNull();
+    });
+
+    it("does not switch task if touch drag distance is below thresholds", () => {
+      const { container } = render(
+        <TaskSlider
+          tasks={mockTasks}
+          onSelect={vi.fn()}
+          onComplete={vi.fn()}
+        />
+      );
+
+      const touchArea = container.querySelector(".touch-pan-y");
+
+      // Slow small swipe (10px move in 500ms)
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      fireEvent.touchStart(touchArea!, {
+        touches: [{ clientX: 200, clientY: 100 }],
+      });
+
+      fireEvent.touchMove(touchArea!, {
+        touches: [{ clientX: 190, clientY: 100 }],
+      });
+
+      vi.setSystemTime(now + 500);
+
+      fireEvent.touchEnd(touchArea!);
+
+      act(() => {
+        vi.advanceTimersByTime(350);
+      });
+
+      // Task remains as task 1
+      expect(screen.getByText("1 / 2")).not.toBeNull();
+      expect(screen.getByText("トマトの芽かき")).not.toBeNull();
+    });
   });
 });

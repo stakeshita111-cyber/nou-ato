@@ -17,6 +17,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   // フリック（スワイプ）およびカードスタックアニメーション用ステート
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
@@ -79,13 +80,12 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
     }, 350);
   };
 
-  const SWIPE_THRESHOLD = 50;
-
   const handleTouchStart = (e: React.TouchEvent) => {
     if (activeTasks.length <= 1 || isAnimating) return;
     const touch = e.touches[0];
     setTouchStartX(touch.clientX);
     setTouchStartY(touch.clientY);
+    setTouchStartTime(Date.now());
     setIsDragging(true);
   };
 
@@ -106,10 +106,18 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
     setTouchStartX(null);
     setTouchStartY(null);
 
-    if (dragOffset < -SWIPE_THRESHOLD) {
-      triggerNext("left");
-    } else if (dragOffset > SWIPE_THRESHOLD) {
-      triggerPrev("right");
+    const touchDuration = touchStartTime ? Date.now() - touchStartTime : 9999;
+    setTouchStartTime(null);
+
+    const isQuickFlick = touchDuration <= 300 && Math.abs(dragOffset) >= 25;
+    const isNormalSwipe = Math.abs(dragOffset) >= 35;
+
+    if (isQuickFlick || isNormalSwipe) {
+      if (dragOffset < 0) {
+        triggerNext("left");
+      } else {
+        triggerPrev("right");
+      }
     } else {
       setDragOffset(0);
     }
@@ -289,6 +297,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 {/* 3枚目カード（最背面） */}
                 {card3Task && (
                   <div
+                    key={card3Task.id || card3Index}
                     style={{
                       ...getCard3Style(),
                       transformOrigin: "top center",
@@ -318,6 +327,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 {/* 2枚目カード（中間） */}
                 {card2Task && (
                   <div
+                    key={card2Task.id || card2Index}
                     style={{
                       ...getCard2Style(),
                       transformOrigin: "top center",
@@ -347,6 +357,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 {/* 最前面カード */}
                 {topTask && (
                   <div
+                    key={topTask.id || validIndex}
                     style={{
                       ...getTopCardStyle(),
                       transformOrigin: "bottom center",
