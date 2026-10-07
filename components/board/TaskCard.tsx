@@ -108,56 +108,21 @@ export default function TaskCard({ task, onDelete, onEdit, onDuplicate }: TaskCa
       </div>
 
       {/* 中央：タイトル ＆ 概要説明 */}
-      <h3 className="font-extrabold text-sm text-gray-900 leading-snug mb-1">
+      <h3 className="font-extrabold text-sm text-gray-900 leading-snug">
         {task.title}
       </h3>
       
       {task.description && (
-        <p className="text-xs text-gray-500 font-semibold leading-relaxed line-clamp-2 mb-3">
+        <p className="text-xs text-gray-500 font-semibold leading-relaxed line-clamp-2 mt-1.5">
           {task.description}
         </p>
       )}
 
-      {/* 下部：バッジ */}
-      <div className="mt-3 pt-2 flex items-center justify-between gap-1 flex-wrap text-[11px] font-bold">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {task.target_crop && (
-            <span className="px-2 py-0.5 bg-green-50 text-green-800 rounded-md border border-green-200/60">
-              {task.target_crop}
-            </span>
-          )}
-          {task.status === "todo" ? (
-            <span className="flex items-center gap-1 text-red-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-              公開中
-            </span>
-          ) : task.status === "prep" ? (
-            <>
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100">
-                事前学習
-              </span>
-              <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-md">
-                公開準備完了
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md">
-                解説資料
-              </span>
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md">
-                下書き
-              </span>
-            </>
-          )}
-        </div>
-
-        {task.status === "todo" ? (
-          <span className="text-gray-400 font-medium">受講生配信中</span>
-        ) : task.estimated_time ? (
-          <span className="text-gray-400 font-medium">目安: {task.estimated_time}</span>
-        ) : null}
-      </div>
+      {task.estimated_time && (
+        <p className="text-[11px] text-gray-400 font-medium mt-2">
+          目安: {task.estimated_time}
+        </p>
+      )}
     </div>
   );
 }
