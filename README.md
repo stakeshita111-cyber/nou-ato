@@ -4,6 +4,35 @@
 
 「**NOU-ATO（のうあと）**」は、体験農園の運営者（講師）と受講生（生徒）をつなぎ、初心者でも迷わず野菜づくりを楽しみながら学べる体験農業経営支援Webアプリケーションです。
 
+> [!TIP]
+> 🚀 **本番デプロイURL**: [https://nou-ato.vercel.app](https://nou-ato.vercel.app)  
+> 🔑 **ログインURL**: [https://nou-ato.vercel.app/login](https://nou-ato.vercel.app/login)（ログイン画面上に**ワンクリック自動入力ボタン**を完備）
+
+---
+
+## 🚀 デプロイURL & 動作確認用デモアカウント
+
+本アプリケーションは Vercel Edge Network 上に常時デプロイされており、PCおよびスマートフォンのブラウザから即座に動作確認いただけます。
+
+- **本番デプロイURL**: [https://nou-ato.vercel.app](https://nou-ato.vercel.app)
+- **ログインURL**: [https://nou-ato.vercel.app/login](https://nou-ato.vercel.app/login)
+- **API ドキュメント (Swagger UI)**: [`docs/api-docs.html`](docs/api-docs.html)
+
+### 🔑 動作確認用デモアカウント情報
+
+ログイン画面（[/login](https://nou-ato.vercel.app/login)）の「⚡ ポートフォリオ確認用デモ」枠にあるボタンを押すと、**メールアドレスとパスワードがワンタップで自動入力**されます。手動で入力される場合は以下をご利用ください。
+
+| ロール | メールアドレス | パスワード | 初期リダイレクト | 主な体験可能機能 |
+| :--- | :--- | :--- | :--- | :--- |
+| **👨‍🌾 講師** | `test01@example.com` | `test01` | `/teacher/dashboard` | ・受講生一覧・ステップ進捗率の把握<br>・農地キャンバス（D&D畝配置・スリム畝カード）<br>・一括アナウンス即時配信<br>・日誌返信 & AIナレッジ化（RAG）承認<br>・農園設定（相談タブON/OFF切り替え） |
+| **👨‍🎓 受講生** | `test11@example.com` | `test11` | `/student` | ・マイファーム（ミニトマト栽培・進捗75%）<br>・マイタスク（立体カードスタック & 無限循環ループ）<br>・成長スキルボード（スロット内3Dコイン回転バッジ）<br>・AIしるべぇ相談（チケット制・Yes/No共有トグル）<br>・24時間お天気予報・農園交換日記 |
+
+```text
+【クイックコピペ用】
+・講師:   test01@example.com / test01
+・受講生: test11@example.com / test11
+```
+
 ---
 
 ## 🌾 プロジェクト概要・特徴
@@ -18,22 +47,6 @@
   - **受講生・区画マネジメント**: 受講生ごとの進捗率、割り当て畝、未読日誌を一元把握。
   - **一括アナウンス配信**: 天候不良や収穫イベントの連絡を受講生全員へ即時配信。
   - **農地キャンバス（畝・区画管理）**: ドラッグ＆ドロップ（@dnd-kit）で畝の栽培状況をグラフィカルに管理。畝ナンバーと作物名に集約したスリムな畝カード設計。
-
----
-
-## 🌐 デモ環境 & アクセス情報
-
-| 環境 | URL | 備考 |
-| :--- | :--- | :--- |
-| **本番デモ環境** | [https://nou-ato.vercel.app](https://nou-ato.vercel.app) | Vercel Edge Network 稼働中 |
-| **ローカル開発環境** | [http://localhost:3000](http://localhost:3000) | `npm run dev` で起動 |
-| **API 仕様 (Swagger UI)** | [`docs/api-docs.html`](docs/api-docs.html) | ブラウザから直接各APIを検証可能 |
-
-### 動作確認用デモアカウント (ログインURL: [/login](https://nou-ato.vercel.app/login))
-| ロール | メールアドレス | パスワード | 確認可能機能・用途 |
-| :--- | :--- | :--- | :--- |
-| **👨‍🌾 講師** | `test01@example.com` | `test01` | 受講生一覧・進捗率、農地キャンバス(D&D)、一括アナウンス配信、日誌返信・ナレッジ承認 |
-| **👨‍🎓 受講生** | `test11@example.com` | `test11` | ミニトマト栽培中(進捗75%)。カードスタックタスク報告、3D回転バッジ、AIしるべぇチャット相談(Yes/No共有)、交換日記 |
 
 ---
 
