@@ -32,10 +32,10 @@ export async function GET(request: Request) {
         const lineName = meta.full_name || meta.name || meta.preferred_username || meta.nickname || user.email?.split('@')[0] || "受講生";
 
         try {
-          // 1. users テーブルの既存レコードを検索
+          // 1. users テーブルの既存レコードを検索してロールを確認
           const { data: existingUser } = await supabase
             .from("users")
-            .select("*")
+            .select("role, display_name, farm_id")
             .eq("id", user.id)
             .single();
 
@@ -44,28 +44,26 @@ export async function GET(request: Request) {
             targetNext = "/teacher/dashboard";
           }
 
-          // farm_id が指定されている場合は優先して紐づけ（空や既存のままで上書きされることを防止）
-          const targetFarmId = (farmIdParam && farmIdParam !== 'tanaka_farm')
-            ? farmIdParam
-            : (existingUser?.farm_id || farmIdParam || "tanaka_farm");
-
-          // 2. users テーブルに最新の表示名・ロール・農園IDを upsert 保存
-          const { error: upsertErr } = await supabase.from("users").upsert([
-            {
-              id: user.id,
-              email: user.email || `${user.id}@line.user`,
-              display_name: lineName || existingUser?.display_name || "受講生",
-              role: userRole,
-              farm_id: targetFarmId,
-            },
-          ], { onConflict: "id" });
-
-          if (upsertErr) {
-            console.error("users table upsert error:", upsertErr);
+          // 2. 表示名の安全な更新
+          if (lineName && lineName !== existingUser?.display_name) {
+            await supabase
+              .from("users")
+              .update({ display_name: lineName })
+              .eq("id", user.id);
           }
 
-        } catch (upsertErr) {
-          console.error("Failed to auto-upsert LINE user into users table:", upsertErr);
+          // 3. 農園紐づけ (join_farm RPC を使用して安全に更新)
+          if (userRole !== "teacher" && farmIdParam && farmIdParam !== "tanaka_farm") {
+            const { error: joinErr } = await supabase.rpc("join_farm", {
+              invite_code: farmIdParam,
+            });
+            if (joinErr) {
+              console.error("join_farm error in OAuth callback:", joinErr);
+            }
+          }
+
+        } catch (callbackErr) {
+          console.error("Failed to process LINE user setup in callback:", callbackErr);
         }
       }
 

@@ -10,7 +10,7 @@ import { useThemeStore } from "@/store/useThemeStore";
 import StudentTalkView from "@/components/student/StudentTalkView";
 import StudentSkillBoardView from "@/components/student/StudentSkillBoardView";
 import StudentFarmRecordView from "@/components/student/StudentFarmRecordView";
-import TaskDetailModel from "@/components/student/TaskDetailModel";
+import TaskDetailModal from "@/components/student/TaskDetailModal";
 import Toast from "@/components/ui/Toast";
 import WeatherWidget from "@/components/ui/WeatherWidget";
 import EventCalendar from "@/components/ui/EventCalendar";
@@ -580,7 +580,7 @@ export default function StudentPage() {
 
       {/* タスク詳細・予習・報告モーダル */}
       {selectedTask && (
-        <TaskDetailModel
+        <TaskDetailModal
           task={selectedTask}
           studentId={user?.id}
           studentName={userAccountName}

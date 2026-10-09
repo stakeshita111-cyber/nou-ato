@@ -4,11 +4,11 @@
 -- 目的: 
 --  1. 生徒退会・削除時の畝自動解放 & 孤立タスク自動消去（論理削除/物理削除両対応トリガー）
 --  2. Supabase Auth ↔ public.users の 100% 確実な自動同期トリガー
---  3. farm_beds と users のリアルタイム結合ビュー（型キャスト対応）
+--  3. farm_beds と users のリアルタイム結合ビュー（UUID直接結合）
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
--- 1. 孤立データの安全な事前クリーンアップ（text = uuid 型キャスト対応）
+-- 1. 孤立データの安全な事前クリーンアップ
 -- ------------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -17,23 +17,22 @@ BEGIN
     SET student_id = NULL,
         student_name = NULL
     WHERE student_id IS NOT NULL 
-      AND student_id::text NOT IN (SELECT id::text FROM public.users);
+      AND student_id NOT IN (SELECT id FROM public.users);
 
     -- 実在しない生徒IDの孤立タスクを削除
     DELETE FROM public.student_tasks
     WHERE student_id IS NOT NULL 
-      AND student_id::text NOT IN (SELECT id::text FROM public.users);
+      AND student_id NOT IN (SELECT id FROM public.users);
 
     -- 実在しない生徒IDの日誌を NULL 化
     UPDATE public.journals
     SET student_id = NULL
     WHERE student_id IS NOT NULL 
-      AND student_id::text NOT IN (SELECT id::text FROM public.users);
+      AND student_id NOT IN (SELECT id FROM public.users);
 END $$;
 
 -- ------------------------------------------------------------------------------
 -- 2. 生徒退会（論理削除）および削除（物理削除）時の自動連動トリガー
---    ※ 既存テーブルの型（text/uuid）に左右されず 100% 確実に連動クリーンナップ
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_user_deletion_or_deactivation()
 RETURNS trigger
@@ -48,16 +47,16 @@ BEGIN
         UPDATE public.farm_beds
         SET student_id = NULL,
             student_name = NULL
-        WHERE student_id::text = OLD.id::text;
+        WHERE student_id = OLD.id;
 
         -- ② 生徒タスクの自動消去 (CASCADE)
         DELETE FROM public.student_tasks
-        WHERE student_id::text = OLD.id::text;
+        WHERE student_id = OLD.id;
 
         -- ③ 日誌の生徒ID安全クリア
         UPDATE public.journals
         SET student_id = NULL
-        WHERE student_id::text = OLD.id::text;
+        WHERE student_id = OLD.id;
     END IF;
 
     IF (TG_OP = 'DELETE') THEN
@@ -85,14 +84,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    default_role text;
     user_name text;
-    invited_farm_id uuid;
 BEGIN
-    -- メタデータからロールを抽出（デフォルトは 'student'）
-    default_role := COALESCE(new.raw_user_meta_data->>'role', 'student');
-    
-    -- メタデータから表示名を抽出（full_name, name, または email プレフィックス）
+    -- メタデータから表示名を抽出（full_name, name, display_name または email プレフィックス）
     user_name := COALESCE(
         new.raw_user_meta_data->>'full_name',
         new.raw_user_meta_data->>'name',
@@ -100,14 +94,8 @@ BEGIN
         split_part(new.email, '@', 1)
     );
 
-    -- 招待メタデータに農園IDがあれば抽出
-    IF (new.raw_user_meta_data->>'farm_id') IS NOT NULL AND (new.raw_user_meta_data->>'farm_id') ~ '^[0-9a-fA-F-]{36}$' THEN
-        invited_farm_id := (new.raw_user_meta_data->>'farm_id')::uuid;
-    ELSE
-        invited_farm_id := NULL;
-    END IF;
-
     -- public.users テーブルへ UPSERT
+    -- セキュリティ強化: メタデータの role や farm_id は一切信用せず、常に role = 'student', farm_id = NULL
     INSERT INTO public.users (
         id,
         email,
@@ -121,8 +109,8 @@ BEGIN
         new.id,
         new.email,
         user_name,
-        default_role,
-        invited_farm_id,
+        'student',
+        NULL,
         NOW(),
         NOW()
     )
@@ -130,7 +118,6 @@ BEGIN
     SET
         email = EXCLUDED.email,
         display_name = COALESCE(public.users.display_name, EXCLUDED.display_name),
-        farm_id = COALESCE(public.users.farm_id, EXCLUDED.farm_id),
         updated_at = NOW();
 
     RETURN NEW;
@@ -170,7 +157,7 @@ SELECT
     b.completion_image_url
 FROM public.farm_beds b
 LEFT JOIN public.users u 
-    ON b.student_id::text = u.id::text 
+    ON b.student_id = u.id
    AND u.deleted_at IS NULL;
 
 -- ------------------------------------------------------------------------------

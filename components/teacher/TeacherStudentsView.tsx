@@ -281,57 +281,29 @@ export default function TeacherStudentsView() {
           const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
 
           baseTasks.forEach((taskObj) => {
-            const taskTitle = String(taskObj.title || "");
-            const cTitle = cleanStr(taskTitle);
+            const taskId = String(taskObj.id || "");
 
-            // ① Supabase DB (student_tasks) の status === "completed" を照合
+            // ① Supabase DB (student_tasks) の status === "completed" を ID で厳密照合
             const isStDone = userStRows.some((st: Record<string, unknown>) => {
               if (st.status !== "completed") return false;
-              const stTasks = st.tasks as { title?: string } | undefined;
-              const stClean = cleanStr(String(st.title || stTasks?.title || ""));
-              return st.task_id === taskObj.id || st.base_task_id === taskObj.id || (cTitle && stClean && (cTitle === stClean || cTitle.includes(stClean) || stClean.includes(cTitle)));
+              const baseId = String(st.base_task_id || st.task_id || st.id || "");
+              return baseId === taskId;
             });
 
-            // ② 日誌 (journals) からの完了報告を照合
-            const isJournalDone = Array.from(userJournalTitles).some((jt) => {
-              const jClean = cleanStr(jt);
-              return cTitle && jClean && (cTitle === jClean || cTitle.includes(jClean) || jClean.includes(cTitle));
-            });
-
-            if (isStDone || isJournalDone) {
+            if (isStDone) {
               completedTasks++;
             } else if (!uncompletedTaskObj) {
               uncompletedTaskObj = taskObj;
             }
           });
 
-          // 生徒個別追加タスク（baseTasks にないもの）で完了しているものも合流
+          // 生徒個別追加タスク (base_task_id なしで student_tasks に直接登録されたもの) で完了しているものも加算
           userStRows.forEach((st: Record<string, unknown>) => {
-            if (st.status === "completed") {
-              const stTitle = cleanStr(String(st.title || ""));
-              const alreadyCounted = baseTasks.some((bt) => {
-                const btTitle = cleanStr(String(bt.title || ""));
-                return bt.id === st.task_id || bt.id === st.base_task_id || (stTitle && btTitle && (stTitle === btTitle || stTitle.includes(btTitle) || btTitle.includes(stTitle)));
-              });
+            if (st.status === "completed" && !st.base_task_id) {
+              const alreadyCounted = baseTasks.some((bt) => String(bt.id) === String(st.id));
               if (!alreadyCounted) {
                 completedTasks++;
               }
-            }
-          });
-
-          // 日誌で完了報告されたが baseTasks や student_tasks に未登録の個別タスクも加算
-          userJournalTitles.forEach((jt) => {
-            const jClean = cleanStr(jt);
-            const inBase = baseTasks.some((bt) => {
-              const bClean = cleanStr(String(bt.title || ""));
-              return bClean && jClean && (bClean === jClean || bClean.includes(jClean) || jClean.includes(bClean));
-            });
-            const inSt = userStRows.some((st: Record<string, unknown>) => {
-              const stClean = cleanStr(String(st.title || ""));
-              return st.status === "completed" && stClean && jClean && (stClean === jClean || stClean.includes(jClean) || jClean.includes(stClean));
-            });
-            if (!inBase && !inSt) {
-              completedTasks++;
             }
           });
 
@@ -762,24 +734,29 @@ export default function TeacherStudentsView() {
       }
 
       if (deleteMode === "purge") {
-        // 完全消去モード: 関連データも DELETE
-        try {
-          await supabase.from("student_tasks").delete().eq("student_id", studentId);
-          await supabase.from("journals").delete().eq("student_id", studentId);
-          // users テーブルからも削除
-          await supabase.from("users").delete().eq("id", studentId);
-        } catch {}
+        // 完全消去モード: CASCADE制約/トリガーに任せて users テーブルから単一DELETE実行
+        const { error: delErr } = await supabase.from("users").delete().eq("id", studentId);
+        if (delErr) {
+          console.error("Purge user error:", delErr);
+          setToastMessage(`❌ 生徒の完全削除に失敗しました: ${delErr.message}`);
+          setShowToast(true);
+          return;
+        }
       } else {
         // アクセス遮断（推奨）モード: farm_id 解除 & deleted_at 記録
-        try {
-          await supabase
-            .from("users")
-            .update({
-              farm_id: null,
-              deleted_at: new Date().toISOString(),
-            })
-            .eq("id", studentId);
-        } catch {}
+        const { error: updateErr } = await supabase
+          .from("users")
+          .update({
+            farm_id: null,
+            deleted_at: new Date().toISOString(),
+          })
+          .eq("id", studentId);
+        if (updateErr) {
+          console.error("Deactivate user error:", updateErr);
+          setToastMessage(`❌ 退会処理に失敗しました: ${updateErr.message}`);
+          setShowToast(true);
+          return;
+        }
       }
 
       // 画面とキャッシュの更新
