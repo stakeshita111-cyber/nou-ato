@@ -136,7 +136,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const publishTaskToStudents = async (taskId: string, targetFarmId?: string | null) => {
     try {
       // 1. Supabase Postgres RPC 関数を呼び出し
-      const { error: rpcErr } = await supabase.rpc('publish_task_to_all_students', {
+      const { error: rpcErr } = await (supabase.rpc as any)('publish_task_to_all_students', {
         p_task_id: taskId,
       });
       if (rpcErr) {
@@ -256,12 +256,21 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       if (data) {
-        const cl = data.checklist && typeof data.checklist === 'object' ? data.checklist : {};
-        const createdTask: Task = {
+        const cl =
+          data.checklist && typeof data.checklist === 'object' && !Array.isArray(data.checklist)
+            ? (data.checklist as Record<string, any>)
+            : {};
+        const createdTask = {
           ...data,
-          badge_name: data.badge_name || cl.badge_name || options?.badge_name || null,
-          badge_icon: data.badge_icon || cl.badge_icon || options?.badge_icon || null,
-        };
+          category: data.category || '育苗・播種',
+          badge_name: (data.badge_name || cl.badge_name || options?.badge_name || null) as
+            | string
+            | null,
+          badge_icon: (data.badge_icon || cl.badge_icon || options?.badge_icon || null) as
+            | string
+            | null,
+          created_by: data.created_by ?? undefined,
+        } as unknown as Task;
         setTasks((prev) => [createdTask, ...prev]);
 
         // status === "todo" (公開中) で追加された場合は受講生へ一括配備

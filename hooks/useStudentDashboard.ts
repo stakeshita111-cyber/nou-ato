@@ -21,7 +21,7 @@ export interface StudentTaskItem {
 export interface StudentUserItem {
   id: string;
   name?: string;
-  email?: string;
+  email?: string | null;
   farm_id?: string | null;
   [key: string]: unknown;
 }
@@ -84,6 +84,7 @@ export function useStudentDashboard() {
             studentUserObj = {
               ...userData,
               name: userData.display_name || displayName,
+              email: userData.email ?? undefined,
             };
             setUser(studentUserObj);
             // 🌟 退会済み（deleted_at あり）または農園未所属の場合を検知 🌟

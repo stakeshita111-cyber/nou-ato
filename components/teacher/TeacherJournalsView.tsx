@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
 import Toast from '@/components/ui/Toast';
@@ -191,7 +192,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           .eq('farm_id', farmId)
           .eq('role', 'student');
         if (farmStudents) {
-          myStudentIds = farmStudents.map((s: any) => s.id);
+          myStudentIds = farmStudents.map((s) => s.id);
         }
       }
 
@@ -223,7 +224,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       }
 
       const studentIds = Array.from(
-        new Set(journalData.map((j: any) => j.student_id).filter(Boolean))
+        new Set(journalData.map((j) => j.student_id).filter((id): id is string => Boolean(id)))
       );
       const userMap: { [key: string]: string } = {};
 
@@ -234,7 +235,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           .in('id', studentIds);
 
         if (usersData) {
-          usersData.forEach((u: any) => {
+          usersData.forEach((u) => {
             if (u.id) {
               userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
             }
@@ -243,7 +244,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       }
 
       // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
-      const filteredData = journalData.filter((j: any) => {
+      const filteredData = journalData.filter((j) => {
         const content = (j.content || '').trim();
         if (!content) return false;
         if (
@@ -257,8 +258,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         return true;
       });
 
-      const formatted: JournalItem[] = filteredData.map((j: any) => {
-        const name = userMap[j.student_id] || '受講生徒';
+      const formatted: JournalItem[] = filteredData.map((j) => {
+        const name = (j.student_id ? userMap[j.student_id] : undefined) || '受講生徒';
         let cleanContent = j.content || '';
         let imgUrl = j.image_url || undefined;
         const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
@@ -276,7 +277,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
         return {
           id: j.id,
-          student_id: j.student_id,
+          student_id: j.student_id || '',
           studentName: name,
           studentAvatar: name.slice(0, 2).toUpperCase(),
           created_at: j.created_at
@@ -506,8 +507,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         setEditingReplyId(null);
         setToastMessage('💡 個人情報を確認・一般化し、農園FAQナレッジとして承認登録しました！✨');
       }
-    } catch (e: any) {
-      setToastMessage('エラーが発生しました: ' + e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setToastMessage('エラーが発生しました: ' + msg);
     } finally {
       setIsSavingKnowledge(false);
       setShowToast(true);
@@ -562,8 +564,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         setJournals(nextList);
         setToastMessage('🗑️ 日記データを削除しました');
       }
-    } catch (err: any) {
-      setToastMessage('削除エラー: ' + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setToastMessage('削除エラー: ' + msg);
     }
     setShowToast(true);
   };
@@ -687,7 +690,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           .eq('farm_id', farmId)
           .eq('role', 'student');
         if (farmStudents) {
-          myStudentIds = farmStudents.map((s: any) => s.id);
+          myStudentIds = farmStudents.map((s) => s.id);
         }
       }
 
@@ -727,7 +730,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         };
       } = {};
       if (bedsData) {
-        bedsData.forEach((b: any) => {
+        bedsData.forEach((b) => {
           if (b.id) {
             bedMap[b.id] = {
               student_name: b.student_name,
@@ -743,30 +746,37 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         .from('farm_plots')
         .select('id, code, student_id, farm_id');
 
-      const plotMap: { [id: string]: any } = {};
+      const plotMap: {
+        [id: string]: {
+          id: string;
+          code: string;
+          student_id?: string | null;
+          farm_id?: string | null;
+        };
+      } = {};
       const studentPlotMap: { [studentId: string]: { plotCode: string; farmId?: string } } = {};
 
       if (plotsData) {
-        plotsData.forEach((p: any) => {
+        plotsData.forEach((p) => {
           if (p.id) plotMap[p.id] = p;
           if (p.student_id && p.code) {
             studentPlotMap[p.student_id] = {
               plotCode: p.code,
-              farmId: p.farm_id,
+              farmId: (p.farm_id as string) || undefined,
             };
           }
         });
       }
 
       if (bedsData) {
-        bedsData.forEach((b: any) => {
+        bedsData.forEach((b) => {
           if (b.student_id && b.plot_id && !studentPlotMap[b.student_id]) {
             const plotInfo = plotMap[b.plot_id];
             const code = plotInfo?.code || b.plot_id.replace(/^plot_cell_/, '');
             if (code) {
               studentPlotMap[b.student_id] = {
                 plotCode: code,
-                farmId: plotInfo?.farm_id,
+                farmId: plotInfo?.farm_id ?? undefined,
               };
             }
           }
@@ -781,7 +791,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       const userMap: { [key: string]: string } = {};
       const otherFarmStudentIds = new Set<string>();
       if (usersData) {
-        usersData.forEach((u: any) => {
+        usersData.forEach((u) => {
           if (u.id) {
             userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
             if (farmId && u.farm_id && u.farm_id !== farmId && u.role === 'student') {
@@ -793,8 +803,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       const allRecords: SlideItemRecord[] = [];
 
+      type SlideCropRecord = Database['public']['Tables']['crop_records']['Row'] & {
+        student_id?: string | null;
+        date?: string;
+        student_name?: string;
+        plot_code?: string;
+        farm_id?: string;
+        photo_url?: string;
+      };
+
       if (recData && recData.length > 0) {
-        recData.forEach((r: any, idx: number) => {
+        (recData as SlideCropRecord[]).forEach((r, idx: number) => {
           const rawDate = r.created_at || r.date;
           const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
           const bedInfo = r.bed_id ? bedMap[r.bed_id] : null;
@@ -856,7 +875,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       if (jData && jData.length > 0) {
         jData
-          .filter((j: any) => {
+          .filter((j) => {
             const c = (j.content || '').trim();
             return (
               c &&
@@ -866,12 +885,18 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               c !== '（コメントなし）'
             );
           })
-          .forEach((j: any, idx: number) => {
+          .forEach((j, idx: number) => {
             // 🌟 自農園に所属する生徒の記録のみに厳密制限 🌟
             if (farmId) {
-              const isMyStudent = j.student_id && myStudentIds.includes(j.student_id);
+              const isMyStudent = Boolean(j.student_id && myStudentIds.includes(j.student_id));
               const isMyFarm = j.farm_id === farmId;
-              if (!isMyStudent && !isMyFarm && otherFarmStudentIds.has(j.student_id)) return;
+              if (
+                !isMyStudent &&
+                !isMyFarm &&
+                j.student_id &&
+                otherFarmStudentIds.has(j.student_id as string)
+              )
+                return;
             }
 
             const rawDate = j.created_at;
@@ -968,7 +993,12 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       // 2行（縦2段の列ペア）に整理
       const cols: SlideItemRecord[][] = [];
       for (let i = 0; i < filteredByStudentRecords.length; i += 2) {
-        cols.push([filteredByStudentRecords[i], filteredByStudentRecords[i + 1]].filter(Boolean));
+        const pair = [filteredByStudentRecords[i], filteredByStudentRecords[i + 1]].filter(
+          (item): item is SlideItemRecord => Boolean(item)
+        );
+        if (pair.length > 0) {
+          cols.push(pair);
+        }
       }
 
       // ループのスムーズさ確保のため、少数の場合は必要十分な長さに複製
@@ -977,7 +1007,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         filledCols = [...filledCols, ...cols];
       }
 
-      setSlideColumns(filledCols as any);
+      setSlideColumns(filledCols);
     } catch (err) {
       console.error('fetchCropRecords error:', err);
       setSlideColumns([]);
