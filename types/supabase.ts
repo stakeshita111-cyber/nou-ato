@@ -52,6 +52,7 @@ export interface Database {
           updated_at: string | null
           deleted_at: string | null
           owner_id: string | null
+          show_student_talk_tab: boolean | null
         }
         Insert: {
           id?: string
@@ -60,6 +61,7 @@ export interface Database {
           updated_at?: string | null
           deleted_at?: string | null
           owner_id?: string | null
+          show_student_talk_tab?: boolean | null
         }
         Update: {
           id?: string
@@ -68,6 +70,7 @@ export interface Database {
           updated_at?: string | null
           deleted_at?: string | null
           owner_id?: string | null
+          show_student_talk_tab?: boolean | null
         }
       }
       farm_plots: {

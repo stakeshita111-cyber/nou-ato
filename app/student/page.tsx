@@ -167,11 +167,17 @@ export default function StudentPage() {
     // サーバーAPIからも最新状態を取得
     const fetchServerSettings = async () => {
       try {
-        const res = await fetch("/api/settings");
+        const studentFarmId = user?.farm_id || (typeof window !== "undefined" ? localStorage.getItem("nouato_invite_farm_id") : null);
+        const url = studentFarmId ? `/api/settings?farm_id=${encodeURIComponent(String(studentFarmId))}` : "/api/settings";
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (data.showStudentTalkTab !== undefined) {
-            setTalkTabEnabled(data.showStudentTalkTab !== false);
+            const isEnabled = data.showStudentTalkTab !== false;
+            setTalkTabEnabled(isEnabled);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("nouato_show_student_talk_tab", String(isEnabled));
+            }
           }
         }
       } catch {
@@ -247,7 +253,7 @@ export default function StudentPage() {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("message", handleWindowMessage);
     };
-  }, []);
+  }, [user?.farm_id]);
 
   // 相談タブがOFFに設定されたら、畑タブに自動で戻す
   useEffect(() => {
