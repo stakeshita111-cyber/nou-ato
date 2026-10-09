@@ -58,10 +58,25 @@
 | **スタイリング** | Tailwind CSS v4, Lucide Icons |
 | **状態管理・D&D** | Zustand, @dnd-kit (Core, Sortable, Modifiers) |
 | **バックエンド / DB** | Supabase (PostgreSQL, Supabase Auth, SSR, Storage, RLS) |
-| **AI / RAG** | Google AI Studio (Gemini 1.5 Flash-Lite), 農園ナレッジ類似度照合エンジン |
+| **AI / RAG** | Google AI Studio (Gemini 1.5 Flash-Lite / `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
 | **API アーキテクチャ** | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI |
 | **CI / CD** | GitHub Actions (Lint, Typecheck, Test, Coverage, Build) |
 | **テストフレームワーク** | Vitest, @vitest/coverage-v8 (閾値 70% 準拠) |
+
+---
+
+## 🌐 外部連携API / サービス一覧
+
+本アプリケーションでは、リアルタイム気象データ、位置情報変換、AI対話、SNS認証等の機能提供のため、以下の外部APIおよびクラウドサービスを利用しています。
+
+| サービス名 | 用途 | 呼び出し箇所 | APIキー要否 | 利用規約 / レート制限 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Google AI Studio (Gemini API)** | AIアシスタント「しるべぇ」のRAG栽培相談・自動回答生成 | `lib/rag/qaKnowledgeRetriever.ts`<br>`app/api/chat/rag/route.ts` | **要** (`GEMINI_API_KEY`) | 15 RPM / 1,500 RPD (Free Tier)<br>※環境変数 `GEMINI_MODEL` (既定: `gemini-flash-lite-latest`) および自動カスケードに対応 |
+| **Open-Meteo Forecast API** | ピンポイント農園天気・24時間予報・降水確率・気温・風速・UV予測データの取得 | `components/ui/WeatherWidget.tsx` | **不要** | 10,000 リクエスト/日 (非商用・開発利用無料) |
+| **Open-Meteo Geocoding API** | 地名・市区町村キーワード検索による経度・緯度特定 | `components/ui/WeatherWidget.tsx` | **不要** | Open-Meteo API Terms 準拠 |
+| **OpenStreetMap Nominatim API** | GPS現在位置（緯度・経度）からの逆ジオコーディング（市区町村名・住所の取得） | `components/ui/WeatherWidget.tsx` | **不要** | 最大 1 リクエスト/秒 (User-Agent 必須) |
+| **Supabase (Auth / DB / Storage / Realtime)** | ユーザー認証、PostgreSQLデータベース、観察写真ストレージ、リアルタイム同期 | `lib/supabase.ts`<br>API Routes / 各コンポーネント | **要** (`NEXT_PUBLIC_SUPABASE_URL`<br>`NEXT_PUBLIC_SUPABASE_ANON_KEY`) | Supabase Terms of Service (Free Tier) |
+| **LINE Login (Supabase OAuth)** | LINE アカウントを用いたワンタップソーシャルログイン認証 | `app/login/page.tsx` | **要** (Supabase DashboardでのLINE Channel設定) | LINE Developers Terms of Service |
 
 ---
 
@@ -87,6 +102,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 # Google AI Studio (Gemini API)
 GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-flash-lite-latest # (任意: 未指定時は gemini-flash-lite-latest を優先使用)
 ```
 
 ### 4. 開発サーバーの起動
