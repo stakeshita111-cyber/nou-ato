@@ -357,6 +357,7 @@ export interface Database {
           image_url: string | null
           audio_url: string | null
           is_approved: boolean | null
+          is_private: boolean
           created_at: string
           updated_at: string | null
           deleted_at: string | null
@@ -374,6 +375,7 @@ export interface Database {
           image_url?: string | null
           audio_url?: string | null
           is_approved?: boolean | null
+          is_private?: boolean
           created_at?: string
           updated_at?: string | null
           deleted_at?: string | null
@@ -391,6 +393,7 @@ export interface Database {
           image_url?: string | null
           audio_url?: string | null
           is_approved?: boolean | null
+          is_private?: boolean
           created_at?: string
           updated_at?: string | null
           deleted_at?: string | null
@@ -401,6 +404,7 @@ export interface Database {
         }
       }
       payments: {
+
         Row: {
           id: string
           student_id: string
@@ -432,6 +436,30 @@ export interface Database {
           created_at?: string
         }
       }
+      ai_usage: {
+        Row: {
+          user_id: string
+          date: string
+          count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          date: string
+          count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          date?: string
+          count?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+
       events: {
         Row: {
           id: string
@@ -523,6 +551,16 @@ export interface Database {
           total_harvest: string | null
           completion_image_url: string | null
         }
+      }
+    }
+    Functions: {
+      check_and_increment_ai_usage: {
+        Args: {
+          p_user_id: string
+          p_date: string
+          p_limit?: number
+        }
+        Returns: boolean
       }
     }
   }

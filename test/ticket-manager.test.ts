@@ -37,10 +37,10 @@ describe("ticketManager", () => {
     expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("detects secret ticket spell correctly", () => {
-    expect(isSecretTicketSpell("チケットください")).toBe(true);
-    expect(isSecretTicketSpell("ちけっと復活")).toBe(true);
-    expect(isSecretTicketSpell("チケットちょうだい")).toBe(true);
+  it("returns false for secret ticket spell (deprecated feature)", () => {
+    expect(isSecretTicketSpell("チケットください")).toBe(false);
+    expect(isSecretTicketSpell("ちけっと復活")).toBe(false);
+    expect(isSecretTicketSpell("チケットちょうだい")).toBe(false);
     expect(isSecretTicketSpell("トマトの育て方を教えて")).toBe(false);
   });
 
@@ -77,11 +77,11 @@ describe("ticketManager", () => {
     expect(res4.count).toBe(0);
   });
 
-  it("restores tickets with secret spell", () => {
+  it("no longer restores tickets with secret spell (deprecated)", () => {
     consumeTicket("user1");
     consumeTicket("user1");
     const restored = restoreTicketsBySpell("user1");
-    expect(restored.count).toBe(DEFAULT_DAILY_TICKETS);
+    expect(restored.count).toBe(1); // restored.count matches current count (no spell recovery)
   });
 
   it("manages question stocks correctly (add, get, clear, format)", () => {
