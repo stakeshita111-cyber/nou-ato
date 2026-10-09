@@ -1,10 +1,39 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+/**
+ * next パラメータを相対パス（/ 開始）のみ許可するようサニタイズ（オープンリダイレクト防止）
+ */
+export function sanitizeNextUrl(nextParam: string | null, fallback: string = '/student'): string {
+  if (!nextParam) return fallback;
+
+  let decoded = nextParam;
+  try {
+    decoded = decodeURIComponent(nextParam).trim();
+  } catch {
+    return fallback;
+  }
+
+  // 1. 相対パス '/' で始まること
+  // 2. '//' や '/\' で始まらないこと (プロトコル相対URLやスライドバックスラッシュの遮断)
+  // 3. 'http:', 'https:', 'javascript:' などのスキームを含まないこと
+  if (
+    decoded.startsWith('/') &&
+    !decoded.startsWith('//') &&
+    !decoded.startsWith('/\\') &&
+    !/^\/[a-z0-9]+:/i.test(decoded)
+  ) {
+    return decoded;
+  }
+
+  return fallback;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/student';
+  const nextRaw = searchParams.get('next');
+  const safeNext = sanitizeNextUrl(nextRaw, '/student');
   const cookieHeader = request.headers.get('cookie') || '';
   const cookieFarmId = cookieHeader.split(';').find(c => c.trim().startsWith('nouato_invite_farm_id='))?.split('=')[1];
   const farmIdParam = searchParams.get('farm_id') || cookieFarmId || '';
@@ -25,7 +54,7 @@ export async function GET(request: Request) {
 
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser();
-      let targetNext = next;
+      let targetNext = safeNext;
 
       if (user) {
         const meta = user.user_metadata || {};
