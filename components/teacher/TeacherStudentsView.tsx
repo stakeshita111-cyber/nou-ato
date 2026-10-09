@@ -10,6 +10,7 @@ import QRCodeModal from "@/components/ui/QRCodeModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { useFarmStore } from "@/store/useFarmStore";
 import { formatDate } from "@/lib/utils/formatHelper";
+import { grantTicket } from "@/lib/ticketManager";
 
 interface StudentData {
   id: string;
@@ -436,6 +437,38 @@ export default function TeacherStudentsView() {
     }
   };
 
+  // 🎟️ 講師から特定受講生へ追加チケットを付与する処理
+  const handleGrantTicket = async (student: StudentData) => {
+    try {
+      // 1. サーバーAPIのエンドポイント POST /api/tickets/grant を呼出
+      await fetch("/api/tickets/grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, amount: 1 }),
+      });
+
+      // 2. クライアント側のチケットストレージも即時アトミック加算
+      const updated = grantTicket(student.id, 1);
+
+      setToastMessage(`🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日残: ${updated.count}枚）`);
+      setShowToast(true);
+
+      // 3. リアルタイム同期イベントを発行
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "TICKETS_UPDATED", userId: student.id, updated, timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+    } catch (err) {
+      console.error("handleGrantTicket error:", err);
+      setToastMessage("チケット付与中にエラーが発生しました");
+      setShowToast(true);
+    }
+  };
+
   // 📢 受講生全員へのメッセージ・お知らせ一括配信処理
   const handleSendBroadcastAll = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -702,34 +735,6 @@ export default function TeacherStudentsView() {
         console.warn("farm_beds release error:", err);
       }
 
-      // localStorage 内の farm_plots も同期更新
-      if (typeof window !== "undefined") {
-        const farmPlotKey = effectiveFarmId ? `nouato_farm_plots_${effectiveFarmId}` : "nouato_farm_plots";
-        const savedPlotsStr = localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots");
-        if (savedPlotsStr) {
-          try {
-            const parsedPlots = JSON.parse(savedPlotsStr);
-              const updatedPlots = parsedPlots.map((plot: Record<string, unknown>) => {
-                const nextBeds = ((plot.beds as Record<string, unknown>[]) || []).map((bed: Record<string, unknown>) => {
-                if (bed.student_id === studentId || bed.student_name === studentName) {
-                  return { ...bed, student_id: null, student_name: null };
-                }
-                return bed;
-              });
-              const isMatchPlot = plot.student_id === studentId || plot.student_name === studentName;
-              return {
-                ...plot,
-                beds: nextBeds,
-                student_id: isMatchPlot ? null : plot.student_id,
-                student_name: isMatchPlot ? null : plot.student_name,
-                is_vacant: isMatchPlot ? true : plot.is_vacant,
-              };
-            });
-            localStorage.setItem(farmPlotKey, JSON.stringify(updatedPlots));
-            localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
-          } catch {}
-        }
-      }
 
       if (deleteMode === "purge") {
         // 完全消去モード: CASCADE制約/トリガーに任せて users テーブルから単一DELETE実行
@@ -1047,8 +1052,8 @@ export default function TeacherStudentsView() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5">
+                <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1075,9 +1080,21 @@ export default function TeacherStudentsView() {
                     >
                       <span>💬 個別配信</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleGrantTicket(student);
+                      }}
+                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-[11px] rounded-xl border border-blue-200 transition flex items-center gap-1 active:scale-95"
+                      title="この受講生にAI相談チケットを1枚追加付与"
+                    >
+                      <span>🎟️ チケット+1</span>
+                    </button>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-50">
                     <button
                       type="button"
                       title="この受講生を退会・削除する"

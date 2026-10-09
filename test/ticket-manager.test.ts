@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   getJstDateString,
-  isSecretTicketSpell,
   getTicketState,
   consumeTicket,
-  restoreTicketsBySpell,
+  grantTicket,
+  isSecretTicketSpell,
   addQuestionStock,
+
   getQuestionStock,
   clearQuestionStock,
   formatStockText,
   DEFAULT_DAILY_TICKETS,
-} from "@/lib/ticketManager";
+} from "@/lib/utils/ticketManager";
 
 describe("ticketManager", () => {
   const mockStorage: Record<string, string> = {};
@@ -77,12 +78,19 @@ describe("ticketManager", () => {
     expect(res4.count).toBe(0);
   });
 
-  it("no longer restores tickets with secret spell (deprecated)", () => {
+  it("grants ticket correctly to a student", () => {
     consumeTicket("user1");
     consumeTicket("user1");
-    const restored = restoreTicketsBySpell("user1");
-    expect(restored.count).toBe(1); // restored.count matches current count (no spell recovery)
+    consumeTicket("user1");
+    expect(getTicketState("user1").count).toBe(0);
+
+    const granted = grantTicket("user1", 1);
+    expect(granted.count).toBe(1);
+
+    const grantedAgain = grantTicket("user1", 2);
+    expect(grantedAgain.count).toBe(3);
   });
+
 
   it("manages question stocks correctly (add, get, clear, format)", () => {
     addQuestionStock("user1", "ナスに虫がついた");

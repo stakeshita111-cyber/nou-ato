@@ -12,6 +12,8 @@ import {
   clearQuestionStock,
   formatStockText,
 } from "@/lib/ticketManager";
+import { formatQuestionTopic } from "@/lib/utils/journalHelper";
+import { sanitizePersonalNames } from "@/lib/rag/qaKnowledgeRetriever";
 
 interface MessageItem {
   id: string;
@@ -67,26 +69,6 @@ const PRESET_FAQS = [
   },
 ];
 
-function sanitizePersonalNames(text: string): string {
-  if (!text) return "";
-  let clean = text;
-  clean = clean.replace(/^[^\n\r]{1,30}(?:さん|様|くん|ちゃん)[^\n\r]*(?:こんにちは|ありがとうございます|お疲れ様です|メッセージ)[^\n\r]*[\n\r]*/gm, "");
-  clean = clean.replace(/^[^\n\r]*(?:チケット無事|復活しました|改めて)[^\n\r]*[\n\r]*/gm, "");
-  clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "");
-  clean = clean.trim();
-  return clean || text.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "").trim();
-}
-
-function formatQuestionTopic(item: MatchedKnowledgeItem): string {
-  if (item.matchedKeywords && item.matchedKeywords.length > 0) {
-    return `【${item.matchedKeywords.join("・")}】に関する栽培相談`;
-  }
-  const cleanQ = sanitizePersonalNames(item.question);
-  if (cleanQ) {
-    return cleanQ.length > 35 ? cleanQ.slice(0, 35) + "..." : cleanQ;
-  }
-  return "【農園トピック】に関する栽培相談";
-}
 
 export default function StudentTalkView({
   journals = [],
@@ -125,6 +107,39 @@ export default function StudentTalkView({
   useEffect(() => {
     const current = getTicketState(studentId || "default", customDailyLimit, planType);
     setTicketState(current);
+  }, [studentId, customDailyLimit, planType]);
+
+  // リアルタイム・クロス cellophane チケット残数同期
+  useEffect(() => {
+    const updateState = () => {
+      const current = getTicketState(studentId || "default", customDailyLimit, planType);
+      setTicketState(current);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_tickets_updated", updateState);
+      window.addEventListener("nouato_sync_event", updateState);
+      window.addEventListener("storage", updateState);
+    }
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc.onmessage = (event) => {
+        if (event.data?.type === "TICKETS_UPDATED") {
+          updateState();
+        }
+      };
+    } catch {}
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_tickets_updated", updateState);
+        window.removeEventListener("nouato_sync_event", updateState);
+        window.removeEventListener("storage", updateState);
+      }
+      if (bc) bc.close();
+    };
   }, [studentId, customDailyLimit, planType]);
 
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
@@ -177,25 +192,58 @@ export default function StudentTalkView({
           return;
         }
 
-        if (j.content) {
-          formatted.push({
-            id: "q_" + j.id,
-            sender: "student",
-            text: j.content,
-            timestamp: j.created_at
-              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-              : (j.date || "過去のメッセージ"),
-          });
+        const isTeacherRole = j.role === "broadcast" || j.role === "teacher" || j.role === "announcement";
+
+        // 🌟 講師返信時に自動作成される通知用重複レコード（例: role="broadcast", text="【返信】...", reply="講師からの返信"）は除外 🌟
+        // （返信本文は元の相談レコード j.reply に保持されており、そちらから講師吹き出しとしてレンダリングされるため）
+        if (
+          isTeacherRole &&
+          (j.text === "【返信】講師から相談への回答が届きました" ||
+            j.text?.startsWith("【返信】") ||
+            j.reply === "講師からの返信")
+        ) {
+          return;
         }
-        if (j.reply) {
-          formatted.push({
-            id: "a_" + j.id,
-            sender: "teacher",
-            text: j.reply,
-            timestamp: j.created_at
-              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-              : (j.date || "回答済み"),
-          });
+
+        const formattedTimestamp = j.created_at
+          ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+          : (j.date || "過去のメッセージ");
+
+        if (isTeacherRole) {
+          // 講師起点の配信・メッセージ（j.content が講師メッセージ本文）
+          if (j.content) {
+            formatted.push({
+              id: "t_" + j.id,
+              sender: "teacher",
+              text: j.content,
+              timestamp: formattedTimestamp,
+            });
+          }
+        } else {
+          // 生徒起点の相談・質問日誌
+          if (j.content) {
+            formatted.push({
+              id: "q_" + j.id,
+              sender: "student",
+              text: j.content,
+              timestamp: formattedTimestamp,
+            });
+          }
+          if (
+            j.reply &&
+            j.reply !== "講師からの返信" &&
+            !j.reply.startsWith("講師配信") &&
+            !j.reply.startsWith("講師個別連絡")
+          ) {
+            formatted.push({
+              id: "a_" + j.id,
+              sender: "teacher",
+              text: j.reply,
+              timestamp: j.created_at
+                ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+                : (j.date || "回答済み"),
+            });
+          }
         }
       });
 
@@ -810,8 +858,8 @@ export default function StudentTalkView({
               )}
             </button>
 
-            <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / 3 回"}>
-              {Array.from({ length: 3 }).map((_, i) => (
+            <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / " + ticketState.dailyLimit + " 回"}>
+              {Array.from({ length: Math.max(3, ticketState.count) }).map((_, i) => (
                 <span
                   key={i}
                   className={"w-1.5 h-1.5 rounded-full transition-all " + (

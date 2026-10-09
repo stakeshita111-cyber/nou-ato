@@ -85,6 +85,32 @@ export const formatMoney = (
 };
 
 /**
+ * 面積表記（例: 10, "10㎡", "10.5m2"）をユーザー設定の表記形式に整形
+ */
+export const formatArea = (
+  val?: string | number | null,
+  format?: ThemeSettings['numberFormat']
+): string => {
+  if (val === undefined || val === null) return '';
+  if (typeof val === 'number') {
+    return formatNumber(val, format, '㎡');
+  }
+  const trimmed = String(val).trim();
+  if (!trimmed) return '';
+
+  const normalizedStr = trimmed.replace(/m2|㎡|平米|m\^2/gi, '');
+  const cleanNumStr = normalizedStr.replace(/[^\d.]/g, '');
+  if (cleanNumStr) {
+    const num = parseFloat(cleanNumStr);
+    if (!isNaN(num)) {
+      return formatNumber(num, format, '㎡');
+    }
+  }
+
+  return trimmed;
+};
+
+/**
  * 講師・アドバイスメッセージのフォーマット補助
  */
 export const formatShirubeSpeech = (text: string): string => {
