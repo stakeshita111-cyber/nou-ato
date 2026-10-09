@@ -6,7 +6,6 @@ function sanitizePersonalNames(text: string): string {
   clean = clean.replace(/^[^\n\r]{1,30}(?:さん|様|くん|ちゃん)[^\n\r]*(?:こんにちは|ありがとうございます|お疲れ様です|メッセージ)[^\n\r]*[\n\r]*/gm, "");
   clean = clean.replace(/^[^\n\r]*(?:チケット無事|復活しました|改めて)[^\n\r]*[\n\r]*/gm, "");
   clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "");
-  clean = clean.replace(/(?:竹下|翔|たけした)[^ \n\r!！🌱〜]*(?:さん|様|くん|ちゃん)?[、,!\s]*/g, "");
   clean = clean.trim();
   return clean || text.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "").trim();
 }
@@ -168,11 +167,11 @@ describe("StudentTalkView Privacy Features", () => {
 
   it("sanitizes personal names in fallback question topic", () => {
     const item = {
-      question: "竹下翔さん、イチゴの芽かきについて質問です",
+      question: "鈴木太郎さん、イチゴの芽かきについて質問です",
       matchedKeywords: [],
     };
     const topic = formatQuestionTopic(item);
-    expect(topic).not.toContain("竹下翔");
+    expect(topic).not.toContain("鈴木太郎");
   });
 
   it("has default allowKnowledgeShare state set to true (default ON)", () => {
