@@ -125,8 +125,15 @@ export default function TeacherSignUpPage() {
     }
   };
 
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+
   // LINE で登録
   const handleLineSignUp = async () => {
+    if (isLineDisabled) {
+      setToastMessage("💡 LINE連携機能は現在準備中です。フォームからご登録ください。");
+      setShowToast(true);
+      return;
+    }
     setLoading(true);
     try {
       const origin = window.location.origin;
@@ -139,12 +146,13 @@ export default function TeacherSignUpPage() {
       });
 
       if (error) {
-        setToastMessage(`LINE登録エラー: ${error.message}`);
+        console.error("LINE signUp error:", error);
+        setToastMessage("💡 LINE連携機能は現在準備中です。フォームからご登録ください。");
         setShowToast(true);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setToastMessage(`エラーが発生しました: ${msg}`);
+      console.error("LINE signUp exception:", err);
+      setToastMessage("💡 LINE連携機能は現在準備中です。フォームからご登録ください。");
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -167,13 +175,17 @@ export default function TeacherSignUpPage() {
           <button
             type="button"
             onClick={handleLineSignUp}
-            disabled={loading}
-            className="w-full py-3.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm"
+            disabled={loading || isLineDisabled}
+            className={`w-full py-3.5 font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm ${
+              isLineDisabled
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed opacity-80"
+                : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+            }`}
           >
             <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
             </svg>
-            <span>{loading ? "LINEへ接続中..." : "LINEで登録"}</span>
+            <span>{isLineDisabled ? "LINEで登録 (準備中)" : loading ? "LINEへ接続中..." : "LINEで登録"}</span>
           </button>
 
           <div className="relative flex py-1 items-center">

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { sanitizeNextUrl } from "@/app/auth/callback/route";
 
 // middleware のリダイレクトロジックの振る舞い検証
 function evaluateAccessControl(pathname: string, user: { id: string; role: "teacher" | "student" } | null) {
@@ -237,6 +238,39 @@ describe("Security & Authorization Tests (認可・セキュリティ検証)", (
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input);
         expect(isUuid).toBe(false);
       });
+    });
+  });
+
+  describe("4. OAuth コールバック next パラメータサニタイズ (sanitizeNextUrl)", () => {
+    it("正常な相対パス (/student, /teacher/dashboard) はそのまま許可されること", () => {
+      expect(sanitizeNextUrl("/student")).toBe("/student");
+      expect(sanitizeNextUrl("/teacher/dashboard")).toBe("/teacher/dashboard");
+      expect(sanitizeNextUrl("/student/quests?tab=active")).toBe("/student/quests?tab=active");
+    });
+
+    it("絶対URL (https://evil.com) によるオープンリダイレクト攻撃は遮断されフォールバックすること", () => {
+      expect(sanitizeNextUrl("https://evil.com")).toBe("/student");
+      expect(sanitizeNextUrl("http://attacker.com/malicious")).toBe("/student");
+    });
+
+    it("プロトコル相対URL (//evil.com, /\\evil.com) は遮断されフォールバックすること", () => {
+      expect(sanitizeNextUrl("//evil.com")).toBe("/student");
+      expect(sanitizeNextUrl("/\\evil.com")).toBe("/student");
+    });
+
+    it("URLエンコードされた不正パス (%2f%2fevil.com) はデコード後に遮断されること", () => {
+      expect(sanitizeNextUrl("%2f%2fevil.com")).toBe("/student");
+    });
+
+    it("スキームを含む不正パス (/http:evil.com, /javascript:alert(1)) は遮断されること", () => {
+      expect(sanitizeNextUrl("/http:evil.com")).toBe("/student");
+      expect(sanitizeNextUrl("/javascript:alert(1)")).toBe("/student");
+    });
+
+    it("null や空文字の場合はデフォルトフォールバック値を返すこと", () => {
+      expect(sanitizeNextUrl(null)).toBe("/student");
+      expect(sanitizeNextUrl("")).toBe("/student");
+      expect(sanitizeNextUrl(null, "/teacher/dashboard")).toBe("/teacher/dashboard");
     });
   });
 });

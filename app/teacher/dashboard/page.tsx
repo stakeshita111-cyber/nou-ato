@@ -165,7 +165,12 @@ export default function TeacherDashboardPage() {
         fetchTeacherFarms();
       } catch (err) {
         console.error("Auth role check error:", err);
-        setIsAuthorized(true);
+        setToastMessage("🚫 認証エラーが発生しました。生徒ダッシュボードへ移動します。");
+        setShowToast(true);
+        setIsAuthorized(false);
+        setTimeout(() => {
+          router.push("/student");
+        }, 1200);
       }
     };
 

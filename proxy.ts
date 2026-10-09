@@ -52,6 +52,21 @@ export async function proxy(request: NextRequest) {
         }
         return NextResponse.redirect(loginUrl);
       }
+    } else {
+      // 2. 講師専用画面 (/teacher) のアクセス制御: ユーザーのロールが 'teacher' でない場合は即座にサーバー側で遮断・リダイレクト
+      if (pathname.startsWith("/teacher")) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (userData?.role !== "teacher") {
+          const studentUrl = request.nextUrl.clone();
+          studentUrl.pathname = "/student";
+          return NextResponse.redirect(studentUrl);
+        }
+      }
     }
   } catch (error) {
     console.error("Middleware error in proxy:", error);
