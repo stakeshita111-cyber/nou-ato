@@ -167,7 +167,7 @@ export default function TaskDetailModal({
               : '本葉展開・つる伸び',
         height_cm: 75,
         work_types: [t.title],
-        notes: reportMemo.trim() || '作業を完了しました。',
+        notes: reportMemo.trim() || `${t.title}の作業を完了しました。`,
         harvest_amount: finalPhotoUrl ? '📷 現場写真あり' : undefined,
         image_url: finalPhotoUrl || undefined,
         photo_url: finalPhotoUrl || undefined,

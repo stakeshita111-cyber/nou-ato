@@ -934,18 +934,73 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           });
       }
 
-      // 🌟 重複レコードの厳格な除外 (同一ID、または同一生徒・同一日時・同一タイトルの重複を排除) 🌟
-      const uniqueRecords: SlideItemRecord[] = [];
-      const seenRecordKeys = new Set<string>();
+      // 🌟 同一生徒による同一内容（同一画像、または「作業を完了しました」等の同日同一コメント）の統合・重複排除 🌟
+      // 生徒が複数タスクを同じ写真やデフォルト定型文で同時完了した場合、タグ違いで同一内容のカードが複数流れるのを防止
+      allRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+      const mergedRecordsMap = new Map<string, SlideItemRecord>();
 
       allRecords.forEach((r) => {
-        const dedupKey =
-          r.id || `${r.studentName}_${r.dateStr}_${r.timeStr}_${r.title}_${r.content}`;
-        if (!seenRecordKeys.has(dedupKey)) {
-          seenRecordKeys.add(dedupKey);
-          uniqueRecords.push(r);
+        const normalizedContent = (r.content || '').trim().replace(/\s+/g, ' ');
+        const isDefaultCompletionText =
+          !normalizedContent ||
+          normalizedContent === '作業を完了しました。' ||
+          normalizedContent === '作業を完了しました' ||
+          normalizedContent === '（コメントなし）';
+
+        let groupKey = '';
+        if (r.imageUrl && r.imageUrl.trim() && r.imageUrl.startsWith('http')) {
+          // 同一生徒 × 同一画像URL -> 同一画像カードとして統合
+          groupKey = `img_${r.studentName}_${r.imageUrl.trim()}`;
+        } else if (isDefaultCompletionText) {
+          // 同一生徒 × 同一日(dateStr) × デフォルト定型文 -> 1枚に統合
+          groupKey = `default_${r.studentName}_${r.dateStr}`;
+        } else if (normalizedContent.length > 0 && normalizedContent.length <= 60) {
+          // 同一生徒 × 同一日(dateStr) × 同一短文コメント -> 1枚に統合
+          groupKey = `content_${r.studentName}_${r.dateStr}_${normalizedContent}`;
+        } else {
+          // その他個別レコード
+          groupKey = `id_${r.id || `${r.studentName}_${r.dateStr}_${r.timeStr}_${r.title}`}`;
+        }
+
+        if (!mergedRecordsMap.has(groupKey)) {
+          mergedRecordsMap.set(groupKey, { ...r });
+        } else {
+          const existing = mergedRecordsMap.get(groupKey)!;
+
+          // タイトル（タグ）の重複排除マージ (例: "【初回必須】キャベツ" + "【外葉拡大】キャベツ")
+          const existingParts = existing.title.split(',').map((t) => t.trim());
+          const newParts = r.title.split(',').map((t) => t.trim());
+          const mergedTitles = Array.from(new Set([...existingParts, ...newParts])).filter(Boolean);
+
+          if (mergedTitles.length > 2) {
+            existing.title = `${mergedTitles[0]} 他${mergedTitles.length - 1}件`;
+          } else {
+            existing.title = mergedTitles.join(', ');
+          }
+
+          // 画像がなければ補完
+          if (!existing.imageUrl && r.imageUrl) {
+            existing.imageUrl = r.imageUrl;
+          }
+
+          // 定型文より具体的な本文があれば優先
+          if (
+            (!existing.content || existing.content === '作業を完了しました。') &&
+            r.content &&
+            r.content !== '作業を完了しました。'
+          ) {
+            existing.content = r.content;
+          }
+
+          // 収穫量の補完
+          if (!existing.harvestAmount && r.harvestAmount) {
+            existing.harvestAmount = r.harvestAmount;
+          }
         }
       });
+
+      const uniqueRecords = Array.from(mergedRecordsMap.values());
 
       // 🌟【要件: 各生徒の直近N回分のみに厳密制限 (デフォルト: 直近3回分)】🌟
       const limit = slideSettings.limitPerStudent;
