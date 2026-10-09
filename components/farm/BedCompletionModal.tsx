@@ -165,6 +165,11 @@ export default function BedCompletionModal({
     let finalImageUrl = imageUrl;
     if (imageUrl && imageUrl.startsWith("data:")) {
       finalImageUrl = await uploadImageToStorage(imageUrl, "beds");
+      if (!finalImageUrl) {
+        alert("画像のアップロードに失敗しました。通信環境を確認して再度お試しください。");
+        setIsSubmitting(false);
+        return;
+      }
     }
     onComplete({
       totalHarvest: totalHarvest.trim() || undefined,

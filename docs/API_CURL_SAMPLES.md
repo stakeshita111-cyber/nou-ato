@@ -18,24 +18,30 @@ curl -X POST http://localhost:3000/api/chat/rag \
     "studentName": "竹下 翔",
     "studentId": null,
     "history": [],
-    "isMemoOnly": false,
-    "isSpell": false
-  }'
-```
-
-### 実行例 (秘密のチケット回復呪文)
-```bash
-curl -X POST http://localhost:3000/api/chat/rag \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "アブラカタブラ",
-    "isSpell": true
+    "isMemoOnly": false
   }'
 ```
 
 ---
 
-## 2. 農園ナレッジ・リアルタイム類似照合 API
+## 2. 講師からの受講生追加チケット付与 API
+
+### エンドポイント
+`POST /api/tickets/grant`
+
+### 実行例 (受講生へ追加チケット1枚付与)
+```bash
+curl -X POST http://localhost:3000/api/tickets/grant \
+  -H "Content-Type: application/json" \
+  -d '{
+    "studentId": "00000000-0000-0000-0000-000000000000",
+    "amount": 1
+  }'
+```
+
+---
+
+## 3. 農園ナレッジ・リアルタイム類似照合 API
 
 ### エンドポイント
 `POST /api/chat/check-knowledge`
@@ -51,7 +57,7 @@ curl -X POST http://localhost:3000/api/chat/check-knowledge \
 
 ---
 
-## 3. システム設定 API
+## 4. システム設定 API
 
 ### 取得: `GET /api/settings`
 ```bash
@@ -69,7 +75,7 @@ curl -X POST http://localhost:3000/api/settings \
 
 ---
 
-## 4. RFC 7807 エラーハンドリング検証
+## 5. RFC 7807 エラーハンドリング検証
 
 ### メッセージ空での 400 Bad Request 検証
 ```bash
