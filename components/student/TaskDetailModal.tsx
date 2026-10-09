@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useFarmManager } from "@/hooks/useFarmManager";
 import { uploadImageToStorage } from "@/lib/storage";
 
-interface TaskDetailModelProps {
+interface TaskDetailModalProps {
   task: any;
   studentId?: string;
   studentName?: string;
@@ -12,13 +12,13 @@ interface TaskDetailModelProps {
   onComplete?: (id: string, bedId?: string, photoUrl?: string, memo?: string) => void;
 }
 
-export default function TaskDetailModel({
+export default function TaskDetailModal({
   task,
   studentId,
   studentName = "受講生",
   onClose,
   onComplete,
-}: TaskDetailModelProps) {
+}: TaskDetailModalProps) {
   const { plots, addCropRecord } = useFarmManager();
 
   // 生徒自身の割当区画＆畝一覧を厳密取得
