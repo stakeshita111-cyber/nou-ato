@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   sanitizePiiText,
-  sanitizePersonalNames,
   extractTopicFromReply,
   CROPS_LIST,
   STOP_WORDS,
@@ -11,11 +10,18 @@ import { supabase } from "@/lib/supabase";
 
 describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライバシー保護)", () => {
   describe("1. 包括的PIIサニタイズ (sanitizePiiText / sanitizePersonalNames)", () => {
-    it("文頭の個人向け挨拶（『竹下翔さん、こんにちは！😊』）を完全に除去すること", () => {
-      const raw = "竹下翔さん、こんにちは！😊\nトマトの芽かきについてアドバイスします。";
+    it("受講生の動的表示名リストに基づくサニタイズが機能し、任意の名前が[受講生]等に置換されること", () => {
+      const raw = "山田太郎さん、こんにちは！佐藤花子様のイチゴ栽培についてご案内します。";
+      const cleaned = sanitizePiiText(raw, ["山田太郎", "佐藤花子"]);
+      expect(cleaned).not.toContain("山田太郎");
+      expect(cleaned).not.toContain("佐藤花子");
+      expect(cleaned).toContain("[受講生]");
+    });
+
+    it("文頭の個人向け挨拶（『〇〇さん、こんにちは！😊』）を完全に除去すること", () => {
+      const raw = "受講生さん、こんにちは！😊\nトマトの芽かきについてアドバイスします。";
       const cleaned = sanitizePiiText(raw);
-      expect(cleaned).not.toContain("竹下");
-      expect(cleaned).not.toContain("翔");
+      expect(cleaned).not.toContain("受講生さん");
       expect(cleaned).toBe("トマトの芽かきについてアドバイスします。");
     });
 
