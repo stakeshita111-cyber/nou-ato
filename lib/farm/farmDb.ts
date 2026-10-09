@@ -237,7 +237,7 @@ export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {
   if (!plotId || !orderedBedIds || orderedBedIds.length === 0) return;
 
   try {
-    const { error } = await supabase.rpc('reorder_beds', {
+    const { error } = await (supabase.rpc as any)('reorder_beds', {
       p_plot_id: plotId,
       p_bed_ids: orderedBedIds,
     });

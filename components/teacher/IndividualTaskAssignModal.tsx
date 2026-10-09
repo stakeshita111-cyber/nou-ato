@@ -71,7 +71,7 @@ export default function IndividualTaskAssignModal({
           .order('created_at', { ascending: false });
 
         if (tasksData) {
-          setTasks(tasksData);
+          setTasks(tasksData.map((t) => ({ ...t, exp: t.exp || 50 }) as TaskOption));
         }
       } catch (err) {
         console.error('Failed to load task assign options:', err);

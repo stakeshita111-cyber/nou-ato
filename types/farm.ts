@@ -17,6 +17,7 @@ export type CropRecord = {
   photo_url?: string;
   is_question?: boolean;
   question_text?: string;
+  crop_name?: string;
   created_at: string;
 };
 
@@ -60,5 +61,6 @@ export type FarmPlot = {
 export type Farm = {
   id: string;
   name: string;
+  owner_id?: string | null;
   created_at?: string;
 };

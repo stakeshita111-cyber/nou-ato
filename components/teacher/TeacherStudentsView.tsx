@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { MASTER_TASKS } from '@/lib/taskMaster';
 import Toast from '@/components/ui/Toast';
@@ -159,11 +160,11 @@ export default function TeacherStudentsView() {
           // ② farm_beds (畝レベルの割当) からも取得して補完
           const { data: dbBeds } = await supabase
             .from('farm_beds')
-            .select('id, student_id, user_id, student_name, user_name, plot_id, bed_number');
+            .select('id, student_id, student_name, plot_id, bed_number');
           if (dbBeds && dbBeds.length > 0) {
-            dbBeds.forEach((b: Record<string, unknown>) => {
-              const assignedUser = String(b.student_id || b.user_id || '');
-              const assignedName = String(b.student_name || b.user_name || '');
+            dbBeds.forEach((b) => {
+              const assignedUser = String(b.student_id || '');
+              const assignedName = String(b.student_name || '');
               const plotCellMatch = String(b.plot_id || '').match(/plot_cell_([A-Za-z0-9]+)/);
               const plotLabel = plotCellMatch
                 ? `区画 ${plotCellMatch[1].toUpperCase()}`
@@ -236,29 +237,23 @@ export default function TeacherStudentsView() {
         try {
           let jDataQuery = supabase
             .from('journals')
-            .select(
-              'id, student_id, farm_id, content, memo, task_title, photo_url, image_url, created_at'
-            )
+            .select('id, student_id, farm_id, content, text, image_url, created_at')
             .order('created_at', { ascending: false });
           if (currentFarmId) {
             jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
           }
           const { data: jData } = await jDataQuery;
           if (jData && jData.length > 0) {
-            jData.forEach((j: Record<string, unknown>) => {
+            jData.forEach((j) => {
               const sid = String(j.student_id || 'student_default');
               if (!lastJournalMap[sid]) {
                 lastJournalMap[sid] = {
-                  content: String(j.content || j.memo || ''),
-                  photo_url: j.photo_url
-                    ? String(j.photo_url)
-                    : j.image_url
-                      ? String(j.image_url)
-                      : undefined,
+                  content: String(j.content || j.text || ''),
+                  photo_url: j.image_url ? String(j.image_url) : undefined,
                   created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
                 };
               }
-              const journalText = String(j.content || j.task_title || '');
+              const journalText = String(j.content || j.text || '');
               if (
                 journalText &&
                 (journalText.includes('タスク完了') || journalText.includes('完了'))
@@ -570,7 +565,7 @@ export default function TeacherStudentsView() {
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
         const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
 
-        const journalInserts: Array<Record<string, unknown>> = [
+        const journalInserts: Array<Database['public']['Tables']['journals']['Insert']> = [
           {
             role: 'broadcast',
             student_id: null,

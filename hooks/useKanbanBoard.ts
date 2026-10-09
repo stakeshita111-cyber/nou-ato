@@ -264,11 +264,9 @@ export function useKanbanBoard(columns: ColumnType[]) {
           ...data,
           category: data.category || '育苗・播種',
           badge_name: (data.badge_name || cl.badge_name || options?.badge_name || null) as
-            | string
-            | null,
+            string | null,
           badge_icon: (data.badge_icon || cl.badge_icon || options?.badge_icon || null) as
-            | string
-            | null,
+            string | null,
           created_by: data.created_by ?? undefined,
         } as unknown as Task;
         setTasks((prev) => [createdTask, ...prev]);

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     let rpcError = null;
 
     try {
-      const { data: rpcData, error } = await supabase.rpc('grant_ai_tickets', {
+      const { data: rpcData, error } = await (supabase.rpc as any)('grant_ai_tickets', {
         p_student_id: studentId,
         p_count: amount,
       });
@@ -73,8 +73,12 @@ export async function POST(request: Request) {
       if (error) {
         rpcError = error;
         logger.warn('RPC grant_ai_tickets notice/fallback:', 'api/tickets/grant', undefined, error);
-      } else if (rpcData && rpcData.length > 0 && typeof rpcData[0].count === 'number') {
-        newCount = rpcData[0].count;
+      } else if (
+        Array.isArray(rpcData) &&
+        rpcData.length > 0 &&
+        typeof (rpcData[0] as any)?.count === 'number'
+      ) {
+        newCount = (rpcData[0] as any).count;
       }
     } catch (err) {
       rpcError = err;
@@ -102,7 +106,7 @@ export async function POST(request: Request) {
           count: newCount,
           granted_count: currentGranted + amount,
           updated_at: new Date().toISOString(),
-        });
+        } as any);
       } catch (dbErr) {
         logger.warn('ai_tickets direct upsert exception:', 'api/tickets/grant', undefined, dbErr);
       }

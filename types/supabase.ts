@@ -37,6 +37,7 @@ export interface Database {
           deleted_at?: string | null;
           email?: string | null;
         };
+        Relationships: [];
       };
       farms: {
         Row: {
@@ -47,6 +48,8 @@ export interface Database {
           deleted_at: string | null;
           owner_id: string | null;
           show_student_talk_tab: boolean | null;
+          invite_code?: string | null;
+          owner_name?: string | null;
         };
         Insert: {
           id?: string;
@@ -56,6 +59,8 @@ export interface Database {
           deleted_at?: string | null;
           owner_id?: string | null;
           show_student_talk_tab?: boolean | null;
+          invite_code?: string | null;
+          owner_name?: string | null;
         };
         Update: {
           id?: string;
@@ -66,6 +71,7 @@ export interface Database {
           owner_id?: string | null;
           show_student_talk_tab?: boolean | null;
         };
+        Relationships: [];
       };
       farm_plots: {
         Row: {
@@ -77,6 +83,9 @@ export interface Database {
           position: Json | null;
           created_at: string;
           student_id: string | null;
+          student_name?: string | null;
+          grid_index?: number | null;
+          is_vacant?: boolean | null;
         };
         Insert: {
           id: string;
@@ -87,6 +96,9 @@ export interface Database {
           position?: Json | null;
           created_at?: string;
           student_id?: string | null;
+          student_name?: string | null;
+          grid_index?: number | null;
+          is_vacant?: boolean | null;
         };
         Update: {
           id?: string;
@@ -97,7 +109,11 @@ export interface Database {
           position?: Json | null;
           created_at?: string;
           student_id?: string | null;
+          student_name?: string | null;
+          grid_index?: number | null;
+          is_vacant?: boolean | null;
         };
+        Relationships: [];
       };
       farm_beds: {
         Row: {
@@ -122,7 +138,7 @@ export interface Database {
         Insert: {
           id: string;
           plot_id?: string | null;
-          bed_number: string;
+          bed_number?: string;
           dimensions?: string | null;
           student_id?: string | null;
           student_name?: string | null;
@@ -157,6 +173,7 @@ export interface Database {
           total_harvest?: string | null;
           completion_image_url?: string | null;
         };
+        Relationships: [];
       };
       crop_records: {
         Row: {
@@ -198,6 +215,7 @@ export interface Database {
           image_url?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       tasks: {
         Row: {
@@ -223,6 +241,8 @@ export interface Database {
           require_photo: boolean | null;
           exp: number | null;
           difficulty: number | null;
+          badge_name?: string | null;
+          badge_icon?: string | null;
         };
         Insert: {
           id?: string;
@@ -247,6 +267,8 @@ export interface Database {
           require_photo?: boolean | null;
           exp?: number | null;
           difficulty?: number | null;
+          badge_name?: string | null;
+          badge_icon?: string | null;
         };
         Update: {
           id?: string;
@@ -271,7 +293,10 @@ export interface Database {
           require_photo?: boolean | null;
           exp?: number | null;
           difficulty?: number | null;
+          badge_name?: string | null;
+          badge_icon?: string | null;
         };
+        Relationships: [];
       };
       student_tasks: {
         Row: {
@@ -340,6 +365,7 @@ export interface Database {
           exp?: number | null;
           difficulty?: number | null;
         };
+        Relationships: [];
       };
       journals: {
         Row: {
@@ -359,6 +385,9 @@ export interface Database {
           student_id: string | null;
           content: string | null;
           reply: string | null;
+          task_title?: string | null;
+          photo_url?: string | null;
+          plot_code?: string | null;
         };
         Insert: {
           id?: string;
@@ -377,6 +406,9 @@ export interface Database {
           student_id?: string | null;
           content?: string | null;
           reply?: string | null;
+          task_title?: string | null;
+          photo_url?: string | null;
+          plot_code?: string | null;
         };
         Update: {
           id?: string;
@@ -395,7 +427,11 @@ export interface Database {
           student_id?: string | null;
           content?: string | null;
           reply?: string | null;
+          task_title?: string | null;
+          photo_url?: string | null;
+          plot_code?: string | null;
         };
+        Relationships: [];
       };
       payments: {
         Row: {
@@ -428,6 +464,7 @@ export interface Database {
           paid_at?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       ai_usage: {
         Row: {
@@ -451,6 +488,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       events: {
@@ -461,6 +499,7 @@ export interface Database {
           date_display: string | null;
           time: string | null;
           location: string | null;
+          farm_id?: string | null;
           capacity: number | null;
           reserved_count: number | null;
           fee: string | null;
@@ -476,6 +515,7 @@ export interface Database {
           date_display?: string | null;
           time?: string | null;
           location?: string | null;
+          farm_id?: string | null;
           capacity?: number | null;
           reserved_count?: number | null;
           fee?: string | null;
@@ -491,6 +531,7 @@ export interface Database {
           date_display?: string | null;
           time?: string | null;
           location?: string | null;
+          farm_id?: string | null;
           capacity?: number | null;
           reserved_count?: number | null;
           fee?: string | null;
@@ -499,6 +540,7 @@ export interface Database {
           attendees?: Json | null;
           created_at?: string | null;
         };
+        Relationships: [];
       };
       reservations: {
         Row: {
@@ -519,6 +561,39 @@ export interface Database {
           student_id?: string;
           created_at?: string;
         };
+        Relationships: [];
+      };
+      ai_tickets: {
+        Row: {
+          id: string;
+          student_id: string;
+          date: string;
+          granted_count: number;
+          count?: number | null;
+          updated_at?: string | null;
+          granted_by: string | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          date: string;
+          granted_count?: number;
+          granted_by?: string | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          date?: string;
+          granted_count?: number;
+          granted_by?: string | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: {
@@ -544,9 +619,17 @@ export interface Database {
           total_harvest: string | null;
           completion_image_url: string | null;
         };
+        Relationships: [];
       };
     };
     Functions: {
+      grant_ai_tickets: {
+        Args: {
+          p_student_id: string;
+          p_count: number;
+        };
+        Returns: Json;
+      };
       check_and_increment_ai_usage: {
         Args: {
           p_user_id: string;
@@ -555,6 +638,52 @@ export interface Database {
         };
         Returns: boolean;
       };
+      publish_task_to_all_students: {
+        Args: {
+          p_task_id: string;
+        };
+        Returns: Json;
+      };
+      reorder_beds: {
+        Args: {
+          p_plot_id: string;
+          p_bed_ids: string[];
+        };
+        Returns: void;
+      };
+      reorder_farm_beds: {
+        Args: {
+          p_plot_id: string;
+          p_bed_ids: string[];
+        };
+        Returns: void;
+      };
+      batch_create_student_tasks: {
+        Args: {
+          p_tasks: Json;
+        };
+        Returns: Json;
+      };
+      register_teacher: {
+        Args: {
+          farm_name: string;
+          display_name?: string;
+        };
+        Returns: Json;
+      };
+      join_farm: {
+        Args: {
+          invite_code: string;
+          display_name?: string;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

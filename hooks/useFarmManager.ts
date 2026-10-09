@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';
 import { FarmPlot, FarmBed, CropRecord, Farm, BedStatus } from '@/types/farm';
 import { supabase } from '@/lib/supabase';
 import {
@@ -114,14 +116,14 @@ export function useFarmManager() {
       if (typeof window !== 'undefined') {
         const savedFarmId = localStorage.getItem('nouato_active_farm_id');
         if (savedFarmId) {
-          targetFarm = currentFarms.find((f: any) => f.id === savedFarmId);
+          targetFarm = currentFarms.find((f: Farm) => f.id === savedFarmId);
         }
       }
       if (!targetFarm && teacherFarmId) {
-        targetFarm = currentFarms.find((f: any) => f.id === teacherFarmId);
+        targetFarm = currentFarms.find((f: Farm) => f.id === teacherFarmId);
       }
       if (!targetFarm && currentUserId) {
-        targetFarm = currentFarms.find((f: any) => f.owner_id === currentUserId);
+        targetFarm = currentFarms.find((f: Farm) => f.owner_id === currentUserId);
       }
 
       const effectiveActiveId = targetFarm ? targetFarm.id : currentFarms[0]?.id || 'farm_1';
@@ -151,7 +153,7 @@ export function useFarmManager() {
 
       if (dbPlots && dbPlots.length > 0) {
         const seenStudentIds = new Set<string>();
-        loadedBasePlots = dbPlots.map((dp: any) => {
+        loadedBasePlots = dbPlots.map((dp: Database['public']['Tables']['farm_plots']['Row']) => {
           let sId = dp.student_id ? dp.student_id : undefined;
           let sName = dp.student_name ? dp.student_name : sId ? studentMap.get(sId) : undefined;
 
@@ -194,9 +196,9 @@ export function useFarmManager() {
             code: dp.code,
             student_id: isVac ? undefined : sId,
             student_name: isVac ? undefined : sName,
-            grid_index: dp.grid_index,
+            grid_index: dp.grid_index ?? undefined,
             is_vacant: isVac,
-            position: dp.position || { x: 0, y: 0 },
+            position: (dp.position as { x: number; y: number } | null) || { x: 0, y: 0 },
             beds: [],
           };
         });
@@ -281,10 +283,10 @@ export function useFarmManager() {
         const isPlotAssigned = !plot.is_vacant && (!!plot.student_id || !!plot.student_name);
 
         const plotArchivedBeds: FarmBed[] = [];
-        const rawActiveBeds: any[] = [];
+        const rawActiveBeds: Database['public']['Tables']['farm_beds']['Row'][] = [];
         const relevantDbBeds = dbBeds || [];
 
-        relevantDbBeds.forEach((b: any) => {
+        relevantDbBeds.forEach((b: Database['public']['Tables']['farm_beds']['Row']) => {
           const isBelong = b.plot_id === plot.id || b.id?.startsWith(`plot_cell_${plotCode}_bed_`);
           if (!isBelong) return;
 
@@ -297,12 +299,12 @@ export function useFarmManager() {
               crop_name: b.crop_name || '過去の作物',
               status: 'archived',
               season: b.season || '2026年 春夏',
-              harvested_at: b.harvested_at,
-              completion_notes: b.completion_notes,
-              total_harvest: b.total_harvest,
-              completion_image_url: b.completion_image_url,
-              student_id: b.student_id,
-              student_name: b.student_name,
+              harvested_at: b.harvested_at ?? undefined,
+              completion_notes: b.completion_notes ?? undefined,
+              total_harvest: b.total_harvest ?? undefined,
+              completion_image_url: b.completion_image_url ?? undefined,
+              student_id: b.student_id ?? undefined,
+              student_name: b.student_name ?? undefined,
               is_updated: false,
             });
           } else {
@@ -372,12 +374,12 @@ export function useFarmManager() {
                   extractedCrop = tagMatch[1].trim();
                   break;
                 } else if (
-                  (rec as any).crop_name &&
-                  (rec as any).crop_name !== 'トマト' &&
-                  (rec as any).crop_name !== '未定 🌱' &&
-                  (rec as any).crop_name !== '未確定 🌱'
+                  rec.crop_name &&
+                  rec.crop_name !== 'トマト' &&
+                  rec.crop_name !== '未定 🌱' &&
+                  rec.crop_name !== '未確定 🌱'
                 ) {
-                  extractedCrop = (rec as any).crop_name;
+                  extractedCrop = rec.crop_name;
                   break;
                 }
               }
@@ -405,10 +407,10 @@ export function useFarmManager() {
             latest_record: latest,
             status: status,
             season: season,
-            harvested_at: dbB?.harvested_at,
-            completion_notes: completion_notes,
-            total_harvest: total_harvest,
-            completion_image_url: completion_image_url,
+            harvested_at: dbB?.harvested_at ?? undefined,
+            completion_notes: completion_notes ?? undefined,
+            total_harvest: total_harvest ?? undefined,
+            completion_image_url: completion_image_url ?? undefined,
           });
         }
 
@@ -425,7 +427,7 @@ export function useFarmManager() {
 
         // 保存状態スナップショットを初期化
         let farmAddress = '';
-        let weatherLocation: any = null;
+        let weatherLocation: { name: string; lat: number; lon: number } | null = null;
         if (typeof window !== 'undefined') {
           farmAddress = localStorage.getItem('nouato_farm_address') || '';
           const wName = localStorage.getItem('nouato_weather_city_name');
@@ -487,7 +489,7 @@ export function useFarmManager() {
 
     try {
       let farmAddress = '';
-      let weatherLocation: any = null;
+      let weatherLocation: { name: string; lat: number; lon: number } | null = null;
       if (typeof window !== 'undefined') {
         farmAddress = localStorage.getItem('nouato_farm_address') || '';
         const wName = localStorage.getItem('nouato_weather_city_name');
@@ -546,7 +548,7 @@ export function useFarmManager() {
       return isSavingRef.current || Date.now() - lastSaveTimeRef.current < 2500;
     };
 
-    let realtimeChannel: any = null;
+    let realtimeChannel: RealtimeChannel | null = null;
     try {
       realtimeChannel = supabase
         .channel(channelName)
@@ -570,8 +572,9 @@ export function useFarmManager() {
     const handleCustomSync = () => reloadAllFromSupabase();
     window.addEventListener('nouato_sync_event', handleCustomSync);
 
-    const handleFarmChanged = (e: any) => {
-      const newFarmId = e?.detail?.farmId;
+    const handleFarmChanged = (e: Event) => {
+      const customEv = e as CustomEvent<{ farmId?: string }>;
+      const newFarmId = customEv?.detail?.farmId;
       if (newFarmId) {
         setActiveFarmId(newFarmId);
       }
@@ -1283,7 +1286,7 @@ export function useFarmManager() {
     const finalNotes = (recordData.notes || '') + (imgToSave ? `\n[IMG:${imgToSave}]` : '');
 
     const extractedCropName =
-      recordData.notes?.match(/【(.*?)】/)?.[1] || (recordData as any).crop_name || '未確定';
+      recordData.notes?.match(/【(.*?)】/)?.[1] || recordData.crop_name || '未確定';
     await insertCropRecordDb({
       id: newRecordId,
       bed_id: bedId,

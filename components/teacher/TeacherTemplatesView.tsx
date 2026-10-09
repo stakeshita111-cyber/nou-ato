@@ -224,7 +224,7 @@ export default function TeacherTemplatesView() {
         farm_id: farmId || null,
       };
 
-      const { error } = await supabase.from('tasks').insert([newTaskData]);
+      const { error } = await supabase.from('tasks').insert([newTaskData] as any);
       if (error) {
         throw error;
       }
