@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "verify": "npm run typecheck && npm run test && npm run format:check && npm run lint"
+    "check:clean": "node scripts/check-clean-code.mjs",
+    "verify": "npm run check:clean && npm run typecheck && npm run test && npm run format:check && npm run lint"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -37,7 +38,9 @@
     "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^9",
     "eslint-config-next": "^16.4.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "lint-staged": "^15.4.3",
     "prettier": "^3.9.9",
     "tailwindcss": "^4",
     "typescript": "^5",
