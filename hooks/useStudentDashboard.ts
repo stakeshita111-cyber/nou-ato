@@ -141,17 +141,18 @@ export function useStudentDashboard() {
         const { data: publicTasks } = await ptQuery.order("created_at", { ascending: false });
 
         const taskList: StudentTaskItem[] = [];
-        const seenTitles = new Set<string>();
+        const seenTaskIds = new Set<string>();
 
         // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加
         if (publicTasks && publicTasks.length > 0) {
           publicTasks.forEach((pt: Record<string, unknown>) => {
-            const cleanPt = (String(pt.title || "")).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-            if (cleanPt && !seenTitles.has(cleanPt)) {
-              seenTitles.add(cleanPt);
+            const ptId = String(pt.id || "");
+            if (ptId && !seenTaskIds.has(ptId)) {
+              seenTaskIds.add(ptId);
+              // base_task_id で厳密照合 (タイトル部分一致の誤照合を排除)
               const stMatch = stData?.find((st: Record<string, unknown>) => {
-                const cleanSt = (String(st.title || "")).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-                return cleanSt && (cleanSt === cleanPt || cleanSt.includes(cleanPt) || cleanPt.includes(cleanSt));
+                const baseId = String(st.base_task_id || st.task_id || "");
+                return baseId === ptId || String(st.id) === ptId;
               });
               const stMatchTyped = stMatch as { id?: string; status?: string } | undefined;
               const isDone = stMatchTyped ? stMatchTyped.status === "completed" : false;
@@ -162,7 +163,7 @@ export function useStudentDashboard() {
 
               taskList.push({
                 id: stMatchTyped?.id ? stMatchTyped.id : `task_${pt.id}`,
-                task_id: String(pt.id || ""),
+                task_id: ptId,
                 status: isDone ? "completed" : "not_started",
                 tasks: {
                   id: pt.id,
@@ -190,12 +191,25 @@ export function useStudentDashboard() {
           });
         }
 
-        // ② 生徒の個別割当タスク (student_tasks) に直接存在するタスクも漏れなく合流
+        // ② 生徒の個別割当タスク (student_tasks) に直接存在するタスクも合流
+        // ※ ただし、base_task_id がある場合は publicTasks に実在するもののみ許可 (講師完全削除タスクの排除)
         if (stData && stData.length > 0) {
           stData.forEach((st: Record<string, unknown>) => {
-            const cleanSt = (String(st.title || "")).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-            if (cleanSt && !seenTitles.has(cleanSt)) {
-              seenTitles.add(cleanSt);
+            const baseTaskId = String(st.base_task_id || st.task_id || "");
+            const stId = String(st.id || "");
+
+            // base_task_id が指定されている場合、publicTasks に存在しない (削除/非公開) なら表示しない
+            if (baseTaskId && baseTaskId !== stId) {
+              const inPublic = publicTasks?.some((pt: Record<string, unknown>) => String(pt.id) === baseTaskId);
+              if (!inPublic) {
+                // 削除されたゾンビタスクを完全にスキップ
+                return;
+              }
+            }
+
+            const effectiveKey = baseTaskId || stId;
+            if (effectiveKey && !seenTaskIds.has(effectiveKey)) {
+              seenTaskIds.add(effectiveKey);
               const isDone = st.status === "completed";
 
               const cl = (st.checklist as Record<string, unknown>) || {};
@@ -203,11 +217,11 @@ export function useStudentDashboard() {
               const resolvedBadgeIcon = (st.badge_icon as string) || (cl.badge_icon as string) || "🏆";
 
               taskList.push({
-                id: String(st.id || ""),
-                task_id: String(st.task_id || st.base_task_id || st.id || ""),
+                id: stId,
+                task_id: effectiveKey,
                 status: isDone ? "completed" : "not_started",
                 tasks: {
-                  id: st.task_id || st.base_task_id || st.id,
+                  id: effectiveKey,
                   title: st.title,
                   description: st.description || "",
                   target_crop: st.target_crop || "野菜全般",
@@ -441,38 +455,38 @@ export function useStudentDashboard() {
   }, []);
 
   const completeTask = async (taskId: string) => {
-    const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || (t.tasks as { id?: string })?.id === taskId);
+    const targetTask = tasks.find(
+      (t) => t.id === taskId || t.task_id === taskId || (t.tasks as { id?: string })?.id === taskId
+    );
     if (!targetTask) return;
 
     const taskTitle = (targetTask.tasks as { title?: string })?.title || targetTask.title || "完了タスク";
+    const baseTaskId = String((targetTask.tasks as { id?: string })?.id || targetTask.task_id || targetTask.id || "").replace(/^task_/, "");
     const currentStudentId = user?.id || "student_default";
 
-    // 1. ローカル UI ステートを即時完了に変更
+    // 1. ローカル UI ステートを即時完了に変更 (IDで厳密一致)
     setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId || t.task_id === targetTask.task_id || (t.tasks as { title?: string })?.title === taskTitle
-          ? { ...t, status: "completed" }
-          : t
-      )
+      prev.map((t) => {
+        const tBaseId = String((t.tasks as { id?: string })?.id || t.task_id || t.id || "").replace(/^task_/, "");
+        if (t.id === targetTask.id || (tBaseId && tBaseId === baseTaskId)) {
+          return { ...t, status: "completed" };
+        }
+        return t;
+      })
     );
 
-    // 2. Supabase DB (student_tasks) の status を 'completed' に無条件確定更新
+    // 2. Supabase DB (student_tasks) の status を 'completed' に更新 (base_task_id で厳密更新)
     try {
-      const cleanT = (taskTitle || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-
-      const { data: userSts, error: fetchErr } = await supabase
+      const { data: userSts } = await supabase
         .from("student_tasks")
-        .select("id, title")
+        .select("id, base_task_id")
         .eq("student_id", currentStudentId);
 
-      if (fetchErr) throw fetchErr;
-
-      let found = false;
+      let updated = false;
       if (userSts && userSts.length > 0) {
         for (const st of userSts) {
-          const stClean = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-          if (stClean && (stClean === cleanT || stClean.includes(cleanT) || cleanT.includes(stClean))) {
-            found = true;
+          if (st.base_task_id === baseTaskId || st.id === targetTask.id) {
+            updated = true;
             await supabase
               .from("student_tasks")
               .update({ status: "completed", completed_at: new Date().toISOString() })
@@ -481,15 +495,19 @@ export function useStudentDashboard() {
         }
       }
 
-      if (!found && currentStudentId && currentStudentId !== "student_default") {
+      if (!updated && currentStudentId && currentStudentId !== "student_default") {
         await supabase
           .from("student_tasks")
-          .insert({
-            student_id: currentStudentId,
-            title: taskTitle,
-            status: "completed",
-            completed_at: new Date().toISOString(),
-          });
+          .upsert(
+            {
+              student_id: currentStudentId,
+              base_task_id: baseTaskId,
+              title: taskTitle,
+              status: "completed",
+              completed_at: new Date().toISOString(),
+            },
+            { onConflict: "student_id,base_task_id" }
+          );
       }
     } catch (e) {
       console.warn("completeTask DB update error:", e);
@@ -507,38 +525,38 @@ export function useStudentDashboard() {
   };
 
   const uncompleteTask = async (taskId: string) => {
-    const targetTask = tasks.find((t) => t.id === taskId || t.task_id === taskId || (t.tasks as { id?: string })?.id === taskId);
+    const targetTask = tasks.find(
+      (t) => t.id === taskId || t.task_id === taskId || (t.tasks as { id?: string })?.id === taskId
+    );
     if (!targetTask) return;
 
     const taskTitle = (targetTask.tasks as { title?: string })?.title || targetTask.title || "完了タスク";
+    const baseTaskId = String((targetTask.tasks as { id?: string })?.id || targetTask.task_id || targetTask.id || "").replace(/^task_/, "");
     const currentStudentId = user?.id || "student_default";
 
-    // 1. ローカル UI ステートを即時未完了に変更
+    // 1. ローカル UI ステートを即時未完了に変更 (IDで厳密一致)
     setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId || t.task_id === targetTask.task_id || (t.tasks as { title?: string })?.title === taskTitle
-          ? { ...t, status: "not_started" }
-          : t
-      )
+      prev.map((t) => {
+        const tBaseId = String((t.tasks as { id?: string })?.id || t.task_id || t.id || "").replace(/^task_/, "");
+        if (t.id === targetTask.id || (tBaseId && tBaseId === baseTaskId)) {
+          return { ...t, status: "not_started" };
+        }
+        return t;
+      })
     );
 
-    // 2. Supabase DB (student_tasks) の status を 'pending' に無条件確定更新
+    // 2. Supabase DB (student_tasks) の status を 'pending' に更新 (base_task_id で厳密更新)
     try {
-      const cleanT = (taskTitle || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-
-      const { data: userSts, error: fetchErr } = await supabase
+      const { data: userSts } = await supabase
         .from("student_tasks")
-        .select("id, title")
+        .select("id, base_task_id")
         .eq("student_id", currentStudentId);
 
-      if (fetchErr) throw fetchErr;
-
-      let found = false;
+      let updated = false;
       if (userSts && userSts.length > 0) {
         for (const st of userSts) {
-          const stClean = (st.title || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
-          if (stClean && (stClean === cleanT || stClean.includes(cleanT) || cleanT.includes(stClean))) {
-            found = true;
+          if (st.base_task_id === baseTaskId || st.id === targetTask.id) {
+            updated = true;
             await supabase
               .from("student_tasks")
               .update({ status: "pending", completed_at: null })
@@ -547,14 +565,19 @@ export function useStudentDashboard() {
         }
       }
 
-      if (!found && currentStudentId && currentStudentId !== "student_default") {
+      if (!updated && currentStudentId && currentStudentId !== "student_default") {
         await supabase
           .from("student_tasks")
-          .insert({
-            student_id: currentStudentId,
-            title: taskTitle,
-            status: "pending",
-          });
+          .upsert(
+            {
+              student_id: currentStudentId,
+              base_task_id: baseTaskId,
+              title: taskTitle,
+              status: "pending",
+              completed_at: null,
+            },
+            { onConflict: "student_id,base_task_id" }
+          );
       }
     } catch (e) {
       console.warn("uncompleteTask DB update error:", e);

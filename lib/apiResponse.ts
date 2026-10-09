@@ -84,6 +84,13 @@ export class ApiResponse {
   }
 
   /**
+   * 429 Too Many Requests
+   */
+  static tooManyRequests(detail = "リクエスト上限に達しました"): NextResponse<ProblemDetails> {
+    return this.problem(429, "Too Many Requests", detail);
+  }
+
+  /**
    * 500 Internal Server Error
    */
   static internalError(detail = "サーバー内部エラーが発生しました"): NextResponse<ProblemDetails> {
