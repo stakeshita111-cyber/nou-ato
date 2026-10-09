@@ -95,8 +95,6 @@ export function useStudentDashboard() {
         if (typeof window !== "undefined") {
           try {
             localStorage.removeItem("nouato_student_task_statuses");
-            localStorage.removeItem("nouato_takeshita_task_completed_flag");
-            localStorage.removeItem("nouato_takeshita_all_completed_flag");
             localStorage.removeItem("nouato_student_all_completed_status");
           } catch {}
         }
