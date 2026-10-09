@@ -737,34 +737,6 @@ export default function TeacherStudentsView() {
         console.warn("farm_beds release error:", err);
       }
 
-      // localStorage 内の farm_plots も同期更新
-      if (typeof window !== "undefined") {
-        const farmPlotKey = effectiveFarmId ? `nouato_farm_plots_${effectiveFarmId}` : "nouato_farm_plots";
-        const savedPlotsStr = localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots");
-        if (savedPlotsStr) {
-          try {
-            const parsedPlots = JSON.parse(savedPlotsStr);
-              const updatedPlots = parsedPlots.map((plot: Record<string, unknown>) => {
-                const nextBeds = ((plot.beds as Record<string, unknown>[]) || []).map((bed: Record<string, unknown>) => {
-                if (bed.student_id === studentId || bed.student_name === studentName) {
-                  return { ...bed, student_id: null, student_name: null };
-                }
-                return bed;
-              });
-              const isMatchPlot = plot.student_id === studentId || plot.student_name === studentName;
-              return {
-                ...plot,
-                beds: nextBeds,
-                student_id: isMatchPlot ? null : plot.student_id,
-                student_name: isMatchPlot ? null : plot.student_name,
-                is_vacant: isMatchPlot ? true : plot.is_vacant,
-              };
-            });
-            localStorage.setItem(farmPlotKey, JSON.stringify(updatedPlots));
-            localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
-          } catch {}
-        }
-      }
 
       if (deleteMode === "purge") {
         // 完全消去モード: CASCADE制約/トリガーに任せて users テーブルから単一DELETE実行
