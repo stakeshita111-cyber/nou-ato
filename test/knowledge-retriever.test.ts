@@ -126,12 +126,13 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
   });
 
   describe("5. 過去ナレッジ検索と生徒生相談文の完全排除 (searchSimilarKnowledge)", () => {
-    it("journals テーブルから select('id, reply, is_approved, student_id') のみを取得し content を要求しないこと", async () => {
+    it("journals テーブルから select('id, reply, is_approved, is_private, student_id') のみを取得し content を要求しないこと", async () => {
       const mockApprovedData = [
         {
           id: "1",
           reply: "【相談トピック: トマトの追肥について】\nトマトの追肥は植え付けから3週間後に行います。",
           is_approved: true,
+          is_private: false,
           student_id: "s1",
         },
       ];
@@ -140,15 +141,17 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const orderMock = vi.fn().mockReturnValue({ limit: limitMock });
       const neqMock = vi.fn().mockReturnValue({ order: orderMock });
       const notMock = vi.fn().mockReturnValue({ neq: neqMock });
-      const eqMock = vi.fn().mockReturnValue({ not: notMock });
+      const eqMock = vi.fn();
+      eqMock.mockReturnValue({ eq: eqMock, not: notMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
       const fromMock = vi.spyOn(supabase, "from").mockReturnValue({ select: selectMock } as any);
 
       const result = await searchSimilarKnowledge("トマト 追肥");
 
       expect(fromMock).toHaveBeenCalledWith("journals");
-      expect(selectMock).toHaveBeenCalledWith("id, reply, is_approved, student_id");
+      expect(selectMock).toHaveBeenCalledWith("id, reply, is_approved, is_private, student_id");
       expect(eqMock).toHaveBeenCalledWith("is_approved", true);
+      expect(eqMock).toHaveBeenCalledWith("is_private", false);
       expect(notMock).toHaveBeenCalledWith("reply", "is", null);
       expect(neqMock).toHaveBeenCalledWith("reply", "");
       expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
@@ -165,11 +168,10 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const mockDbData = [
         {
           id: "101",
-          // content にのみ存在する個人情報やキーワード
           content: "山田太郎です。電話090-1234-5678。住所は東京都渋谷区。緊急でカボチャの相談です。",
-          // reply のみに存在する回答・トピック
           reply: "【相談トピック: ナスの支柱立てと追肥方法】\nナスの支柱は風で倒れないよう早めに立て、追肥は2週間おきに施してください。",
           is_approved: true,
+          is_private: false,
           student_id: "s101",
         },
       ];
@@ -178,7 +180,8 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const orderMock = vi.fn().mockReturnValue({ limit: limitMock });
       const neqMock = vi.fn().mockReturnValue({ order: orderMock });
       const notMock = vi.fn().mockReturnValue({ neq: neqMock });
-      const eqMock = vi.fn().mockReturnValue({ not: notMock });
+      const eqMock = vi.fn();
+      eqMock.mockReturnValue({ eq: eqMock, not: notMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
       const fromMock = vi.spyOn(supabase, "from").mockReturnValue({ select: selectMock } as any);
 
@@ -204,6 +207,7 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
           content: "トマトを育てています。枝豆の栽培について教えてください。",
           reply: "【相談トピック: 枝豆のカメムシ対策について】\n枝豆にカメムシが発生した場合は防虫ネットを張りましょう。",
           is_approved: true,
+          is_private: false,
           student_id: "s201",
         },
       ];
@@ -212,7 +216,8 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const orderMock = vi.fn().mockReturnValue({ limit: limitMock });
       const neqMock = vi.fn().mockReturnValue({ order: orderMock });
       const notMock = vi.fn().mockReturnValue({ neq: neqMock });
-      const eqMock = vi.fn().mockReturnValue({ not: notMock });
+      const eqMock = vi.fn();
+      eqMock.mockReturnValue({ eq: eqMock, not: notMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
       const fromMock = vi.spyOn(supabase, "from").mockReturnValue({ select: selectMock } as any);
 
@@ -220,7 +225,7 @@ describe("Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const tomatoResult = await searchSimilarKnowledge("トマト 防虫ネット");
       expect(tomatoResult.length).toBe(0);
 
-      // 枝豆で質問した場合はヒッすること
+      // 枝豆で質問した場合はヒットすること
       const edamameResult = await searchSimilarKnowledge("枝豆 カメムシ");
       expect(edamameResult.length).toBe(1);
 

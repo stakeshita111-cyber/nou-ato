@@ -1,10 +1,39 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+/**
+ * next パラメータを相対パス（/ 開始）のみ許可するようサニタイズ（オープンリダイレクト防止）
+ */
+export function sanitizeNextUrl(nextParam: string | null, fallback: string = '/student'): string {
+  if (!nextParam) return fallback;
+
+  let decoded = nextParam;
+  try {
+    decoded = decodeURIComponent(nextParam).trim();
+  } catch {
+    return fallback;
+  }
+
+  // 1. 相対パス '/' で始まること
+  // 2. '//' や '/\' で始まらないこと (プロトコル相対URLやスライドバックスラッシュの遮断)
+  // 3. 'http:', 'https:', 'javascript:' などのスキームを含まないこと
+  if (
+    decoded.startsWith('/') &&
+    !decoded.startsWith('//') &&
+    !decoded.startsWith('/\\') &&
+    !/^\/[a-z0-9]+:/i.test(decoded)
+  ) {
+    return decoded;
+  }
+
+  return fallback;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/student';
+  const nextRaw = searchParams.get('next');
+  const safeNext = sanitizeNextUrl(nextRaw, '/student');
   const cookieHeader = request.headers.get('cookie') || '';
   const cookieFarmId = cookieHeader.split(';').find(c => c.trim().startsWith('nouato_invite_farm_id='))?.split('=')[1];
   const farmIdParam = searchParams.get('farm_id') || cookieFarmId || '';
@@ -25,17 +54,17 @@ export async function GET(request: Request) {
 
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser();
-      let targetNext = next;
+      let targetNext = safeNext;
 
       if (user) {
         const meta = user.user_metadata || {};
         const lineName = meta.full_name || meta.name || meta.preferred_username || meta.nickname || user.email?.split('@')[0] || "受講生";
 
         try {
-          // 1. users テーブルの既存レコードを検索
+          // 1. users テーブルの既存レコードを検索してロールを確認
           const { data: existingUser } = await supabase
             .from("users")
-            .select("*")
+            .select("role, display_name, farm_id")
             .eq("id", user.id)
             .single();
 
@@ -44,28 +73,26 @@ export async function GET(request: Request) {
             targetNext = "/teacher/dashboard";
           }
 
-          // farm_id が指定されている場合は優先して紐づけ（空や既存のままで上書きされることを防止）
-          const targetFarmId = (farmIdParam && farmIdParam !== 'tanaka_farm')
-            ? farmIdParam
-            : (existingUser?.farm_id || farmIdParam || "tanaka_farm");
-
-          // 2. users テーブルに最新の表示名・ロール・農園IDを upsert 保存
-          const { error: upsertErr } = await supabase.from("users").upsert([
-            {
-              id: user.id,
-              email: user.email || `${user.id}@line.user`,
-              display_name: lineName || existingUser?.display_name || "受講生",
-              role: userRole,
-              farm_id: targetFarmId,
-            },
-          ], { onConflict: "id" });
-
-          if (upsertErr) {
-            console.error("users table upsert error:", upsertErr);
+          // 2. 表示名の安全な更新
+          if (lineName && lineName !== existingUser?.display_name) {
+            await supabase
+              .from("users")
+              .update({ display_name: lineName })
+              .eq("id", user.id);
           }
 
-        } catch (upsertErr) {
-          console.error("Failed to auto-upsert LINE user into users table:", upsertErr);
+          // 3. 農園紐づけ (join_farm RPC を使用して安全に更新)
+          if (userRole !== "teacher" && farmIdParam && farmIdParam !== "tanaka_farm") {
+            const { error: joinErr } = await supabase.rpc("join_farm", {
+              invite_code: farmIdParam,
+            });
+            if (joinErr) {
+              console.error("join_farm error in OAuth callback:", joinErr);
+            }
+          }
+
+        } catch (callbackErr) {
+          console.error("Failed to process LINE user setup in callback:", callbackErr);
         }
       }
 

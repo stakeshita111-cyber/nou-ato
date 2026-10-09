@@ -1,9 +1,8 @@
 /**
  * NOU-ATO AI相談チケット管理モジュール
  * - JST 日本時間0時自動リセット
- * - 秘密の呪文対応
- * - 将来の「相談し放題（無制限プラン）」や「1日の回数制限変更」に完全対応
- * - 🌟【新機能】チケット終了時の「質問ストック・累積メモ」機能（次回コピー用）
+ * - 1日3回制限 (サーバー側 ai_usage 連動)
+ * - 🌟【機能】チケット終了時の「質問ストック・累積メモ」機能（次回コピー用）
  */
 
 export type TicketPlanType = "limited" | "unlimited" | "memo_only";
@@ -34,13 +33,10 @@ export function getJstDateString(): string {
 }
 
 /**
- * 秘密のチケット復活の呪文かどうかを判定
- * 例: 「チケットください」「チケット下さい」「チケットくれ」「チケットちょうだい」「ちけっと復活」など
+ * 秘密の呪文判定（廃止のため常に false を返却）
  */
-export function isSecretTicketSpell(text: string): boolean {
-  const clean = text.trim().toLowerCase();
-  const pattern = /(?:チケット|ちけっと).*(?:ください|下さい|くれ|ちょうだい|復活|ほしい|増やして|リセット)/;
-  return pattern.test(clean);
+export function isSecretTicketSpell(_text: string): boolean {
+  return false;
 }
 
 /**
@@ -165,30 +161,17 @@ export function consumeTicket(
 }
 
 /**
- * 秘密の呪文によりチケットを全回復
+ * 秘密の呪文による全回復（廃止のため現在のチケット状態をそのまま返却）
  */
 export function restoreTicketsBySpell(
   userId: string = "default",
   customLimit: number = DEFAULT_DAILY_TICKETS
 ): TicketState {
-  const updated: TicketState = {
-    date: getJstDateString(),
-    count: customLimit,
-    plan: "limited",
-    dailyLimit: customLimit,
-    isUnlimited: false,
-  };
-
-  if (typeof window !== "undefined") {
-    const storageKey = `nouato_ai_tickets_${userId}`;
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-  }
-
-  return updated;
+  return getTicketState(userId, customLimit);
 }
 
 // ==========================================
-// 🌟【新機能】質問ストック（累積メモ）管理 🌟
+// 🌟【機能】質問ストック（累積メモ）管理 🌟
 // ==========================================
 
 /**
@@ -237,5 +220,5 @@ export function clearQuestionStock(userId: string = "default"): void {
  */
 export function formatStockText(items: string[]): string {
   if (!items || items.length === 0) return "";
-  return items.map((it, i) => `・${it}`).join("\n");
+  return items.map((it) => `・${it}`).join("\n");
 }

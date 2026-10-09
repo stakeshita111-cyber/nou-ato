@@ -6,8 +6,6 @@ import { supabase } from "@/lib/supabase";
 import {
   getTicketState,
   consumeTicket,
-  restoreTicketsBySpell,
-  isSecretTicketSpell,
   DEFAULT_DAILY_TICKETS,
   TicketPlanType,
   addQuestionStock,
@@ -68,7 +66,6 @@ const PRESET_FAQS = [
     answer: "【農園アドバイス：水やりのコツ】💧\n\n基本は「朝の涼しい時間帯（早朝〜8時頃）」にたっぷりとあげるのがベストです！\n日中の暑い時間に水をあげるとお湯のようになって根を傷める原因になります。土の表面が乾いて白っぽくなったら、株元にしっかりあげてくださいね🌱",
   },
 ];
-
 
 function sanitizePersonalNames(text: string): string {
   if (!text) return "";
@@ -161,7 +158,6 @@ export default function StudentTalkView({
       (targetList || []).forEach((j: any) => {
         const c = (j.content || "").trim();
 
-        // 🌟 入力欄から送信した相談・質問以外の「畝作業記録」「タスク完了報告」「システム通知」を完全に除外 🌟
         if (
           !c ||
           c === "テスト" ||
@@ -283,17 +279,10 @@ export default function StudentTalkView({
     const text = inputText.trim();
     if (!text || isSending) return;
 
-    // 秘密の呪文判定
-    if (isSecretTicketSpell(text)) {
-      executeSendMessage(false);
-      return;
-    }
-
     setIsCheckingKnowledge(true);
     setMatchedKnowledgeList([]);
 
     try {
-      // サーバー側の厳格ナレッジ検索APIを呼び出し
       const res = await fetch("/api/chat/check-knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -348,7 +337,6 @@ export default function StudentTalkView({
     const rawInput = inputText.trim();
     if (!rawInput || isSending) return;
 
-    // オプトアウト (非公開指定) の場合は 【非公開相談】 タグを先頭に付与
     const text = allowKnowledgeShare || rawInput.startsWith("【非公開相談】")
       ? rawInput
       : `【非公開相談】${rawInput}`;
@@ -356,10 +344,9 @@ export default function StudentTalkView({
     const timeStr = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
     const userMsgId = "user_" + Date.now();
 
-    const isSpell = isSecretTicketSpell(text);
     const currentTicket = getTicketState(studentId || "default", customDailyLimit, planType);
     const hasTicket = currentTicket.isUnlimited || currentTicket.count > 0;
-    const isMemoOnly = !isSpell && !hasTicket;
+    const isMemoOnly = !hasTicket;
 
     const newStudentMsg: MessageItem = {
       id: userMsgId,
@@ -390,12 +377,7 @@ export default function StudentTalkView({
       return;
     }
 
-    if (isSpell) {
-      const restored = restoreTicketsBySpell(studentId || "default", customDailyLimit);
-      setTicketState(restored);
-      setToastMessage("✨ 秘密の呪文を発動！チケットが全回復しました（残" + restored.count + "回）");
-      setShowToast(true);
-    } else if (currentTicket.isUnlimited) {
+    if (currentTicket.isUnlimited) {
       setToastMessage("🌟 AIに相談しました（相談し放題プラン）");
       setShowToast(true);
     } else if (hasTicket) {
@@ -406,14 +388,6 @@ export default function StudentTalkView({
       setShowToast(true);
     }
 
-    const recentHistory = messages
-      .filter((m) => m.id !== "welcome_msg" && !m.id.startsWith("bot_err_"))
-      .slice(-6)
-      .map((m) => ({
-        sender: m.sender,
-        text: m.text,
-      }));
-
     try {
       const res = await fetch("/api/chat/rag", {
         method: "POST",
@@ -421,12 +395,23 @@ export default function StudentTalkView({
         body: JSON.stringify({
           message: text,
           studentName: studentName,
-          studentId: studentId,
-          history: recentHistory,
           isMemoOnly: false,
-          isSpell: isSpell,
         }),
       });
+
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        setToastMessage(data.detail || "本日のAI相談上限（1日3回）に達しました");
+        setShowToast(true);
+        const limitMsg: MessageItem = {
+          id: "bot_limit_" + Date.now(),
+          sender: "teacher",
+          text: "【しるべぇ】本日のAI相談チケット（1日3回）上限に達しました🙇 ご入力内容は質問メモとして大切にお預かりしましたので、次回来園時に講師にご相談くださいね🌱",
+          timestamp: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+        };
+        setMessages((prev) => [...prev, limitMsg]);
+        return;
+      }
 
       if (!res.ok) throw new Error("チャットサーバーの応答に失敗しました");
 
@@ -504,7 +489,7 @@ export default function StudentTalkView({
   // 検索ハイライト
   const renderHighlightedText = (text: string, keyword: string) => {
     if (!keyword.trim()) return text;
-    const parts = text.split(new RegExp(`(${keyword.replace(/[.*+?^$${}()|[\]\\]/g, "\\$&")})`, "gi"));
+    const parts = text.split(new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
     return parts.map((part, i) =>
       part.toLowerCase() === keyword.toLowerCase() ? (
         <mark key={i} className="bg-amber-300 text-amber-950 px-1 py-0.5 rounded font-black shadow-2xs">
