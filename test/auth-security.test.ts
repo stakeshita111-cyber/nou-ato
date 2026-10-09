@@ -211,22 +211,26 @@ describe('Security & Authorization Suite (本番コード直撃セキュリテ�
       .map((f) => fs.readFileSync(path.join(migrationsDir, f), 'utf-8'))
       .join('\n');
 
-    it('全主要テーブルに ENABLE ROW LEVEL SECURITY (RLS) が適用されていること', () => {
-      const requiredTables = [
-        'users',
-        'farms',
-        'farm_plots',
-        'farm_beds',
-        'journals',
-        'student_tasks',
+    it('マイグレーションで定義された全テーブルに漏れなく ENABLE ROW LEVEL SECURITY (RLS) が適用されていること', () => {
+      const cleanSql = combinedContent.replace(/--.*$/gm, '');
+      const tableMatches = [
+        ...cleanSql.matchAll(
+          /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?([a-zA-Z0-9_]+)/gi
+        ),
       ];
+      const allDetectedTables = [...new Set(tableMatches.map((m) => m[1]))];
 
-      for (const table of requiredTables) {
+      expect(allDetectedTables.length).toBeGreaterThanOrEqual(10);
+
+      for (const table of allDetectedTables) {
         const hasRls = new RegExp(
-          `ALTER\\s+TABLE\\s+public\\.${table}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
+          `ALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:ONLY\\s+)?(?:public\\.)?${table}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
           'i'
-        ).test(combinedContent);
-        expect(hasRls).toBe(true);
+        ).test(cleanSql);
+        expect(
+          hasRls,
+          `テーブル '${table}' に ENABLE ROW LEVEL SECURITY が設定されていません`
+        ).toBe(true);
       }
     });
 
