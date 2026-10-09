@@ -134,6 +134,48 @@ export function useKanbanBoard(columns: ColumnType[]) {
     }
   };
 
+  // 🌟 タスク公開時に全受講生に対して student_tasks を一括配備するヘルパー関数 🌟
+  const publishTaskToStudents = async (taskId: string, targetFarmId?: string | null) => {
+    try {
+      // 1. Supabase Postgres RPC 関数を呼び出し
+      const { error: rpcErr } = await supabase.rpc("publish_task_to_all_students", { p_task_id: taskId });
+      if (rpcErr) {
+        console.warn("publish_task_to_all_students RPC notice:", rpcErr.message);
+      }
+
+      // 2. クライアント側フォールバック (全受講生への student_tasks 一括配備)
+      let query = supabase.from("users").select("id").eq("role", "student").is("deleted_at", null);
+      if (targetFarmId) {
+        query = query.eq("farm_id", targetFarmId);
+      }
+      const { data: students } = await query;
+
+      const { data: taskData } = await supabase.from("tasks").select("*").eq("id", taskId).maybeSingle();
+      if (students && students.length > 0 && taskData) {
+        const inserts = students.map((s) => ({
+          student_id: s.id,
+          base_task_id: taskData.id,
+          title: taskData.title,
+          description: taskData.description,
+          category: taskData.category,
+          status: "not_started",
+          estimated_time: taskData.estimated_time,
+          tools_needed: taskData.tools_needed,
+          checklist: taskData.checklist,
+          reference_links: taskData.reference_links,
+          memo: taskData.memo,
+          target_crop: taskData.target_crop,
+          require_photo: taskData.require_photo ?? true,
+          exp: taskData.exp || 50,
+          difficulty: taskData.difficulty || 2,
+        }));
+        await supabase.from("student_tasks").upsert(inserts, { onConflict: "student_id,base_task_id" });
+      }
+    } catch (e) {
+      console.warn("publishTaskToStudents exception:", e);
+    }
+  };
+
   // タスクの追加（Create: 作成された Task を返却）
   const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
     let effectiveFarmId = farmId;
@@ -216,6 +258,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
           badge_icon: data.badge_icon || cl.badge_icon || options?.badge_icon || null,
         };
         setTasks((prev) => [createdTask, ...prev]);
+
+        // status === "todo" (公開中) で追加された場合は受講生へ一括配備
+        if (createdTask.status === "todo") {
+          await publishTaskToStudents(createdTask.id, effectiveFarmId);
+        }
+
         notifyTaskSync();
         return createdTask;
       }
@@ -266,6 +314,10 @@ export function useKanbanBoard(columns: ColumnType[]) {
         console.warn("saveTaskDetails DB保存警告:", error.message);
       }
 
+      if (updatedTask.status === "todo") {
+        await publishTaskToStudents(updatedTask.id, farmId);
+      }
+
       setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? { ...updatedTask, checklist: updatedChecklist } : t)));
       setEditingTask(null);
     } catch (e) {
@@ -291,8 +343,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
         console.warn("削除警告:", error.message);
       }
 
+      // student_tasks からも CASCADE / 即時連動削除
+      await supabase.from("student_tasks").delete().eq("base_task_id", id);
+
       setTasks(tasks.filter((task) => task.id !== id));
       setTrashTasks([{ ...targetTask, deleted_at: deletedAtIso }, ...trashTasks]);
+      notifyTaskSync();
     } catch (e) {
       console.error("deleteTask 実行中に例外が発生しました:", e);
     }
@@ -325,6 +381,9 @@ export function useKanbanBoard(columns: ColumnType[]) {
     if (!confirm("本当に永久削除しますか？この操作は取り消せません。")) return;
 
     try {
+      // student_tasks 連動削除
+      await supabase.from("student_tasks").delete().eq("base_task_id", id);
+
       const { error } = await supabase
         .from("tasks")
         .delete()
@@ -335,6 +394,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
+      notifyTaskSync();
     } catch (e) {
       console.error("permanentlyDeleteTask 実行中に例外が発生しました:", e);
     }
@@ -397,6 +457,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
       if (error) {
         console.error("【デバッグ】ドラッグ更新失敗:", error);
       } else {
+        if (newStatus === "todo") {
+          await publishTaskToStudents(taskId, farmId);
+        } else {
+          // 'todo' (生徒公開) 以外のレーンにドラッグされた場合は student_tasks から削除
+          await supabase.from("student_tasks").delete().eq("base_task_id", taskId);
+        }
         notifyTaskSync();
       }
     } catch (e) {
