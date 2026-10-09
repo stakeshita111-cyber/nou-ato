@@ -4,11 +4,13 @@ import { supabase } from "@/lib/supabase";
  * Base64 文字列 (data:image/...) または File / Blob を Supabase Storage にアップロードし、公開URLを返却する
  * @param fileOrBase64 - File, Blob, または Base64 文字列
  * @param folder - 保存先フォルダ名（例: "tasks", "records", "beds"）
- * @returns Supabase Storage の公開URL（失敗時はフォールバックとして元の入力値）
+ * @param userId - オプションのユーザーID（指定がない場合は認証ユーザーから自動取得）
+ * @returns Supabase Storage の公開URL（失敗時は空文字列 "" を返却。Base64直保存は廃止）
  */
 export async function uploadImageToStorage(
   fileOrBase64: File | Blob | string | undefined | null,
-  folder: string = "general"
+  folder: string = "general",
+  userId?: string
 ): Promise<string> {
   if (!fileOrBase64) return "";
 
@@ -18,6 +20,13 @@ export async function uploadImageToStorage(
   }
 
   try {
+    // ユーザーIDの取得 (渡されていない場合は Supabase Auth から取得)
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const { data: authData } = await supabase.auth.getUser();
+      currentUserId = authData?.user?.id || "anonymous";
+    }
+
     let blob: Blob;
     let extension = "jpg";
 
@@ -25,7 +34,8 @@ export async function uploadImageToStorage(
       // Base64 文字列 (data:image/jpeg;base64,...) を Blob にデコード
       const match = fileOrBase64.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
       if (!match) {
-        return fileOrBase64;
+        console.warn("uploadImageToStorage: Invalid base64 string format");
+        return "";
       }
 
       const mimeSubtype = match[1].toLowerCase();
@@ -45,25 +55,28 @@ export async function uploadImageToStorage(
       }
     }
 
-    // 重複を避けるユニークなファイル名
-    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+    // ユーザーIDを含むパス形式: <user_id>/<timestamp>_<filename> または <folder>/<user_id>/<timestamp>_<filename>
+    // Storage RLS ポリシー (<user_id> プレフィックス) に準拠
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    const fileName = `${currentUserId}/${folder}_${Date.now()}_${randomSuffix}.${extension}`;
 
     const { error: uploadError } = await supabase.storage
       .from("crop-photos")
       .upload(fileName, blob, {
         contentType: blob.type || "image/jpeg",
-        upsert: true,
+        upsert: false, // 衝突防止のため upsert は false (ユニークファイル名)
       });
 
     if (uploadError) {
       console.warn("Supabase Storage upload warning:", uploadError.message);
-      return typeof fileOrBase64 === "string" ? fileOrBase64 : "";
+      // 失敗時は Base64 を DB に直接保存させないよう空文字 "" を返却
+      return "";
     }
 
     const { data } = supabase.storage.from("crop-photos").getPublicUrl(fileName);
-    return data?.publicUrl || (typeof fileOrBase64 === "string" ? fileOrBase64 : "");
+    return data?.publicUrl || "";
   } catch (err) {
     console.error("uploadImageToStorage exception:", err);
-    return typeof fileOrBase64 === "string" ? fileOrBase64 : "";
+    return "";
   }
 }
