@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDate, formatNumber, formatHarvestAmount, formatMoney, formatShirubeSpeech } from "@/lib/utils/formatHelper";
+import { formatDate, formatNumber, formatHarvestAmount, formatMoney, formatArea, formatShirubeSpeech } from "@/lib/utils/formatHelper";
 
 describe("formatHelper", () => {
   it("formats date with slash format", () => {
@@ -36,6 +36,14 @@ describe("formatHelper", () => {
     expect(formatMoney(10000, "raw")).toBe("¥10000");
     expect(formatMoney(10000, "comma")).toBe("¥10,000");
     expect(formatMoney(10000, "unit")).toBe("¥10,000円");
+  });
+
+  it("formats area correctly", () => {
+    expect(formatArea(10, "unit")).toBe("10㎡");
+    expect(formatArea("10.5m2", "unit")).toBe("10.5㎡");
+    expect(formatArea("1500㎡", "raw")).toBe("1500");
+    expect(formatArea("1500㎡", "comma")).toBe("1,500");
+    expect(formatArea(null)).toBe("");
   });
 
   it("formats speech text", () => {

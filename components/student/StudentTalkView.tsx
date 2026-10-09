@@ -12,6 +12,8 @@ import {
   clearQuestionStock,
   formatStockText,
 } from "@/lib/ticketManager";
+import { formatQuestionTopic } from "@/lib/utils/journalHelper";
+import { sanitizePersonalNames } from "@/lib/rag/qaKnowledgeRetriever";
 
 interface MessageItem {
   id: string;
@@ -67,26 +69,6 @@ const PRESET_FAQS = [
   },
 ];
 
-function sanitizePersonalNames(text: string): string {
-  if (!text) return "";
-  let clean = text;
-  clean = clean.replace(/^[^\n\r]{1,30}(?:さん|様|くん|ちゃん)[^\n\r]*(?:こんにちは|ありがとうございます|お疲れ様です|メッセージ)[^\n\r]*[\n\r]*/gm, "");
-  clean = clean.replace(/^[^\n\r]*(?:チケット無事|復活しました|改めて)[^\n\r]*[\n\r]*/gm, "");
-  clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "");
-  clean = clean.trim();
-  return clean || text.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "").trim();
-}
-
-function formatQuestionTopic(item: MatchedKnowledgeItem): string {
-  if (item.matchedKeywords && item.matchedKeywords.length > 0) {
-    return `【${item.matchedKeywords.join("・")}】に関する栽培相談`;
-  }
-  const cleanQ = sanitizePersonalNames(item.question);
-  if (cleanQ) {
-    return cleanQ.length > 35 ? cleanQ.slice(0, 35) + "..." : cleanQ;
-  }
-  return "【農園トピック】に関する栽培相談";
-}
 
 export default function StudentTalkView({
   journals = [],
