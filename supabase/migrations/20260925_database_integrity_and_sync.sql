@@ -136,6 +136,7 @@ CREATE TRIGGER on_auth_user_created
 --    ※ security_invoker = true によりクエリ実行者の RLS ポリシーを厳格適用（情報漏洩防止）
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW public.farm_beds_with_students WITH (security_invoker = true) AS
+
 SELECT 
     b.id,
     b.plot_id,
