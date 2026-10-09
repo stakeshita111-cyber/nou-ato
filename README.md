@@ -1,8 +1,20 @@
 # NOU-ATO (のうあと) - 体験農業経営支援アプリ
 
-![NOU-ATO Demo Preview](public/images/demo-preview.svg)
-
 「**NOU-ATO（のうあと）**」は、体験農園の運営者（講師）と受講生（生徒）をつなぎ、初心者でも迷わず野菜づくりを楽しみながら学べる体験農業経営支援Webアプリケーションです。
+
+## 📱 アプリケーション画面ギャラリー (UI Screenshots)
+
+### 👨‍🌾 講師向けダッシュボード & 農地マネジメント
+| 📊 ダッシュボード概要 | 🚜 農地キャンバス (D&D畝配置) |
+| :---: | :---: |
+| ![講師ダッシュボード](public/images/teacher-dashboard.png) | ![農地キャンバス](public/images/teacher-farm.png) |
+| *受講生進捗、未読日誌、一括アナウンスの一元管理* | *ドラッグ＆ドロップによる畝・作物レイアウト管理* |
+
+### 👨‍🎓 受講生向けモバイルポータル
+| 📱 マイファーム & タスクスタック | 🏆 成長スキルボード (3Dバッジ) |
+| :---: | :---: |
+| ![受講生マイファーム](public/images/student-mobile.png) | ![スキルボード](public/images/student-skills.png) |
+| *立体カードスタック & 無限循環による快適なタスク消化* | *スロット内3Dコイン回転の達成バッジコレクション* |
 
 > [!TIP]
 > 🚀 **本番デプロイURL**: [https://nou-ato.vercel.app](https://nou-ato.vercel.app)  
@@ -85,6 +97,7 @@
 ### 1. 前提条件
 - Node.js `v20` 以上 (推奨: `v24` 以上)
 - npm `v10` 以上
+- Supabase アカウント (新規プロジェクト作成用)
 
 ### 2. リポジトリのクローンと依存関係インストール
 ```bash
@@ -93,19 +106,62 @@ cd nou-ato
 npm install
 ```
 
-### 3. 環境変数の設定
+### 3. Supabase プロジェクトの初期セットアップ (DB & Storage)
+
+ゼロから新規の Supabase 環境を構築する場合は、以下の手順でデータベーススキーマの適用と Storage バケットの設定を行います。
+
+#### A. データベースマイグレーションの実行 (DB Schema)
+Supabase CLI を利用する方法、または Supabase Dashboard の SQL Editor を利用する方法のいずれかでマイグレーションを適用します。
+
+##### 方法1: Supabase CLI を使う場合（推奨）
+```bash
+# 1. Supabase CLI にログイン
+npx supabase login
+
+# 2. プロジェクトにリンク (YOUR_PROJECT_REF は Supabase ダッシュボード URL または Settings > General から取得)
+npx supabase link --project-ref <YOUR_PROJECT_REF>
+
+# 3. マイグレーションファイルを適用
+npx supabase db push
+```
+
+##### 方法2: Supabase Dashboard (SQL Editor) を使う場合
+1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
+2. 左メニューの **SQL Editor** を開きます。
+3. 以下の順序で `supabase/migrations/` 配下の SQL ファイル内容を貼り付けて実行 (**Run**) します：
+   - **1st**: `supabase/migrations/00000000000000_initial_schema.sql` (テーブル、RLS、RPC関数、初期デモデータの作成)
+   - **2nd**: `supabase/migrations/20260925_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
+
+---
+
+#### B. Storage バケット (`journals`) の作成と公開設定
+日誌投稿時の写真アップロードに必要な `journals` ストレージバケットを作成します。
+
+##### 手順:
+1. Supabase Dashboard の左メニューから **Storage** を選択します。
+2. **New bucket** ボタンをクリックし、以下の設定でバケットを作成します：
+   - **Bucket name**: `journals`
+   - **Public bucket**: **ON** (有効化: 投稿された画像URLの公開アクセスのため)
+3. バケット作成後、認証済みユーザーが画像をアップロードできるように RLS ポリシー（Policies）を設定します：
+   - **SELECT**: `Public` (全員読み取り可能)
+   - **INSERT / UPDATE**: `Authenticated users` (ログイン済みユーザーのみアップロード可能)
+   - *（※ `00000000000000_initial_schema.sql` を適用済みの場合は Storage RLS ポリシーも自動設定されます）*
+
+---
+
+### 4. 環境変数の設定
 プロジェクトルートに `.env.local` を作成し、必要なキーを設定します：
 ```env
-# Supabase
+# Supabase (Dashboard > Project Settings > API から取得)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-# Google AI Studio (Gemini API)
+# Google AI Studio (Gemini API Key)
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-flash-lite-latest # (任意: 未指定時は gemini-flash-lite-latest を優先使用)
 ```
 
-### 4. 開発サーバーの起動
+### 5. 開発サーバーの起動
 ```bash
 npm run dev
 ```
