@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -307,6 +307,7 @@ export interface Database {
           image_url: string | null
           audio_url: string | null
           is_approved: boolean | null
+          is_private: boolean
           created_at: string
           updated_at: string | null
           deleted_at: string | null
@@ -324,6 +325,7 @@ export interface Database {
           image_url?: string | null
           audio_url?: string | null
           is_approved?: boolean | null
+          is_private?: boolean
           created_at?: string
           updated_at?: string | null
           deleted_at?: string | null
@@ -341,6 +343,7 @@ export interface Database {
           image_url?: string | null
           audio_url?: string | null
           is_approved?: boolean | null
+          is_private?: boolean
           created_at?: string
           updated_at?: string | null
           deleted_at?: string | null
@@ -348,6 +351,29 @@ export interface Database {
           student_id?: string | null
           content?: string | null
           reply?: string | null
+        }
+      }
+      ai_usage: {
+        Row: {
+          user_id: string
+          date: string
+          count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          date: string
+          count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          date?: string
+          count?: number
+          created_at?: string
+          updated_at?: string
         }
       }
       events: {
@@ -421,6 +447,16 @@ export interface Database {
           total_harvest: string | null
           completion_image_url: string | null
         }
+      }
+    }
+    Functions: {
+      check_and_increment_ai_usage: {
+        Args: {
+          p_user_id: string
+          p_date: string
+          p_limit?: number
+        }
+        Returns: boolean
       }
     }
   }
