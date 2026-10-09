@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -73,25 +73,31 @@ export interface Database {
       farm_plots: {
         Row: {
           id: string
+          farm_id: string | null
           name: string
           code: string
           description: string | null
+          position: Json | null
           created_at: string
           student_id: string | null
         }
         Insert: {
-          id?: string
+          id: string
+          farm_id?: string | null
           name: string
           code: string
           description?: string | null
+          position?: Json | null
           created_at?: string
           student_id?: string | null
         }
         Update: {
           id?: string
+          farm_id?: string | null
           name?: string
           code?: string
           description?: string | null
+          position?: Json | null
           created_at?: string
           student_id?: string | null
         }
@@ -99,7 +105,7 @@ export interface Database {
       farm_beds: {
         Row: {
           id: string
-          plot_id: string
+          plot_id: string | null
           bed_number: string
           dimensions: string | null
           student_id: string | null
@@ -117,8 +123,8 @@ export interface Database {
           completion_image_url: string | null
         }
         Insert: {
-          id?: string
-          plot_id: string
+          id: string
+          plot_id?: string | null
           bed_number: string
           dimensions?: string | null
           student_id?: string | null
@@ -137,7 +143,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          plot_id?: string
+          plot_id?: string | null
           bed_number?: string
           dimensions?: string | null
           student_id?: string | null
@@ -153,6 +159,47 @@ export interface Database {
           completion_notes?: string | null
           total_harvest?: string | null
           completion_image_url?: string | null
+        }
+      }
+      crop_records: {
+        Row: {
+          id: string
+          bed_id: string
+          date: string
+          crop_name: string | null
+          growth_stage: string | null
+          height_cm: number | null
+          work_types: Json | null
+          notes: string | null
+          harvest_amount: string | null
+          image_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          bed_id: string
+          date: string
+          crop_name?: string | null
+          growth_stage?: string | null
+          height_cm?: number | null
+          work_types?: Json | null
+          notes?: string | null
+          harvest_amount?: string | null
+          image_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          bed_id?: string
+          date?: string
+          crop_name?: string | null
+          growth_stage?: string | null
+          height_cm?: number | null
+          work_types?: Json | null
+          notes?: string | null
+          harvest_amount?: string | null
+          image_url?: string | null
+          created_at?: string
         }
       }
       tasks: {
@@ -350,6 +397,38 @@ export interface Database {
           reply?: string | null
         }
       }
+      payments: {
+        Row: {
+          id: string
+          student_id: string
+          amount: number
+          fee_type: string
+          status: string | null
+          due_date: string | null
+          paid_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          amount: number
+          fee_type: string
+          status?: string | null
+          due_date?: string | null
+          paid_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          amount?: number
+          fee_type?: string
+          status?: string | null
+          due_date?: string | null
+          paid_at?: string | null
+          created_at?: string
+        }
+      }
       events: {
         Row: {
           id: string
@@ -397,12 +476,32 @@ export interface Database {
           created_at?: string | null
         }
       }
+      reservations: {
+        Row: {
+          id: string
+          event_id: string
+          student_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          student_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          student_id?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       farm_beds_with_students: {
         Row: {
           id: string
-          plot_id: string
+          plot_id: string | null
           bed_number: string
           dimensions: string | null
           student_id: string | null
