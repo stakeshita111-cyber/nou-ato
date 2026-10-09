@@ -9,7 +9,6 @@ interface ChatRequestBody {
   studentId?: string | null;
   history?: ChatHistoryItem[];
   isMemoOnly?: boolean;
-  isSpell?: boolean;
 }
 
 export async function POST(request: Request) {
@@ -21,7 +20,6 @@ export async function POST(request: Request) {
       studentId,
       history = [] as ChatHistoryItem[],
       isMemoOnly = false, // 🌟 チケット0枚時のメモ専用モード
-      isSpell = false,    // 🌟 秘密のチケット復活呪文
     } = body;
 
     if (!message || !message.trim()) {
@@ -57,15 +55,11 @@ export async function POST(request: Request) {
     let reply = "";
     let referencedQa: ReferencedQA[] = [];
 
-    // 🌟 1. 秘密の呪文の場合 🌟
-    if (isSpell) {
-      reply = `✨【秘密の呪文を確認しました！】🧙‍♂️\n\n本日のAI相談チケットが全回復しました！（残り3回）\nまたいつでも気軽に質問してくださいね🌱`;
-    } 
-    // 🌟 2. チケット0枚・メモ専用モードの場合 (AIは呼ばずにルールベースで記録) 🌟
-    else if (isMemoOnly) {
+    // 🌟 1. チケット0枚・メモ専用モードの場合 (AIは呼ばずにルールベースで記録) 🌟
+    if (isMemoOnly) {
       reply = `📝【質問メモをお預かりしました】🌱\n\n本日のAI相談チケット（1日3回）を使い切ったため、AIによる即時回答はお休みとなります。\nご相談内容は農園ノートに記録しましたので、次回の来園時に講師より詳しくアドバイスいたしますね！\n\n※チケットは毎晩日本時間0:00に復活します✨`;
     } 
-    // 🌟 3. 通常のAIチケット消費モード (Gemini Flash-Lite + 農園ナレッジ) 🌟
+    // 🌟 2. 通常のAIチケット消費モード (Gemini Flash-Lite + 農園ナレッジ) 🌟
     else {
       const ragRes = await generateRagAnswer(
         message.trim(),
@@ -76,9 +70,8 @@ export async function POST(request: Request) {
       referencedQa = ragRes.referencedQa;
     }
 
-    // 2. Supabase の journals テーブルに対話履歴・質問メモを確実に保存
+    // Supabase の journals テーブルに対話履歴・質問メモを確実に保存
     try {
-      const isPrivate = message.trim().startsWith("【非公開相談】");
       const { error: insertErr } = await supabase.from("journals").insert([
         {
           student_id: effectiveStudentId,
@@ -86,7 +79,7 @@ export async function POST(request: Request) {
           // メモ専用の場合は講師の対応待ちとするため、replyをnullにして講師未回答扱いにする（生徒画面には上記案内を即時表示）
           reply: isMemoOnly ? null : reply,
           role: "student",
-          is_approved: false, // デフォルトで未承認（非公開相談タグがある場合は確実に承認対象外）
+          is_approved: false, // デフォルトで未承認
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

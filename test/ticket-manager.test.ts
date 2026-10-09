@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   getJstDateString,
-  isSecretTicketSpell,
   getTicketState,
   consumeTicket,
-  restoreTicketsBySpell,
+  grantTicket,
   addQuestionStock,
   getQuestionStock,
   clearQuestionStock,
@@ -35,13 +34,6 @@ describe("ticketManager", () => {
   it("returns JST date string in YYYY-MM-DD format", () => {
     const d = getJstDateString();
     expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it("detects secret ticket spell correctly", () => {
-    expect(isSecretTicketSpell("チケットください")).toBe(true);
-    expect(isSecretTicketSpell("ちけっと復活")).toBe(true);
-    expect(isSecretTicketSpell("チケットちょうだい")).toBe(true);
-    expect(isSecretTicketSpell("トマトの育て方を教えて")).toBe(false);
   });
 
   it("initializes default ticket state with 3 tickets", () => {
@@ -77,11 +69,17 @@ describe("ticketManager", () => {
     expect(res4.count).toBe(0);
   });
 
-  it("restores tickets with secret spell", () => {
+  it("grants ticket correctly to a student", () => {
     consumeTicket("user1");
     consumeTicket("user1");
-    const restored = restoreTicketsBySpell("user1");
-    expect(restored.count).toBe(DEFAULT_DAILY_TICKETS);
+    consumeTicket("user1");
+    expect(getTicketState("user1").count).toBe(0);
+
+    const granted = grantTicket("user1", 1);
+    expect(granted.count).toBe(1);
+
+    const grantedAgain = grantTicket("user1", 2);
+    expect(grantedAgain.count).toBe(3);
   });
 
   it("manages question stocks correctly (add, get, clear, format)", () => {
