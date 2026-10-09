@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
-import Toast from "@/components/ui/Toast";
+import { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
+import Toast from '@/components/ui/Toast';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -15,12 +15,12 @@ export default function QRCodeModal({
   isOpen,
   onClose,
   inviteUrl,
-  farmName = "農園招待",
+  farmName = '農園招待',
 }: QRCodeModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [dataUrl, setDataUrl] = useState<string>("");
+  const [dataUrl, setDataUrl] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     if (isOpen && inviteUrl) {
@@ -33,12 +33,12 @@ export default function QRCodeModal({
             width: 240,
             margin: 2,
             color: {
-              dark: "#064e3b", // 深いエメラルドグリーン
-              light: "#ffffff",
+              dark: '#064e3b', // 深いエメラルドグリーン
+              light: '#ffffff',
             },
           },
           (error) => {
-            if (error) console.error("QR Code canvas generation error:", error);
+            if (error) console.error('QR Code canvas generation error:', error);
           }
         );
       }
@@ -50,8 +50,8 @@ export default function QRCodeModal({
           width: 500,
           margin: 2,
           color: {
-            dark: "#064e3b",
-            light: "#ffffff",
+            dark: '#064e3b',
+            light: '#ffffff',
           },
         },
         (err, url) => {
@@ -68,7 +68,7 @@ export default function QRCodeModal({
   const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      setToastMessage("📋 招待URLをクリップボードにコピーしました！");
+      setToastMessage('📋 招待URLをクリップボードにコピーしました！');
       setShowToast(true);
     } catch (err) {
       console.error(err);
@@ -121,7 +121,10 @@ export default function QRCodeModal({
               📥 QR画像保存
             </a>
           ) : (
-            <button disabled className="py-2.5 bg-gray-200 text-gray-400 font-bold text-xs rounded-xl">
+            <button
+              disabled
+              className="py-2.5 bg-gray-200 text-gray-400 font-bold text-xs rounded-xl"
+            >
               読み込み中...
             </button>
           )}

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React from "react";
-import { formatDate } from "@/lib/utils/formatHelper";
+import React from 'react';
+import { formatDate } from '@/lib/utils/formatHelper';
 
 export type StudentUser = {
   id: string;
@@ -24,8 +24,11 @@ export default function StudentCard({ student }: StudentCardProps) {
   const completed = student.completed_task_count || 0;
   const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const displayName = student.display_name || student.name || (student.email ? student.email.split("@")[0] : "受講生");
-  const initial = displayName ? displayName[0].toUpperCase() : "生";
+  const displayName =
+    student.display_name ||
+    student.name ||
+    (student.email ? student.email.split('@')[0] : '受講生');
+  const initial = displayName ? displayName[0].toUpperCase() : '生';
 
   return (
     <div className="bg-white rounded-3xl p-6 border border-gray-200/80 shadow-sm hover:shadow-md transition flex flex-col justify-between">
@@ -36,11 +39,9 @@ export default function StudentCard({ student }: StudentCardProps) {
             {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-extrabold text-gray-900 truncate">
-              {displayName}
-            </h3>
+            <h3 className="text-sm font-extrabold text-gray-900 truncate">{displayName}</h3>
             <p className="text-xs text-gray-400 font-medium truncate">
-              {student.email || "メール未登録"}
+              {student.email || 'メール未登録'}
             </p>
           </div>
         </div>
@@ -49,7 +50,9 @@ export default function StudentCard({ student }: StudentCardProps) {
         <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-4">
           <div className="flex justify-between items-center text-xs font-bold mb-2">
             <span className="text-gray-600">クエストクリア率</span>
-            <span className="text-emerald-700">{rate}% ({completed}/{total})</span>
+            <span className="text-emerald-700">
+              {rate}% ({completed}/{total})
+            </span>
           </div>
           <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
             <div
@@ -63,7 +66,7 @@ export default function StudentCard({ student }: StudentCardProps) {
       {/* ステータスバッジ */}
       <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-100 text-xs font-bold text-gray-500">
         <span>登録日</span>
-        <span>{student.created_at ? formatDate(student.created_at) : "最近"}</span>
+        <span>{student.created_at ? formatDate(student.created_at) : '最近'}</span>
       </div>
     </div>
   );

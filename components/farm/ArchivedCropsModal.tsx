@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Image from "next/image";
-import { FarmBed, CropRecord } from "@/types/farm";
+import { useState } from 'react';
+import Image from 'next/image';
+import { FarmBed, CropRecord } from '@/types/farm';
 
 interface ArchivedCropsModalProps {
   isOpen: boolean;
@@ -15,18 +15,18 @@ interface ArchivedCropsModalProps {
 
 // 作物名からアイコン絵文字を判定するヘルパー
 const getCropEmoji = (name?: string) => {
-  if (!name || name.includes("未確定") || name.includes("未定")) return "🌱";
-  if (name.includes("トマト")) return "🍅";
-  if (name.includes("ナス")) return "🍆";
-  if (name.includes("ピーマン") || name.includes("パプリカ")) return "🫑";
-  if (name.includes("きゅうり") || name.includes("キュウリ")) return "🥒";
-  if (name.includes("ニンジン") || name.includes("にんじん")) return "🥕";
-  if (name.includes("イチゴ") || name.includes("いちご")) return "🍓";
-  if (name.includes("ネギ") || name.includes("ねぎ")) return "🧅";
-  if (name.includes("レタス") || name.includes("キャベツ")) return "🥬";
-  if (name.includes("スイカ")) return "🍉";
-  if (name.includes("トウモロコシ") || name.includes("コーン")) return "🌽";
-  return "🌱";
+  if (!name || name.includes('未確定') || name.includes('未定')) return '🌱';
+  if (name.includes('トマト')) return '🍅';
+  if (name.includes('ナス')) return '🍆';
+  if (name.includes('ピーマン') || name.includes('パプリカ')) return '🫑';
+  if (name.includes('きゅうり') || name.includes('キュウリ')) return '🥒';
+  if (name.includes('ニンジン') || name.includes('にんじん')) return '🥕';
+  if (name.includes('イチゴ') || name.includes('いちご')) return '🍓';
+  if (name.includes('ネギ') || name.includes('ねぎ')) return '🧅';
+  if (name.includes('レタス') || name.includes('キャベツ')) return '🥬';
+  if (name.includes('スイカ')) return '🍉';
+  if (name.includes('トウモロコシ') || name.includes('コーン')) return '🌽';
+  return '🌱';
 };
 
 export default function ArchivedCropsModal({
@@ -37,22 +37,20 @@ export default function ArchivedCropsModal({
   isTeacher = false,
   onUnarchive,
 }: ArchivedCropsModalProps) {
-  const [selectedSeason, setSelectedSeason] = useState<string>("all");
+  const [selectedSeason, setSelectedSeason] = useState<string>('all');
   // 複数または個別に展開できる展開中ベッドIDの配列
   const [expandedBedIds, setExpandedBedIds] = useState<string[]>([]);
 
   if (!isOpen) return null;
 
   // 存在するシーズン一覧のユニーク抽出
-  const seasons = Array.from(
-    new Set(archivedBeds.map((b) => b.season || "2026年 春夏"))
-  );
+  const seasons = Array.from(new Set(archivedBeds.map((b) => b.season || '2026年 春夏')));
 
   // フィルタリング & 新しい収穫日順（またはIDのタイムスタンプ順）にソート
   const filteredBeds = [...archivedBeds]
     .filter((b) => {
-      if (selectedSeason === "all") return true;
-      return (b.season || "2026年 春夏") === selectedSeason;
+      if (selectedSeason === 'all') return true;
+      return (b.season || '2026年 春夏') === selectedSeason;
     })
     .sort((a, b) => {
       const timeA = a.harvested_at ? new Date(a.harvested_at).getTime() : 0;
@@ -108,7 +106,7 @@ export default function ArchivedCropsModal({
             >
               <option value="all">すべてのシーズン ({archivedBeds.length}件)</option>
               {seasons.map((s) => {
-                const count = archivedBeds.filter((b) => (b.season || "2026年 春夏") === s).length;
+                const count = archivedBeds.filter((b) => (b.season || '2026年 春夏') === s).length;
                 return (
                   <option key={s} value={s}>
                     {s} ({count}件)
@@ -152,8 +150,8 @@ export default function ArchivedCropsModal({
                   key={bed.id}
                   className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
                     isExpanded
-                      ? "bg-emerald-50/50 border-emerald-400 shadow-md ring-1 ring-emerald-400/30"
-                      : "bg-white border-gray-200 hover:border-emerald-300 hover:shadow-xs"
+                      ? 'bg-emerald-50/50 border-emerald-400 shadow-md ring-1 ring-emerald-400/30'
+                      : 'bg-white border-gray-200 hover:border-emerald-300 hover:shadow-xs'
                   }`}
                 >
                   {/* カードヘッダー（クリックで展開/折りたたみ） */}
@@ -179,7 +177,7 @@ export default function ArchivedCropsModal({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-black text-sm text-gray-900 truncate">
-                            {bed.crop_name || "作物"}
+                            {bed.crop_name || '作物'}
                           </span>
                           <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-black shrink-0">
                             畝 {bed.bed_number}
@@ -189,14 +187,15 @@ export default function ArchivedCropsModal({
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 font-bold truncate mt-0.5">
-                          🗓️ {bed.season || "2026年 春夏"} ・ 収穫日: {bed.harvested_at || "記録あり"}
+                          🗓️ {bed.season || '2026年 春夏'} ・ 収穫日:{' '}
+                          {bed.harvested_at || '記録あり'}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs font-black text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
-                        {isExpanded ? "閉じる ▲" : "詳細を見る ▼"}
+                        {isExpanded ? '閉じる ▲' : '詳細を見る ▼'}
                       </span>
                     </div>
                   </div>
@@ -225,7 +224,7 @@ export default function ArchivedCropsModal({
                           <span className="text-base">🧺</span>
                           <span className="font-black text-gray-700">総収穫量:</span>
                           <span className="font-black text-emerald-800 text-sm">
-                            {bed.total_harvest || "記録なし"}
+                            {bed.total_harvest || '記録なし'}
                           </span>
                         </div>
 
@@ -238,7 +237,9 @@ export default function ArchivedCropsModal({
                             {bed.completion_notes ? (
                               bed.completion_notes
                             ) : (
-                              <span className="text-gray-400 font-normal">（振り返りメモはありません）</span>
+                              <span className="text-gray-400 font-normal">
+                                （振り返りメモはありません）
+                              </span>
                             )}
                           </div>
                         </div>

@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
-import type { Provider } from "@supabase/supabase-js";
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import type { Provider } from '@supabase/supabase-js';
 
 interface LineLinkingCardProps {
   onStatusChange?: () => void;
@@ -12,19 +12,23 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
   const supabase = createClient();
   const [isLinked, setIsLinked] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     let isMounted = true;
     const fetchStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user && isMounted) {
-          const lineIdentity = user.identities?.find((id) => id.provider === "custom:line" || id.provider === "line");
+          const lineIdentity = user.identities?.find(
+            (id) => id.provider === 'custom:line' || id.provider === 'line'
+          );
           setIsLinked(!!lineIdentity);
         }
       } catch (err) {
-        console.error("Failed to fetch user identities:", err);
+        console.error('Failed to fetch user identities:', err);
       }
     };
 
@@ -35,19 +39,19 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
     };
   }, [supabase]);
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
 
   const handleLinkLine = async () => {
     if (isLineDisabled) {
-      setMessage("💡 LINEアカウント連携機能は現在準備中です。");
+      setMessage('💡 LINEアカウント連携機能は現在準備中です。');
       return;
     }
     setLoading(true);
-    setMessage("");
+    setMessage('');
     try {
       const origin = window.location.origin;
       const { data, error } = await supabase.auth.linkIdentity({
-        provider: "custom:line" as unknown as Provider,
+        provider: 'custom:line' as unknown as Provider,
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student`,
@@ -55,14 +59,14 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
       });
 
       if (error) {
-        console.error("LINE link identity error:", error);
-        setMessage("💡 LINEアカウント連携機能は現在準備中です（未設定環境）。");
+        console.error('LINE link identity error:', error);
+        setMessage('💡 LINEアカウント連携機能は現在準備中です（未設定環境）。');
       } else if (data?.url) {
         window.location.href = data.url;
       }
     } catch (err: unknown) {
-      console.error("LINE link identity exception:", err);
-      setMessage("💡 LINEアカウント連携機能は現在準備中です（未設定環境）。");
+      console.error('LINE link identity exception:', err);
+      setMessage('💡 LINEアカウント連携機能は現在準備中です（未設定環境）。');
     } finally {
       setLoading(false);
     }
@@ -70,13 +74,17 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
 
   const handleUnlinkLine = async () => {
     setLoading(true);
-    setMessage("");
+    setMessage('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const lineIdentity = user?.identities?.find((id) => id.provider === "custom:line" || id.provider === "line");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const lineIdentity = user?.identities?.find(
+        (id) => id.provider === 'custom:line' || id.provider === 'line'
+      );
 
       if (!lineIdentity) {
-        setMessage("LINEアカウントが連携されていません");
+        setMessage('LINEアカウントが連携されていません');
         setLoading(false);
         return;
       }
@@ -85,12 +93,12 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
       if (error) {
         setMessage(`連携解除失敗: ${error.message}`);
       } else {
-        setMessage("LINEアカウントの連携を解除しました");
+        setMessage('LINEアカウントの連携を解除しました');
         setIsLinked(false);
         if (onStatusChange) onStatusChange();
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
+      const msg = err instanceof Error ? err.message : '';
       setMessage(`エラーが発生しました: ${msg}`);
     } finally {
       setLoading(false);
@@ -106,9 +114,7 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
           </div>
           <div>
             <h3 className="text-sm font-bold text-gray-900">LINE アカウント連携</h3>
-            <p className="text-xs text-gray-500">
-              LINEログインや通知連携を有効にします
-            </p>
+            <p className="text-xs text-gray-500">LINEログインや通知連携を有効にします</p>
           </div>
         </div>
 
@@ -116,13 +122,13 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
           <span
             className={`text-xs px-3 py-1 rounded-full font-bold ${
               isLineDisabled
-                ? "bg-amber-100 text-amber-800"
+                ? 'bg-amber-100 text-amber-800'
                 : isLinked
-                ? "bg-green-100 text-green-800"
-                : "bg-gray-100 text-gray-600"
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-gray-100 text-gray-600'
             }`}
           >
-            {isLineDisabled ? "準備中" : isLinked ? "連携済み" : "未連携"}
+            {isLineDisabled ? '準備中' : isLinked ? '連携済み' : '未連携'}
           </span>
         )}
       </div>
@@ -141,7 +147,7 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
             disabled={loading}
             className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition"
           >
-            {loading ? "解除中..." : "LINE連携を解除する"}
+            {loading ? '解除中...' : 'LINE連携を解除する'}
           </button>
         ) : (
           <button
@@ -150,12 +156,18 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
             disabled={loading || isLineDisabled}
             className={`w-full py-2.5 font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-2 ${
               isLineDisabled
-                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-[#06C755] hover:bg-[#05b34c] text-white'
             }`}
           >
             <span>💬</span>
-            <span>{isLineDisabled ? "LINE連携 (準備中)" : loading ? "LINEへ移動中..." : "LINEアカウントと連携する"}</span>
+            <span>
+              {isLineDisabled
+                ? 'LINE連携 (準備中)'
+                : loading
+                  ? 'LINEへ移動中...'
+                  : 'LINEアカウントと連携する'}
+            </span>
           </button>
         )}
       </div>

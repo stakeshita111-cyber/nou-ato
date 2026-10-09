@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
 /**
  * RFC 7807 Problem Details for HTTP APIs
@@ -50,7 +50,7 @@ export class ApiResponse {
     return NextResponse.json(body, {
       status,
       headers: {
-        "Content-Type": "application/problem+json",
+        'Content-Type': 'application/problem+json',
       },
     });
   }
@@ -58,42 +58,45 @@ export class ApiResponse {
   /**
    * 400 Bad Request
    */
-  static badRequest(detail: string, invalidParams?: Array<{ name: string; reason: string }>): NextResponse<ProblemDetails> {
-    return this.problem(400, "Bad Request", detail, { invalidParams });
+  static badRequest(
+    detail: string,
+    invalidParams?: Array<{ name: string; reason: string }>
+  ): NextResponse<ProblemDetails> {
+    return this.problem(400, 'Bad Request', detail, { invalidParams });
   }
 
   /**
    * 401 Unauthorized
    */
-  static unauthorized(detail = "認証が必要です"): NextResponse<ProblemDetails> {
-    return this.problem(401, "Unauthorized", detail);
+  static unauthorized(detail = '認証が必要です'): NextResponse<ProblemDetails> {
+    return this.problem(401, 'Unauthorized', detail);
   }
 
   /**
    * 403 Forbidden
    */
-  static forbidden(detail = "アクセス権限がありません"): NextResponse<ProblemDetails> {
-    return this.problem(403, "Forbidden", detail);
+  static forbidden(detail = 'アクセス権限がありません'): NextResponse<ProblemDetails> {
+    return this.problem(403, 'Forbidden', detail);
   }
 
   /**
    * 404 Not Found
    */
-  static notFound(detail = "リソースが見つかりません"): NextResponse<ProblemDetails> {
-    return this.problem(404, "Not Found", detail);
+  static notFound(detail = 'リソースが見つかりません'): NextResponse<ProblemDetails> {
+    return this.problem(404, 'Not Found', detail);
   }
 
   /**
    * 429 Too Many Requests
    */
-  static tooManyRequests(detail = "リクエスト上限に達しました"): NextResponse<ProblemDetails> {
-    return this.problem(429, "Too Many Requests", detail);
+  static tooManyRequests(detail = 'リクエスト上限に達しました'): NextResponse<ProblemDetails> {
+    return this.problem(429, 'Too Many Requests', detail);
   }
 
   /**
    * 500 Internal Server Error
    */
-  static internalError(detail = "サーバー内部エラーが発生しました"): NextResponse<ProblemDetails> {
-    return this.problem(500, "Internal Server Error", detail);
+  static internalError(detail = 'サーバー内部エラーが発生しました'): NextResponse<ProblemDetails> {
+    return this.problem(500, 'Internal Server Error', detail);
   }
 }

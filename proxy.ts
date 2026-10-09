@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be configured."
+      'Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be configured.'
     );
   }
 
@@ -44,32 +44,32 @@ export async function proxy(request: NextRequest) {
 
     // 1. 未認証アクセス制限 (TC-AUTH-004: 未ログイン時は即座にサーバー側でログイン画面へ誘導)
     if (authError || !user) {
-      if (pathname === "/" || pathname.startsWith("/teacher") || pathname.startsWith("/student")) {
+      if (pathname === '/' || pathname.startsWith('/teacher') || pathname.startsWith('/student')) {
         const loginUrl = request.nextUrl.clone();
-        loginUrl.pathname = "/login";
-        if (pathname !== "/") {
-          loginUrl.searchParams.set("redirect", pathname);
+        loginUrl.pathname = '/login';
+        if (pathname !== '/') {
+          loginUrl.searchParams.set('redirect', pathname);
         }
         return NextResponse.redirect(loginUrl);
       }
     } else {
       // 2. 講師専用画面 (/teacher) のアクセス制御: ユーザーのロールが 'teacher' でない場合は即座にサーバー側で遮断・リダイレクト
-      if (pathname.startsWith("/teacher")) {
+      if (pathname.startsWith('/teacher')) {
         const { data: userData } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
           .maybeSingle();
 
-        if (userData?.role !== "teacher") {
+        if (userData?.role !== 'teacher') {
           const studentUrl = request.nextUrl.clone();
-          studentUrl.pathname = "/student";
+          studentUrl.pathname = '/student';
           return NextResponse.redirect(studentUrl);
         }
       }
     }
   } catch (error) {
-    console.error("Middleware error in proxy:", error);
+    console.error('Middleware error in proxy:', error);
     return response;
   }
 
@@ -80,8 +80,5 @@ export const middleware = proxy;
 export default proxy;
 
 export const config = {
-  matcher: [
-    "/teacher/:path*",
-    "/student/:path*",
-  ],
+  matcher: ['/teacher/:path*', '/student/:path*'],
 };

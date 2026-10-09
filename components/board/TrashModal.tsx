@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React from "react";
-import { Task } from "@/types/task";
+import React from 'react';
+import { Task } from '@/types/task';
 
 type TrashModalProps = {
   trashTasks: Task[];
@@ -19,7 +19,6 @@ export default function TrashModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 text-gray-800 animate-in fade-in duration-150">
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl flex flex-col">
-        
         {/* ヘッダー */}
         <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 flex justify-between items-center rounded-t-3xl">
           <div className="flex items-center gap-3">
@@ -62,14 +61,10 @@ export default function TrashModal({
                         {task.target_crop}
                       </span>
                     )}
-                    <h3 className="font-bold text-sm text-gray-900 truncate">
-                      {task.title}
-                    </h3>
+                    <h3 className="font-bold text-sm text-gray-900 truncate">{task.title}</h3>
                   </div>
                   {task.description && (
-                    <p className="text-xs text-gray-500 font-medium truncate">
-                      {task.description}
-                    </p>
+                    <p className="text-xs text-gray-500 font-medium truncate">{task.description}</p>
                   )}
                 </div>
 
@@ -105,7 +100,6 @@ export default function TrashModal({
             閉じる
           </button>
         </div>
-
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { FarmPlot } from "@/types/farm";
+import { FarmPlot } from '@/types/farm';
 
 export interface CardBoundingBox {
   x: number;
@@ -74,7 +74,13 @@ export function buildPlotUpsertPayload(
 
   const bedsMeta: { [bed_id: string]: any } = {};
   (plot.beds || []).forEach((b) => {
-    if (b.status === "completed_pending" || b.status === "archived" || b.completion_notes || b.completion_image_url || b.total_harvest) {
+    if (
+      b.status === 'completed_pending' ||
+      b.status === 'archived' ||
+      b.completion_notes ||
+      b.completion_image_url ||
+      b.total_harvest
+    ) {
       bedsMeta[b.id] = {
         status: b.status,
         season: b.season,
@@ -86,15 +92,16 @@ export function buildPlotUpsertPayload(
     }
   });
 
-  const validStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
-  const validFarmId = (activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId)) ? activeFarmId : null;
+  const validStudentId =
+    plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id) ? plot.student_id : null;
+  const validFarmId = activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId) ? activeFarmId : null;
 
   return {
     id: plot.id,
     name: plotName,
     code: plot.code,
     student_id: isVac ? null : validStudentId,
-    student_name: isVac ? null : (plot.student_name || null),
+    student_name: isVac ? null : plot.student_name || null,
     is_vacant: isVac,
     farm_id: validFarmId,
     description: JSON.stringify({
@@ -107,37 +114,39 @@ export function buildPlotUpsertPayload(
         farm_id: activeFarmId,
       },
       farm_meta: {
-        address: farmMeta.address || "",
+        address: farmMeta.address || '',
         weather_location: farmMeta.weatherLocation || null,
       },
     }),
   };
 }
 
-export function buildBedUpsertPayloadsForPlot(
-  plot: FarmPlot
-): BedUpsertPayload[] {
-  if (!plot || plot.id.startsWith("plot_placeholder_")) return [];
+export function buildBedUpsertPayloadsForPlot(plot: FarmPlot): BedUpsertPayload[] {
+  if (!plot || plot.id.startsWith('plot_placeholder_')) return [];
   const bedsToUpsert: BedUpsertPayload[] = [];
   const isVac = Boolean(plot.is_vacant);
   if (plot.beds && plot.beds.length > 0) {
-    const activeOnlyBeds = plot.beds.filter(b => b.status !== "archived" && !b.id?.startsWith("archived_"));
+    const activeOnlyBeds = plot.beds.filter(
+      (b) => b.status !== 'archived' && !b.id?.startsWith('archived_')
+    );
     for (let bIdx = 0; bIdx < activeOnlyBeds.length; bIdx++) {
       const b = activeOnlyBeds[bIdx];
       const bedNumber = String(b.bed_number || bIdx + 1);
-      const plotCode = plot.code || "C3";
-      const bedId = b.id && !b.id.startsWith("bed_") ? b.id : `plot_cell_${plotCode}_bed_${bedNumber}`;
-      const validBedStudentId = (plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id)) ? plot.student_id : null;
+      const plotCode = plot.code || 'C3';
+      const bedId =
+        b.id && !b.id.startsWith('bed_') ? b.id : `plot_cell_${plotCode}_bed_${bedNumber}`;
+      const validBedStudentId =
+        plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id) ? plot.student_id : null;
       bedsToUpsert.push({
         id: bedId,
         plot_id: plot.id,
         bed_number: bedNumber,
-        crop_name: b.crop_name || "未確定 🌱",
+        crop_name: b.crop_name || '未確定 🌱',
         student_id: isVac ? null : validBedStudentId,
-        student_name: isVac ? null : (plot.student_name || null),
+        student_name: isVac ? null : plot.student_name || null,
         progress_percent: b.progress_percent || 0,
-        status: b.status || "active",
-        season: b.season || "2026年 秋冬",
+        status: b.status || 'active',
+        season: b.season || '2026年 秋冬',
         harvested_at: b.harvested_at || null,
         completion_notes: b.completion_notes || null,
         total_harvest: b.total_harvest || null,
@@ -168,8 +177,9 @@ export const buildFixedPlots = (
       const existing = existingPlots.find((p) => p.code === cellAddress);
       const uniquePlotId = `plot_cell_${cellAddress}`;
 
-      if (existing && !existing.id.startsWith("plot_placeholder_")) {
-        const isVacantStatus = Boolean(existing.is_vacant) || (existing as any).description === "vacant";
+      if (existing && !existing.id.startsWith('plot_placeholder_')) {
+        const isVacantStatus =
+          Boolean(existing.is_vacant) || (existing as any).description === 'vacant';
 
         fixedPlots.push({
           ...existing,
@@ -188,7 +198,7 @@ export const buildFixedPlots = (
                 id: `bed_${cellAddress}_${bIdx + 1}`,
                 plot_id: uniquePlotId,
                 bed_number: bIdx + 1,
-                crop_name: "未確定 🌱",
+                crop_name: '未確定 🌱',
                 is_updated: false,
               })),
         });
@@ -205,7 +215,7 @@ export const buildFixedPlots = (
             id: `bed_${cellAddress}_${bIdx + 1}`,
             plot_id: uniquePlotId,
             bed_number: bIdx + 1,
-            crop_name: "未確定 🌱",
+            crop_name: '未確定 🌱',
             is_updated: false,
           })),
         });

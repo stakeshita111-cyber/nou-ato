@@ -3,6 +3,7 @@ name: generate-commit-message
 description: Gitの変更差分（git diff）を解析し、Conventional Commitsに準拠したコミットメッセージを自動生成するスキル。コミット作成時に呼び出します。
 allowed-tools: [run_command]
 ---
+
 # コミットメッセージ自動生成手順
 
 1. `git status` および `git diff --cached` (または `git diff`) を実行して、変更されたファイルと差分を確認してください。

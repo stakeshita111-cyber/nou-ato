@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React from "react";
+import React from 'react';
 
 export type Template = {
   id: string;
@@ -26,16 +26,14 @@ export default function TemplateCard({ template, onCreateTask }: TemplateCardPro
       <div>
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
-            {template.target_crop || "全般"}
+            {template.target_crop || '全般'}
           </span>
           <span className="text-xs text-gray-400 font-semibold">
             ★{template.difficulty} / {template.exp} EXP
           </span>
         </div>
 
-        <h3 className="text-lg font-extrabold text-gray-900 leading-snug mb-2">
-          {template.title}
-        </h3>
+        <h3 className="text-lg font-extrabold text-gray-900 leading-snug mb-2">{template.title}</h3>
 
         {template.tools_needed && (
           <div className="mb-3 text-xs text-gray-600 font-medium bg-gray-50 p-2.5 rounded-xl border border-gray-100">

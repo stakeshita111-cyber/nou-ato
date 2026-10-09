@@ -1,1 +1,1 @@
-export * from "@/lib/ticketManager";
+export * from '@/lib/ticketManager';

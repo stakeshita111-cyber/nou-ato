@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import Toast from "@/components/ui/Toast";
-import { supabase } from "@/lib/supabase";
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import Toast from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
 import {
   getTicketState,
   consumeTicket,
@@ -11,13 +11,13 @@ import {
   addQuestionStock,
   clearQuestionStock,
   formatStockText,
-} from "@/lib/ticketManager";
-import { formatQuestionTopic } from "@/lib/utils/journalHelper";
-import { sanitizePersonalNames } from "@/lib/rag/qaKnowledgeRetriever";
+} from '@/lib/ticketManager';
+import { formatQuestionTopic } from '@/lib/utils/journalHelper';
+import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
 
 interface MessageItem {
   id: string;
-  sender: "student" | "teacher" | "system";
+  sender: 'student' | 'teacher' | 'system';
   text: string;
   timestamp: string;
   referencedQa?: { question: string; answer: string }[];
@@ -44,44 +44,47 @@ interface StudentTalkViewProps {
 // 定型よくある質問（無料・チケット非消費）
 const PRESET_FAQS = [
   {
-    id: "faq_fertilizer",
-    chipLabel: "🌱 追肥のやり方",
-    question: "追肥のタイミングやおすすめのやり方を教えてください",
-    answer: "【農園アドバイス：追肥の基本】🌱\n\n植え付けから2〜3週間後、または一番果（最初の実）がついた頃が1回目の追肥タイミングです！\n株元から少し離れた場所に肥料を一握り施し、土と軽く混ぜてあげてくださいね。有機ぼかし肥や油かすを使うと根を傷めず元気に育ちます✨",
+    id: 'faq_fertilizer',
+    chipLabel: '🌱 追肥のやり方',
+    question: '追肥のタイミングやおすすめのやり方を教えてください',
+    answer:
+      '【農園アドバイス：追肥の基本】🌱\n\n植え付けから2〜3週間後、または一番果（最初の実）がついた頃が1回目の追肥タイミングです！\n株元から少し離れた場所に肥料を一握り施し、土と軽く混ぜてあげてくださいね。有機ぼかし肥や油かすを使うと根を傷めず元気に育ちます✨',
   },
   {
-    id: "faq_yellow_leaf",
-    chipLabel: "🍅 葉が黄色い",
-    question: "葉っぱが黄色くなってきました。どうすればいいですか？",
-    answer: "【農園アドバイス：葉の黄変について】🍅\n\n・一番下の古い葉が黄色い場合：自然な老化ですので、風通しを良くするため根本からハサミで切り取って大丈夫です。\n・株全体や上部が黄色い場合：水切れ、または肥料切れ（チッソ不足）の可能性があります。土の乾き具合を確認し、必要に応じて追肥を行ってみてくださいね！",
+    id: 'faq_yellow_leaf',
+    chipLabel: '🍅 葉が黄色い',
+    question: '葉っぱが黄色くなってきました。どうすればいいですか？',
+    answer:
+      '【農園アドバイス：葉の黄変について】🍅\n\n・一番下の古い葉が黄色い場合：自然な老化ですので、風通しを良くするため根本からハサミで切り取って大丈夫です。\n・株全体や上部が黄色い場合：水切れ、または肥料切れ（チッソ不足）の可能性があります。土の乾き具合を確認し、必要に応じて追肥を行ってみてくださいね！',
   },
   {
-    id: "faq_pest",
-    chipLabel: "🐛 害虫の対策",
-    question: "害虫（ハダニやアブラムシ）を見つけました。無農薬での対策は？",
-    answer: "【農園アドバイス：安心な害虫対策】🐛\n\n・アブラムシ・ハダニ：葉の裏に勢いよく水をかける「葉水」がとても効果的です。水で薄めたお酢や牛乳スプレーも窒息効果があります。\n・アオムシ等：見つけたら割り箸などで優しく捕殺するのが確実です。早めの発見が大切ですので、葉の裏をこまめに観察してくださいね！",
+    id: 'faq_pest',
+    chipLabel: '🐛 害虫の対策',
+    question: '害虫（ハダニやアブラムシ）を見つけました。無農薬での対策は？',
+    answer:
+      '【農園アドバイス：安心な害虫対策】🐛\n\n・アブラムシ・ハダニ：葉の裏に勢いよく水をかける「葉水」がとても効果的です。水で薄めたお酢や牛乳スプレーも窒息効果があります。\n・アオムシ等：見つけたら割り箸などで優しく捕殺するのが確実です。早めの発見が大切ですので、葉の裏をこまめに観察してくださいね！',
   },
   {
-    id: "faq_watering",
-    chipLabel: "💧 水やりの頻度",
-    question: "夏の水やりのタイミングや頻度を教えてください",
-    answer: "【農園アドバイス：水やりのコツ】💧\n\n基本は「朝の涼しい時間帯（早朝〜8時頃）」にたっぷりとあげるのがベストです！\n日中の暑い時間に水をあげるとお湯のようになって根を傷める原因になります。土の表面が乾いて白っぽくなったら、株元にしっかりあげてくださいね🌱",
+    id: 'faq_watering',
+    chipLabel: '💧 水やりの頻度',
+    question: '夏の水やりのタイミングや頻度を教えてください',
+    answer:
+      '【農園アドバイス：水やりのコツ】💧\n\n基本は「朝の涼しい時間帯（早朝〜8時頃）」にたっぷりとあげるのがベストです！\n日中の暑い時間に水をあげるとお湯のようになって根を傷める原因になります。土の表面が乾いて白っぽくなったら、株元にしっかりあげてくださいね🌱',
   },
 ];
 
-
 export default function StudentTalkView({
   journals = [],
-  studentName = "受講生",
+  studentName = '受講生',
   studentId,
   customDailyLimit = DEFAULT_DAILY_TICKETS,
-  planType = "limited",
+  planType = 'limited',
 }: StudentTalkViewProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
-  const [inputText, setInputText] = useState("");
+  const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -95,48 +98,48 @@ export default function StudentTalkView({
 
   // 検索機能 State
   const [showSearch, setShowSearch] = useState(false);
-  const [searchMode, setSearchMode] = useState<"jump" | "list">("jump");
-  const [searchKeyword, setSearchKeyword] = useState("");
+  const [searchMode, setSearchMode] = useState<'jump' | 'list'>('jump');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
   // AI相談チケット State
   const [ticketState, setTicketState] = useState(() =>
-    getTicketState(studentId || "default", customDailyLimit, planType)
+    getTicketState(studentId || 'default', customDailyLimit, planType)
   );
 
   useEffect(() => {
-    const current = getTicketState(studentId || "default", customDailyLimit, planType);
+    const current = getTicketState(studentId || 'default', customDailyLimit, planType);
     setTicketState(current);
   }, [studentId, customDailyLimit, planType]);
 
   // リアルタイム・クロス cellophane チケット残数同期
   useEffect(() => {
     const updateState = () => {
-      const current = getTicketState(studentId || "default", customDailyLimit, planType);
+      const current = getTicketState(studentId || 'default', customDailyLimit, planType);
       setTicketState(current);
     };
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("nouato_tickets_updated", updateState);
-      window.addEventListener("nouato_sync_event", updateState);
-      window.addEventListener("storage", updateState);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nouato_tickets_updated', updateState);
+      window.addEventListener('nouato_sync_event', updateState);
+      window.addEventListener('storage', updateState);
     }
 
     let bc: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = (event) => {
-        if (event.data?.type === "TICKETS_UPDATED") {
+        if (event.data?.type === 'TICKETS_UPDATED') {
           updateState();
         }
       };
     } catch {}
 
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("nouato_tickets_updated", updateState);
-        window.removeEventListener("nouato_sync_event", updateState);
-        window.removeEventListener("storage", updateState);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nouato_tickets_updated', updateState);
+        window.removeEventListener('nouato_sync_event', updateState);
+        window.removeEventListener('storage', updateState);
       }
       if (bc) bc.close();
     };
@@ -149,72 +152,81 @@ export default function StudentTalkView({
 
       if (studentId) {
         const { data: dbJournals } = await supabase
-          .from("journals")
-          .select("*")
-          .eq("student_id", studentId)
-          .order("created_at", { ascending: true });
+          .from('journals')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: true });
 
         // 自分のデータのみを使用（0件なら0件のまま。他人の会話には絶対にフォールバックしない）
         targetList = dbJournals || [];
       } else if (journals && journals.length > 0) {
         // studentId 未設定の場合でも、他人のデータ混入を防止
-        targetList = journals.filter((j: any) => !j.student_id || j.student_id === "student_default");
+        targetList = journals.filter(
+          (j: any) => !j.student_id || j.student_id === 'student_default'
+        );
       }
 
       const formatted: MessageItem[] = [];
 
       formatted.push({
-        id: "welcome_msg",
-        sender: "teacher",
-        text: "こんにちは、" + studentName + "さん！🌱\n農家のしるべぇ(農業AI)です。\n\n野菜の育て方や土作り、今日のお天気、日々のちょっとしたお話まで、何でも気軽にチャットしてくださいね🧑‍🌾",
-        timestamp: "現在",
+        id: 'welcome_msg',
+        sender: 'teacher',
+        text:
+          'こんにちは、' +
+          studentName +
+          'さん！🌱\n農家のしるべぇ(農業AI)です。\n\n野菜の育て方や土作り、今日のお天気、日々のちょっとしたお話まで、何でも気軽にチャットしてくださいね🧑‍🌾',
+        timestamp: '現在',
       });
 
       (targetList || []).forEach((j: any) => {
-        const c = (j.content || "").trim();
+        const c = (j.content || '').trim();
 
         if (
           !c ||
-          c === "テスト" ||
-          c === "○○困ってます" ||
-          c.startsWith("【畝") ||
-          c.includes("【畝 ") ||
-          c.includes("【畝") ||
-          c.startsWith("【収穫") ||
-          c.includes("【収穫完了報告】") ||
-          c.startsWith("【差し戻し") ||
-          c.startsWith("【承認") ||
-          c.startsWith("【全体お知らせ") ||
-          c.includes("を完了報告しました") ||
-          c.includes("タスク完了") ||
-          (j.task_title && !j.reply && (c.startsWith("【") || c.includes("完了")))
+          c === 'テスト' ||
+          c === '○○困ってます' ||
+          c.startsWith('【畝') ||
+          c.includes('【畝 ') ||
+          c.includes('【畝') ||
+          c.startsWith('【収穫') ||
+          c.includes('【収穫完了報告】') ||
+          c.startsWith('【差し戻し') ||
+          c.startsWith('【承認') ||
+          c.startsWith('【全体お知らせ') ||
+          c.includes('を完了報告しました') ||
+          c.includes('タスク完了') ||
+          (j.task_title && !j.reply && (c.startsWith('【') || c.includes('完了')))
         ) {
           return;
         }
 
-        const isTeacherRole = j.role === "broadcast" || j.role === "teacher" || j.role === "announcement";
+        const isTeacherRole =
+          j.role === 'broadcast' || j.role === 'teacher' || j.role === 'announcement';
 
         // 🌟 講師返信時に自動作成される通知用重複レコード（例: role="broadcast", text="【返信】...", reply="講師からの返信"）は除外 🌟
         // （返信本文は元の相談レコード j.reply に保持されており、そちらから講師吹き出しとしてレンダリングされるため）
         if (
           isTeacherRole &&
-          (j.text === "【返信】講師から相談への回答が届きました" ||
-            j.text?.startsWith("【返信】") ||
-            j.reply === "講師からの返信")
+          (j.text === '【返信】講師から相談への回答が届きました' ||
+            j.text?.startsWith('【返信】') ||
+            j.reply === '講師からの返信')
         ) {
           return;
         }
 
         const formattedTimestamp = j.created_at
-          ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-          : (j.date || "過去のメッセージ");
+          ? new Date(j.created_at).toLocaleTimeString('ja-JP', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : j.date || '過去のメッセージ';
 
         if (isTeacherRole) {
           // 講師起点の配信・メッセージ（j.content が講師メッセージ本文）
           if (j.content) {
             formatted.push({
-              id: "t_" + j.id,
-              sender: "teacher",
+              id: 't_' + j.id,
+              sender: 'teacher',
               text: j.content,
               timestamp: formattedTimestamp,
             });
@@ -223,25 +235,28 @@ export default function StudentTalkView({
           // 生徒起点の相談・質問日誌
           if (j.content) {
             formatted.push({
-              id: "q_" + j.id,
-              sender: "student",
+              id: 'q_' + j.id,
+              sender: 'student',
               text: j.content,
               timestamp: formattedTimestamp,
             });
           }
           if (
             j.reply &&
-            j.reply !== "講師からの返信" &&
-            !j.reply.startsWith("講師配信") &&
-            !j.reply.startsWith("講師個別連絡")
+            j.reply !== '講師からの返信' &&
+            !j.reply.startsWith('講師配信') &&
+            !j.reply.startsWith('講師個別連絡')
           ) {
             formatted.push({
-              id: "a_" + j.id,
-              sender: "teacher",
+              id: 'a_' + j.id,
+              sender: 'teacher',
               text: j.reply,
               timestamp: j.created_at
-                ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-                : (j.date || "回答済み"),
+                ? new Date(j.created_at).toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : j.date || '回答済み',
             });
           }
         }
@@ -249,7 +264,7 @@ export default function StudentTalkView({
 
       setMessages(formatted);
     } catch (e) {
-      console.error("loadChatHistory error:", e);
+      console.error('loadChatHistory error:', e);
     }
   }, [studentId, studentName, journals]);
 
@@ -259,7 +274,7 @@ export default function StudentTalkView({
 
   const scrollToBottom = useCallback(() => {
     if (!searchKeyword.trim() && !showSearch) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [searchKeyword, showSearch]);
 
@@ -271,15 +286,13 @@ export default function StudentTalkView({
   const matchedMessageIds = useMemo(() => {
     if (!searchKeyword.trim()) return [];
     const q = searchKeyword.trim().toLowerCase();
-    return messages
-      .filter((m) => m.text.toLowerCase().includes(q))
-      .map((m) => m.id);
+    return messages.filter((m) => m.text.toLowerCase().includes(q)).map((m) => m.id);
   }, [messages, searchKeyword]);
 
   const jumpToMessage = useCallback((messageId: string) => {
     const el = messageRefs.current[messageId];
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, []);
 
@@ -306,10 +319,11 @@ export default function StudentTalkView({
 
   const studentQuestionsList = useMemo(() => {
     return messages
-      .filter((m) => m.sender === "student")
+      .filter((m) => m.sender === 'student')
       .map((m, idx) => {
         const mIdx = messages.findIndex((orig) => orig.id === m.id);
-        const replyMsg = mIdx >= 0 && messages[mIdx + 1]?.sender === "teacher" ? messages[mIdx + 1] : null;
+        const replyMsg =
+          mIdx >= 0 && messages[mIdx + 1]?.sender === 'teacher' ? messages[mIdx + 1] : null;
         return {
           id: m.id,
           question: m.text,
@@ -331,9 +345,9 @@ export default function StudentTalkView({
     setMatchedKnowledgeList([]);
 
     try {
-      const res = await fetch("/api/chat/check-knowledge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/chat/check-knowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: text }),
       });
       if (res.ok) {
@@ -343,7 +357,7 @@ export default function StudentTalkView({
         }
       }
     } catch (err) {
-      console.warn("Knowledge pre-check error:", err);
+      console.warn('Knowledge pre-check error:', err);
     } finally {
       setIsCheckingKnowledge(false);
       setShowConfirmModal(true);
@@ -354,28 +368,28 @@ export default function StudentTalkView({
   const handleUseFreeKnowledge = (item: MatchedKnowledgeItem) => {
     setShowConfirmModal(false);
 
-    const timeStr = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
-    const userMsgId = "user_" + Date.now();
+    const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    const userMsgId = 'user_' + Date.now();
 
     const studentMsg: MessageItem = {
       id: userMsgId,
-      sender: "student",
+      sender: 'student',
       text: inputText.trim(),
       timestamp: timeStr,
     };
 
     const cleanAnswer = sanitizePersonalNames(item.answer);
     const replyMsg: MessageItem = {
-      id: "kn_" + (Date.now() + 1),
-      sender: "teacher",
+      id: 'kn_' + (Date.now() + 1),
+      sender: 'teacher',
       text: cleanAnswer,
       timestamp: timeStr,
       isKnowledgeHit: true,
     };
 
     setMessages((prev) => [...prev, studentMsg, replyMsg]);
-    setInputText("");
-    setToastMessage("💡 農園ノートの回答を表示しました");
+    setInputText('');
+    setToastMessage('💡 農園ノートの回答を表示しました');
     setShowToast(true);
   };
 
@@ -385,61 +399,63 @@ export default function StudentTalkView({
     const rawInput = inputText.trim();
     if (!rawInput || isSending) return;
 
-    const text = allowKnowledgeShare || rawInput.startsWith("【非公開相談】")
-      ? rawInput
-      : `【非公開相談】${rawInput}`;
+    const text =
+      allowKnowledgeShare || rawInput.startsWith('【非公開相談】')
+        ? rawInput
+        : `【非公開相談】${rawInput}`;
 
-    const timeStr = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
-    const userMsgId = "user_" + Date.now();
+    const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    const userMsgId = 'user_' + Date.now();
 
-    const currentTicket = getTicketState(studentId || "default", customDailyLimit, planType);
+    const currentTicket = getTicketState(studentId || 'default', customDailyLimit, planType);
     const hasTicket = currentTicket.isUnlimited || currentTicket.count > 0;
     const isMemoOnly = !hasTicket;
 
     const newStudentMsg: MessageItem = {
       id: userMsgId,
-      sender: "student",
+      sender: 'student',
       text: text,
       timestamp: timeStr,
     };
     setMessages((prev) => [...prev, newStudentMsg]);
-    setInputText("");
+    setInputText('');
     setIsSending(true);
 
     if (isMemoOnly) {
-      const updatedStock = addQuestionStock(studentId || "default", text);
-      const memoReplyText = "📝【質問メモをストック（追記）しました】🌱\n\n本日のAI相談チケットはお休みですが、思いついた質問をメモとして書き足してまとめておきました！\n\n明日チケットが復活した際などに、下の【入力欄にセット】ボタンを押してまとめてAIに相談してくださいね✨";
+      const updatedStock = addQuestionStock(studentId || 'default', text);
+      const memoReplyText =
+        '📝【質問メモをストック（追記）しました】🌱\n\n本日のAI相談チケットはお休みですが、思いついた質問をメモとして書き足してまとめておきました！\n\n明日チケットが復活した際などに、下の【入力欄にセット】ボタンを押してまとめてAIに相談してくださいね✨';
 
       const memoSystemMsg: MessageItem = {
-        id: "stock_" + Date.now(),
-        sender: "teacher",
+        id: 'stock_' + Date.now(),
+        sender: 'teacher',
         text: memoReplyText,
         timestamp: timeStr,
         stockItems: updatedStock,
       };
 
       setMessages((prev) => [...prev, memoSystemMsg]);
-      setToastMessage("📝 質問メモをストックしました（追記・まとめ保存）");
+      setToastMessage('📝 質問メモをストックしました（追記・まとめ保存）');
       setShowToast(true);
       setIsSending(false);
       return;
     }
 
     if (currentTicket.isUnlimited) {
-      setToastMessage("🌟 AIに相談しました（相談し放題プラン）");
+      setToastMessage('🌟 AIに相談しました（相談し放題プラン）');
       setShowToast(true);
     } else if (hasTicket) {
-      const consumed = consumeTicket(studentId || "default", customDailyLimit, planType);
+      const consumed = consumeTicket(studentId || 'default', customDailyLimit, planType);
       setTicketState(consumed);
-      clearQuestionStock(studentId || "default");
-      setToastMessage("🎟️ チケットを使って相談しました（本日残り" + consumed.count + "回）");
+      clearQuestionStock(studentId || 'default');
+      setToastMessage('🎟️ チケットを使って相談しました（本日残り' + consumed.count + '回）');
       setShowToast(true);
     }
 
     try {
-      const res = await fetch("/api/chat/rag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           studentName: studentName,
@@ -449,37 +465,37 @@ export default function StudentTalkView({
 
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}));
-        setToastMessage(data.detail || "本日のAI相談上限（1日3回）に達しました");
+        setToastMessage(data.detail || '本日のAI相談上限（1日3回）に達しました');
         setShowToast(true);
         const limitMsg: MessageItem = {
-          id: "bot_limit_" + Date.now(),
-          sender: "teacher",
-          text: "【しるべぇ】本日のAI相談チケット（1日3回）上限に達しました🙇 ご入力内容は質問メモとして大切にお預かりしましたので、次回来園時に講師にご相談くださいね🌱",
-          timestamp: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+          id: 'bot_limit_' + Date.now(),
+          sender: 'teacher',
+          text: '【しるべぇ】本日のAI相談チケット（1日3回）上限に達しました🙇 ご入力内容は質問メモとして大切にお預かりしましたので、次回来園時に講師にご相談くださいね🌱',
+          timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, limitMsg]);
         return;
       }
 
-      if (!res.ok) throw new Error("チャットサーバーの応答に失敗しました");
+      if (!res.ok) throw new Error('チャットサーバーの応答に失敗しました');
 
       const data = await res.json();
       const aiMsg: MessageItem = {
-        id: "ai_" + Date.now(),
-        sender: "teacher",
-        text: data.reply || "メッセージを受け付けました。",
-        timestamp: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+        id: 'ai_' + Date.now(),
+        sender: 'teacher',
+        text: data.reply || 'メッセージを受け付けました。',
+        timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
         referencedQa: data.referencedQa,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
-      console.error("Chat sending error:", err);
+      console.error('Chat sending error:', err);
       const fallbackMsg: MessageItem = {
-        id: "bot_err_" + Date.now(),
-        sender: "teacher",
-        text: "【しるべぇ】メッセージを受け付けました！次回来園時に講師より詳しくお伝えしますね🧑‍🌾",
-        timestamp: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+        id: 'bot_err_' + Date.now(),
+        sender: 'teacher',
+        text: '【しるべぇ】メッセージを受け付けました！次回来園時に講師より詳しくお伝えしますね🧑‍🌾',
+        timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
@@ -492,23 +508,23 @@ export default function StudentTalkView({
     const faq = PRESET_FAQS.find((f) => f.id === faqId);
     if (!faq) return;
 
-    const timeStr = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     const studentMsg: MessageItem = {
-      id: "faq_q_" + Date.now(),
-      sender: "student",
+      id: 'faq_q_' + Date.now(),
+      sender: 'student',
       text: faq.question,
       timestamp: timeStr,
     };
     const replyMsg: MessageItem = {
-      id: "faq_a_" + (Date.now() + 1),
-      sender: "teacher",
+      id: 'faq_a_' + (Date.now() + 1),
+      sender: 'teacher',
       text: faq.answer,
       timestamp: timeStr,
       isKnowledgeHit: true,
     };
 
     setMessages((prev) => [...prev, studentMsg, replyMsg]);
-    setToastMessage("💡 よくある質問のためチケットを消費せずに回答しました！");
+    setToastMessage('💡 よくある質問のためチケットを消費せずに回答しました！');
     setShowToast(true);
   };
 
@@ -516,7 +532,7 @@ export default function StudentTalkView({
   const handleApplyStockToInput = (stockItems: string[]) => {
     const formatted = formatStockText(stockItems);
     setInputText(formatted);
-    setToastMessage("📋 ストックした質問を入力欄にセットしました！");
+    setToastMessage('📋 ストックした質問を入力欄にセットしました！');
     setShowToast(true);
   };
 
@@ -525,11 +541,11 @@ export default function StudentTalkView({
     const formatted = formatStockText(stockItems);
     try {
       await navigator.clipboard.writeText(formatted);
-      setToastMessage("📋 ストックした質問をクリップボードにコピーしました！");
+      setToastMessage('📋 ストックした質問をクリップボードにコピーしました！');
       setShowToast(true);
     } catch (e) {
       setInputText(formatted);
-      setToastMessage("📋 入力欄にセットしました");
+      setToastMessage('📋 入力欄にセットしました');
       setShowToast(true);
     }
   };
@@ -537,10 +553,15 @@ export default function StudentTalkView({
   // 検索ハイライト
   const renderHighlightedText = (text: string, keyword: string) => {
     if (!keyword.trim()) return text;
-    const parts = text.split(new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+    const parts = text.split(
+      new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    );
     return parts.map((part, i) =>
       part.toLowerCase() === keyword.toLowerCase() ? (
-        <mark key={i} className="bg-amber-300 text-amber-950 px-1 py-0.5 rounded font-black shadow-2xs">
+        <mark
+          key={i}
+          className="bg-amber-300 text-amber-950 px-1 py-0.5 rounded font-black shadow-2xs"
+        >
           {part}
         </mark>
       ) : (
@@ -568,11 +589,14 @@ export default function StudentTalkView({
           type="button"
           onClick={() => {
             setShowSearch(!showSearch);
-            if (showSearch) setSearchKeyword("");
+            if (showSearch) setSearchKeyword('');
           }}
-          className={"px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer " + (
-            showSearch ? "bg-white text-emerald-900 shadow-xs" : "bg-black/20 hover:bg-black/30 text-emerald-100"
-          )}
+          className={
+            'px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer ' +
+            (showSearch
+              ? 'bg-white text-emerald-900 shadow-xs'
+              : 'bg-black/20 hover:bg-black/30 text-emerald-100')
+          }
           title="会話履歴を検索"
         >
           <span>🔍</span>
@@ -587,19 +611,25 @@ export default function StudentTalkView({
             <div className="flex space-x-1 bg-emerald-100/80 p-0.5 rounded-xl text-xs font-bold">
               <button
                 type="button"
-                onClick={() => setSearchMode("jump")}
-                className={"px-2.5 py-1 rounded-lg transition cursor-pointer " + (
-                  searchMode === "jump" ? "bg-white text-emerald-900 shadow-2xs" : "text-emerald-700 hover:text-emerald-900"
-                )}
+                onClick={() => setSearchMode('jump')}
+                className={
+                  'px-2.5 py-1 rounded-lg transition cursor-pointer ' +
+                  (searchMode === 'jump'
+                    ? 'bg-white text-emerald-900 shadow-2xs'
+                    : 'text-emerald-700 hover:text-emerald-900')
+                }
               >
                 🔀 キーワード検索
               </button>
               <button
                 type="button"
-                onClick={() => setSearchMode("list")}
-                className={"px-2.5 py-1 rounded-lg transition cursor-pointer " + (
-                  searchMode === "list" ? "bg-white text-emerald-900 shadow-2xs" : "text-emerald-700 hover:text-emerald-900"
-                )}
+                onClick={() => setSearchMode('list')}
+                className={
+                  'px-2.5 py-1 rounded-lg transition cursor-pointer ' +
+                  (searchMode === 'list'
+                    ? 'bg-white text-emerald-900 shadow-2xs'
+                    : 'text-emerald-700 hover:text-emerald-900')
+                }
               >
                 📜 過去の質問一覧 ({studentQuestionsList.length})
               </button>
@@ -609,7 +639,7 @@ export default function StudentTalkView({
               type="button"
               onClick={() => {
                 setShowSearch(false);
-                setSearchKeyword("");
+                setSearchKeyword('');
               }}
               className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-0.5 cursor-pointer"
             >
@@ -617,7 +647,7 @@ export default function StudentTalkView({
             </button>
           </div>
 
-          {searchMode === "jump" ? (
+          {searchMode === 'jump' ? (
             <div className="flex items-center space-x-2">
               <input
                 type="text"
@@ -661,12 +691,10 @@ export default function StudentTalkView({
       )}
 
       {/* 🌟 3. メインチャットエリア 🌟 */}
-      {showSearch && searchMode === "list" ? (
+      {showSearch && searchMode === 'list' ? (
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-emerald-50/30 animate-fade-in">
           {studentQuestionsList.length === 0 ? (
-            <div className="p-8 text-center text-xs text-gray-400">
-              まだ質問履歴はありません。
-            </div>
+            <div className="p-8 text-center text-xs text-gray-400">まだ質問履歴はありません。</div>
           ) : (
             studentQuestionsList.map((item) => (
               <div
@@ -698,10 +726,9 @@ export default function StudentTalkView({
       ) : (
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#fcfbf9]">
           {messages.map((msg) => {
-            const isMe = msg.sender === "student";
+            const isMe = msg.sender === 'student';
             const isTargetMatch =
-              searchKeyword.trim() &&
-              matchedMessageIds[currentMatchIndex] === msg.id;
+              searchKeyword.trim() && matchedMessageIds[currentMatchIndex] === msg.id;
 
             return (
               <div
@@ -709,11 +736,22 @@ export default function StudentTalkView({
                 ref={(el) => {
                   messageRefs.current[msg.id] = el;
                 }}
-                className={"flex flex-col " + (isMe ? "items-end" : "items-start") + " space-y-1 animate-fade-in transition-all duration-300 " + (
-                  isTargetMatch ? "scale-[1.02] p-1 bg-amber-100/60 rounded-3xl border-2 border-amber-400 shadow-md" : ""
-                )}
+                className={
+                  'flex flex-col ' +
+                  (isMe ? 'items-end' : 'items-start') +
+                  ' space-y-1 animate-fade-in transition-all duration-300 ' +
+                  (isTargetMatch
+                    ? 'scale-[1.02] p-1 bg-amber-100/60 rounded-3xl border-2 border-amber-400 shadow-md'
+                    : '')
+                }
               >
-                <div className={"flex items-start max-w-[88%] " + (isMe ? "flex-row-reverse" : "flex-row") + " space-x-2"}>
+                <div
+                  className={
+                    'flex items-start max-w-[88%] ' +
+                    (isMe ? 'flex-row-reverse' : 'flex-row') +
+                    ' space-x-2'
+                  }
+                >
                   {!isMe && (
                     <div className="w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center text-xs shadow-2xs shrink-0 mt-0.5 mr-1.5">
                       🧑‍🌾
@@ -721,11 +759,12 @@ export default function StudentTalkView({
                   )}
 
                   <div
-                    className={"p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs transition-all " + (
-                      isMe
-                        ? "bg-[#1c4d21] text-white rounded-tr-none font-medium"
-                        : "bg-white text-gray-800 border border-gray-200/90 rounded-tl-none font-normal"
-                    )}
+                    className={
+                      'p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs transition-all ' +
+                      (isMe
+                        ? 'bg-[#1c4d21] text-white rounded-tr-none font-medium'
+                        : 'bg-white text-gray-800 border border-gray-200/90 rounded-tl-none font-normal')
+                    }
                   >
                     <p className="whitespace-pre-wrap">
                       {renderHighlightedText(msg.text, searchKeyword)}
@@ -763,18 +802,32 @@ export default function StudentTalkView({
                     )}
 
                     {/* 📚 参照した過去の講師Q&Aナレッジ (AI新規生成時のみ表示し、ルールベース直答時は重複防止) */}
-                    {!isMe && !msg.isKnowledgeHit && msg.referencedQa && msg.referencedQa.length > 0 && (
-                      <div className="mt-2.5 pt-2 border-t border-gray-100 text-[10.5px] text-emerald-800 bg-emerald-50/80 p-2 rounded-xl">
-                        <span className="font-bold block mb-0.5">💡 参考にした過去の講師回答 (重み1.2):</span>
-                        <p className="text-gray-600 font-normal italic">
-                          「{sanitizePersonalNames(msg.referencedQa[0].answer).length > 60 ? sanitizePersonalNames(msg.referencedQa[0].answer).slice(0, 60) + "..." : sanitizePersonalNames(msg.referencedQa[0].answer)}」
-                        </p>
-                      </div>
-                    )}
+                    {!isMe &&
+                      !msg.isKnowledgeHit &&
+                      msg.referencedQa &&
+                      msg.referencedQa.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-gray-100 text-[10.5px] text-emerald-800 bg-emerald-50/80 p-2 rounded-xl">
+                          <span className="font-bold block mb-0.5">
+                            💡 参考にした過去の講師回答 (重み1.2):
+                          </span>
+                          <p className="text-gray-600 font-normal italic">
+                            「
+                            {sanitizePersonalNames(msg.referencedQa[0].answer).length > 60
+                              ? sanitizePersonalNames(msg.referencedQa[0].answer).slice(0, 60) +
+                                '...'
+                              : sanitizePersonalNames(msg.referencedQa[0].answer)}
+                            」
+                          </p>
+                        </div>
+                      )}
                   </div>
                 </div>
 
-                <span className={"text-[9.5px] text-gray-400 font-bold px-1 " + (isMe ? "mr-1" : "ml-9")}>
+                <span
+                  className={
+                    'text-[9.5px] text-gray-400 font-bold px-1 ' + (isMe ? 'mr-1' : 'ml-9')
+                  }
+                >
                   {msg.timestamp}
                 </span>
               </div>
@@ -791,7 +844,9 @@ export default function StudentTalkView({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:0.2s]"></span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-bounce [animation-delay:0.4s]"></span>
                 <span className="text-[10.5px] text-emerald-900 font-bold ml-1">
-                  {ticketState.isUnlimited || ticketState.count > 0 ? "AI回答を生成中..." : "メモをストック中..."}
+                  {ticketState.isUnlimited || ticketState.count > 0
+                    ? 'AI回答を生成中...'
+                    : 'メモをストック中...'}
                 </span>
               </div>
             </div>
@@ -812,7 +867,9 @@ export default function StudentTalkView({
             className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-200/80 rounded-full shrink-0 shadow-2xs transition active:scale-95 cursor-pointer flex items-center gap-1"
           >
             <span>{faq.chipLabel}</span>
-            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded-full font-bold">無料</span>
+            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded-full font-bold">
+              無料
+            </span>
           </button>
         ))}
       </div>
@@ -829,8 +886,8 @@ export default function StudentTalkView({
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
               ticketState.isUnlimited || ticketState.count > 0
-                ? "栽培の質問や相談を入力..."
-                : "次回質問用のメモを入力 (ストックに追記)..."
+                ? '栽培の質問や相談を入力...'
+                : '次回質問用のメモを入力 (ストックに追記)...'
             }
             disabled={isSending || isCheckingKnowledge}
             className="flex-1 min-w-0 px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 focus:bg-white border border-gray-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] transition placeholder-gray-400"
@@ -840,35 +897,43 @@ export default function StudentTalkView({
             <button
               type="submit"
               disabled={!inputText.trim() || isSending || isCheckingKnowledge}
-              className={"w-9 h-9 rounded-2xl font-black transition flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 " + (
-                !inputText.trim() || isSending || isCheckingKnowledge
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              className={
+                'w-9 h-9 rounded-2xl font-black transition flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 ' +
+                (!inputText.trim() || isSending || isCheckingKnowledge
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   : ticketState.isUnlimited || ticketState.count > 0
-                  ? "bg-[#1c4d21] text-white hover:bg-[#153e19]"
-                  : "bg-amber-700 text-white hover:bg-amber-800"
-              )}
+                    ? 'bg-[#1c4d21] text-white hover:bg-[#153e19]'
+                    : 'bg-amber-700 text-white hover:bg-amber-800')
+              }
               title="相談内容を確認して送信"
             >
               {isCheckingKnowledge ? (
                 <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
               ) : (
-                <svg className="w-4 h-4 fill-current transform rotate-45 -translate-y-0.5 translate-x-0.5" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4 fill-current transform rotate-45 -translate-y-0.5 translate-x-0.5"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               )}
             </button>
 
-            <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / " + ticketState.dailyLimit + " 回"}>
+            <div
+              className="flex items-center space-x-1"
+              title={'本日残り ' + ticketState.count + ' / ' + ticketState.dailyLimit + ' 回'}
+            >
               {Array.from({ length: Math.max(3, ticketState.count) }).map((_, i) => (
                 <span
                   key={i}
-                  className={"w-1.5 h-1.5 rounded-full transition-all " + (
-                    ticketState.isUnlimited
-                      ? "bg-emerald-600 scale-110"
+                  className={
+                    'w-1.5 h-1.5 rounded-full transition-all ' +
+                    (ticketState.isUnlimited
+                      ? 'bg-emerald-600 scale-110'
                       : i < ticketState.count
-                      ? "bg-emerald-600 shadow-2xs scale-110"
-                      : "bg-gray-300"
-                  )}
+                        ? 'bg-emerald-600 shadow-2xs scale-110'
+                        : 'bg-gray-300')
+                  }
                 ></span>
               ))}
             </div>
@@ -885,7 +950,7 @@ export default function StudentTalkView({
               className="w-4 h-4 text-emerald-700 bg-white border-emerald-300 rounded focus:ring-emerald-600 cursor-pointer"
             />
             <span className="text-[11px] font-bold text-emerald-950">
-              共有許可 ({allowKnowledgeShare ? "Yes" : "No"})
+              共有許可 ({allowKnowledgeShare ? 'Yes' : 'No'})
             </span>
           </label>
         </div>
@@ -895,7 +960,6 @@ export default function StudentTalkView({
       {showConfirmModal && (
         <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-gray-200 space-y-3.5 text-left max-h-[90vh] flex flex-col">
-            
             {/* 💡 パターンA: 過去の農園知識（1つ以上）が見つかった場合 */}
             {matchedKnowledgeList.length > 0 ? (
               <>
@@ -918,19 +982,25 @@ export default function StudentTalkView({
                       {/* 一致キーワードバッジ */}
                       <div className="flex flex-wrap items-center gap-1">
                         <span className="text-[9.5px] font-black text-emerald-900 bg-white px-1.5 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
-                          🏷️ 一致: {item.matchedKeywords.join(", ")}
+                          🏷️ 一致: {item.matchedKeywords.join(', ')}
                         </span>
                       </div>
 
                       {/* 過去質問トピック (他生徒原文の非表示化) */}
                       <div className="text-xs">
-                        <span className="text-[10px] font-bold text-gray-500 block">Q. 質問トピック:</span>
-                        <p className="font-extrabold text-gray-900 line-clamp-2">{formatQuestionTopic(item)}</p>
+                        <span className="text-[10px] font-bold text-gray-500 block">
+                          Q. 質問トピック:
+                        </span>
+                        <p className="font-extrabold text-gray-900 line-clamp-2">
+                          {formatQuestionTopic(item)}
+                        </p>
                       </div>
 
                       {/* 回答プレビュー */}
                       <div className="text-[11px] text-gray-700 bg-white/80 p-2 rounded-xl border border-emerald-100">
-                        <span className="text-[10px] font-bold text-emerald-800 block mb-0.5">A. 回答の抜粋:</span>
+                        <span className="text-[10px] font-bold text-emerald-800 block mb-0.5">
+                          A. 回答の抜粋:
+                        </span>
                         <p className="line-clamp-2 leading-relaxed italic">
                           {sanitizePersonalNames(item.answer)}
                         </p>
@@ -982,26 +1052,30 @@ export default function StudentTalkView({
               /* 🌱 パターンB: 過去の知識がなく、チケットを使って新しくAI相談する場合 */
               <>
                 <div className="flex items-center space-x-2 text-emerald-950 shrink-0">
-                  <span className="text-2xl">{ticketState.isUnlimited || ticketState.count > 0 ? "🎟️" : "📝"}</span>
+                  <span className="text-2xl">
+                    {ticketState.isUnlimited || ticketState.count > 0 ? '🎟️' : '📝'}
+                  </span>
                   <div>
                     <h4 className="font-black text-sm text-gray-900 leading-tight">
                       {ticketState.isUnlimited || ticketState.count > 0
-                        ? "チケットを使ってAIに相談しますか？"
-                        : "質問ストックにメモを追記しますか？"}
+                        ? 'チケットを使ってAIに相談しますか？'
+                        : '質問ストックにメモを追記しますか？'}
                     </h4>
                     <p className="text-[10px] text-gray-500 font-semibold mt-0.5">
                       {ticketState.isUnlimited
-                        ? "過去のノートに一致がないため、AIに新しく相談します"
+                        ? '過去のノートに一致がないため、AIに新しく相談します'
                         : ticketState.count > 0
-                        ? `過去のノートに一致がないため、チケットを1枚消費します (本日残り${ticketState.count}回)`
-                        : "AI枠終了のため、次回用ストックメモに追記保存されます"}
+                          ? `過去のノートに一致がないため、チケットを1枚消費します (本日残り${ticketState.count}回)`
+                          : 'AI枠終了のため、次回用ストックメモに追記保存されます'}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="space-y-1">
-                    <span className="text-[10.5px] font-bold text-gray-500 block">📝 相談内容:</span>
+                    <span className="text-[10.5px] font-bold text-gray-500 block">
+                      📝 相談内容:
+                    </span>
                     <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-200/80 text-xs text-gray-800 max-h-36 overflow-y-auto whitespace-pre-wrap font-medium leading-relaxed">
                       {inputText}
                     </div>
@@ -1016,7 +1090,7 @@ export default function StudentTalkView({
                       className="w-4 h-4 text-emerald-700 bg-white border-gray-300 rounded focus:ring-emerald-600 cursor-pointer"
                     />
                     <span className="text-[11px] font-bold text-emerald-950 leading-tight">
-                      共有許可 ({allowKnowledgeShare ? "Yes" : "No"})
+                      共有許可 ({allowKnowledgeShare ? 'Yes' : 'No'})
                     </span>
                   </label>
                 </div>
@@ -1032,18 +1106,20 @@ export default function StudentTalkView({
                   <button
                     type="button"
                     onClick={() => executeSendMessage(false)}
-                    className={"flex-1 py-2.5 font-bold text-xs rounded-xl shadow-md transition cursor-pointer text-center text-white " + (
-                      ticketState.isUnlimited || ticketState.count > 0
-                        ? "bg-[#1c4d21] hover:bg-[#153e19]"
-                        : "bg-amber-700 hover:bg-amber-800"
-                    )}
+                    className={
+                      'flex-1 py-2.5 font-bold text-xs rounded-xl shadow-md transition cursor-pointer text-center text-white ' +
+                      (ticketState.isUnlimited || ticketState.count > 0
+                        ? 'bg-[#1c4d21] hover:bg-[#153e19]'
+                        : 'bg-amber-700 hover:bg-amber-800')
+                    }
                   >
-                    {ticketState.isUnlimited || ticketState.count > 0 ? "はい、相談する" : "はい、メモを追記"}
+                    {ticketState.isUnlimited || ticketState.count > 0
+                      ? 'はい、相談する'
+                      : 'はい、メモを追記'}
                   </button>
                 </div>
               </>
             )}
-
           </div>
         </div>
       )}

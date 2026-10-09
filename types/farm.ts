@@ -1,6 +1,8 @@
-export type GrowthStage = "播種・苗植え" | "発芽・活着" | "本葉展開・つる伸び" | "開花・受粉" | "果実肥大" | "収穫期";
+export type GrowthStage =
+  '播種・苗植え' | '発芽・活着' | '本葉展開・つる伸び' | '開花・受粉' | '果実肥大' | '収穫期';
 
-export type WorkType = "水やり" | "追肥" | "わき芽かき・仕立て" | "除草・土寄せ" | "病害虫対策" | "収穫";
+export type WorkType =
+  '水やり' | '追肥' | 'わき芽かき・仕立て' | '除草・土寄せ' | '病害虫対策' | '収穫';
 
 export type CropRecord = {
   id: string;
@@ -18,7 +20,7 @@ export type CropRecord = {
   created_at: string;
 };
 
-export type BedStatus = "active" | "completed_pending" | "rejected" | "archived";
+export type BedStatus = 'active' | 'completed_pending' | 'rejected' | 'archived';
 
 export type FarmBed = {
   id: string;

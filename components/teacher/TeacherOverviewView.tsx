@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import Toast from "@/components/ui/Toast";
-import QRCodeModal from "@/components/ui/QRCodeModal";
-import WeatherWidget from "@/components/ui/WeatherWidget";
-import { useFarmManager } from "@/hooks/useFarmManager";
-import { useFarmStore } from "@/store/useFarmStore";
-import { isRegularRecord } from "@/lib/utils/journalHelper";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import Toast from '@/components/ui/Toast';
+import QRCodeModal from '@/components/ui/QRCodeModal';
+import WeatherWidget from '@/components/ui/WeatherWidget';
+import { useFarmManager } from '@/hooks/useFarmManager';
+import { useFarmStore } from '@/store/useFarmStore';
+import { isRegularRecord } from '@/lib/utils/journalHelper';
 
 interface TeacherOverviewViewProps {
   onAddNewTaskClick: () => void;
@@ -29,8 +29,14 @@ export default function TeacherOverviewView({
   const { plots } = useFarmManager();
   const { activeFarmId, activeFarmName } = useFarmStore();
 
-  const farmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") || "" : "");
-  const farmName = activeFarmName || (typeof window !== "undefined" ? localStorage.getItem("nouato_current_farm_name") || "農園" : "農園");
+  const farmId =
+    activeFarmId ||
+    (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') || '' : '');
+  const farmName =
+    activeFarmName ||
+    (typeof window !== 'undefined'
+      ? localStorage.getItem('nouato_current_farm_name') || '農園'
+      : '農園');
 
   const [studentsCount, setStudentsCount] = useState<number>(0);
   const [reportCount, setReportCount] = useState<number>(0);
@@ -48,31 +54,34 @@ export default function TeacherOverviewView({
 
   // 謎のフォールバック(+3)を完全撤廃し、各区画に実際に登録されているアクティブな畝数を正確に集計
   const displayBedsCount = activePlots.reduce((sum, p) => {
-    const validBeds = (p?.beds || []).filter((b) => b && b.status !== "archived");
+    const validBeds = (p?.beds || []).filter((b) => b && b.status !== 'archived');
     return sum + validBeds.length;
   }, 0);
 
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showQRModal, setShowQRModal] = useState(false);
 
-  const [origin, setOrigin] = useState("http://localhost:3000");
+  const [origin, setOrigin] = useState('http://localhost:3000');
 
   const fetchCounts = async (targetFarmId?: string) => {
-    const currentFid = targetFarmId || farmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+    const currentFid =
+      targetFarmId ||
+      farmId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
 
     // 1. 本日以降のイベント・講習予約件数
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toISOString().split('T')[0];
     const { count: eCount } = await supabase
-      .from("events")
-      .select("*", { count: "exact" })
-      .gte("date", todayStr);
+      .from('events')
+      .select('*', { count: 'exact' })
+      .gte('date', todayStr);
 
     if (eCount !== null && eCount !== undefined) {
       setEventsCount(eCount);
     } else {
-      const eventKey = currentFid ? `nouato_shared_events_${currentFid}` : "nouato_shared_events";
-      const saved = typeof window !== "undefined" ? localStorage.getItem(eventKey) : null;
+      const eventKey = currentFid ? `nouato_shared_events_${currentFid}` : 'nouato_shared_events';
+      const saved = typeof window !== 'undefined' ? localStorage.getItem(eventKey) : null;
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -87,15 +96,13 @@ export default function TeacherOverviewView({
     }
 
     // 2. 本日の作業記録件数 (crop_records)
-    const { count: cCount } = await supabase
-      .from("crop_records")
-      .select("*", { count: "exact" });
-    
+    const { count: cCount } = await supabase.from('crop_records').select('*', { count: 'exact' });
+
     if (cCount !== null && cCount !== undefined) {
       setReportCount(cCount);
     } else {
-      const cropKey = currentFid ? `nouato_crop_records_${currentFid}` : "nouato_crop_records";
-      const savedRec = typeof window !== "undefined" ? localStorage.getItem(cropKey) : null;
+      const cropKey = currentFid ? `nouato_crop_records_${currentFid}` : 'nouato_crop_records';
+      const savedRec = typeof window !== 'undefined' ? localStorage.getItem(cropKey) : null;
       if (savedRec) {
         try {
           setReportCount(JSON.parse(savedRec).length);
@@ -108,24 +115,21 @@ export default function TeacherOverviewView({
     }
 
     // 3. 未回答の質問・気づきメモ (自農園スコープ)
-    let jQuery = supabase
-      .from("journals")
-      .select("*")
-      .is("reply", null);
+    let jQuery = supabase.from('journals').select('*').is('reply', null);
     if (currentFid) {
-      jQuery = jQuery.eq("farm_id", currentFid);
+      jQuery = jQuery.eq('farm_id', currentFid);
     }
     const { data: jData } = await jQuery;
 
     if (jData) {
       const unrepliedNotices = jData.filter((j: any) => {
-        const content = (j.content || "").trim();
+        const content = (j.content || '').trim();
         return (
           content &&
-          !content.includes("【収穫完了報告】") &&
-          !content.includes("【差し戻し通知】") &&
-          !content.includes("を完了報告しました") &&
-          content !== "（コメントなし）" &&
+          !content.includes('【収穫完了報告】') &&
+          !content.includes('【差し戻し通知】') &&
+          !content.includes('を完了報告しました') &&
+          content !== '（コメントなし）' &&
           !isRegularRecord(content)
         );
       });
@@ -136,12 +140,12 @@ export default function TeacherOverviewView({
 
     // 4. 受講生数 (自農園スコープ)
     let sQuery = supabase
-      .from("users")
-      .select("*", { count: "exact" })
-      .eq("role", "student")
-      .is("deleted_at", null);
+      .from('users')
+      .select('*', { count: 'exact' })
+      .eq('role', 'student')
+      .is('deleted_at', null);
     if (currentFid) {
-      sQuery = sQuery.eq("farm_id", currentFid);
+      sQuery = sQuery.eq('farm_id', currentFid);
     }
     const { count: sCount } = await sQuery;
     if (sCount !== null && sCount !== undefined) {
@@ -150,7 +154,7 @@ export default function TeacherOverviewView({
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       setOrigin(window.location.origin);
     }
     fetchCounts(farmId);
@@ -160,7 +164,7 @@ export default function TeacherOverviewView({
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl);
-    setToastMessage("LINE招待リンクをコピーしました！");
+    setToastMessage('LINE招待リンクをコピーしました！');
     setShowToast(true);
   };
 
@@ -187,7 +191,6 @@ export default function TeacherOverviewView({
 
       {/* 2. 🌟 統一デザインサマリーカード (左上:マーク / 右上:ステータス / 中央:数字 / 下部:説明) 🌟 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        
         {/* カード 1: 👥 受講生サマリー */}
         <div
           onClick={onNavigateToStudents}
@@ -204,7 +207,9 @@ export default function TeacherOverviewView({
           </div>
 
           <div className="my-auto py-1">
-            <span className="text-3xl font-black text-gray-900 tracking-tight">{studentsCount}</span>
+            <span className="text-3xl font-black text-gray-900 tracking-tight">
+              {studentsCount}
+            </span>
             <span className="text-xs font-bold text-gray-500 ml-1">名</span>
           </div>
 
@@ -231,7 +236,9 @@ export default function TeacherOverviewView({
           </div>
 
           <div className="my-auto py-1">
-            <span className="text-3xl font-black text-gray-900 tracking-tight">{displayPlotsCount}</span>
+            <span className="text-3xl font-black text-gray-900 tracking-tight">
+              {displayPlotsCount}
+            </span>
             <span className="text-xs font-bold text-gray-500 ml-1">区画</span>
             <span className="text-xl font-extrabold text-gray-400 mx-1">/</span>
             <span className="text-2xl font-black text-gray-800">{displayBedsCount}</span>
@@ -315,7 +322,9 @@ export default function TeacherOverviewView({
           </div>
 
           <div className="my-auto py-1">
-            <span className="text-3xl font-black text-red-600 tracking-tight">{unrepliedCount}</span>
+            <span className="text-3xl font-black text-red-600 tracking-tight">
+              {unrepliedCount}
+            </span>
             <span className="text-xs font-bold text-gray-500 ml-1">件</span>
           </div>
 
@@ -325,7 +334,6 @@ export default function TeacherOverviewView({
             </span>
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ name: analyze-build-errors
 description: プロジェクトのビルドエラーや型エラー、Lint警告が発生した際に呼び出し、原因の解析と修正手順を提案させます。
 allowed-tools: [run_command, view_file, grep_search]
 ---
+
 # ビルド・Lintエラー解析手順
 
 1. 以下のビルドまたは型チェックコマンドを実行して、エラーの全体像を取得してください。

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React from "react";
+import React from 'react';
 
 type PageHeaderProps = {
   icon?: string;
@@ -17,11 +17,7 @@ export default function PageHeader({ icon, title, subtitle, actionButton }: Page
           {icon && <span>{icon}</span>}
           <span>{title}</span>
         </h1>
-        {subtitle && (
-          <p className="text-sm text-gray-500 font-medium mt-1">
-            {subtitle}
-          </p>
-        )}
+        {subtitle && <p className="text-sm text-gray-500 font-medium mt-1">{subtitle}</p>}
       </div>
 
       {actionButton && <div>{actionButton}</div>}

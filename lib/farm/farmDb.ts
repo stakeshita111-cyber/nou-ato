@@ -1,11 +1,11 @@
-import { supabase } from "@/lib/supabase";
-import { FarmPlot, CropRecord, Farm } from "@/types/farm";
+import { supabase } from '@/lib/supabase';
+import { FarmPlot, CropRecord, Farm } from '@/types/farm';
 import {
   buildPlotUpsertPayload,
   buildBedUpsertPayloadsForPlot,
   PlotUpsertPayload,
   BedUpsertPayload,
-} from "./farmCalculations";
+} from './farmCalculations';
 
 export interface StudentProfile {
   id: string;
@@ -13,15 +13,17 @@ export interface StudentProfile {
   role: string;
 }
 
-export async function fetchFarmsDb(currentUserId?: string): Promise<{ farms: Farm[]; teacherFarmId: string | null; teacherDisplayName: string | null }> {
+export async function fetchFarmsDb(
+  currentUserId?: string
+): Promise<{ farms: Farm[]; teacherFarmId: string | null; teacherDisplayName: string | null }> {
   let teacherFarmId: string | null = null;
   let teacherDisplayName: string | null = null;
 
   if (currentUserId) {
     const { data: uData } = await supabase
-      .from("users")
-      .select("display_name, farm_id")
-      .eq("id", currentUserId)
+      .from('users')
+      .select('display_name, farm_id')
+      .eq('id', currentUserId)
       .maybeSingle();
 
     if (uData?.farm_id) {
@@ -32,12 +34,12 @@ export async function fetchFarmsDb(currentUserId?: string): Promise<{ farms: Far
     }
   }
 
-  let farmsQuery = supabase.from("farms").select("*");
+  let farmsQuery = supabase.from('farms').select('*');
   if (currentUserId) {
     if (teacherFarmId) {
       farmsQuery = farmsQuery.or(`owner_id.eq.${currentUserId},id.eq.${teacherFarmId}`);
     } else {
-      farmsQuery = farmsQuery.eq("owner_id", currentUserId);
+      farmsQuery = farmsQuery.eq('owner_id', currentUserId);
     }
   }
   const { data: dbFarms } = await farmsQuery;
@@ -46,12 +48,16 @@ export async function fetchFarmsDb(currentUserId?: string): Promise<{ farms: Far
   return { farms, teacherFarmId, teacherDisplayName };
 }
 
-export async function fetchStudentsDb(activeFarmId: string, currentUserId?: string, teacherDisplayName?: string): Promise<{ students: StudentProfile[]; studentMap: Map<string, string> }> {
+export async function fetchStudentsDb(
+  activeFarmId: string,
+  currentUserId?: string,
+  teacherDisplayName?: string
+): Promise<{ students: StudentProfile[]; studentMap: Map<string, string> }> {
   const studentMap = new Map<string, string>();
   const { data: usersData } = await supabase
-    .from("users")
-    .select("id, display_name, role, farm_id")
-    .eq("role", "student");
+    .from('users')
+    .select('id, display_name, role, farm_id')
+    .eq('role', 'student');
 
   if (!usersData || usersData.length === 0) {
     return { students: [], studentMap };
@@ -64,12 +70,12 @@ export async function fetchStudentsDb(activeFarmId: string, currentUserId?: stri
   });
 
   filtered.forEach((u: any) => {
-    studentMap.set(u.id, u.display_name || "受講生");
+    studentMap.set(u.id, u.display_name || '受講生');
   });
 
   const students: StudentProfile[] = filtered.map((u: any) => ({
     id: u.id,
-    full_name: u.display_name || "受講生",
+    full_name: u.display_name || '受講生',
     role: u.role,
   }));
 
@@ -78,27 +84,27 @@ export async function fetchStudentsDb(activeFarmId: string, currentUserId?: stri
 
 export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
   const { data: cropRecs } = await supabase
-    .from("crop_records")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .from('crop_records')
+    .select('*')
+    .order('created_at', { ascending: false });
 
   if (!cropRecs || cropRecs.length === 0) return [];
 
   return cropRecs.map((r: any) => {
-    let cleanNotes = r.notes || "";
+    let cleanNotes = r.notes || '';
     let imgUrl = r.image_url || r.photo_url || undefined;
     const imgMatch = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
     if (imgMatch) {
       imgUrl = imgMatch[1];
-      cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+      cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
     }
     return {
       id: r.id,
       bed_id: r.bed_id,
-      date: r.date || new Date(r.created_at).toLocaleDateString("ja-JP"),
-      growth_stage: r.growth_stage || "観察記録",
+      date: r.date || new Date(r.created_at).toLocaleDateString('ja-JP'),
+      growth_stage: r.growth_stage || '観察記録',
       height_cm: r.height_cm,
-      work_types: Array.isArray(r.work_types) ? r.work_types : ["手入れ"],
+      work_types: Array.isArray(r.work_types) ? r.work_types : ['手入れ'],
       notes: cleanNotes,
       harvest_amount: r.harvest_amount,
       image_url: imgUrl,
@@ -109,29 +115,32 @@ export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
 }
 
 export async function fetchRawPlotsAndBedsDb() {
-  const { data: dbPlots } = await supabase.from("farm_plots").select("*");
-  const { data: dbBeds } = await supabase.from("farm_beds").select("*");
+  const { data: dbPlots } = await supabase.from('farm_plots').select('*');
+  const { data: dbBeds } = await supabase.from('farm_beds').select('*');
   return { dbPlots: dbPlots || [], dbBeds: dbBeds || [] };
 }
 
 export async function fetchPendingJournalsDb() {
-  const pendingApprovalMap = new Map<string, {
-    total_harvest?: string;
-    completion_notes?: string;
-    completion_image_url?: string;
-    season?: string;
-  }>();
+  const pendingApprovalMap = new Map<
+    string,
+    {
+      total_harvest?: string;
+      completion_notes?: string;
+      completion_image_url?: string;
+      season?: string;
+    }
+  >();
 
   try {
     const { data: pendingJournals } = await supabase
-      .from("journals")
-      .select("*")
-      .order("created_at", { ascending: false })
+      .from('journals')
+      .select('*')
+      .order('created_at', { ascending: false })
       .limit(20);
 
     if (pendingJournals && pendingJournals.length > 0) {
       pendingJournals.forEach((j: any) => {
-        if (j.content && j.content.includes("【収穫完了報告】") && !j.is_approved) {
+        if (j.content && j.content.includes('【収穫完了報告】') && !j.is_approved) {
           const bedMatch = j.content.match(/畝\s*([0-9]+)/);
           const harvestMatch = j.content.match(/収穫量:\s*([^\n]+)/);
           const notesMatch = j.content.match(/振り返り:\s*([^\n]+)/);
@@ -145,14 +154,14 @@ export async function fetchPendingJournalsDb() {
               total_harvest: harvestMatch ? harvestMatch[1].trim() : undefined,
               completion_notes: notesMatch ? notesMatch[1].trim() : j.content,
               completion_image_url: j.image_url || undefined,
-              season: "2026年 春夏",
+              season: '2026年 春夏',
             });
           }
         }
       });
     }
   } catch (e) {
-    console.warn("fetchPendingJournalsDb notice:", e);
+    console.warn('fetchPendingJournalsDb notice:', e);
   }
 
   return pendingApprovalMap;
@@ -168,7 +177,7 @@ export async function savePlotsAndBedsToDb(
 ) {
   // 1. farm_plots upsert (diff detection)
   const allPlotPayloads = updatedPlots
-    .filter((plot) => plot && !plot.id.startsWith("plot_placeholder_"))
+    .filter((plot) => plot && !plot.id.startsWith('plot_placeholder_'))
     .map((plot) => buildPlotUpsertPayload(plot, activeFarmId, dims, farmMeta));
 
   const plotsToUpsert: PlotUpsertPayload[] = [];
@@ -182,9 +191,9 @@ export async function savePlotsAndBedsToDb(
   if (plotsToUpsert.length > 0) {
     for (let i = 0; i < plotsToUpsert.length; i += 50) {
       const chunk = plotsToUpsert.slice(i, i + 50);
-      const { error: plotsError } = await supabase.from("farm_plots").upsert(chunk);
+      const { error: plotsError } = await supabase.from('farm_plots').upsert(chunk);
       if (plotsError) {
-        console.error("farm_plots bulk upsert error:", plotsError);
+        console.error('farm_plots bulk upsert error:', plotsError);
       } else {
         for (const p of chunk) {
           lastSavedPlotsMap.set(p.id, JSON.stringify(p));
@@ -196,7 +205,7 @@ export async function savePlotsAndBedsToDb(
   // 2. farm_beds upsert (diff detection)
   const allBedPayloads: BedUpsertPayload[] = [];
   for (const plot of updatedPlots) {
-    if (!plot || plot.id.startsWith("plot_placeholder_")) continue;
+    if (!plot || plot.id.startsWith('plot_placeholder_')) continue;
     const beds = buildBedUpsertPayloadsForPlot(plot);
     allBedPayloads.push(...beds);
   }
@@ -212,9 +221,9 @@ export async function savePlotsAndBedsToDb(
   if (bedsToUpsert.length > 0) {
     for (let i = 0; i < bedsToUpsert.length; i += 100) {
       const chunk = bedsToUpsert.slice(i, i + 100);
-      const { error: bedsError } = await supabase.from("farm_beds").upsert(chunk);
+      const { error: bedsError } = await supabase.from('farm_beds').upsert(chunk);
       if (bedsError) {
-        console.warn("farm_beds upsert notice:", bedsError.message || bedsError);
+        console.warn('farm_beds upsert notice:', bedsError.message || bedsError);
       } else {
         for (const b of chunk) {
           lastSavedBedsMap.set(b.id, JSON.stringify(b));
@@ -228,7 +237,7 @@ export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {
   if (!plotId || !orderedBedIds || orderedBedIds.length === 0) return;
 
   try {
-    const { error } = await supabase.rpc("reorder_beds", {
+    const { error } = await supabase.rpc('reorder_beds', {
       p_plot_id: plotId,
       p_bed_ids: orderedBedIds,
     });
@@ -237,30 +246,30 @@ export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {
       // Fallback: row-by-row update if RPC function is not available
       for (let i = 0; i < orderedBedIds.length; i++) {
         await supabase
-          .from("farm_beds")
+          .from('farm_beds')
           .update({ bed_number: String(i + 1) })
-          .eq("id", orderedBedIds[i]);
+          .eq('id', orderedBedIds[i]);
       }
     }
   } catch (err) {
-    console.warn("reorderBedsInDb error:", err);
+    console.warn('reorderBedsInDb error:', err);
   }
 }
 
 export async function insertBedDb(payload: any) {
-  const { data, error } = await supabase.from("farm_beds").upsert(payload).select().single();
+  const { data, error } = await supabase.from('farm_beds').upsert(payload).select().single();
   if (error) {
-    console.error("insertBedDb error:", error);
+    console.error('insertBedDb error:', error);
   }
   return data;
 }
 
 export async function deleteBedDb(bedId: string) {
   try {
-    await supabase.from("crop_records").delete().eq("bed_id", bedId);
-    await supabase.from("farm_beds").delete().eq("id", bedId);
+    await supabase.from('crop_records').delete().eq('bed_id', bedId);
+    await supabase.from('farm_beds').delete().eq('id', bedId);
   } catch (e) {
-    console.error("deleteBedDb error:", e);
+    console.error('deleteBedDb error:', e);
   }
 }
 
@@ -276,38 +285,38 @@ export async function insertCropRecordDb(record: {
   work_types?: string[];
 }) {
   try {
-    await supabase.from("crop_records").insert(record);
-    await supabase.from("farm_beds").upsert({
+    await supabase.from('crop_records').insert(record);
+    await supabase.from('farm_beds').upsert({
       id: record.bed_id,
       progress_percent: 100,
     });
   } catch (e) {
-    console.error("insertCropRecordDb error:", e);
+    console.error('insertCropRecordDb error:', e);
   }
 }
 
-export async function updateCropRecordDb(recordId: string, payload: {
-  notes?: string;
-  height_cm?: number;
-  growth_stage?: string;
-  work_types?: string[];
-  harvest_amount?: string;
-}) {
+export async function updateCropRecordDb(
+  recordId: string,
+  payload: {
+    notes?: string;
+    height_cm?: number;
+    growth_stage?: string;
+    work_types?: string[];
+    harvest_amount?: string;
+  }
+) {
   try {
-    await supabase
-      .from("crop_records")
-      .update(payload)
-      .eq("id", recordId);
+    await supabase.from('crop_records').update(payload).eq('id', recordId);
   } catch (e) {
-    console.error("updateCropRecordDb error:", e);
+    console.error('updateCropRecordDb error:', e);
   }
 }
 
 export async function deleteCropRecordDb(recordId: string) {
   try {
-    await supabase.from("crop_records").delete().eq("id", recordId);
+    await supabase.from('crop_records').delete().eq('id', recordId);
   } catch (e) {
-    console.error("deleteCropRecordDb error:", e);
+    console.error('deleteCropRecordDb error:', e);
   }
 }
 
@@ -320,8 +329,8 @@ export async function addFarmDb(id: string, name: string, ownerId?: string) {
   if (ownerId) {
     payload.owner_id = ownerId;
   }
-  const { error } = await supabase.from("farms").upsert([payload]);
+  const { error } = await supabase.from('farms').upsert([payload]);
   if (error) {
-    console.error("addFarmDb error:", error);
+    console.error('addFarmDb error:', error);
   }
 }

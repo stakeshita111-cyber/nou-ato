@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import Toast from "@/components/ui/Toast";
-import { useThemeStore, ThemeSettings } from "@/store/useThemeStore";
-import { formatDate, formatNumber } from "@/lib/utils/formatHelper";
+import { useEffect, useState } from 'react';
+import Toast from '@/components/ui/Toast';
+import { useThemeStore, ThemeSettings } from '@/store/useThemeStore';
+import { formatDate, formatNumber } from '@/lib/utils/formatHelper';
 
 export default function TeacherSettingsView() {
   const { settings, updateSettings, resetSettings } = useThemeStore();
 
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
 
   // DBから最新の設定値を同期取得
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch("/api/settings");
+        const res = await fetch('/api/settings');
         if (res.ok) {
           const data = await res.json();
           if (data.showStudentTalkTab !== undefined) {
@@ -23,7 +23,7 @@ export default function TeacherSettingsView() {
           }
         }
       } catch (err) {
-        console.error("Failed to fetch settings:", err);
+        console.error('Failed to fetch settings:', err);
       }
     };
     fetchSettings();
@@ -31,7 +31,7 @@ export default function TeacherSettingsView() {
 
   const handleToggleContrast = (enabled: boolean) => {
     updateSettings({ outdoorHighContrast: enabled });
-    setToastMessage(`✨ 高コントラスト表示を ${enabled ? "ON" : "OFF"} に切り替えました！`);
+    setToastMessage(`✨ 高コントラスト表示を ${enabled ? 'ON' : 'OFF'} に切り替えました！`);
     setShowToast(true);
   };
 
@@ -41,7 +41,8 @@ export default function TeacherSettingsView() {
   // フォントファミリーのインラインCSSマッピング
   const getFontFamilyCss = (family: ThemeSettings['fontFamily']) => {
     if (family === 'serif') return 'Georgia, Cambria, "Times New Roman", Times, serif';
-    if (family === 'rounded') return '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif';
+    if (family === 'rounded')
+      return '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif';
     return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   };
 
@@ -65,16 +66,18 @@ export default function TeacherSettingsView() {
       {/* 🌟 メインカラム (サイドバーw-64を除外) と100%横位置・横幅が一致する常時フローティングプレビュー 🌟 */}
       <div className="fixed top-[72px] left-0 md:left-64 right-0 z-40 flex justify-center px-4 sm:px-8 pointer-events-none">
         <div className="max-w-4xl w-full pointer-events-auto">
-          <div 
+          <div
             className={`p-3.5 sm:p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all space-y-2.5 ${
-              settings.outdoorHighContrast ? "bg-amber-50/95 border-amber-400 ring-2 ring-amber-300" : "bg-white/95 border-emerald-300 ring-1 ring-emerald-200"
+              settings.outdoorHighContrast
+                ? 'bg-amber-50/95 border-amber-400 ring-2 ring-amber-300'
+                : 'bg-white/95 border-emerald-300 ring-1 ring-emerald-200'
             }`}
             style={{ fontFamily: getFontFamilyCss(settings.fontFamily) }}
           >
             {/* 上段: 受講生プロフ (メインカラー反映) ＆ 日付表記サンプル (日付表記形式反映) */}
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
               <div className="flex items-center space-x-2.5">
-                <div 
+                <div
                   className="w-7 h-7 rounded-lg font-black text-white flex items-center justify-center text-[11px] shadow-2xs shrink-0"
                   style={{ backgroundColor: settings.primaryColor }}
                 >
@@ -89,13 +92,29 @@ export default function TeacherSettingsView() {
 
             {/* 中段: タイポグラフィサンプル (文字サイズ・太さ・行間反映) ＆ 収穫量表記 (数値形式反映) */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gray-50/90 p-2.5 rounded-xl border border-gray-200/80">
-              <p className={`text-gray-900 ${
-                settings.fontSize === 'small' ? 'text-xs' : settings.fontSize === 'large' ? 'text-base' : settings.fontSize === 'xlarge' ? 'text-lg font-black' : 'text-sm'
-              } ${
-                settings.fontWeight === 'bold' ? 'font-black' : settings.fontWeight === 'medium' ? 'font-medium' : 'font-normal'
-              } ${
-                settings.lineHeight === 'loose' ? 'leading-loose' : settings.lineHeight === 'relaxed' ? 'leading-relaxed' : 'leading-normal'
-              }`}>
+              <p
+                className={`text-gray-900 ${
+                  settings.fontSize === 'small'
+                    ? 'text-xs'
+                    : settings.fontSize === 'large'
+                      ? 'text-base'
+                      : settings.fontSize === 'xlarge'
+                        ? 'text-lg font-black'
+                        : 'text-sm'
+                } ${
+                  settings.fontWeight === 'bold'
+                    ? 'font-black'
+                    : settings.fontWeight === 'medium'
+                      ? 'font-medium'
+                      : 'font-normal'
+                } ${
+                  settings.lineHeight === 'loose'
+                    ? 'leading-loose'
+                    : settings.lineHeight === 'relaxed'
+                      ? 'leading-relaxed'
+                      : 'leading-normal'
+                }`}
+              >
                 文字サイズ・太さ・書体・行間 視認性確認テキスト
               </p>
 
@@ -117,7 +136,6 @@ export default function TeacherSettingsView() {
                 ＋ サンプルボタン (見た目プレビュー)
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -130,19 +148,20 @@ export default function TeacherSettingsView() {
         </div>
 
         <div className="divide-y divide-gray-100 text-xs font-bold">
-          
           {/* 1. 農園メインカラー */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
               <span className="text-sm font-black text-gray-900 block">🎨 農園メインカラー</span>
-              <span className="text-[11px] text-gray-500 font-medium">基調テーマカラーを選択します</span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                基調テーマカラーを選択します
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "キャベツグリーン", color: "#10b981", sec: "#f59e0b" },
-                { label: "シトラスオレンジ", color: "#e06d2d", sec: "#f59e0b" },
-                { label: "ストロベリーピンク", color: "#d8527c", sec: "#f59e0b" },
-                { label: "サファイアブルー", color: "#3182ce", sec: "#f59e0b" },
+                { label: 'キャベツグリーン', color: '#10b981', sec: '#f59e0b' },
+                { label: 'シトラスオレンジ', color: '#e06d2d', sec: '#f59e0b' },
+                { label: 'ストロベリーピンク', color: '#d8527c', sec: '#f59e0b' },
+                { label: 'サファイアブルー', color: '#3182ce', sec: '#f59e0b' },
               ].map((c) => (
                 <button
                   key={c.label}
@@ -154,11 +173,14 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border flex items-center space-x-2 transition ${
                     settings.primaryColor === c.color
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  <span className="w-4 h-4 rounded-full border border-white shrink-0 shadow-2xs" style={{ backgroundColor: c.color }} />
+                  <span
+                    className="w-4 h-4 rounded-full border border-white shrink-0 shadow-2xs"
+                    style={{ backgroundColor: c.color }}
+                  />
                   <span>{c.label}</span>
                 </button>
               ))}
@@ -168,15 +190,19 @@ export default function TeacherSettingsView() {
           {/* 2. 文字の大きさ */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">🔤 文字の大きさ (屋外ズーム)</span>
-              <span className="text-[11px] text-gray-500 font-medium">画面全体のフォントサイズを一括調整します</span>
+              <span className="text-sm font-black text-gray-900 block">
+                🔤 文字の大きさ (屋外ズーム)
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                画面全体のフォントサイズを一括調整します
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "小 (14px)", value: "small" },
-                { label: "標準 (16px)", value: "medium" },
-                { label: "大 (20px)", value: "large" },
-                { label: "極大 (24px) ⚠️推奨", value: "xlarge" },
+                { label: '小 (14px)', value: 'small' },
+                { label: '標準 (16px)', value: 'medium' },
+                { label: '大 (20px)', value: 'large' },
+                { label: '極大 (24px) ⚠️推奨', value: 'xlarge' },
               ].map((s) => (
                 <button
                   key={s.value}
@@ -188,8 +214,8 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border transition ${
                     settings.fontSize === s.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {s.label}
@@ -206,9 +232,9 @@ export default function TeacherSettingsView() {
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "ゴシック (標準)", value: "sans" },
-                { label: "明朝体 (上品)", value: "serif" },
-                { label: "丸ゴシック (読みやすい)", value: "rounded" },
+                { label: 'ゴシック (標準)', value: 'sans' },
+                { label: '明朝体 (上品)', value: 'serif' },
+                { label: '丸ゴシック (読みやすい)', value: 'rounded' },
               ].map((f) => (
                 <button
                   key={f.value}
@@ -220,8 +246,8 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border transition ${
                     settings.fontFamily === f.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {f.label}
@@ -233,14 +259,18 @@ export default function TeacherSettingsView() {
           {/* 4. 文字の太さ (日差し対策) */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">✒️ 文字の太さ (日差し反射対策)</span>
-              <span className="text-[11px] text-gray-500 font-medium">直射日光下で文字の輪郭を浮き立たせます</span>
+              <span className="text-sm font-black text-gray-900 block">
+                ✒️ 文字の太さ (日差し反射対策)
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                直射日光下で文字の輪郭を浮き立たせます
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "標準 (細め)", value: "normal" },
-                { label: "中 (読みやすい)", value: "medium" },
-                { label: "極太 (クッキリ)", value: "bold" },
+                { label: '標準 (細め)', value: 'normal' },
+                { label: '中 (読みやすい)', value: 'medium' },
+                { label: '極太 (クッキリ)', value: 'bold' },
               ].map((w) => (
                 <button
                   key={w.value}
@@ -252,8 +282,8 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border transition ${
                     settings.fontWeight === w.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {w.label}
@@ -265,14 +295,18 @@ export default function TeacherSettingsView() {
           {/* 5. 文章の行間 */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">↕️ 文章の行間 (誤読予防)</span>
-              <span className="text-[11px] text-gray-500 font-medium">行間の隙間を広げて視認性を高めます</span>
+              <span className="text-sm font-black text-gray-900 block">
+                ↕️ 文章の行間 (誤読予防)
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                行間の隙間を広げて視認性を高めます
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "標準", value: "normal" },
-                { label: "ゆったり", value: "relaxed" },
-                { label: "広い (誤読防止)", value: "loose" },
+                { label: '標準', value: 'normal' },
+                { label: 'ゆったり', value: 'relaxed' },
+                { label: '広い (誤読防止)', value: 'loose' },
               ].map((lh) => (
                 <button
                   key={lh.value}
@@ -284,8 +318,8 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border transition ${
                     settings.lineHeight === lh.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {lh.label}
@@ -298,13 +332,15 @@ export default function TeacherSettingsView() {
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
               <span className="text-sm font-black text-gray-900 block">🔘 ボタンの形状</span>
-              <span className="text-[11px] text-gray-500 font-medium">ボタンの角の丸みを変更します</span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                ボタンの角の丸みを変更します
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "四角形 (角なし)", value: "none" },
-                { label: "角丸 (標準)", value: "md" },
-                { label: "楕円丸 (完全丸形)", value: "full" },
+                { label: '四角形 (角なし)', value: 'none' },
+                { label: '角丸 (標準)', value: 'md' },
+                { label: '楕円丸 (完全丸形)', value: 'full' },
               ].map((r) => (
                 <button
                   key={r.value}
@@ -315,11 +351,15 @@ export default function TeacherSettingsView() {
                     setShowToast(true);
                   }}
                   className={`px-3.5 py-2 border transition ${
-                    r.value === 'none' ? 'rounded-none' : r.value === 'full' ? 'rounded-full' : 'rounded-xl'
+                    r.value === 'none'
+                      ? 'rounded-none'
+                      : r.value === 'full'
+                        ? 'rounded-full'
+                        : 'rounded-xl'
                   } ${
                     settings.borderRadius === r.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {r.label}
@@ -332,12 +372,14 @@ export default function TeacherSettingsView() {
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
               <span className="text-sm font-black text-gray-900 block">🔘 ボタンサイズ</span>
-              <span className="text-[11px] text-gray-500 font-medium">ボタンの表示サイズを変更します</span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                ボタンの表示サイズを変更します
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "標準", value: "normal" },
-                { label: "大", value: "large" },
+                { label: '標準', value: 'normal' },
+                { label: '大', value: 'large' },
               ].map((p) => (
                 <button
                   key={p.value}
@@ -348,11 +390,13 @@ export default function TeacherSettingsView() {
                     setShowToast(true);
                   }}
                   className={`border transition ${
-                    p.value === 'large' ? 'px-6 py-3.5 text-sm font-black' : 'px-3.5 py-2 text-xs font-bold'
+                    p.value === 'large'
+                      ? 'px-6 py-3.5 text-sm font-black'
+                      : 'px-3.5 py-2 text-xs font-bold'
                   } rounded-xl ${
                     settings.buttonPadding === p.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {p.label}
@@ -364,8 +408,12 @@ export default function TeacherSettingsView() {
           {/* 8. 高コントラストモード */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">☀️ 高コントラスト表示モード</span>
-              <span className="text-[11px] text-gray-500 font-medium">直射日光下の白飛び防止用高輝度モード</span>
+              <span className="text-sm font-black text-gray-900 block">
+                ☀️ 高コントラスト表示モード
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                直射日光下の白飛び防止用高輝度モード
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -373,8 +421,8 @@ export default function TeacherSettingsView() {
                 onClick={() => handleToggleContrast(false)}
                 className={`px-3.5 py-2 rounded-xl border transition ${
                   !settings.outdoorHighContrast
-                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                    ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 標準表示 (OFF)
@@ -384,8 +432,8 @@ export default function TeacherSettingsView() {
                 onClick={() => handleToggleContrast(true)}
                 className={`px-3.5 py-2 rounded-xl border transition ${
                   settings.outdoorHighContrast
-                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                    ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 高コントラスト (ON)
@@ -397,12 +445,14 @@ export default function TeacherSettingsView() {
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
               <span className="text-sm font-black text-gray-900 block">📅 日付の表記スタイル</span>
-              <span className="text-[11px] text-gray-500 font-medium">日付の表示フォーマットを選択します</span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                日付の表示フォーマットを選択します
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "8月14日(金)", value: "japanese" },
-                { label: "2026/08/14", value: "slash" },
+                { label: '8月14日(金)', value: 'japanese' },
+                { label: '2026/08/14', value: 'slash' },
               ].map((d) => (
                 <button
                   key={d.value}
@@ -414,8 +464,8 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border transition ${
                     settings.dateFormat === d.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {d.label}
@@ -428,13 +478,15 @@ export default function TeacherSettingsView() {
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
               <span className="text-sm font-black text-gray-900 block">📊 収穫量・数値表記</span>
-              <span className="text-[11px] text-gray-500 font-medium">数値と単位の表示フォーマットを選択します</span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                数値と単位の表示フォーマットを選択します
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "単位あり (1,500g)", value: "unit" },
-                { label: "カンマあり (1,500)", value: "comma" },
-                { label: "そのまま (1500)", value: "raw" },
+                { label: '単位あり (1,500g)', value: 'unit' },
+                { label: 'カンマあり (1,500)', value: 'comma' },
+                { label: 'そのまま (1500)', value: 'raw' },
               ].map((num) => (
                 <button
                   key={num.value}
@@ -446,8 +498,8 @@ export default function TeacherSettingsView() {
                   }}
                   className={`px-3.5 py-2 rounded-xl border transition ${
                     settings.numberFormat === num.value
-                      ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                      ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {num.label}
@@ -459,21 +511,25 @@ export default function TeacherSettingsView() {
           {/* 11. 講師画面: 収支シミュレーションメニューの表示 */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">💳 講師画面: 収支シミュレーションメニューの表示</span>
-              <span className="text-[11px] text-gray-500 font-medium">左サイドバーの「収支シミュレーション」メニューの表示・非表示を切り替えます（基本は非表示）</span>
+              <span className="text-sm font-black text-gray-900 block">
+                💳 講師画面: 収支シミュレーションメニューの表示
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                左サイドバーの「収支シミュレーション」メニューの表示・非表示を切り替えます（基本は非表示）
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => {
                   updateSettings({ showPaymentsMenu: true });
-                  setToastMessage("💳 収支シミュレーションメニューを「表示 (ON)」に設定しました");
+                  setToastMessage('💳 収支シミュレーションメニューを「表示 (ON)」に設定しました');
                   setShowToast(true);
                 }}
                 className={`px-3.5 py-2 rounded-xl border transition ${
                   settings.showPaymentsMenu === true
-                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                    ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 表示 (ON)
@@ -482,13 +538,15 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => {
                   updateSettings({ showPaymentsMenu: false });
-                  setToastMessage("💳 収支シミュレーションメニューを「非表示 (OFF)」に設定しました");
+                  setToastMessage(
+                    '💳 収支シミュレーションメニューを「非表示 (OFF)」に設定しました'
+                  );
                   setShowToast(true);
                 }}
                 className={`px-3.5 py-2 rounded-xl border transition ${
                   !settings.showPaymentsMenu
-                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                    ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 非表示 (OFF)
@@ -499,43 +557,59 @@ export default function TeacherSettingsView() {
           {/* 12. 生徒画面: 相談・質問機能の表示 */}
           <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/50 transition">
             <div>
-              <span className="text-sm font-black text-gray-900 block">💬 生徒画面: 相談・質問機能（Talk）の表示</span>
-              <span className="text-[11px] text-gray-500 font-medium">生徒画面下部ナビゲーションの「相談」タブの表示・非表示を切り替えます</span>
+              <span className="text-sm font-black text-gray-900 block">
+                💬 生徒画面: 相談・質問機能（Talk）の表示
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">
+                生徒画面下部ナビゲーションの「相談」タブの表示・非表示を切り替えます
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => {
                   updateSettings({ showStudentTalkTab: true });
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("nouato_show_student_talk_tab", "true");
-                    window.dispatchEvent(new CustomEvent("nouato_talk_tab_toggled", { detail: { show: true } }));
-                    window.dispatchEvent(new CustomEvent("nouato_settings_updated", { detail: { ...settings, showStudentTalkTab: true } }));
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('nouato_show_student_talk_tab', 'true');
+                    window.dispatchEvent(
+                      new CustomEvent('nouato_talk_tab_toggled', { detail: { show: true } })
+                    );
+                    window.dispatchEvent(
+                      new CustomEvent('nouato_settings_updated', {
+                        detail: { ...settings, showStudentTalkTab: true },
+                      })
+                    );
                     try {
-                      const bc = new BroadcastChannel("nouato_settings_sync");
-                      bc.postMessage({ type: "TALK_TAB_TOGGLE", show: true });
-                      bc.postMessage({ type: "SETTINGS_UPDATED", settings: { ...settings, showStudentTalkTab: true } });
+                      const bc = new BroadcastChannel('nouato_settings_sync');
+                      bc.postMessage({ type: 'TALK_TAB_TOGGLE', show: true });
+                      bc.postMessage({
+                        type: 'SETTINGS_UPDATED',
+                        settings: { ...settings, showStudentTalkTab: true },
+                      });
                     } catch (e) {}
                     // プレビュー用iframeへの直接postMessage送信
-                    document.querySelectorAll("iframe").forEach((iframe) => {
+                    document.querySelectorAll('iframe').forEach((iframe) => {
                       try {
-                        iframe.contentWindow?.postMessage({ type: "TALK_TAB_TOGGLE", show: true }, "*");
+                        iframe.contentWindow?.postMessage(
+                          { type: 'TALK_TAB_TOGGLE', show: true },
+                          '*'
+                        );
                       } catch (e) {}
                     });
                     // サーバー共有APIへの保存（全端末リアルタイム同期）
-                    fetch("/api/settings", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
+                    fetch('/api/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ showStudentTalkTab: true }),
                     }).catch(() => {});
                   }
-                  setToastMessage("💬 生徒の相談画面を「表示 (ON)」に設定しました");
+                  setToastMessage('💬 生徒の相談画面を「表示 (ON)」に設定しました');
                   setShowToast(true);
                 }}
                 className={`px-3.5 py-2 rounded-xl border transition ${
                   settings.showStudentTalkTab !== false
-                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                    ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 表示 (ON)
@@ -544,42 +618,53 @@ export default function TeacherSettingsView() {
                 type="button"
                 onClick={() => {
                   updateSettings({ showStudentTalkTab: false });
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("nouato_show_student_talk_tab", "false");
-                    window.dispatchEvent(new CustomEvent("nouato_talk_tab_toggled", { detail: { show: false } }));
-                    window.dispatchEvent(new CustomEvent("nouato_settings_updated", { detail: { ...settings, showStudentTalkTab: false } }));
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('nouato_show_student_talk_tab', 'false');
+                    window.dispatchEvent(
+                      new CustomEvent('nouato_talk_tab_toggled', { detail: { show: false } })
+                    );
+                    window.dispatchEvent(
+                      new CustomEvent('nouato_settings_updated', {
+                        detail: { ...settings, showStudentTalkTab: false },
+                      })
+                    );
                     try {
-                      const bc = new BroadcastChannel("nouato_settings_sync");
-                      bc.postMessage({ type: "TALK_TAB_TOGGLE", show: false });
-                      bc.postMessage({ type: "SETTINGS_UPDATED", settings: { ...settings, showStudentTalkTab: false } });
+                      const bc = new BroadcastChannel('nouato_settings_sync');
+                      bc.postMessage({ type: 'TALK_TAB_TOGGLE', show: false });
+                      bc.postMessage({
+                        type: 'SETTINGS_UPDATED',
+                        settings: { ...settings, showStudentTalkTab: false },
+                      });
                     } catch (e) {}
                     // プレビュー用iframeへの直接postMessage送信
-                    document.querySelectorAll("iframe").forEach((iframe) => {
+                    document.querySelectorAll('iframe').forEach((iframe) => {
                       try {
-                        iframe.contentWindow?.postMessage({ type: "TALK_TAB_TOGGLE", show: false }, "*");
+                        iframe.contentWindow?.postMessage(
+                          { type: 'TALK_TAB_TOGGLE', show: false },
+                          '*'
+                        );
                       } catch (e) {}
                     });
                     // サーバー共有APIへの保存（全端末リアルタイム同期）
-                    fetch("/api/settings", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
+                    fetch('/api/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ showStudentTalkTab: false }),
                     }).catch(() => {});
                   }
-                  setToastMessage("💬 生徒の相談画面を「非表示 (OFF)」に設定しました");
+                  setToastMessage('💬 生徒の相談画面を「非表示 (OFF)」に設定しました');
                   setShowToast(true);
                 }}
                 className={`px-3.5 py-2 rounded-xl border transition ${
                   settings.showStudentTalkTab === false
-                    ? "bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300"
-                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                    ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-300'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 非表示 (OFF)
               </button>
             </div>
           </div>
-
         </div>
 
         {/* 下部初期化ボタン */}
@@ -591,7 +676,7 @@ export default function TeacherSettingsView() {
             type="button"
             onClick={() => {
               resetSettings();
-              setToastMessage("🔄 すべてのカスタマイズ設定を標準初期状態に戻しました");
+              setToastMessage('🔄 すべてのカスタマイズ設定を標準初期状態に戻しました');
               setShowToast(true);
             }}
             className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition shadow-2xs"

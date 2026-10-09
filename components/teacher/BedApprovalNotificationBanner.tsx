@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { FarmPlot, FarmBed } from "@/types/farm";
-import { formatHarvestAmount } from "@/lib/utils/formatHelper";
+import { FarmPlot, FarmBed } from '@/types/farm';
+import { formatHarvestAmount } from '@/lib/utils/formatHelper';
 
 interface PendingApprovalItem {
   plot: FarmPlot;
@@ -22,7 +22,7 @@ export default function BedApprovalNotificationBanner({
 
   plots.forEach((plot) => {
     (plot.beds || []).forEach((bed) => {
-      if (bed.status === "completed_pending") {
+      if (bed.status === 'completed_pending') {
         pendingItems.push({ plot, bed });
       }
     });
@@ -74,15 +74,17 @@ export default function BedApprovalNotificationBanner({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <span className="font-black text-sm text-gray-900">
-                    🧑‍🌾 {plot.student_name || "生徒"}さん
+                    🧑‍🌾 {plot.student_name || '生徒'}さん
                   </span>
                   <span className="text-xs bg-amber-100 text-amber-950 px-2.5 py-0.5 rounded-lg font-black border border-amber-300">
-                    区画 {plot.code}・畝 #{bed.bed_number} ({bed.crop_name || "作物"})
+                    区画 {plot.code}・畝 #{bed.bed_number} ({bed.crop_name || '作物'})
                   </span>
                 </div>
                 <p className="text-xs text-gray-700 font-bold line-clamp-1">
-                  {bed.total_harvest ? "🧺 総収穫量: " + formatHarvestAmount(bed.total_harvest) : "🎉 収穫完了"}
-                  {bed.completion_notes ? " / 「" + bed.completion_notes + "」" : ""}
+                  {bed.total_harvest
+                    ? '🧺 総収穫量: ' + formatHarvestAmount(bed.total_harvest)
+                    : '🎉 収穫完了'}
+                  {bed.completion_notes ? ' / 「' + bed.completion_notes + '」' : ''}
                 </p>
               </div>
             </div>

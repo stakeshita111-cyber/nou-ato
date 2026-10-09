@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 
 interface BadgeItem {
   id: string;
@@ -22,8 +22,8 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
 
   // ページ切り替えスライドアニメーション方向
-  const [badgeSlideDir, setBadgeSlideDir] = useState<"left" | "right">("left");
-  const [footprintSlideDir, setFootprintSlideDir] = useState<"left" | "right">("left");
+  const [badgeSlideDir, setBadgeSlideDir] = useState<'left' | 'right'>('left');
+  const [footprintSlideDir, setFootprintSlideDir] = useState<'left' | 'right'>('left');
 
   // スワイプ操作用のタッチ座標状態
   const [badgeTouchStart, setBadgeTouchStart] = useState<number | null>(null);
@@ -34,7 +34,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
   const BADGES_PER_PAGE = 6;
   const FOOTPRINTS_PER_PAGE = 5;
 
-  const completedTasks = tasks.filter((t) => t.status === "completed");
+  const completedTasks = tasks.filter((t) => t.status === 'completed');
 
   // 経験値計算
   const totalExp = completedTasks.length * 50;
@@ -45,13 +45,13 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
   const allBadges: BadgeItem[] = tasks
     .filter((t) => {
       const badgeName = t.tasks?.badge_name || t.badge_name;
-      return typeof badgeName === "string" && badgeName.trim() !== "";
+      return typeof badgeName === 'string' && badgeName.trim() !== '';
     })
     .map((t, idx) => {
       const badgeTitle = (t.tasks?.badge_name || t.badge_name) as string;
-      const badgeIcon = ((t.tasks?.badge_icon || t.badge_icon) as string) || "🏆";
-      const taskTitle = (t.tasks?.title || t.title || "タスク") as string;
-      const unlocked = t.status === "completed";
+      const badgeIcon = ((t.tasks?.badge_icon || t.badge_icon) as string) || '🏆';
+      const taskTitle = (t.tasks?.title || t.title || 'タスク') as string;
+      const unlocked = t.status === 'completed';
       return {
         id: t.id || `badge_${idx}`,
         title: badgeTitle,
@@ -95,11 +95,11 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
 
     if (distance > MIN_SWIPE_DISTANCE && currentBadgePage < totalBadgePages) {
       // 次のページへスライド
-      setBadgeSlideDir("left");
+      setBadgeSlideDir('left');
       setBadgePage((p) => Math.min(totalBadgePages, p + 1));
     } else if (distance < -MIN_SWIPE_DISTANCE && currentBadgePage > 1) {
       // 前のページへスライド
-      setBadgeSlideDir("right");
+      setBadgeSlideDir('right');
       setBadgePage((p) => Math.max(1, p - 1));
     }
   };
@@ -120,10 +120,10 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
     const MIN_SWIPE_DISTANCE = 40;
 
     if (distance > MIN_SWIPE_DISTANCE && currentFootprintPage < totalFootprintPages) {
-      setFootprintSlideDir("left");
+      setFootprintSlideDir('left');
       setFootprintPage((p) => Math.min(totalFootprintPages, p + 1));
     } else if (distance < -MIN_SWIPE_DISTANCE && currentFootprintPage > 1) {
-      setFootprintSlideDir("right");
+      setFootprintSlideDir('right');
       setFootprintPage((p) => Math.max(1, p - 1));
     }
   };
@@ -138,7 +138,9 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
               Lv.{level}
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">農業スキル等級</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
+                農業スキル等級
+              </span>
               <h3 className="text-xl font-black">見習い農家</h3>
             </div>
           </div>
@@ -190,7 +192,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
               <div
                 key={`badge-page-${currentBadgePage}`}
                 className={`grid grid-cols-3 sm:grid-cols-6 gap-3 ${
-                  badgeSlideDir === "left" ? "animate-slide-left" : "animate-slide-right"
+                  badgeSlideDir === 'left' ? 'animate-slide-left' : 'animate-slide-right'
                 }`}
               >
                 {pagedBadges.map((badge) => {
@@ -204,21 +206,21 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                       onClick={() => setSelectedBadge(isSelected ? null : badge)}
                       className={`relative aspect-square p-3 rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer select-none outline-none focus:ring-2 focus:ring-green-500 ${
                         badge.unlocked
-                          ? "bg-white border-green-200 shadow-xs hover:border-green-400 hover:shadow-md"
-                          : "bg-gray-100/70 border-gray-200 opacity-60 grayscale hover:opacity-80"
-                      } ${isSelected ? "ring-2 ring-green-500 border-green-500 bg-green-50/50" : ""}`}
+                          ? 'bg-white border-green-200 shadow-xs hover:border-green-400 hover:shadow-md'
+                          : 'bg-gray-100/70 border-gray-200 opacity-60 grayscale hover:opacity-80'
+                      } ${isSelected ? 'ring-2 ring-green-500 border-green-500 bg-green-50/50' : ''}`}
                     >
                       {/* バッジアイコン (獲得済みは3Dコイン回転表示) */}
                       <div
                         className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner transition-all ${
                           badge.unlocked
-                            ? "bg-gradient-to-br from-green-50 to-emerald-100 text-green-800 border border-green-200/80"
-                            : "bg-gray-200 text-gray-500"
+                            ? 'bg-gradient-to-br from-green-50 to-emerald-100 text-green-800 border border-green-200/80'
+                            : 'bg-gray-200 text-gray-500'
                         }`}
                       >
                         <span
                           className={`inline-flex items-center justify-center transition-transform [transform-style:preserve-3d] ${
-                            badge.unlocked ? "animate-spin-3d-slow" : ""
+                            badge.unlocked ? 'animate-spin-3d-slow' : ''
                           }`}
                         >
                           {badge.icon}
@@ -255,11 +257,11 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                     <span
                       className={`text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full ${
                         selectedBadge.unlocked
-                          ? "bg-green-100 text-green-800 border border-green-300"
-                          : "bg-gray-200 text-gray-600 border border-gray-300"
+                          ? 'bg-green-100 text-green-800 border border-green-300'
+                          : 'bg-gray-200 text-gray-600 border border-gray-300'
                       }`}
                     >
-                      {selectedBadge.unlocked ? "獲得済み" : "未獲得"}
+                      {selectedBadge.unlocked ? '獲得済み' : '未獲得'}
                     </span>
                   </div>
 
@@ -267,11 +269,17 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                   <p className="text-xs sm:text-sm font-bold text-gray-800 leading-snug">
                     {selectedBadge.unlocked ? (
                       <span className="text-green-800">
-                        ✅ クリアタスク: 「<span className="underline decoration-green-400 decoration-2">{selectedBadge.taskTitle}</span>」
+                        ✅ クリアタスク: 「
+                        <span className="underline decoration-green-400 decoration-2">
+                          {selectedBadge.taskTitle}
+                        </span>
+                        」
                       </span>
                     ) : (
                       <span className="text-amber-800">
-                        🔒 獲得条件: 「<span className="font-extrabold">{selectedBadge.taskTitle}</span>」をクリアする
+                        🔒 獲得条件: 「
+                        <span className="font-extrabold">{selectedBadge.taskTitle}</span>
+                        」をクリアする
                       </span>
                     )}
                   </p>
@@ -294,7 +302,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 <button
                   type="button"
                   onClick={() => {
-                    setBadgeSlideDir("right");
+                    setBadgeSlideDir('right');
                     setBadgePage((p) => Math.max(1, p - 1));
                   }}
                   disabled={currentBadgePage === 1}
@@ -308,7 +316,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 <button
                   type="button"
                   onClick={() => {
-                    setBadgeSlideDir("left");
+                    setBadgeSlideDir('left');
                     setBadgePage((p) => Math.min(totalBadgePages, p + 1));
                   }}
                   disabled={currentBadgePage === totalBadgePages}
@@ -343,7 +351,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
               <div
                 key={`footprint-page-${currentFootprintPage}`}
                 className={`space-y-3 ${
-                  footprintSlideDir === "left" ? "animate-slide-left" : "animate-slide-right"
+                  footprintSlideDir === 'left' ? 'animate-slide-left' : 'animate-slide-right'
                 }`}
               >
                 {pagedFootprints.map((ct) => (
@@ -364,7 +372,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-500 line-clamp-1">
-                        {ct.tasks?.description || "無事に作業完了を報告しました。"}
+                        {ct.tasks?.description || '無事に作業完了を報告しました。'}
                       </p>
                     </div>
                   </div>
@@ -378,7 +386,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 <button
                   type="button"
                   onClick={() => {
-                    setFootprintSlideDir("right");
+                    setFootprintSlideDir('right');
                     setFootprintPage((p) => Math.max(1, p - 1));
                   }}
                   disabled={currentFootprintPage === 1}
@@ -392,7 +400,7 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
                 <button
                   type="button"
                   onClick={() => {
-                    setFootprintSlideDir("left");
+                    setFootprintSlideDir('left');
                     setFootprintPage((p) => Math.min(totalFootprintPages, p + 1));
                   }}
                   disabled={currentFootprintPage === totalFootprintPages}

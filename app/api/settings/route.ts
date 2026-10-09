@@ -1,6 +1,6 @@
-import { ApiResponse } from "@/lib/apiResponse";
-import { logger } from "@/lib/logger";
-import { createClient } from "@/utils/supabase/server";
+import { ApiResponse } from '@/lib/apiResponse';
+import { logger } from '@/lib/logger';
+import { createClient } from '@/utils/supabase/server';
 
 interface ServerSettings {
   showStudentTalkTab: boolean;
@@ -13,10 +13,10 @@ const DEFAULT_SETTINGS: ServerSettings = {
 
 export async function GET(request?: Request) {
   try {
-    logger.info("Fetching global server settings", "api/settings");
+    logger.info('Fetching global server settings', 'api/settings');
 
     const url = request ? new URL(request.url) : null;
-    const requestedFarmId = url?.searchParams.get("farm_id") || null;
+    const requestedFarmId = url?.searchParams.get('farm_id') || null;
 
     const supabase = await createClient();
     let targetFarmId: string | null = requestedFarmId;
@@ -29,18 +29,18 @@ export async function GET(request?: Request) {
       if (user) {
         if (!targetFarmId) {
           const { data: userData } = await supabase
-            .from("users")
-            .select("farm_id, role")
-            .eq("id", user.id)
+            .from('users')
+            .select('farm_id, role')
+            .eq('id', user.id)
             .maybeSingle();
 
           if (userData?.farm_id) {
             targetFarmId = userData.farm_id;
-          } else if (userData?.role === "teacher") {
+          } else if (userData?.role === 'teacher') {
             const { data: ownedFarm } = await supabase
-              .from("farms")
-              .select("id")
-              .eq("owner_id", user.id)
+              .from('farms')
+              .select('id')
+              .eq('owner_id', user.id)
               .limit(1)
               .maybeSingle();
             if (ownedFarm) {
@@ -50,30 +50,38 @@ export async function GET(request?: Request) {
         }
       }
     } catch (authErr) {
-      logger.warn("Auth user lookup in GET /api/settings:", "api/settings", undefined, authErr);
+      logger.warn('Auth user lookup in GET /api/settings:', 'api/settings', undefined, authErr);
     }
 
     let showStudentTalkTab = DEFAULT_SETTINGS.showStudentTalkTab !== false;
 
     if (targetFarmId) {
       const { data: farmData } = await supabase
-        .from("farms")
-        .select("show_student_talk_tab")
-        .eq("id", targetFarmId)
+        .from('farms')
+        .select('show_student_talk_tab')
+        .eq('id', targetFarmId)
         .maybeSingle();
 
-      if (farmData && farmData.show_student_talk_tab !== null && farmData.show_student_talk_tab !== undefined) {
+      if (
+        farmData &&
+        farmData.show_student_talk_tab !== null &&
+        farmData.show_student_talk_tab !== undefined
+      ) {
         showStudentTalkTab = farmData.show_student_talk_tab !== false;
       }
     } else {
       // フォールバック: DB全体の先頭農園の設定を取得
       const { data: defaultFarm } = await supabase
-        .from("farms")
-        .select("show_student_talk_tab")
+        .from('farms')
+        .select('show_student_talk_tab')
         .limit(1)
         .maybeSingle();
 
-      if (defaultFarm && defaultFarm.show_student_talk_tab !== null && defaultFarm.show_student_talk_tab !== undefined) {
+      if (
+        defaultFarm &&
+        defaultFarm.show_student_talk_tab !== null &&
+        defaultFarm.show_student_talk_tab !== undefined
+      ) {
         showStudentTalkTab = defaultFarm.show_student_talk_tab !== false;
       }
     }
@@ -86,8 +94,8 @@ export async function GET(request?: Request) {
       showStudentTalkTab,
     });
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : "設定の取得に失敗しました";
-    logger.error("Failed to fetch settings", "api/settings", undefined, err);
+    const errorMsg = err instanceof Error ? err.message : '設定の取得に失敗しました';
+    logger.error('Failed to fetch settings', 'api/settings', undefined, err);
     return ApiResponse.internalError(errorMsg);
   }
 }
@@ -95,8 +103,8 @@ export async function GET(request?: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Partial<ServerSettings>;
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return ApiResponse.badRequest("リクエストボディが不正です");
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return ApiResponse.badRequest('リクエストボディが不正です');
     }
 
     const supabase = await createClient();
@@ -109,52 +117,52 @@ export async function POST(request: Request) {
     if (user) {
       // ログイン中講師が所有/所属する農園を取得・更新
       const { data: userData } = await supabase
-        .from("users")
-        .select("farm_id, role")
-        .eq("id", user.id)
+        .from('users')
+        .select('farm_id, role')
+        .eq('id', user.id)
         .maybeSingle();
 
       const { data: ownedFarms } = await supabase
-        .from("farms")
-        .select("id")
-        .or(`owner_id.eq.${user.id}${userData?.farm_id ? `,id.eq.${userData.farm_id}` : ""}`);
+        .from('farms')
+        .select('id')
+        .or(`owner_id.eq.${user.id}${userData?.farm_id ? `,id.eq.${userData.farm_id}` : ''}`);
 
       if (ownedFarms && ownedFarms.length > 0) {
         const farmIds = ownedFarms.map((f) => f.id);
         await supabase
-          .from("farms")
+          .from('farms')
           .update({
             show_student_talk_tab: showStudentTalkTab,
             updated_at: new Date().toISOString(),
           })
-          .in("id", farmIds);
+          .in('id', farmIds);
       } else {
         // 農園レコードが未登録の場合は新規作成/upsert
         const newFarmId = userData?.farm_id || crypto.randomUUID();
-        await supabase.from("farms").upsert([
+        await supabase.from('farms').upsert([
           {
             id: newFarmId,
-            name: "マイ農園",
+            name: 'マイ農園',
             owner_id: user.id,
             show_student_talk_tab: showStudentTalkTab,
             updated_at: new Date().toISOString(),
           },
         ]);
         if (!userData?.farm_id) {
-          await supabase.from("users").update({ farm_id: newFarmId }).eq("id", user.id);
+          await supabase.from('users').update({ farm_id: newFarmId }).eq('id', user.id);
         }
       }
     } else {
       // 未ログイン状態でも全体デフォルト設定として1件目の農園があれば更新を試みる
-      const { data: firstFarm } = await supabase.from("farms").select("id").limit(1).maybeSingle();
+      const { data: firstFarm } = await supabase.from('farms').select('id').limit(1).maybeSingle();
       if (firstFarm) {
         await supabase
-          .from("farms")
+          .from('farms')
           .update({
             show_student_talk_tab: showStudentTalkTab,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", firstFarm.id);
+          .eq('id', firstFarm.id);
       }
     }
 
@@ -164,7 +172,7 @@ export async function POST(request: Request) {
       showStudentTalkTab,
     };
 
-    logger.info("Updated global server settings", "api/settings", {
+    logger.info('Updated global server settings', 'api/settings', {
       showStudentTalkTab,
     });
 
@@ -174,8 +182,8 @@ export async function POST(request: Request) {
       showStudentTalkTab,
     });
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : "設定の更新に失敗しました";
-    logger.error("Failed to update settings", "api/settings", undefined, err);
+    const errorMsg = err instanceof Error ? err.message : '設定の更新に失敗しました';
+    logger.error('Failed to update settings', 'api/settings', undefined, err);
     return ApiResponse.internalError(errorMsg);
   }
 }

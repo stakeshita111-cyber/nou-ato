@@ -6,14 +6,14 @@
 
 ## 1. パフォーマンス目標 (Performance & Latency SLO)
 
-| 項目 | 目標値 (SLO) | 計測環境・基準 | 達成施策 |
-| :--- | :--- | :--- | :--- |
-| **API レスポンス時間 (一般)** | **95パーセンタイル < 300ms** | Next.js Route Handlers (`/api/settings` 等) | エッジ配信、Supabaseインデックス最適化 |
-| **AI RAG 回答生成時間** | **95パーセンタイル < 2,500ms** | `/api/chat/rag` (Gemini 1.5 Flash-Lite) | ストリーミング準備、類似度上位3件の軽量コンテキスト注入 |
-| **ナレッジ照合応答時間** | **95パーセンタイル < 150ms** | `/api/chat/check-knowledge` | インメモリ作物品種フィルタリング & STOP_WORDS高速照合 |
-| **Initial Page Load (LCP)** | **< 2.5 秒 (Good判定)** | 受講生ポータル (`/student`), 講師ダッシュボード | SSR + Turbopack最適化、画像WebP変換 |
-| **Cumulative Layout Shift (CLS)** | **< 0.1** | 全画面 | スケルトンスクリーン、固定アスペクト比コンテナ |
-| **First Input Delay (FID / INP)** | **< 100ms** | D&D畝操作、モーダル開閉 | 軽量カスタムフック、不要な再レンダリング防止 |
+| 項目                              | 目標値 (SLO)                   | 計測環境・基準                                  | 達成施策                                                |
+| :-------------------------------- | :----------------------------- | :---------------------------------------------- | :------------------------------------------------------ |
+| **API レスポンス時間 (一般)**     | **95パーセンタイル < 300ms**   | Next.js Route Handlers (`/api/settings` 等)     | エッジ配信、Supabaseインデックス最適化                  |
+| **AI RAG 回答生成時間**           | **95パーセンタイル < 2,500ms** | `/api/chat/rag` (Gemini 1.5 Flash-Lite)         | ストリーミング準備、類似度上位3件の軽量コンテキスト注入 |
+| **ナレッジ照合応答時間**          | **95パーセンタイル < 150ms**   | `/api/chat/check-knowledge`                     | インメモリ作物品種フィルタリング & STOP_WORDS高速照合   |
+| **Initial Page Load (LCP)**       | **< 2.5 秒 (Good判定)**        | 受講生ポータル (`/student`), 講師ダッシュボード | SSR + Turbopack最適化、画像WebP変換                     |
+| **Cumulative Layout Shift (CLS)** | **< 0.1**                      | 全画面                                          | スケルトンスクリーン、固定アスペクト比コンテナ          |
+| **First Input Delay (FID / INP)** | **< 100ms**                    | D&D畝操作、モーダル開閉                         | 軽量カスタムフック、不要な再レンダリング防止            |
 
 ---
 
@@ -33,6 +33,7 @@
 ## 3. セキュリティ & プライバシー要件 (Security & Privacy)
 
 ### 3.1 認証・認可
+
 - **Supabase Auth & Session Management**:
   - JWT (JSON Web Token) ベースのセキュアな認証。HTTP-only Cookie 運用。
   - Middleware による受講生・講師ロール判定と不正アクセス即時リダイレクト。
@@ -44,6 +45,7 @@
   - 論理退会済みユーザー (`deleted_at IS NOT NULL`) のアクセスを全テーブルで拒絶。
 
 ### 3.2 データ保護 & 通信暗号化
+
 - **通信暗号化**: 全リクエスト HTTPS (TLS 1.3) 強制。
 - **個人情報匿名化 (PII Masking)**:
   - RAGナレッジ共有時、過去日誌に含まれる受講生氏名（「竹下翔さん」等）を自動検知して「受講生の方」等にサニタイズ（`sanitizePersonalNames`）。
@@ -51,6 +53,7 @@
   - APIキー、トークンはサーバー側環境変数 (`.env.local`) で管理。構造化ロガーで自動マスキング処理。
 
 ### 3.3 レート制限 (Rate Limiting) & コスト防衛 (Cost Defense)
+
 - **AI 相談チケット制**:
   - 1人あたり 1日3回 のチケット制限（深夜0:00リセット）。
   - チケット枯渇時は即座にメモ専用モードへ切り替え、無制限なLLM API呼び出しを防止。

@@ -1,34 +1,34 @@
-"use client";
+'use client';
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
-import type { Provider } from "@supabase/supabase-js";
-import Toast from "@/components/ui/Toast";
-import Link from "next/link";
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+import type { Provider } from '@supabase/supabase-js';
+import Toast from '@/components/ui/Toast';
+import Link from 'next/link';
 
 function AccountMergeForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const reason = searchParams.get("reason");
-  const isReasonNotice = reason === "already_registered" || reason === "identity_conflict";
+  const reason = searchParams.get('reason');
+  const isReasonNotice = reason === 'already_registered' || reason === 'identity_conflict';
   const [toastMessage, setToastMessage] = useState(
     isReasonNotice
-      ? "このLINEアカウントのメールアドレスは既存のアカウントで登録されています。パスワードを入力して連携を完了してください。"
-      : ""
+      ? 'このLINEアカウントのメールアドレスは既存のアカウントで登録されています。パスワードを入力して連携を完了してください。'
+      : ''
   );
   const [showToast, setShowToast] = useState(isReasonNotice);
 
   const handleMergeAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      setToastMessage("メールアドレスとパスワードを入力してください");
+      setToastMessage('メールアドレスとパスワードを入力してください');
       setShowToast(true);
       return;
     }
@@ -51,7 +51,7 @@ function AccountMergeForm() {
       // 2. 認証完了後、LINE Identityを統合リンク
       const origin = window.location.origin;
       const { error: linkError } = await supabase.auth.linkIdentity({
-        provider: "custom:line" as unknown as Provider,
+        provider: 'custom:line' as unknown as Provider,
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student`,
@@ -65,15 +65,15 @@ function AccountMergeForm() {
         return;
       }
 
-      setToastMessage("🎉 アカウントの統合が完了しました！");
+      setToastMessage('🎉 アカウントの統合が完了しました！');
       setShowToast(true);
 
       setTimeout(() => {
-        router.push("/student");
+        router.push('/student');
       }, 900);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "";
-      setToastMessage("エラーが発生しました: " + message);
+      const message = err instanceof Error ? err.message : '';
+      setToastMessage('エラーが発生しました: ' + message);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -139,7 +139,7 @@ function AccountMergeForm() {
           disabled={loading}
           className="w-full py-3.5 bg-[#1d5c23] hover:bg-[#16471a] text-white font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-sm"
         >
-          <span>{loading ? "認証・連携処理中..." : "認証してLINEアカウントを統合"}</span>
+          <span>{loading ? '認証・連携処理中...' : '認証してLINEアカウントを統合'}</span>
         </button>
       </form>
 

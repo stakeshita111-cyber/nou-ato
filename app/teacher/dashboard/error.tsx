@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 export default function TeacherDashboardError({
   error,
@@ -10,7 +10,7 @@ export default function TeacherDashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Teacher Dashboard Error captured by ErrorBoundary:", error);
+    console.error('Teacher Dashboard Error captured by ErrorBoundary:', error);
   }, [error]);
 
   return (
@@ -41,9 +41,9 @@ export default function TeacherDashboardError({
           <button
             type="button"
             onClick={() => {
-              if (typeof window !== "undefined") {
-                sessionStorage.removeItem("nouato_teacher_active_menu");
-                window.location.href = "/teacher/dashboard";
+              if (typeof window !== 'undefined') {
+                sessionStorage.removeItem('nouato_teacher_active_menu');
+                window.location.href = '/teacher/dashboard';
               }
             }}
             className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl hover:bg-slate-200 transition"

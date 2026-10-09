@@ -1,13 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useDroppable } from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { Task, ColumnType } from "@/types/task";
-import TaskCard from "./TaskCard";
+import { useState } from 'react';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Task, ColumnType } from '@/types/task';
+import TaskCard from './TaskCard';
 
 interface BoardColumnProps {
   column: ColumnType;
@@ -31,9 +28,8 @@ export default function BoardColumn({
   const [showAllPublicTasks, setShowAllPublicTasks] = useState(false);
 
   // 生徒へ公開中（todo カラム）の場合、最新2件のみ表示の制御 (要件⑤)
-  const isPublicColumn = column.id === "todo";
-  const visibleTasks =
-    isPublicColumn && !showAllPublicTasks ? tasks.slice(0, 2) : tasks;
+  const isPublicColumn = column.id === 'todo';
+  const visibleTasks = isPublicColumn && !showAllPublicTasks ? tasks.slice(0, 2) : tasks;
   const hiddenCount = tasks.length - 2;
 
   return (
@@ -48,7 +44,9 @@ export default function BoardColumn({
             <span className={`w-3 h-3 rounded-full ${column.dotColor}`}></span>
             <h3 className="font-bold text-gray-800 text-sm">{column.title}</h3>
           </div>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${column.badgeBg} ${column.badgeText}`}>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold ${column.badgeBg} ${column.badgeText}`}
+          >
             {tasks.length}
           </span>
         </div>
@@ -56,10 +54,7 @@ export default function BoardColumn({
       </div>
 
       {/* タスクリスト */}
-      <SortableContext
-        items={tasks.map((t) => t.id)}
-        strategy={verticalListSortingStrategy}
-      >
+      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex-1 space-y-3">
           {visibleTasks.map((task) => (
             <TaskCard
@@ -79,7 +74,7 @@ export default function BoardColumn({
             >
               <span>
                 {showAllPublicTasks
-                  ? "最新2件のみ表示に戻す"
+                  ? '最新2件のみ表示に戻す'
                   : `過去の公開タスクを表示 (+${hiddenCount}件)`}
               </span>
             </button>

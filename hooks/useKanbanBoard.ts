@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Task, ColumnType } from "../types/task";
-import { useFarmStore } from "../store/useFarmStore";
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import { Task, ColumnType } from '../types/task';
+import { useFarmStore } from '../store/useFarmStore';
 
 export function useKanbanBoard(columns: ColumnType[]) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -12,7 +12,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const [userId, setUserId] = useState<string | null>(null);
   const [farmId, setFarmId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  
+
   // 編集中のタスク
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -22,37 +22,38 @@ export function useKanbanBoard(columns: ColumnType[]) {
   // 初回読み込み（Read）
   const fetchTasks = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
 
-      let effectiveFarmId = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      let effectiveFarmId =
+        useFarmStore.getState().activeFarmId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
       if (!effectiveFarmId) {
         const { data: userData } = await supabase
-          .from("users")
-          .select("farm_id")
-          .eq("id", user.id)
+          .from('users')
+          .select('farm_id')
+          .eq('id', user.id)
           .maybeSingle();
-        effectiveFarmId = userData?.farm_id || "";
+        effectiveFarmId = userData?.farm_id || '';
       }
       if (effectiveFarmId) {
         setFarmId(effectiveFarmId);
       }
 
       // 1. 有効なタスク (自農園のもの、または共通テンプレート教材)
-      let tasksQuery = supabase
-        .from("tasks")
-        .select("*")
-        .is("deleted_at", null);
+      let tasksQuery = supabase.from('tasks').select('*').is('deleted_at', null);
 
       if (effectiveFarmId) {
         tasksQuery = tasksQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
       }
 
-      const { data: tasksData } = await tasksQuery.order("created_at", { ascending: false });
+      const { data: tasksData } = await tasksQuery.order('created_at', { ascending: false });
       if (tasksData) {
         const mappedTasks: Task[] = tasksData.map((t: any) => {
-          const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+          const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
           return {
             ...t,
             badge_name: t.badge_name || cl.badge_name || null,
@@ -63,19 +64,16 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       // 2. ゴミ箱内のタスク (deleted_at IS NOT NULL)
-      let trashQuery = supabase
-        .from("tasks")
-        .select("*")
-        .not("deleted_at", "is", null);
+      let trashQuery = supabase.from('tasks').select('*').not('deleted_at', 'is', null);
 
       if (effectiveFarmId) {
         trashQuery = trashQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
       }
 
-      const { data: trashData } = await trashQuery.order("deleted_at", { ascending: false });
+      const { data: trashData } = await trashQuery.order('deleted_at', { ascending: false });
       if (trashData) {
         const mappedTrash: Task[] = trashData.map((t: any) => {
-          const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+          const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
           return {
             ...t,
             badge_name: t.badge_name || cl.badge_name || null,
@@ -85,7 +83,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         setTrashTasks(mappedTrash);
       }
     } catch (e) {
-      console.error("fetchTasks 中に例外が発生しました:", e);
+      console.error('fetchTasks 中に例外が発生しました:', e);
     } finally {
       setIsLoading(false);
     }
@@ -98,38 +96,38 @@ export function useKanbanBoard(columns: ColumnType[]) {
       fetchTasks();
     };
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("nouato_tasks_updated", handleTaskUpdated);
-      window.addEventListener("nouato_sync_event", handleTaskUpdated);
-      window.addEventListener("nouato_active_farm_changed", handleTaskUpdated);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nouato_tasks_updated', handleTaskUpdated);
+      window.addEventListener('nouato_sync_event', handleTaskUpdated);
+      window.addEventListener('nouato_active_farm_changed', handleTaskUpdated);
     }
 
     const realtimeChannel = supabase
-      .channel("tasks_realtime_channel")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => fetchTasks())
+      .channel('tasks_realtime_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
       .subscribe();
 
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("nouato_tasks_updated", handleTaskUpdated);
-        window.removeEventListener("nouato_sync_event", handleTaskUpdated);
-        window.removeEventListener("nouato_active_farm_changed", handleTaskUpdated);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nouato_tasks_updated', handleTaskUpdated);
+        window.removeEventListener('nouato_sync_event', handleTaskUpdated);
+        window.removeEventListener('nouato_active_farm_changed', handleTaskUpdated);
       }
       supabase.removeChannel(realtimeChannel);
     };
   }, []);
 
   const notifyTaskSync = () => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("nouato_tasks_updated"));
-      window.dispatchEvent(new Event("nouato_sync_event"));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('nouato_tasks_updated'));
+      window.dispatchEvent(new Event('nouato_sync_event'));
       try {
-        const bc = new BroadcastChannel("nouato_farm_sync_channel");
-        bc.postMessage({ type: "TASKS_UPDATED", timestamp: Date.now() });
+        const bc = new BroadcastChannel('nouato_farm_sync_channel');
+        bc.postMessage({ type: 'TASKS_UPDATED', timestamp: Date.now() });
         bc.close();
       } catch (e) {}
       try {
-        localStorage.setItem("nouato_sync_event", Date.now().toString());
+        localStorage.setItem('nouato_sync_event', Date.now().toString());
       } catch (e) {}
     }
   };
@@ -138,19 +136,25 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const publishTaskToStudents = async (taskId: string, targetFarmId?: string | null) => {
     try {
       // 1. Supabase Postgres RPC 関数を呼び出し
-      const { error: rpcErr } = await supabase.rpc("publish_task_to_all_students", { p_task_id: taskId });
+      const { error: rpcErr } = await supabase.rpc('publish_task_to_all_students', {
+        p_task_id: taskId,
+      });
       if (rpcErr) {
-        console.warn("publish_task_to_all_students RPC notice:", rpcErr.message);
+        console.warn('publish_task_to_all_students RPC notice:', rpcErr.message);
       }
 
       // 2. クライアント側フォールバック (全受講生への student_tasks 一括配備)
-      let query = supabase.from("users").select("id").eq("role", "student").is("deleted_at", null);
+      let query = supabase.from('users').select('id').eq('role', 'student').is('deleted_at', null);
       if (targetFarmId) {
-        query = query.eq("farm_id", targetFarmId);
+        query = query.eq('farm_id', targetFarmId);
       }
       const { data: students } = await query;
 
-      const { data: taskData } = await supabase.from("tasks").select("*").eq("id", taskId).maybeSingle();
+      const { data: taskData } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .maybeSingle();
       if (students && students.length > 0 && taskData) {
         const inserts = students.map((s) => ({
           student_id: s.id,
@@ -158,7 +162,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
           title: taskData.title,
           description: taskData.description,
           category: taskData.category,
-          status: "not_started",
+          status: 'not_started',
           estimated_time: taskData.estimated_time,
           tools_needed: taskData.tools_needed,
           checklist: taskData.checklist,
@@ -169,18 +173,20 @@ export function useKanbanBoard(columns: ColumnType[]) {
           exp: taskData.exp || 50,
           difficulty: taskData.difficulty || 2,
         }));
-        await supabase.from("student_tasks").upsert(inserts, { onConflict: "student_id,base_task_id" });
+        await supabase
+          .from('student_tasks')
+          .upsert(inserts, { onConflict: 'student_id,base_task_id' });
       }
     } catch (e) {
-      console.warn("publishTaskToStudents exception:", e);
+      console.warn('publishTaskToStudents exception:', e);
     }
   };
 
   // タスクの追加（Create: 作成された Task を返却）
   const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
     let effectiveFarmId = farmId;
-    if (!effectiveFarmId && typeof window !== "undefined") {
-      effectiveFarmId = localStorage.getItem("nouato_active_farm_id") || "";
+    if (!effectiveFarmId && typeof window !== 'undefined') {
+      effectiveFarmId = localStorage.getItem('nouato_active_farm_id') || '';
     }
 
     if (!userId || !effectiveFarmId) {
@@ -188,8 +194,8 @@ export function useKanbanBoard(columns: ColumnType[]) {
       const tempTask: Task = {
         id: `temp_${Date.now()}`,
         title,
-        status: options?.status || "pool",
-        category: options?.category || "work",
+        status: options?.status || 'pool',
+        category: options?.category || 'work',
         description: options?.description || null,
         tools_needed: options?.tools_needed || null,
         reference_links: options?.reference_links || null,
@@ -207,17 +213,20 @@ export function useKanbanBoard(columns: ColumnType[]) {
     }
 
     try {
-      const existingChecklist = (options as any)?.checklist && typeof (options as any)?.checklist === "object" ? (options as any).checklist : {};
+      const existingChecklist =
+        (options as any)?.checklist && typeof (options as any)?.checklist === 'object'
+          ? (options as any).checklist
+          : {};
       const newTaskChecklist = {
         ...existingChecklist,
         badge_name: options?.badge_name || null,
         badge_icon: options?.badge_icon || null,
       };
 
-      const newTaskData = { 
-        title, 
-        status: options?.status || "pool", 
-        category: options?.category || "work", 
+      const newTaskData = {
+        title,
+        status: options?.status || 'pool',
+        category: options?.category || 'work',
         description: options?.description || null,
         tools_needed: options?.tools_needed || null,
         reference_links: options?.reference_links || null,
@@ -229,17 +238,13 @@ export function useKanbanBoard(columns: ColumnType[]) {
         estimated_time: options?.estimated_time || null,
         checklist: newTaskChecklist,
         created_by: userId,
-        farm_id: effectiveFarmId 
+        farm_id: effectiveFarmId,
       };
 
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert([newTaskData])
-        .select()
-        .single();
+      const { data, error } = await supabase.from('tasks').insert([newTaskData]).select().single();
 
       if (error) {
-        console.warn("タスクDB追加警告:", error.message);
+        console.warn('タスクDB追加警告:', error.message);
         const tempTask: Task = {
           id: `temp_${Date.now()}`,
           ...newTaskData,
@@ -251,7 +256,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       if (data) {
-        const cl = data.checklist && typeof data.checklist === "object" ? data.checklist : {};
+        const cl = data.checklist && typeof data.checklist === 'object' ? data.checklist : {};
         const createdTask: Task = {
           ...data,
           badge_name: data.badge_name || cl.badge_name || options?.badge_name || null,
@@ -260,7 +265,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         setTasks((prev) => [createdTask, ...prev]);
 
         // status === "todo" (公開中) で追加された場合は受講生へ一括配備
-        if (createdTask.status === "todo") {
+        if (createdTask.status === 'todo') {
           await publishTaskToStudents(createdTask.id, effectiveFarmId);
         }
 
@@ -268,7 +273,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         return createdTask;
       }
     } catch (e) {
-      console.error("addTask 実行中に例外が発生しました:", e);
+      console.error('addTask 実行中に例外が発生しました:', e);
     }
     return null;
   };
@@ -278,7 +283,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
     const copyTitle = `${taskToDuplicate.title} (コピー)`;
     await addTask(copyTitle, {
       ...taskToDuplicate,
-      status: "pool", // 複製されたものは教材ストックへ追加
+      status: 'pool', // 複製されたものは教材ストックへ追加
     });
   };
 
@@ -286,7 +291,10 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const saveTaskDetails = async (updatedTask: Task) => {
     try {
       const existingTask = tasks.find((t) => t.id === updatedTask.id);
-      const existingChecklist = (existingTask as any)?.checklist && typeof (existingTask as any)?.checklist === "object" ? (existingTask as any).checklist : {};
+      const existingChecklist =
+        (existingTask as any)?.checklist && typeof (existingTask as any)?.checklist === 'object'
+          ? (existingTask as any).checklist
+          : {};
       const updatedChecklist = {
         ...existingChecklist,
         badge_name: updatedTask.badge_name || null,
@@ -294,7 +302,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       };
 
       const { error } = await supabase
-        .from("tasks")
+        .from('tasks')
         .update({
           title: updatedTask.title,
           description: updatedTask.description,
@@ -308,95 +316,93 @@ export function useKanbanBoard(columns: ColumnType[]) {
           difficulty: updatedTask.difficulty,
           checklist: updatedChecklist,
         })
-        .eq("id", updatedTask.id);
+        .eq('id', updatedTask.id);
 
       if (error) {
-        console.warn("saveTaskDetails DB保存警告:", error.message);
+        console.warn('saveTaskDetails DB保存警告:', error.message);
       }
 
-      if (updatedTask.status === "todo") {
+      if (updatedTask.status === 'todo') {
         await publishTaskToStudents(updatedTask.id, farmId);
       }
 
-      setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? { ...updatedTask, checklist: updatedChecklist } : t)));
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === updatedTask.id ? { ...updatedTask, checklist: updatedChecklist } : t
+        )
+      );
       setEditingTask(null);
     } catch (e) {
-      console.error("saveTaskDetails 実行中に例外が発生しました:", e);
+      console.error('saveTaskDetails 実行中に例外が発生しました:', e);
     }
   };
 
   // 🗑️ タスクのゴミ箱移動（論理削除）
   const deleteTask = async (id: string) => {
-    const targetTask = tasks.find(t => t.id === id);
+    const targetTask = tasks.find((t) => t.id === id);
     if (!targetTask) return;
 
     if (!confirm(`「${targetTask.title}」をゴミ箱へ移動しますか？`)) return;
-    
+
     try {
       const deletedAtIso = new Date().toISOString();
       const { error } = await supabase
-        .from("tasks")
+        .from('tasks')
         .update({ deleted_at: deletedAtIso })
-        .eq("id", id);
+        .eq('id', id);
 
       if (error) {
-        console.warn("削除警告:", error.message);
+        console.warn('削除警告:', error.message);
       }
 
       // student_tasks からも CASCADE / 即時連動削除
-      await supabase.from("student_tasks").delete().eq("base_task_id", id);
+      await supabase.from('student_tasks').delete().eq('base_task_id', id);
 
       setTasks(tasks.filter((task) => task.id !== id));
       setTrashTasks([{ ...targetTask, deleted_at: deletedAtIso }, ...trashTasks]);
       notifyTaskSync();
     } catch (e) {
-      console.error("deleteTask 実行中に例外が発生しました:", e);
+      console.error('deleteTask 実行中に例外が発生しました:', e);
     }
   };
 
   // ♻️ ゴミ箱から復元（リストア）
   const restoreTask = async (id: string) => {
-    const targetTask = trashTasks.find(t => t.id === id);
+    const targetTask = trashTasks.find((t) => t.id === id);
     if (!targetTask) return;
 
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ deleted_at: null })
-        .eq("id", id);
+      const { error } = await supabase.from('tasks').update({ deleted_at: null }).eq('id', id);
 
       if (error) {
-        console.warn("復元警告:", error.message);
+        console.warn('復元警告:', error.message);
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
       setTasks([{ ...targetTask, deleted_at: null }, ...tasks]);
     } catch (e) {
-      console.error("restoreTask 実行中に例外が発生しました:", e);
+      console.error('restoreTask 実行中に例外が発生しました:', e);
     }
   };
 
   // ❌ 永久削除
   const permanentlyDeleteTask = async (id: string) => {
-    if (!confirm("本当に永久削除しますか？この操作は取り消せません。")) return;
+    if (!confirm('本当に永久削除しますか？この操作は取り消せません。')) return;
 
     try {
       // student_tasks 連動削除
-      await supabase.from("student_tasks").delete().eq("base_task_id", id);
+      await supabase.from('student_tasks').delete().eq('base_task_id', id);
 
-      const { error } = await supabase
-        .from("tasks")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
 
       if (error) {
-        console.warn("完全削除警告:", error.message);
+        console.warn('完全削除警告:', error.message);
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
       notifyTaskSync();
     } catch (e) {
-      console.error("permanentlyDeleteTask 実行中に例外が発生しました:", e);
+      console.error('permanentlyDeleteTask 実行中に例外が発生しました:', e);
     }
   };
 
@@ -449,24 +455,21 @@ export function useKanbanBoard(columns: ColumnType[]) {
     });
 
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ status: newStatus })
-        .eq("id", taskId);
+      const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
 
       if (error) {
-        console.error("【デバッグ】ドラッグ更新失敗:", error);
+        console.error('【デバッグ】ドラッグ更新失敗:', error);
       } else {
-        if (newStatus === "todo") {
+        if (newStatus === 'todo') {
           await publishTaskToStudents(taskId, farmId);
         } else {
           // 'todo' (生徒公開) 以外のレーンにドラッグされた場合は student_tasks から削除
-          await supabase.from("student_tasks").delete().eq("base_task_id", taskId);
+          await supabase.from('student_tasks').delete().eq('base_task_id', taskId);
         }
         notifyTaskSync();
       }
     } catch (e) {
-      console.error("【デバッグ】handleDragEnd 例外:", e);
+      console.error('【デバッグ】handleDragEnd 例外:', e);
     }
   };
 

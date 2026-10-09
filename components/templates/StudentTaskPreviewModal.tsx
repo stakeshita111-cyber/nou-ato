@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import { TaskTemplate } from "@/lib/taskTemplates";
+import React, { useState, useEffect } from 'react';
+import { TaskTemplate } from '@/lib/taskTemplates';
 
 interface StudentTaskPreviewModalProps {
   template: TaskTemplate | null;
@@ -30,7 +30,7 @@ export default function StudentTaskPreviewModal({
   // 手順を行ごとにパース
   const steps = template.description
     ? template.description
-        .split("\n")
+        .split('\n')
         .map((s) => s.trim())
         .filter((s) => s.length > 0)
     : [];
@@ -48,7 +48,7 @@ export default function StudentTaskPreviewModal({
   // 難易度スター生成
   const renderStars = (difficulty: number = 1) => {
     return Array.from({ length: 5 }, (_, i) => (
-      <span key={i} className={i < difficulty ? "text-amber-400 text-sm" : "text-gray-200 text-sm"}>
+      <span key={i} className={i < difficulty ? 'text-amber-400 text-sm' : 'text-gray-200 text-sm'}>
         ★
       </span>
     ));
@@ -64,7 +64,9 @@ export default function StudentTaskPreviewModal({
         {/* モーダル上部コントロールバー */}
         <div className="mb-2.5 flex items-center justify-between w-full px-2 text-white">
           <div className="flex items-center space-x-2">
-            <span className="text-xs sm:text-sm font-black text-emerald-400">📱 生徒視点プレビュー</span>
+            <span className="text-xs sm:text-sm font-black text-emerald-400">
+              📱 生徒視点プレビュー
+            </span>
             <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">
               受講生のスマホ表示
             </span>
@@ -148,7 +150,9 @@ export default function StudentTaskPreviewModal({
                 <span className="text-[10px] font-bold text-emerald-800">難易度</span>
                 <div className="flex items-center gap-1">
                   <div className="flex">{renderStars(template.difficulty)}</div>
-                  <span className="text-[10px] font-bold text-gray-500">Lv.{template.difficulty}</span>
+                  <span className="text-[10px] font-bold text-gray-500">
+                    Lv.{template.difficulty}
+                  </span>
                 </div>
               </div>
               <div className="space-y-0.5">
@@ -174,7 +178,7 @@ export default function StudentTaskPreviewModal({
             {template.badge_name && (
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 rounded-2xl border border-amber-200 flex items-center space-x-3 shadow-xs">
                 <div className="w-11 h-11 bg-white rounded-2xl border border-amber-300 flex items-center justify-center text-2xl shadow-xs shrink-0">
-                  {template.badge_icon || "🏆"}
+                  {template.badge_icon || '🏆'}
                 </div>
                 <div>
                   <div className="flex items-center space-x-1">
@@ -182,7 +186,9 @@ export default function StudentTaskPreviewModal({
                       達成時バッジ
                     </span>
                   </div>
-                  <h4 className="font-black text-amber-950 text-xs mt-0.5">{template.badge_name}</h4>
+                  <h4 className="font-black text-amber-950 text-xs mt-0.5">
+                    {template.badge_name}
+                  </h4>
                   <p className="text-[10px] text-amber-800/80 font-medium">
                     このタスクを報告・承認されると獲得できます！
                   </p>
@@ -223,8 +229,8 @@ export default function StudentTaskPreviewModal({
                       onClick={() => toggleStep(idx)}
                       className={`p-3 rounded-2xl border transition cursor-pointer flex items-start space-x-2.5 ${
                         isChecked
-                          ? "bg-emerald-50/70 border-emerald-300 text-emerald-950"
-                          : "bg-white border-gray-200 hover:border-gray-300 text-gray-800"
+                          ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                          : 'bg-white border-gray-200 hover:border-gray-300 text-gray-800'
                       }`}
                     >
                       <input
@@ -233,7 +239,9 @@ export default function StudentTaskPreviewModal({
                         onChange={() => {}} // 親divのonClickでトグル
                         className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-gray-300 focus:ring-emerald-500 cursor-pointer shrink-0"
                       />
-                      <span className={`text-xs leading-relaxed font-medium ${isChecked ? "line-through opacity-70" : ""}`}>
+                      <span
+                        className={`text-xs leading-relaxed font-medium ${isChecked ? 'line-through opacity-70' : ''}`}
+                      >
                         {step}
                       </span>
                     </div>
@@ -270,18 +278,20 @@ export default function StudentTaskPreviewModal({
                 <div>
                   <p className="font-bold text-gray-800 text-xs">作業写真の提出</p>
                   <p className="text-[10px] text-gray-500">
-                    {template.require_photo ? "仕上がり写真の撮影・添付が必須です" : "写真の提出は任意です"}
+                    {template.require_photo
+                      ? '仕上がり写真の撮影・添付が必須です'
+                      : '写真の提出は任意です'}
                   </p>
                 </div>
               </div>
               <span
                 className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                   template.require_photo
-                    ? "bg-red-100 text-red-700 border border-red-200"
-                    : "bg-gray-200 text-gray-700"
+                    ? 'bg-red-100 text-red-700 border border-red-200'
+                    : 'bg-gray-200 text-gray-700'
                 }`}
               >
-                {template.require_photo ? "必須" : "任意"}
+                {template.require_photo ? '必須' : '任意'}
               </span>
             </div>
 
@@ -318,7 +328,7 @@ export default function StudentTaskPreviewModal({
                 disabled={isAdding}
                 className="flex-1 py-2.5 app-accent-btn font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
               >
-                <span>{isAdding ? "追加中..." : "＋ この教材をタスクに追加"}</span>
+                <span>{isAdding ? '追加中...' : '＋ この教材をタスクに追加'}</span>
               </button>
             )}
           </div>

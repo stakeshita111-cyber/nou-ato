@@ -2,7 +2,7 @@ export type Attendee = {
   id: string;
   name: string;
   plot: string;
-  status: "confirmed" | "pending";
+  status: 'confirmed' | 'pending';
 };
 
 export type EventItem = {
@@ -16,6 +16,6 @@ export type EventItem = {
   reservedCount: number;
   fee: string;
   description: string;
-  category: "harvest" | "workshop" | "lecture";
+  category: 'harvest' | 'workshop' | 'lecture';
   attendees: Attendee[];
 };

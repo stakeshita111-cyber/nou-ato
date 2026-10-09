@@ -1,25 +1,27 @@
-"use client";
+'use client';
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import Toast from "@/components/ui/Toast";
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+import Toast from '@/components/ui/Toast';
 
 function ResetPasswordForm() {
   const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     const checkRecoverySession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) {
           // ハッシュフラグメントに recovery token があるか、セッション変更イベントを待機
           supabase.auth.onAuthStateChange(() => {
@@ -27,7 +29,7 @@ function ResetPasswordForm() {
           });
         }
       } catch (e) {
-        console.warn("Recovery session check warn:", e);
+        console.warn('Recovery session check warn:', e);
       } finally {
         setCheckingSession(false);
       }
@@ -40,19 +42,19 @@ function ResetPasswordForm() {
     e.preventDefault();
 
     if (!password || !confirmPassword) {
-      setToastMessage("新しいパスワードを入力してください");
+      setToastMessage('新しいパスワードを入力してください');
       setShowToast(true);
       return;
     }
 
     if (password.length < 6) {
-      setToastMessage("パスワードは6文字以上で入力してください");
+      setToastMessage('パスワードは6文字以上で入力してください');
       setShowToast(true);
       return;
     }
 
     if (password !== confirmPassword) {
-      setToastMessage("パスワードが一致しません");
+      setToastMessage('パスワードが一致しません');
       setShowToast(true);
       return;
     }
@@ -67,14 +69,14 @@ function ResetPasswordForm() {
         setToastMessage(`更新エラー: ${error.message}`);
         setShowToast(true);
       } else {
-        setToastMessage("🎉 パスワードを更新しました！ログイン画面へ移動します");
+        setToastMessage('🎉 パスワードを更新しました！ログイン画面へ移動します');
         setShowToast(true);
         setTimeout(() => {
-          router.push("/login");
+          router.push('/login');
         }, 1200);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "";
+      const message = err instanceof Error ? err.message : '';
       setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
@@ -101,12 +103,10 @@ function ResetPasswordForm() {
 
       <form onSubmit={handleUpdatePassword} className="space-y-4">
         <div>
-          <label className="block text-[11px] font-bold text-gray-600 mb-1">
-            新しいパスワード
-          </label>
+          <label className="block text-[11px] font-bold text-gray-600 mb-1">新しいパスワード</label>
           <div className="relative">
             <input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               required
               minLength={6}
               value={password}
@@ -118,9 +118,9 @@ function ResetPasswordForm() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 text-sm font-bold"
-              title={showPassword ? "パスワードを非表示" : "パスワードを表示"}
+              title={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
             >
-              {showPassword ? "🙈" : "👁️"}
+              {showPassword ? '🙈' : '👁️'}
             </button>
           </div>
         </div>
@@ -130,7 +130,7 @@ function ResetPasswordForm() {
             新しいパスワード（確認用）
           </label>
           <input
-            type={showPassword ? "text" : "password"}
+            type={showPassword ? 'text' : 'password'}
             required
             minLength={6}
             value={confirmPassword}
@@ -145,7 +145,7 @@ function ResetPasswordForm() {
           disabled={loading}
           className="w-full py-3.5 bg-[#16471a] hover:bg-[#123915] text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center space-x-2 text-sm cursor-pointer disabled:opacity-50 mt-2"
         >
-          <span>{loading ? "更新中..." : "パスワードを更新する"}</span>
+          <span>{loading ? '更新中...' : 'パスワードを更新する'}</span>
         </button>
       </form>
 

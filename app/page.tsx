@@ -1,45 +1,47 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 export default function RootPage() {
-  const [statusText, setStatusText] = useState("ログイン状態を確認しています...");
+  const [statusText, setStatusText] = useState('ログイン状態を確認しています...');
 
   useEffect(() => {
     let isMounted = true;
 
     const checkAuthAndRedirect = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
         if (!isMounted) return;
 
         if (session?.user) {
-          setStatusText("ダッシュボードへ移動中...");
+          setStatusText('ダッシュボードへ移動中...');
           // ログイン済みの場合はロール（講師/生徒）に応じて自動振り分け
           const { data: userData } = await supabase
-            .from("users")
-            .select("role")
-            .eq("id", session.user.id)
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
             .maybeSingle();
 
           if (!isMounted) return;
 
-          if (userData?.role === "teacher") {
-            window.location.replace("/teacher/dashboard");
+          if (userData?.role === 'teacher') {
+            window.location.replace('/teacher/dashboard');
           } else {
-            window.location.replace("/student");
+            window.location.replace('/student');
           }
         } else {
-          setStatusText("ログイン画面へ移動中...");
-          window.location.replace("/login");
+          setStatusText('ログイン画面へ移動中...');
+          window.location.replace('/login');
         }
       } catch (err) {
-        console.error("RootPage auth check error:", err);
+        console.error('RootPage auth check error:', err);
         if (isMounted) {
-          window.location.replace("/login");
+          window.location.replace('/login');
         }
       }
     };
@@ -49,7 +51,7 @@ export default function RootPage() {
     // 1.5秒経過しても自動遷移しない場合の安全タイマー (フォールバック)
     const timer = setTimeout(() => {
       if (isMounted) {
-        window.location.replace("/login");
+        window.location.replace('/login');
       }
     }, 1500);
 

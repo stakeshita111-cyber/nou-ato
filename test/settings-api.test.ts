@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET, POST } from "@/app/api/settings/route";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { GET, POST } from '@/app/api/settings/route';
 
 let mockUser: { id: string; email?: string } | null = null;
 let mockUserData: { farm_id?: string | null; role?: string } | null = null;
 let mockFarmsData: Array<{ id: string; show_student_talk_tab?: boolean | null }> = [];
 
-vi.mock("@/utils/supabase/server", () => ({
+vi.mock('@/utils/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
       getUser: vi.fn(async () => ({ data: { user: mockUser } })),
     },
     from: vi.fn((table: string) => {
-      if (table === "users") {
+      if (table === 'users') {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -23,7 +23,7 @@ vi.mock("@/utils/supabase/server", () => ({
           })),
         };
       }
-      if (table === "farms") {
+      if (table === 'farms') {
         return {
           select: vi.fn(() => ({
             eq: vi.fn((_field: string, value: string) => ({
@@ -63,14 +63,14 @@ vi.mock("@/utils/supabase/server", () => ({
   })),
 }));
 
-describe("/api/settings Route Handler", () => {
+describe('/api/settings Route Handler', () => {
   beforeEach(() => {
     mockUser = null;
     mockUserData = null;
     mockFarmsData = [];
   });
 
-  it("GET returns default settings with 200 status when no farm is found", async () => {
+  it('GET returns default settings with 200 status when no farm is found', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
 
@@ -79,10 +79,10 @@ describe("/api/settings Route Handler", () => {
     expect(body.showStudentTalkTab).toBe(true);
   });
 
-  it("GET returns farm show_student_talk_tab setting when farm exists in DB", async () => {
-    mockUser = { id: "teacher-1" };
-    mockUserData = { farm_id: "farm-123", role: "teacher" };
-    mockFarmsData = [{ id: "farm-123", show_student_talk_tab: false }];
+  it('GET returns farm show_student_talk_tab setting when farm exists in DB', async () => {
+    mockUser = { id: 'teacher-1' };
+    mockUserData = { farm_id: 'farm-123', role: 'teacher' };
+    mockFarmsData = [{ id: 'farm-123', show_student_talk_tab: false }];
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -92,15 +92,15 @@ describe("/api/settings Route Handler", () => {
     expect(body.settings.showStudentTalkTab).toBe(false);
   });
 
-  it("POST validates body and updates settings with 200 status for authenticated teacher", async () => {
-    mockUser = { id: "teacher-1" };
-    mockUserData = { farm_id: "farm-123", role: "teacher" };
-    mockFarmsData = [{ id: "farm-123", show_student_talk_tab: true }];
+  it('POST validates body and updates settings with 200 status for authenticated teacher', async () => {
+    mockUser = { id: 'teacher-1' };
+    mockUserData = { farm_id: 'farm-123', role: 'teacher' };
+    mockFarmsData = [{ id: 'farm-123', show_student_talk_tab: true }];
 
-    const request = new Request("http://localhost/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ showStudentTalkTab: false, customOption: "test" }),
+    const request = new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showStudentTalkTab: false, customOption: 'test' }),
     });
 
     const res = await POST(request);
@@ -111,14 +111,14 @@ describe("/api/settings Route Handler", () => {
     expect(body.showStudentTalkTab).toBe(false);
     expect(body.settings).toEqual({
       showStudentTalkTab: false,
-      customOption: "test",
+      customOption: 'test',
     });
   });
 
-  it("POST returns 400 Bad Request when request body is an array or invalid JSON/non-object", async () => {
-    const request = new Request("http://localhost/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+  it('POST returns 400 Bad Request when request body is an array or invalid JSON/non-object', async () => {
+    const request = new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([1, 2, 3]),
     });
 
@@ -126,7 +126,7 @@ describe("/api/settings Route Handler", () => {
     expect(res.status).toBe(400);
 
     const body = await res.json();
-    expect(body.title).toBe("Bad Request");
-    expect(body.detail).toBe("リクエストボディが不正です");
+    expect(body.title).toBe('Bad Request');
+    expect(body.detail).toBe('リクエストボディが不正です');
   });
 });

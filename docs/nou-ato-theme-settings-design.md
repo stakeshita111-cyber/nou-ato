@@ -35,6 +35,7 @@ farm-management-app/
 ## 📄 2. 実装コード一式
 
 ### ① Zustand 設定管理コード (`store/useThemeStore.ts`)
+
 既存の設定（カラー・サイズ）と、追加したいアクセシビリティ項目（手袋対応・日差し対策等）を統合したストアです。
 
 ```typescript
@@ -43,8 +44,8 @@ import { persist } from 'zustand/middleware';
 
 export interface ThemeSettings {
   // 1. カラー・文字サイズ（既存＋拡張）
-  primaryColor: string;      // 農園のメインカラー（例：トマトレッド、キャベツグリーン）
-  secondaryColor: string;    // アクセントカラー
+  primaryColor: string; // 農園のメインカラー（例：トマトレッド、キャベツグリーン）
+  secondaryColor: string; // アクセントカラー
   fontSize: 'small' | 'medium' | 'large' | 'xlarge'; // 屋外用「極大」を追加（シニア農家推奨）
 
   // 2. タイポグラフィ（新規追加）
@@ -98,6 +99,7 @@ export const useThemeStore = create<ThemeState>()(
 ```
 
 ### ② Tailwind CSS変数 動的適用フック (`hooks/useDynamicTheme.ts`)
+
 createTheme の代わりに、CSS Custom Propertiesを操作します。Next.jsのSSR/SSGでもハイドレーションエラーを起こさないクリーンな仕組みです。
 
 ```typescript
@@ -163,12 +165,12 @@ export const useDynamicTheme = () => {
       large: '16px 32px',
     };
     root.style.setProperty('--button-padding', paddingMap[settings.buttonPadding]);
-
   }, [settings]);
 };
 ```
 
 ### ③ Tailwind CSS変数定義 (`app/globals.css` の一部)
+
 Tailwind CSSの設定とCSS変数のマッピングを行い、アクセシビリティとして**フォーカスリング**の規定を入れます。
 
 ```css
@@ -184,14 +186,16 @@ Tailwind CSSの設定とCSS変数のマッピングを行い、アクセシビ�
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-base);
     line-height: var(--line-height-base);
-    transition: font-size 0.2s ease, font-weight 0.2s ease;
+    transition:
+      font-size 0.2s ease,
+      font-weight 0.2s ease;
   }
 
   /* アクセシビリティ：キーボード操作用の強コントラスト・フォーカスリング */
-  input:focus-visible, 
-  select:focus-visible, 
+  input:focus-visible,
+  select:focus-visible,
   button:focus-visible,
-  [role="button"]:focus-visible {
+  [role='button']:focus-visible {
     outline: 3px solid #3b82f6;
     outline-offset: 2px;
   }
@@ -220,6 +224,7 @@ Tailwind CSSの設定とCSS変数のマッピングを行い、アクセシビ�
 ```
 
 ### ④ 日付・数値・文体の汎用フォーマッター (`lib/utils/formatHelper.ts`)
+
 テーマではなく、アプリ内のデータ整形としるべぇのAI会話文体にリアルタイム適用させるためのヘルパーです。
 
 ```typescript
@@ -231,7 +236,7 @@ import { ThemeSettings } from '@/store/useThemeStore';
 export const formatDate = (date: Date | string, format: ThemeSettings['dateFormat']): string => {
   const d = new Date(date);
   if (isNaN(d.getTime())) return String(date);
-  
+
   if (format === 'slash') {
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
   }
@@ -243,8 +248,8 @@ export const formatDate = (date: Date | string, format: ThemeSettings['dateForma
  * ユーザー指定の数値（重さ、通貨など）の表記フォーマットに変換
  */
 export const formatNumber = (
-  num: number, 
-  format: ThemeSettings['numberFormat'], 
+  num: number,
+  format: ThemeSettings['numberFormat'],
   unit: 'g' | '円' | '個' = 'g'
 ): string => {
   if (format === 'raw') return String(num);
@@ -273,6 +278,7 @@ export const formatShirubeSpeech = (text: string, style: ThemeSettings['politeSt
 ```
 
 ### ⑤ 新規設定画面 UI (`app/settings/page.tsx` - Next.js + shadcn/ui + Tailwind)
+
 MUIのSelectやSwitchなどの部品を、Tailwindとshadcn/ui（Radix UI）仕様に完璧に移植した最新の設定画面コードです。
 
 ```tsx
@@ -282,7 +288,13 @@ import React from 'react';
 import { useThemeStore } from '@/store/useThemeStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
@@ -305,12 +317,16 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>テーマ・カラー & サイズ</CardTitle>
-          <CardDescription>アプリのメイン色と、視認性を決める最も重要な設定項目です。</CardDescription>
+          <CardDescription>
+            アプリのメイン色と、視認性を決める最も重要な設定項目です。
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="primary-color" className="font-semibold">農園のシンボルカラー（メイン）</Label>
+              <Label htmlFor="primary-color" className="font-semibold">
+                農園のシンボルカラー（メイン）
+              </Label>
               <div className="flex gap-3">
                 <input
                   type="color"
@@ -323,7 +339,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="secondary-color" className="font-semibold">アクセントカラー（通知・警告）</Label>
+              <Label htmlFor="secondary-color" className="font-semibold">
+                アクセントカラー（通知・警告）
+              </Label>
               <div className="flex gap-3">
                 <input
                   type="color"
@@ -352,12 +370,23 @@ export default function SettingsPage() {
             <div className="px-2 py-2">
               <Slider
                 value={[
-                  settings.fontSize === 'small' ? 0 : settings.fontSize === 'medium' ? 1 : settings.fontSize === 'large' ? 2 : 3
+                  settings.fontSize === 'small'
+                    ? 0
+                    : settings.fontSize === 'medium'
+                      ? 1
+                      : settings.fontSize === 'large'
+                        ? 2
+                        : 3,
                 ]}
                 max={3}
                 step={1}
                 onValueChange={(value) => {
-                  const sizes: ('small' | 'medium' | 'large' | 'xlarge')[] = ['small', 'medium', 'large', 'xlarge'];
+                  const sizes: ('small' | 'medium' | 'large' | 'xlarge')[] = [
+                    'small',
+                    'medium',
+                    'large',
+                    'xlarge',
+                  ];
                   updateSettings({ fontSize: sizes[value[0]] });
                 }}
               />
@@ -370,11 +399,12 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>屋外作業・アクセシビリティ</CardTitle>
-          <CardDescription>日差し反射の軽減、手袋対応、日付・数字の表記としるべぇの言葉遣いを調整します。</CardDescription>
+          <CardDescription>
+            日差し反射の軽減、手袋対応、日付・数字の表記としるべぇの言葉遣いを調整します。
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            
             {/* フォント */}
             <div className="space-y-2">
               <Label className="font-semibold">表示フォント</Label>
@@ -474,11 +504,15 @@ export default function SettingsPage() {
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="slash" id="df-slash" />
-                  <Label htmlFor="df-slash" className="cursor-pointer">2026/08/11</Label>
+                  <Label htmlFor="df-slash" className="cursor-pointer">
+                    2026/08/11
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="japanese" id="df-jap" />
-                  <Label htmlFor="df-jap" className="cursor-pointer">8月11日(火)</Label>
+                  <Label htmlFor="df-jap" className="cursor-pointer">
+                    8月11日(火)
+                  </Label>
                 </div>
               </RadioGroup>
             </div>
@@ -518,7 +552,6 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-
           </div>
 
           <Separator />
@@ -540,6 +573,7 @@ export default function SettingsPage() {
 ## 💻 3. 各画面へのリアルタイム反映・適用例
 
 ### ① グローバルレイアウトでの適用 (`app/layout.tsx`)
+
 フックを一番外側のレイアウトに設置することで、画面遷移をしてもチラつくことなくグローバルにテーマ変更が即時反映されます。
 
 ```tsx
@@ -555,9 +589,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body>
-        <div className="min-h-screen bg-slate-50 transition-colors">
-          {children}
-        </div>
+        <div className="min-h-screen bg-slate-50 transition-colors">{children}</div>
       </body>
     </html>
   );
@@ -565,6 +597,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```
 
 ### ② Teacher Dashboard (`/teacher/dashboard`) での適用例
+
 農園主が登録した生徒一覧や、収穫データ、そして最新のお知らせを綺麗にフォーマットして表示します。
 
 ```tsx
@@ -576,39 +609,40 @@ import { formatDate, formatNumber } from '@/lib/utils/formatHelper';
 
 export default function TeacherDashboard() {
   const { settings } = useThemeStore();
-  
+
   // ダミーデータ
   const lastUpdated = '2026-08-11T09:00:00Z';
   const cabbageHarvest = 1500; // g
-  
+
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold">農園主ダッシュボード</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 日付フォーマットの適用 */}
         <div className="p-4 bg-white rounded shadow">
           <h2 className="text-sm text-muted-foreground">最終同期</h2>
           <p className="text-lg font-bold">{formatDate(lastUpdated, settings.dateFormat)}</p>
         </div>
-        
+
         {/* 数値表記の適用 */}
         <div className="p-4 bg-white rounded shadow">
           <h2 className="text-sm text-muted-foreground">本日のキャベツ総収穫量</h2>
-          <p className="text-lg font-bold">{formatNumber(cabbageHarvest, settings.numberFormat, 'g')}</p>
+          <p className="text-lg font-bold">
+            {formatNumber(cabbageHarvest, settings.numberFormat, 'g')}
+          </p>
         </div>
       </div>
-      
+
       {/* 動的ボタン */}
-      <button className="btn-farm">
-        新しいお知らせ（ToDo）を配信
-      </button>
+      <button className="btn-farm">新しいお知らせ（ToDo）を配信</button>
     </div>
   );
 }
 ```
 
 ### ③ Student Quests (`/student/quests`) ＆ AIしるべぇチャットでの適用例
+
 生徒側のクエスト一覧と、AIしるべぇが「敬体」に自動変換されたアドバイスを返してくれるエリアです。
 
 ```tsx
@@ -620,9 +654,10 @@ import { formatDate, formatShirubeSpeech } from '@/lib/utils/formatHelper';
 
 export default function StudentQuestsPage() {
   const { settings } = useThemeStore();
-  
+
   const questDeadline = '2026-08-15T18:00:00Z';
-  const shirubeRawSpeech = "トマトの葉が白いのはハダニの初期症状だべぇ！この天然資材を薄めて散布するべぇ！";
+  const shirubeRawSpeech =
+    'トマトの葉が白いのはハダニの初期症状だべぇ！この天然資材を薄めて散布するべぇ！';
 
   return (
     <div className="p-6 space-y-6">
@@ -646,9 +681,7 @@ export default function StudentQuestsPage() {
         </div>
       </div>
 
-      <button className="btn-farm">
-        クエスト完了を報告
-      </button>
+      <button className="btn-farm">クエスト完了を報告</button>
     </div>
   );
 }
@@ -658,11 +691,11 @@ export default function StudentQuestsPage() {
 
 ## 📈 4. Before / After の改善ポイント一覧
 
-| 評価項目 | 従来の仕様（Before） | 新しいのうあと仕様（After） |
-| :--- | :--- | :--- |
-| **技術構成** | Next.js ＋ Material-UI (MUI) による動的 `createTheme` 適用。 | **Next.js ＋ Tailwind CSS ＋ shadcn/ui**。CSS Custom Propertiesによる高速かつハイドレーションエラーのない安全な即時反映。 |
-| **屋外での視認性** | 文字サイズ調整のみ。日差しでコントラスト比が落ち、画面が白飛びする。 | **文字の太さ (fontWeight) 変更** や **丸ゴシック (rounded) 導入** により、日差しの中でも文字の輪郭がくっきり浮き立つ。 |
-| **手袋装着時の操作性** | 標準的なボタン幅。手が泥などで汚れており、手袋をしていると誤タップが頻発する。 | **ボタンの角丸 (borderRadius) 調整** ＋ **極大パディング (buttonPadding)** を追加。手袋をしたままでもピンポイントでタップ可能。 |
-| **しるべぇの口調** | 「～だべぇ！」に固定されており、丁寧なやり取りを好むシニア層や他産業ユーザーで好みが分かれる。 | **Switchひとつで「常体/敬体」を動的切り替え**。しるべぇの愛らしさを保ちつつ、普通の「です/ます調」に自動翻訳。 |
-| **日付・数値の多様性** | システム標準の英語表記、あるいは固定された表記。 | **曜日つき日本語表記 (japanese)** や、農業単位 (g) などの **単位自動結合機能 (numberFormat)** を搭載。 |
-| **アクセシビリティ** | 特になし。 | キーボード操作やタブ選択時における **明瞭な高コントラスト・フォーカスリング** の自動付与。 |
+| 評価項目               | 従来の仕様（Before）                                                                           | 新しいのうあと仕様（After）                                                                                                     |
+| :--------------------- | :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| **技術構成**           | Next.js ＋ Material-UI (MUI) による動的 `createTheme` 適用。                                   | **Next.js ＋ Tailwind CSS ＋ shadcn/ui**。CSS Custom Propertiesによる高速かつハイドレーションエラーのない安全な即時反映。       |
+| **屋外での視認性**     | 文字サイズ調整のみ。日差しでコントラスト比が落ち、画面が白飛びする。                           | **文字の太さ (fontWeight) 変更** や **丸ゴシック (rounded) 導入** により、日差しの中でも文字の輪郭がくっきり浮き立つ。          |
+| **手袋装着時の操作性** | 標準的なボタン幅。手が泥などで汚れており、手袋をしていると誤タップが頻発する。                 | **ボタンの角丸 (borderRadius) 調整** ＋ **極大パディング (buttonPadding)** を追加。手袋をしたままでもピンポイントでタップ可能。 |
+| **しるべぇの口調**     | 「～だべぇ！」に固定されており、丁寧なやり取りを好むシニア層や他産業ユーザーで好みが分かれる。 | **Switchひとつで「常体/敬体」を動的切り替え**。しるべぇの愛らしさを保ちつつ、普通の「です/ます調」に自動翻訳。                  |
+| **日付・数値の多様性** | システム標準の英語表記、あるいは固定された表記。                                               | **曜日つき日本語表記 (japanese)** や、農業単位 (g) などの **単位自動結合機能 (numberFormat)** を搭載。                          |
+| **アクセシビリティ**   | 特になし。                                                                                     | キーボード操作やタブ選択時における **明瞭な高コントラスト・フォーカスリング** の自動付与。                                      |

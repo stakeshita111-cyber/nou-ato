@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 export default function GlobalError({
   error,
@@ -10,7 +10,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Global Application Error:", error);
+    console.error('Global Application Error:', error);
   }, [error]);
 
   return (
@@ -41,8 +41,8 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => {
-              if (typeof window !== "undefined") {
-                window.location.href = "/login";
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login';
               }
             }}
             className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl hover:bg-slate-200 transition"

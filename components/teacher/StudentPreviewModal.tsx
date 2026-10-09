@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 interface StudentPreviewModalProps {
   student: any;
@@ -6,7 +6,11 @@ interface StudentPreviewModalProps {
   onDeleteStudent?: (student: any) => void;
 }
 
-export default function StudentPreviewModal({ student, onClose, onDeleteStudent }: StudentPreviewModalProps) {
+export default function StudentPreviewModal({
+  student,
+  onClose,
+  onDeleteStudent,
+}: StudentPreviewModalProps) {
   if (!student) return null;
 
   const activeTask = student.activeTask || null;
@@ -24,11 +28,10 @@ export default function StudentPreviewModal({ student, onClose, onDeleteStudent 
             <span className="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
             <span className="w-2.5 h-2.5 rounded-full bg-green-400"></span>
           </div>
-          <span className="text-[11px] font-bold text-gray-500">📱 生徒画面プレビュー ({student.name})</span>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 font-bold text-sm"
-          >
+          <span className="text-[11px] font-bold text-gray-500">
+            📱 生徒画面プレビュー ({student.name})
+          </span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-sm">
             ✕
           </button>
         </div>
@@ -44,7 +47,10 @@ export default function StudentPreviewModal({ student, onClose, onDeleteStudent 
               </span>
             </div>
             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-[#1d5c23] transition-all duration-500" style={{ width: `${student.progress}%` }}></div>
+              <div
+                className="h-full bg-[#1d5c23] transition-all duration-500"
+                style={{ width: `${student.progress}%` }}
+              ></div>
             </div>
           </div>
 
@@ -104,7 +110,9 @@ export default function StudentPreviewModal({ student, onClose, onDeleteStudent 
                 {lastJournal?.content ? (
                   <p>💬 「{lastJournal.content}」</p>
                 ) : (
-                  <p className="text-gray-400 text-center font-bold">まだ提出写真・報告メモはありません</p>
+                  <p className="text-gray-400 text-center font-bold">
+                    まだ提出写真・報告メモはありません
+                  </p>
                 )}
               </div>
             )}

@@ -3,10 +3,7 @@ import { useThemeStore, ThemeSettings } from '@/store/useThemeStore';
 /**
  * ユーザー指定の日付フォーマットに変換（format省略時は現在のテーマ設定を適用）
  */
-export const formatDate = (
-  date: Date | string,
-  format?: ThemeSettings['dateFormat']
-): string => {
+export const formatDate = (date: Date | string, format?: ThemeSettings['dateFormat']): string => {
   const d = new Date(date);
   if (isNaN(d.getTime())) return String(date);
 
@@ -74,10 +71,7 @@ export const formatHarvestAmount = (
 /**
  * 通貨・金額表記をユーザー設定の表記形式に整形
  */
-export const formatMoney = (
-  num: number,
-  format?: ThemeSettings['numberFormat']
-): string => {
+export const formatMoney = (num: number, format?: ThemeSettings['numberFormat']): string => {
   const activeFormat = format || useThemeStore.getState().settings.numberFormat || 'unit';
   if (activeFormat === 'raw') return `¥${num}`;
   if (activeFormat === 'unit') return `¥${num.toLocaleString()}円`;

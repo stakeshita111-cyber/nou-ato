@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
 interface MobilePhonePreviewModalProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ interface MobilePhonePreviewModalProps {
 export default function MobilePhonePreviewModal({
   isOpen,
   onClose,
-  initialUrl = "/teacher/dashboard",
+  initialUrl = '/teacher/dashboard',
 }: MobilePhonePreviewModalProps) {
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
 
@@ -37,10 +37,12 @@ export default function MobilePhonePreviewModal({
             {/* URL切替ボタン */}
             <button
               type="button"
-              onClick={() => setCurrentUrl(currentUrl.startsWith("/teacher") ? "/student" : "/teacher/dashboard")}
+              onClick={() =>
+                setCurrentUrl(currentUrl.startsWith('/teacher') ? '/student' : '/teacher/dashboard')
+              }
               className="text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1 rounded-lg transition"
             >
-              {currentUrl.startsWith("/teacher") ? "👀 生徒画面に切替" : "🌾 講師画面に切替"}
+              {currentUrl.startsWith('/teacher') ? '👀 生徒画面に切替' : '🌾 講師画面に切替'}
             </button>
 
             {/* クローズボタン */}

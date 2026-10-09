@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import { useStudentDashboard } from "@/hooks/useStudentDashboard";
-import { useEvents } from "@/hooks/useEvents";
-import { useThemeStore } from "@/store/useThemeStore";
-import StudentTalkView from "@/components/student/StudentTalkView";
-import StudentSkillBoardView from "@/components/student/StudentSkillBoardView";
-import StudentFarmRecordView from "@/components/student/StudentFarmRecordView";
-import TaskDetailModal from "@/components/student/TaskDetailModal";
-import Toast from "@/components/ui/Toast";
-import WeatherWidget from "@/components/ui/WeatherWidget";
-import EventCalendar from "@/components/ui/EventCalendar";
-import { SproutLoader } from "@/components/SproutLoader";
-import { formatDate } from "@/lib/utils/formatHelper";
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { useStudentDashboard } from '@/hooks/useStudentDashboard';
+import { useEvents } from '@/hooks/useEvents';
+import { useThemeStore } from '@/store/useThemeStore';
+import StudentTalkView from '@/components/student/StudentTalkView';
+import StudentSkillBoardView from '@/components/student/StudentSkillBoardView';
+import StudentFarmRecordView from '@/components/student/StudentFarmRecordView';
+import TaskDetailModal from '@/components/student/TaskDetailModal';
+import Toast from '@/components/ui/Toast';
+import WeatherWidget from '@/components/ui/WeatherWidget';
+import EventCalendar from '@/components/ui/EventCalendar';
+import { SproutLoader } from '@/components/SproutLoader';
+import { formatDate } from '@/lib/utils/formatHelper';
 
 export default function StudentPage() {
   const router = useRouter();
@@ -37,22 +37,22 @@ export default function StudentPage() {
 
   const { events, reserveEvent } = useEvents();
 
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
-  const VALID_STUDENT_TABS = ["myfarm", "weather", "events", "talk", "feed", "library"];
+  const VALID_STUDENT_TABS = ['myfarm', 'weather', 'events', 'talk', 'feed', 'library'];
   const [activeTab, setActiveTab] = useState<string>(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const tabParam = urlParams.get("tab");
+      const tabParam = urlParams.get('tab');
       if (tabParam && VALID_STUDENT_TABS.includes(tabParam)) {
         return tabParam;
       }
-      const savedTab = sessionStorage.getItem("nouato_student_active_tab");
+      const savedTab = sessionStorage.getItem('nouato_student_active_tab');
       if (savedTab && VALID_STUDENT_TABS.includes(savedTab)) {
         return savedTab;
       }
     }
-    return "myfarm";
+    return 'myfarm';
   });
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -62,36 +62,39 @@ export default function StudentPage() {
     if (!showAccountMenu) return;
 
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (
-        accountMenuRef.current &&
-        !accountMenuRef.current.contains(event.target as Node)
-      ) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
         setShowAccountMenu(false);
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [showAccountMenu]);
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [readBroadcastIds, setReadBroadcastIds] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nouato_read_broadcast_ids");
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nouato_read_broadcast_ids');
       if (saved) {
-        try { return JSON.parse(saved); } catch { return []; }
+        try {
+          return JSON.parse(saved);
+        } catch {
+          return [];
+        }
       }
     }
     return [];
   });
 
   // 未読お知らせの有無判定
-  const unreadBroadcasts = broadcasts.filter((b: { id: string }) => !readBroadcastIds.includes(b.id));
+  const unreadBroadcasts = broadcasts.filter(
+    (b: { id: string }) => !readBroadcastIds.includes(b.id)
+  );
   const hasUnreadBroadcasts = unreadBroadcasts.length > 0;
 
   // お知らせモーダルを開いた際の既読処理
@@ -101,28 +104,28 @@ export default function StudentPage() {
       const allIds = broadcasts.map((b: { id: string }) => b.id);
       const updated = Array.from(new Set([...readBroadcastIds, ...allIds]));
       setReadBroadcastIds(updated);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("nouato_read_broadcast_ids", JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nouato_read_broadcast_ids', JSON.stringify(updated));
       }
     }
   };
 
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("nouato_student_active_tab", newTab);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('nouato_student_active_tab', newTab);
       const url = new URL(window.location.href);
-      url.searchParams.set("tab", newTab);
-      window.history.replaceState(null, "", url.toString());
+      url.searchParams.set('tab', newTab);
+      window.history.replaceState(null, '', url.toString());
     }
   };
-  
+
   // 🌟 クライアント初期化時に即座にLocalStorageから判定 🌟
   const [talkTabEnabled, setTalkTabEnabled] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const direct = localStorage.getItem("nouato_show_student_talk_tab");
-      if (direct !== null) return direct !== "false";
-      const themeStore = localStorage.getItem("nou-ato-theme-settings");
+    if (typeof window !== 'undefined') {
+      const direct = localStorage.getItem('nouato_show_student_talk_tab');
+      if (direct !== null) return direct !== 'false';
+      const themeStore = localStorage.getItem('nou-ato-theme-settings');
       if (themeStore) {
         try {
           const parsed = JSON.parse(themeStore);
@@ -139,15 +142,15 @@ export default function StudentPage() {
 
   // 🌟 講師の設定変更（相談画面の表示・非表示など）をリアルタイムに受信・同期 🌟
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     const syncVisibility = () => {
-      const direct = localStorage.getItem("nouato_show_student_talk_tab");
+      const direct = localStorage.getItem('nouato_show_student_talk_tab');
       if (direct !== null) {
-        setTalkTabEnabled(direct !== "false");
+        setTalkTabEnabled(direct !== 'false');
         return;
       }
-      const themeStore = localStorage.getItem("nou-ato-theme-settings");
+      const themeStore = localStorage.getItem('nou-ato-theme-settings');
       if (themeStore) {
         try {
           const parsed = JSON.parse(themeStore);
@@ -167,16 +170,20 @@ export default function StudentPage() {
     // サーバーAPIからも最新状態を取得
     const fetchServerSettings = async () => {
       try {
-        const studentFarmId = user?.farm_id || (typeof window !== "undefined" ? localStorage.getItem("nouato_invite_farm_id") : null);
-        const url = studentFarmId ? `/api/settings?farm_id=${encodeURIComponent(String(studentFarmId))}` : "/api/settings";
+        const studentFarmId =
+          user?.farm_id ||
+          (typeof window !== 'undefined' ? localStorage.getItem('nouato_invite_farm_id') : null);
+        const url = studentFarmId
+          ? `/api/settings?farm_id=${encodeURIComponent(String(studentFarmId))}`
+          : '/api/settings';
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (data.showStudentTalkTab !== undefined) {
             const isEnabled = data.showStudentTalkTab !== false;
             setTalkTabEnabled(isEnabled);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("nouato_show_student_talk_tab", String(isEnabled));
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('nouato_show_student_talk_tab', String(isEnabled));
             }
           }
         }
@@ -191,14 +198,14 @@ export default function StudentPage() {
     const handleFocusSync = () => {
       fetchServerSettings();
     };
-    window.addEventListener("focus", handleFocusSync);
+    window.addEventListener('focus', handleFocusSync);
 
     let bc: BroadcastChannel | null = null;
-    if (typeof BroadcastChannel !== "undefined") {
+    if (typeof BroadcastChannel !== 'undefined') {
       try {
-        bc = new BroadcastChannel("nouato_settings_sync");
+        bc = new BroadcastChannel('nouato_settings_sync');
         bc.onmessage = (msg) => {
-          if (msg.data?.type === "TALK_TAB_TOGGLE" && msg.data?.show !== undefined) {
+          if (msg.data?.type === 'TALK_TAB_TOGGLE' && msg.data?.show !== undefined) {
             setTalkTabEnabled(msg.data.show !== false);
           } else if (msg.data?.settings?.showStudentTalkTab !== undefined) {
             useThemeStore.setState({ settings: msg.data.settings });
@@ -206,7 +213,7 @@ export default function StudentPage() {
           }
         };
       } catch (e) {
-        console.warn("BroadcastChannel sync error:", e);
+        console.warn('BroadcastChannel sync error:', e);
       }
     }
 
@@ -226,85 +233,81 @@ export default function StudentPage() {
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "nouato_show_student_talk_tab" || e.key === "nou-ato-theme-settings") {
+      if (e.key === 'nouato_show_student_talk_tab' || e.key === 'nou-ato-theme-settings') {
         syncVisibility();
       }
     };
 
     // 親ウィンドウやiframeからのpostMessage受信
     const handleWindowMessage = (e: MessageEvent) => {
-      if (e.data?.type === "TALK_TAB_TOGGLE" && e.data?.show !== undefined) {
+      if (e.data?.type === 'TALK_TAB_TOGGLE' && e.data?.show !== undefined) {
         setTalkTabEnabled(e.data.show !== false);
       } else if (e.data?.settings?.showStudentTalkTab !== undefined) {
         setTalkTabEnabled(e.data.settings.showStudentTalkTab !== false);
       }
     };
 
-    window.addEventListener("nouato_settings_updated", handleCustom);
-    window.addEventListener("nouato_talk_tab_toggled", handleTalkToggle);
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("message", handleWindowMessage);
+    window.addEventListener('nouato_settings_updated', handleCustom);
+    window.addEventListener('nouato_talk_tab_toggled', handleTalkToggle);
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('message', handleWindowMessage);
 
     return () => {
-      window.removeEventListener("focus", handleFocusSync);
+      window.removeEventListener('focus', handleFocusSync);
       if (bc) bc.close();
-      window.removeEventListener("nouato_settings_updated", handleCustom);
-      window.removeEventListener("nouato_talk_tab_toggled", handleTalkToggle);
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("message", handleWindowMessage);
+      window.removeEventListener('nouato_settings_updated', handleCustom);
+      window.removeEventListener('nouato_talk_tab_toggled', handleTalkToggle);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('message', handleWindowMessage);
     };
   }, [user?.farm_id]);
 
   // 相談タブがOFFに設定されたら、畑タブに自動で戻す
   useEffect(() => {
-    if (!talkTabEnabled && activeTab === "talk") {
+    if (!talkTabEnabled && activeTab === 'talk') {
       const timer = setTimeout(() => {
-        handleTabChange("myfarm");
+        handleTabChange('myfarm');
       }, 0);
       return () => clearTimeout(timer);
     }
   }, [talkTabEnabled, activeTab]);
 
   // ログイン中のアカウント表示名
-  const userAccountName = user?.name
-    ? user.name
-    : user?.email
-    ? user.email
-    : "受講生";
+  const userAccountName = user?.name ? user.name : user?.email ? user.email : '受講生';
 
   // タスク完了トリガー
   const handleCompleteTask = async (id: string) => {
     await completeTask(id);
-    setToastMessage("🎉 タスク完了を報告しました！");
+    setToastMessage('🎉 タスク完了を報告しました！');
     setShowToast(true);
   };
 
   // タスク未完了復元トリガー
   const handleUncompleteTask = async (id: string) => {
     await uncompleteTask(id);
-    setToastMessage("↩️ タスクを未完了（進行中）に戻しました");
+    setToastMessage('↩️ タスクを未完了（進行中）に戻しました');
     setShowToast(true);
   };
 
   // 気づきメモ投稿
   const handleAddJournal = async () => {
     if (!newJournal.trim()) {
-      setToastMessage("気づきメモを入力してください");
+      setToastMessage('気づきメモを入力してください');
       setShowToast(true);
       return;
     }
     await addJournal();
-    setToastMessage("📝 講師へ日誌・気づきメモを送信しました！");
+    setToastMessage('📝 講師へ日誌・気づきメモを送信しました！');
     setShowToast(true);
   };
 
   // 生徒: カレンダーからイベント参加予約申し込み
   const handleReserveEvent = async (eventId: string) => {
-    const result = await reserveEvent(eventId, userAccountName, "受講区画 A");
-    if (result === "already_reserved") {
-      setToastMessage("既にこのイベントには参加予約を申し込んでいます");
+    const result = await reserveEvent(eventId, userAccountName, '受講区画 A');
+    if (result === 'already_reserved') {
+      setToastMessage('既にこのイベントには参加予約を申し込んでいます');
     } else if (result) {
-      setToastMessage("🙋‍♂️ イベントへの参加予約申込を送信しました！講師の承認をお待ちください。");
+      setToastMessage('🙋‍♂️ イベントへの参加予約申込を送信しました！講師の承認をお待ちください。');
     }
     setShowToast(true);
   };
@@ -312,10 +315,10 @@ export default function StudentPage() {
   // ログアウト処理
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setToastMessage("ログアウトしました。ログイン画面へ遷移します");
+    setToastMessage('ログアウトしました。ログイン画面へ遷移します');
     setShowToast(true);
     setTimeout(() => {
-      router.push("/login");
+      router.push('/login');
     }, 800);
   };
 
@@ -342,7 +345,9 @@ export default function StudentPage() {
 
           <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 text-left space-y-1 text-[11px] text-gray-600 font-semibold">
             <p className="font-bold text-gray-800">💡 再度利用したい場合:</p>
-            <p>農園の講師から共有された新しい招待リンク（URLまたはQRコード）から再度農園へご参加ください。</p>
+            <p>
+              農園の講師から共有された新しい招待リンク（URLまたはQRコード）から再度農園へご参加ください。
+            </p>
           </div>
 
           <div className="pt-2 space-y-2">
@@ -359,14 +364,20 @@ export default function StudentPage() {
   }
 
   return (
-    <div className={`bg-[#f8faf7] flex flex-col items-center justify-between font-sans text-gray-800 ${
-      activeTab === "talk" ? "h-[100dvh] h-screen overflow-hidden" : "min-h-screen pb-20"
-    }`}>
+    <div
+      className={`bg-[#f8faf7] flex flex-col items-center justify-between font-sans text-gray-800 ${
+        activeTab === 'talk' ? 'h-[100dvh] h-screen overflow-hidden' : 'min-h-screen pb-20'
+      }`}
+    >
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* モックヘッダー */}
       <header className="w-full max-w-md bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs shrink-0">
-        <Link href="/login" title="ログイン画面に戻る" className="text-gray-500 hover:text-gray-800 text-lg font-bold">
+        <Link
+          href="/login"
+          title="ログイン画面に戻る"
+          className="text-gray-500 hover:text-gray-800 text-lg font-bold"
+        >
           ✕
         </Link>
         <div className="text-center flex flex-col items-center">
@@ -429,15 +440,21 @@ export default function StudentPage() {
       </header>
 
       {/* メインコンテンツ */}
-      <main className={`w-full max-w-md ${activeTab === "talk" ? "p-2 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden" : "p-4 space-y-5 flex-1 pb-28"}`}>
+      <main
+        className={`w-full max-w-md ${activeTab === 'talk' ? 'p-2 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden' : 'p-4 space-y-5 flex-1 pb-28'}`}
+      >
         {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
-        {activeTab === "myfarm" && (
+        {activeTab === 'myfarm' && (
           <div className="space-y-4">
             <StudentFarmRecordView
               studentId={user?.id}
               studentName={userAccountName}
               tasks={tasks}
-              onSelectTask={(task) => setSelectedTask(task as unknown as import("@/hooks/useStudentDashboard").StudentTaskItem)}
+              onSelectTask={(task) =>
+                setSelectedTask(
+                  task as unknown as import('@/hooks/useStudentDashboard').StudentTaskItem
+                )
+              }
               onCompleteTask={handleCompleteTask}
               onUncompleteTask={handleUncompleteTask}
               newJournal={newJournal}
@@ -448,7 +465,7 @@ export default function StudentPage() {
         )}
 
         {/* 🌟 2. 天気 タブ (天気予報ウィジェット ＆ 気象アドバイス) 🌟 */}
-        {activeTab === "weather" && (
+        {activeTab === 'weather' && (
           <div className="space-y-5 animate-fade-in">
             {/* 農園ピンポイント天気予報 ＆ 気象アドバイスウィジェット */}
             <WeatherWidget hideBroadcastButton />
@@ -456,10 +473,12 @@ export default function StudentPage() {
         )}
 
         {/* Events (カレンダー予約) タブ */}
-        {activeTab === "events" && (
+        {activeTab === 'events' && (
           <div className="space-y-4 animate-fade-in">
             <div className="bg-white p-4 rounded-2xl border border-gray-200 space-y-1">
-              <h2 className="text-base font-black text-gray-900">📅 農園イベント ＆ 講習予約カレンダー</h2>
+              <h2 className="text-base font-black text-gray-900">
+                📅 農園イベント ＆ 講習予約カレンダー
+              </h2>
               <p className="text-xs text-gray-500 font-medium">
                 講師が登録した収穫体験イベントや対面講習会をGoogleカレンダー風ビューで確認・参加予約できます。
               </p>
@@ -475,7 +494,7 @@ export default function StudentPage() {
         )}
 
         {/* 4. 相談 タブ */}
-        {activeTab === "talk" && talkTabEnabled && (
+        {activeTab === 'talk' && talkTabEnabled && (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
             <StudentTalkView
               journals={journals}
@@ -486,21 +505,17 @@ export default function StudentPage() {
         )}
 
         {/* 5. 成長 タブ */}
-        {activeTab === "feed" && (
-          <StudentSkillBoardView tasks={tasks} user={user} />
-        )}
+        {activeTab === 'feed' && <StudentSkillBoardView tasks={tasks} user={user} />}
 
         {/* Library タブ */}
-        {activeTab === "library" && (
+        {activeTab === 'library' && (
           <div className="space-y-4 animate-fade-in p-4 bg-white rounded-2xl border border-gray-200">
             <h2 className="text-base font-bold text-gray-900">📚 教材・マニュアルライブラリ</h2>
             <ul className="space-y-2 text-xs text-gray-700">
               <li className="p-3 bg-green-50 rounded-xl font-semibold text-[#1d5c23]">
                 📖 春野菜栽培の基礎マニュアル
               </li>
-              <li className="p-3 bg-gray-50 rounded-xl font-semibold">
-                🐛 病害虫対策ガイドライン
-              </li>
+              <li className="p-3 bg-gray-50 rounded-xl font-semibold">🐛 病害虫対策ガイドライン</li>
               <li className="p-3 bg-gray-50 rounded-xl font-semibold">
                 💧 散水・土壌水分コントロール方法
               </li>
@@ -539,30 +554,42 @@ export default function StudentPage() {
                   <p>現在届いているお知らせはありません</p>
                 </div>
               ) : (
-                broadcasts.map((bc: { id: string; sender?: string; created_at?: string; title: string; content: string }) => (
-                  <div
-                    key={bc.id}
-                    className="bg-amber-50/70 border border-amber-200 p-4 rounded-2xl space-y-2 text-xs font-bold text-gray-800 shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between border-b border-amber-200/60 pb-1.5">
-                      <span className="text-[11px] font-black text-amber-900 flex items-center gap-1">
-                        <span>👤 {bc.sender || "講師"}</span>
-                      </span>
-                      <span className="text-[10px] text-gray-500 font-semibold">
-                        {bc.created_at ? `${formatDate(bc.created_at)} ${new Date(bc.created_at).toLocaleTimeString("ja-JP", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}` : "最新"}
-                      </span>
+                broadcasts.map(
+                  (bc: {
+                    id: string;
+                    sender?: string;
+                    created_at?: string;
+                    title: string;
+                    content: string;
+                  }) => (
+                    <div
+                      key={bc.id}
+                      className="bg-amber-50/70 border border-amber-200 p-4 rounded-2xl space-y-2 text-xs font-bold text-gray-800 shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between border-b border-amber-200/60 pb-1.5">
+                        <span className="text-[11px] font-black text-amber-900 flex items-center gap-1">
+                          <span>👤 {bc.sender || '講師'}</span>
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-semibold">
+                          {bc.created_at
+                            ? `${formatDate(bc.created_at)} ${new Date(
+                                bc.created_at
+                              ).toLocaleTimeString('ja-JP', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}`
+                            : '最新'}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-sm text-gray-900 leading-snug">
+                        {bc.title}
+                      </h4>
+                      <p className="text-xs text-gray-800 font-medium whitespace-pre-wrap leading-relaxed bg-white/80 p-3 rounded-xl border border-amber-200/50">
+                        {bc.content}
+                      </p>
                     </div>
-                    <h4 className="font-extrabold text-sm text-gray-900 leading-snug">
-                      {bc.title}
-                    </h4>
-                    <p className="text-xs text-gray-800 font-medium whitespace-pre-wrap leading-relaxed bg-white/80 p-3 rounded-xl border border-amber-200/50">
-                      {bc.content}
-                    </p>
-                  </div>
-                ))
+                  )
+                )
               )}
             </div>
 
@@ -593,9 +620,9 @@ export default function StudentPage() {
       <footer className="w-full max-w-md bg-white border-t border-gray-200 fixed bottom-0 z-20 px-2 py-2 flex items-center justify-around shadow-lg">
         {/* 🌟 1. 畑 🌟 */}
         <button
-          onClick={() => handleTabChange("myfarm")}
+          onClick={() => handleTabChange('myfarm')}
           className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
-            activeTab === "myfarm" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+            activeTab === 'myfarm' ? 'bg-[#1d5c23] text-white' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
           <span className="text-base leading-none">🌾</span>
@@ -604,9 +631,11 @@ export default function StudentPage() {
 
         {/* 🌟 2. 天気 🌟 */}
         <button
-          onClick={() => handleTabChange("weather")}
+          onClick={() => handleTabChange('weather')}
           className={`flex flex-col items-center py-1 px-3 rounded-xl transition ${
-            activeTab === "weather" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+            activeTab === 'weather'
+              ? 'bg-[#1d5c23] text-white'
+              : 'text-gray-400 hover:text-gray-600'
           }`}
         >
           <span className="text-base leading-none">☀️</span>
@@ -615,9 +644,9 @@ export default function StudentPage() {
 
         {/* 🌟 3. カレンダー 🌟 */}
         <button
-          onClick={() => handleTabChange("events")}
+          onClick={() => handleTabChange('events')}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
-            activeTab === "events" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+            activeTab === 'events' ? 'bg-[#1d5c23] text-white' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
           <span className="text-base leading-none">📅</span>
@@ -627,14 +656,19 @@ export default function StudentPage() {
         {/* 🌟 4. 相談 (ON時のみ表示) 🌟 */}
         {talkTabEnabled && (
           <button
-            onClick={() => handleTabChange("talk")}
+            onClick={() => handleTabChange('talk')}
             className={`relative flex flex-col items-center py-1 px-2 rounded-xl transition ${
-              activeTab === "talk" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+              activeTab === 'talk' ? 'bg-[#1d5c23] text-white' : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
             </svg>
             <span className="text-[10px] font-bold mt-0.5">相談</span>
           </button>
@@ -642,9 +676,9 @@ export default function StudentPage() {
 
         {/* 🌟 5. 成長 🌟 */}
         <button
-          onClick={() => handleTabChange("feed")}
+          onClick={() => handleTabChange('feed')}
           className={`flex flex-col items-center py-1 px-2 rounded-xl transition ${
-            activeTab === "feed" ? "bg-[#1d5c23] text-white" : "text-gray-400 hover:text-gray-600"
+            activeTab === 'feed' ? 'bg-[#1d5c23] text-white' : 'text-gray-400 hover:text-gray-600'
           }`}
         >
           <span className="text-base leading-none">🌱</span>

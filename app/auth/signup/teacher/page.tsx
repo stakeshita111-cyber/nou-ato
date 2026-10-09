@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { supabase } from "@/lib/supabase";
-import Toast from "@/components/ui/Toast";
-import Link from "next/link";
+import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import Toast from '@/components/ui/Toast';
+import Link from 'next/link';
 
 export default function TeacherSignUpPage() {
   // フォームステート
-  const [farmName, setFarmName] = useState("");
-  const [teacherName, setTeacherName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [farmName, setFarmName] = useState('');
+  const [teacherName, setTeacherName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // トースト
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
   // 講師アカウント登録処理
@@ -23,13 +23,13 @@ export default function TeacherSignUpPage() {
     e.preventDefault();
 
     if (!farmName.trim() || !teacherName.trim() || !email.trim() || !password) {
-      setToastMessage("すべての必須項目を入力してください");
+      setToastMessage('すべての必須項目を入力してください');
       setShowToast(true);
       return;
     }
 
     if (password.length < 6) {
-      setToastMessage("パスワードは6文字以上で入力してください");
+      setToastMessage('パスワードは6文字以上で入力してください');
       setShowToast(true);
       return;
     }
@@ -78,22 +78,22 @@ export default function TeacherSignUpPage() {
       }
 
       if (!userId) {
-        setToastMessage("ユーザーアカウントの認証に失敗しました。再度お試しください。");
+        setToastMessage('ユーザーアカウントの認証に失敗しました。再度お試しください。');
         setShowToast(true);
         setLoading(false);
         return;
       }
 
       // 2. 表示名の更新
-      await supabase.from("users").update({ display_name: teacherName.trim() }).eq("id", userId);
+      await supabase.from('users').update({ display_name: teacherName.trim() }).eq('id', userId);
 
       // 3. Postgres 関数 register_teacher (SECURITY DEFINER) を呼び出して講師昇格 & 農園開設
-      const { data: rpcResult, error: rpcError } = await supabase.rpc("register_teacher", {
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('register_teacher', {
         farm_name: farmName.trim(),
       });
 
       if (rpcError) {
-        console.error("register_teacher error:", rpcError);
+        console.error('register_teacher error:', rpcError);
         setToastMessage(`講師登録に失敗しました: ${rpcError.message}`);
         setShowToast(true);
         setLoading(false);
@@ -102,19 +102,19 @@ export default function TeacherSignUpPage() {
 
       const createdFarmId = rpcResult?.farm_id;
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem("nouato_owner_name", teacherName.trim());
-        localStorage.setItem("nouato_current_farm_name", farmName.trim());
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nouato_owner_name', teacherName.trim());
+        localStorage.setItem('nouato_current_farm_name', farmName.trim());
         if (createdFarmId) {
-          localStorage.setItem("nouato_active_farm_id", createdFarmId);
+          localStorage.setItem('nouato_active_farm_id', createdFarmId);
         }
       }
 
-      setToastMessage("🎉 講師アカウントおよび農場を開設しました！ダッシュボードへ移動します");
+      setToastMessage('🎉 講師アカウントおよび農場を開設しました！ダッシュボードへ移動します');
       setShowToast(true);
 
       setTimeout(() => {
-        window.location.href = "/teacher/dashboard";
+        window.location.href = '/teacher/dashboard';
       }, 800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -125,12 +125,12 @@ export default function TeacherSignUpPage() {
     }
   };
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
 
   // LINE で登録
   const handleLineSignUp = async () => {
     if (isLineDisabled) {
-      setToastMessage("💡 LINE連携機能は現在準備中です。フォームからご登録ください。");
+      setToastMessage('💡 LINE連携機能は現在準備中です。フォームからご登録ください。');
       setShowToast(true);
       return;
     }
@@ -138,21 +138,21 @@ export default function TeacherSignUpPage() {
     try {
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "custom:line" as unknown as "github",
+        provider: 'custom:line' as unknown as 'github',
         options: {
-          scopes: "openid profile email",
+          scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/teacher/dashboard`,
         },
       });
 
       if (error) {
-        console.error("LINE signUp error:", error);
-        setToastMessage("💡 LINE連携機能は現在準備中です。フォームからご登録ください。");
+        console.error('LINE signUp error:', error);
+        setToastMessage('💡 LINE連携機能は現在準備中です。フォームからご登録ください。');
         setShowToast(true);
       }
     } catch (err: unknown) {
-      console.error("LINE signUp exception:", err);
-      setToastMessage("💡 LINE連携機能は現在準備中です。フォームからご登録ください。");
+      console.error('LINE signUp exception:', err);
+      setToastMessage('💡 LINE連携機能は現在準備中です。フォームからご登録ください。');
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -178,14 +178,16 @@ export default function TeacherSignUpPage() {
             disabled={loading || isLineDisabled}
             className={`w-full py-3.5 font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm ${
               isLineDisabled
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed opacity-80"
-                : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+                ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-80'
+                : 'bg-[#06C755] hover:bg-[#05b34c] text-white'
             }`}
           >
             <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
+              <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z" />
             </svg>
-            <span>{isLineDisabled ? "LINEで登録 (準備中)" : loading ? "LINEへ接続中..." : "LINEで登録"}</span>
+            <span>
+              {isLineDisabled ? 'LINEで登録 (準備中)' : loading ? 'LINEへ接続中...' : 'LINEで登録'}
+            </span>
           </button>
 
           <div className="relative flex py-1 items-center">
@@ -198,9 +200,7 @@ export default function TeacherSignUpPage() {
         {/* 登録フォーム */}
         <form onSubmit={handleTeacherSignUp} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1">
-              農場名
-            </label>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">農場名</label>
             <input
               type="text"
               required
@@ -212,9 +212,7 @@ export default function TeacherSignUpPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1">
-              講師名
-            </label>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">講師名</label>
             <input
               type="text"
               required
@@ -226,9 +224,7 @@ export default function TeacherSignUpPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1">
-              メールアドレス
-            </label>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">メールアドレス</label>
             <input
               type="email"
               required
@@ -240,12 +236,10 @@ export default function TeacherSignUpPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1">
-              パスワード
-            </label>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">パスワード</label>
             <div className="relative">
               <input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 required
                 minLength={6}
                 value={password}
@@ -257,9 +251,9 @@ export default function TeacherSignUpPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 text-sm font-bold"
-                title={showPassword ? "パスワードを非表示" : "パスワードを表示"}
+                title={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
               >
-                {showPassword ? "🙈" : "👁️"}
+                {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
           </div>
@@ -269,13 +263,13 @@ export default function TeacherSignUpPage() {
             disabled={loading}
             className="w-full py-3.5 bg-[#16471a] hover:bg-[#123915] text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center space-x-2 text-sm mt-2"
           >
-            <span>{loading ? "登録中..." : "登録する"}</span>
+            <span>{loading ? '登録中...' : '登録する'}</span>
           </button>
         </form>
 
         {/* フッターリンク */}
         <div className="pt-2 text-center text-xs font-medium text-gray-500">
-          すでにアカウントをお持ちですか？{" "}
+          すでにアカウントをお持ちですか？{' '}
           <Link href="/login" className="text-[#1c4d21] font-bold hover:underline">
             ログイン
           </Link>

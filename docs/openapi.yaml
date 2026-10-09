@@ -29,9 +29,9 @@ paths:
             schema:
               $ref: '#/components/schemas/ChatRagRequest'
             example:
-              message: "ミニトマトの脇芽かきはいつ行うべきですか？"
-              studentName: "竹下 翔"
-              studentId: "usr_student_01"
+              message: 'ミニトマトの脇芽かきはいつ行うべきですか？'
+              studentName: '竹下 翔'
+              studentId: 'usr_student_01'
               history: []
               isMemoOnly: false
               isSpell: false
@@ -45,11 +45,11 @@ paths:
               example:
                 reply: "🌱【脇芽かきのコツ】\nミニトマトの主枝と葉の付け根から出てくる「わき芽」は、晴れた日の午前中に手で摘み取るのがおすすめです！"
                 referencedQa:
-                  - id: "db_journal_123"
-                    question: "トマトの芽かきのやり方を教えてください"
-                    answer: "天気の良い日の午前中に手でぽきっと折るように摘み取ります。"
+                  - id: 'db_journal_123'
+                    question: 'トマトの芽かきのやり方を教えてください'
+                    answer: '天気の良い日の午前中に手でぽきっと折るように摘み取ります。'
                     similarityScore: 8.5
-                timestamp: "2026-09-25T12:00:00.000Z"
+                timestamp: '2026-09-25T12:00:00.000Z'
         '400':
           description: 不正なリクエスト (メッセージ未指定など)
           content:
@@ -81,7 +81,7 @@ paths:
                 question:
                   type: string
                   description: 照合対象の質問テキスト
-                  example: "きゅうりの葉っぱが黄色くなってきました"
+                  example: 'きゅうりの葉っぱが黄色くなってきました'
       responses:
         '200':
           description: 照合結果リストの返却
@@ -96,10 +96,10 @@ paths:
                       $ref: '#/components/schemas/KnowledgeMatch'
               example:
                 matches:
-                  - id: "faq_yellow_leaf"
-                    question: "葉っぱが黄色くなってきました。どうすればいいですか？"
-                    answer: "【農園アドバイス：葉の黄変について】一番下の古い葉が黄色い場合は自然な老化ですので切り取って大丈夫です。"
-                    matchedKeywords: ["黄色", "葉が黄色"]
+                  - id: 'faq_yellow_leaf'
+                    question: '葉っぱが黄色くなってきました。どうすればいいですか？'
+                    answer: '【農園アドバイス：葉の黄変について】一番下の古い葉が黄色い場合は自然な老化ですので切り取って大丈夫です。'
+                    matchedKeywords: ['黄色', '葉が黄色']
                     score: 20
 
   /api/settings:
@@ -175,7 +175,7 @@ components:
         studentName:
           type: string
           description: 受講生氏名（パーソナライズ用）
-          default: "受講生"
+          default: '受講生'
         studentId:
           type: string
           nullable: true
@@ -271,11 +271,11 @@ components:
         type:
           type: string
           description: エラー種別を識別する URI リファレンス (RFC 7807)
-          example: "https://httpstatuses.com/400"
+          example: 'https://httpstatuses.com/400'
         title:
           type: string
           description: 人間が理解可能なエラーの概要タイトル
-          example: "Bad Request"
+          example: 'Bad Request'
         status:
           type: integer
           description: HTTP ステータスコード
@@ -283,14 +283,14 @@ components:
         detail:
           type: string
           description: 本エラーの具体的な発生事由
-          example: "メッセージが空です"
+          example: 'メッセージが空です'
         instance:
           type: string
           description: エラー発生リソースの URI
         error:
           type: string
           description: 従来クライアントとの後方互換用エラーメッセージ
-          example: "メッセージが空です"
+          example: 'メッセージが空です'
         invalidParams:
           type: array
           items:

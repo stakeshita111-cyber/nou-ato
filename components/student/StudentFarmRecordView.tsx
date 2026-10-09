@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useFarmManager } from "@/hooks/useFarmManager";
-import { GrowthStage, WorkType, CropRecord, FarmBed } from "@/types/farm";
-import Toast from "@/components/ui/Toast";
-import TaskSlider from "@/components/student/TaskSlider";
-import BedCompletionModal from "@/components/farm/BedCompletionModal";
-import ArchivedCropsModal from "@/components/farm/ArchivedCropsModal";
-import { SproutLoader } from "@/components/SproutLoader";
-import { supabase } from "@/lib/supabase";
-import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
-import { uploadImageToStorage } from "@/lib/storage";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useFarmManager } from '@/hooks/useFarmManager';
+import { GrowthStage, WorkType, CropRecord, FarmBed } from '@/types/farm';
+import Toast from '@/components/ui/Toast';
+import TaskSlider from '@/components/student/TaskSlider';
+import BedCompletionModal from '@/components/farm/BedCompletionModal';
+import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
+import { SproutLoader } from '@/components/SproutLoader';
+import { supabase } from '@/lib/supabase';
+import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
+import { uploadImageToStorage } from '@/lib/storage';
 
 interface StudentFarmRecordViewProps {
   studentId?: string;
@@ -26,34 +26,42 @@ interface StudentFarmRecordViewProps {
 
 export default function StudentFarmRecordView({
   studentId,
-  studentName = "受講生",
+  studentName = '受講生',
   tasks = [],
   onSelectTask,
   onCompleteTask,
   onUncompleteTask,
-  newJournal = "",
+  newJournal = '',
   setNewJournal,
   onAddJournal,
 }: StudentFarmRecordViewProps) {
-  const { isLoading, plots, records, addCropRecord, updateCropRecord, deleteCropRecord, completeBedCrop, updateBedCrop } = useFarmManager();
+  const {
+    isLoading,
+    plots,
+    records,
+    addCropRecord,
+    updateCropRecord,
+    deleteCropRecord,
+    completeBedCrop,
+    updateBedCrop,
+  } = useFarmManager();
 
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  
 
   // 🌟 自分（ログイン中の生徒）に現在割り当てられている担当区画を厳密抽出 🌟
   const myPlot =
     // 1. studentId に完全一致するプロットを最優先
-    (studentId
-      ? plots.find((p) => !p.is_vacant && p.student_id === studentId)
-      : null) ||
+    (studentId ? plots.find((p) => !p.is_vacant && p.student_id === studentId) : null) ||
     // 2. studentName (表示名) に一致するプロット
-    (studentName && studentName !== "受講生"
+    (studentName && studentName !== '受講生'
       ? plots.find(
           (p) =>
             !p.is_vacant &&
             p.student_name &&
-            (p.student_name === studentName || p.student_name.includes(studentName) || studentName.includes(p.student_name))
+            (p.student_name === studentName ||
+              p.student_name.includes(studentName) ||
+              studentName.includes(p.student_name))
         )
       : null) ||
     // 3. 未ログイン/デフォルト時のフォールバック (最初の利用可能プロット)
@@ -61,22 +69,23 @@ export default function StudentFarmRecordView({
     plots[0] ||
     null;
 
-  const plotCode = myPlot?.code || "A1";
-  const defaultBedCount = (myPlot?.beds && myPlot.beds.length > 0) ? myPlot.beds.length : 7;
-  const rawBeds: FarmBed[] = (myPlot?.beds && myPlot.beds.length > 0)
-    ? myPlot.beds
-    : Array.from({ length: defaultBedCount }, (_, i) => ({
-        id: `plot_cell_${plotCode}_bed_${i + 1}`,
-        plot_id: `plot_cell_${plotCode}`,
-        bed_number: i + 1,
-        crop_name: "未確定 🌱",
-        is_updated: false,
-        status: "active",
-      }));
+  const plotCode = myPlot?.code || 'A1';
+  const defaultBedCount = myPlot?.beds && myPlot.beds.length > 0 ? myPlot.beds.length : 7;
+  const rawBeds: FarmBed[] =
+    myPlot?.beds && myPlot.beds.length > 0
+      ? myPlot.beds
+      : Array.from({ length: defaultBedCount }, (_, i) => ({
+          id: `plot_cell_${plotCode}_bed_${i + 1}`,
+          plot_id: `plot_cell_${plotCode}`,
+          bed_number: i + 1,
+          crop_name: '未確定 🌱',
+          is_updated: false,
+          status: 'active',
+        }));
 
   // 🌟 1. 稼働中の畝（未アーカイブ）と過去のアーカイブ畝をまず分離 🌟
-  const unarchivedBeds = rawBeds.filter((b) => b.status !== "archived");
-  const archivedBeds = rawBeds.filter((b) => b.status === "archived");
+  const unarchivedBeds = rawBeds.filter((b) => b.status !== 'archived');
+  const archivedBeds = rawBeds.filter((b) => b.status === 'archived');
 
   // 🌟 2. 稼働中ベッドを bed_number 順に整列（講師画面と完全一致） 🌟
   const activeBeds: FarmBed[] = [...unarchivedBeds]
@@ -85,8 +94,8 @@ export default function StudentFarmRecordView({
       ...b,
       id: b.id || `plot_cell_${plotCode}_bed_${b.bed_number || idx + 1}`,
       bed_number: Number(b.bed_number) || idx + 1,
-      status: b.status || "active",
-      crop_name: b.crop_name || "未確定 🌱",
+      status: b.status || 'active',
+      crop_name: b.crop_name || '未確定 🌱',
     }));
 
   // 生徒が選択中の対象畝ベッド (初期状態は未選択、クリック時のみ選択)
@@ -96,35 +105,35 @@ export default function StudentFarmRecordView({
   const [showInputModal, setShowInputModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<CropRecord | null>(null);
 
-  const [customCropName, setCustomCropName] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [customCropName, setCustomCropName] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [isSubmittingRecord, setIsSubmittingRecord] = useState(false);
 
-  const [selectedStage, setSelectedStage] = useState<GrowthStage>("果実肥大");
+  const [selectedStage, setSelectedStage] = useState<GrowthStage>('果実肥大');
   const [heightCm, setHeightCm] = useState<number>(75);
-  const [selectedWorks, setSelectedWorks] = useState<WorkType[]>(["水やり", "追肥"]);
-  const [notes, setNotes] = useState("");
-  const [harvestAmount, setHarvestAmount] = useState("");
+  const [selectedWorks, setSelectedWorks] = useState<WorkType[]>(['水やり', '追肥']);
+  const [notes, setNotes] = useState('');
+  const [harvestAmount, setHarvestAmount] = useState('');
 
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
 
   const STAGES: GrowthStage[] = [
-    "播種・苗植え",
-    "発芽・活着",
-    "本葉展開・つる伸び",
-    "開花・受粉",
-    "果実肥大",
-    "収穫期",
+    '播種・苗植え',
+    '発芽・活着',
+    '本葉展開・つる伸び',
+    '開花・受粉',
+    '果実肥大',
+    '収穫期',
   ];
 
   const WORKS: WorkType[] = [
-    "水やり",
-    "追肥",
-    "わき芽かき・仕立て",
-    "除草・土寄せ",
-    "病害虫対策",
-    "収穫",
+    '水やり',
+    '追肥',
+    'わき芽かき・仕立て',
+    '除草・土寄せ',
+    '病害虫対策',
+    '収穫',
   ];
 
   const handleToggleWork = (w: WorkType) => {
@@ -137,7 +146,7 @@ export default function StudentFarmRecordView({
 
   // 画像ファイルを自動リサイズ＆圧縮（スマホ写真やスクショを超軽量JPEG変換）
   const processImageFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    if (!file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (readerEvent) => {
       const rawResult = readerEvent.target?.result as string;
@@ -156,18 +165,18 @@ export default function StudentFarmRecordView({
             h = maxDim;
           }
         }
-        const canvas = document.createElement("canvas");
+        const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const compressed = canvas.toDataURL("image/jpeg", 0.5);
+          const compressed = canvas.toDataURL('image/jpeg', 0.5);
           setImageUrl(compressed);
         } else {
           setImageUrl(rawResult);
         }
-        setToastMessage("📸 写真・画像を最適化して添付しました！");
+        setToastMessage('📸 写真・画像を最適化して添付しました！');
         setShowToast(true);
       };
       img.src = rawResult;
@@ -188,7 +197,7 @@ export default function StudentFarmRecordView({
     const items = e.clipboardData?.items;
     if (!items) return;
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith("image/")) {
+      if (items[i].type.startsWith('image/')) {
         const file = items[i].getAsFile();
         if (file) {
           e.preventDefault();
@@ -207,29 +216,35 @@ export default function StudentFarmRecordView({
     setIsSubmittingRecord(true);
     try {
       let finalImageUrl = imageUrl;
-      if (imageUrl && imageUrl.startsWith("data:")) {
-        finalImageUrl = await uploadImageToStorage(imageUrl, "records");
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        finalImageUrl = await uploadImageToStorage(imageUrl, 'records');
         if (!finalImageUrl) {
-          alert("画像のアップロードに失敗しました。通信環境を確認して再度お試しください。");
+          alert('画像のアップロードに失敗しました。通信環境を確認して再度お試しください。');
           setIsSubmittingRecord(false);
           return;
         }
       }
 
       // 🌟 生徒が入力した品種名 (未入力時は既存品種を引き継ぐ) 🌟
-      const finalCrop = customCropName.trim() || (currentBed.crop_name !== "未確定 🌱" ? currentBed.crop_name : "") || "未確定 🌱";
-      const cleanNotes = notes.replace(/\[IMG:[\s\S]+?\]/g, "").replace(/【.*?】/g, "").trim();
-      const taggedNotes = finalCrop !== "未確定 🌱" ? `【${finalCrop}】${cleanNotes}` : cleanNotes;
+      const finalCrop =
+        customCropName.trim() ||
+        (currentBed.crop_name !== '未確定 🌱' ? currentBed.crop_name : '') ||
+        '未確定 🌱';
+      const cleanNotes = notes
+        .replace(/\[IMG:[\s\S]+?\]/g, '')
+        .replace(/【.*?】/g, '')
+        .trim();
+      const taggedNotes = finalCrop !== '未確定 🌱' ? `【${finalCrop}】${cleanNotes}` : cleanNotes;
 
       // 1. Supabase farm_beds の作物品種名を更新 (即時DB反映)
       try {
         if (updateBedCrop) {
           await updateBedCrop(currentBed.id, finalCrop);
         } else {
-          await supabase.from("farm_beds").update({ crop_name: finalCrop }).eq("id", currentBed.id);
+          await supabase.from('farm_beds').update({ crop_name: finalCrop }).eq('id', currentBed.id);
         }
       } catch (e) {
-        console.warn("farm_beds crop update notice:", e);
+        console.warn('farm_beds crop update notice:', e);
       }
 
       if (editingRecord) {
@@ -241,9 +256,9 @@ export default function StudentFarmRecordView({
           harvest_amount: harvestAmount.trim() || undefined,
           image_url: finalImageUrl || undefined,
         });
-        setToastMessage("✏️ 過去の観察記録を更新しました！");
+        setToastMessage('✏️ 過去の観察記録を更新しました！');
       } else {
-        const todayStr = new Date().toLocaleDateString("ja-JP");
+        const todayStr = new Date().toLocaleDateString('ja-JP');
         addCropRecord(currentBed.id, {
           bed_id: currentBed.id,
           date: todayStr,
@@ -263,42 +278,45 @@ export default function StudentFarmRecordView({
             myPlot?.student_id ||
             null;
 
-          const hasHttpImg = finalImageUrl && finalImageUrl.startsWith("http");
-          const journalContent = finalImageUrl && !hasHttpImg
-            ? `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}\n[IMG:${finalImageUrl}]`
-            : `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`;
+          const hasHttpImg = finalImageUrl && finalImageUrl.startsWith('http');
+          const journalContent =
+            finalImageUrl && !hasHttpImg
+              ? `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}\n[IMG:${finalImageUrl}]`
+              : `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`;
 
-          const { error: jErr } = await supabase.from("journals").insert([
+          const { error: jErr } = await supabase.from('journals').insert([
             {
               student_id: resolvedStudentId,
               content: journalContent,
               image_url: hasHttpImg ? finalImageUrl : null,
-              role: "student",
+              role: 'student',
             },
           ]);
           if (jErr) {
-            console.warn("journals insert warning:", jErr);
+            console.warn('journals insert warning:', jErr);
           }
         } catch (e) {
-          console.error("journals insert error:", e);
+          console.error('journals insert error:', e);
         }
 
-        setToastMessage(`🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`);
+        setToastMessage(
+          `🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`
+        );
       }
 
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
       }
 
       setShowInputModal(false);
       setEditingRecord(null);
-      setNotes("");
-      setCustomCropName("");
-      setImageUrl("");
-      setHarvestAmount("");
+      setNotes('');
+      setCustomCropName('');
+      setImageUrl('');
+      setHarvestAmount('');
       setShowToast(true);
     } catch (err) {
-      console.error("handleSubmitRecord error:", err);
+      console.error('handleSubmitRecord error:', err);
     } finally {
       setIsSubmittingRecord(false);
     }
@@ -307,21 +325,29 @@ export default function StudentFarmRecordView({
   // 🌟 編集モーダルを開く 🌟
   const handleOpenEditModal = (rec: CropRecord) => {
     setEditingRecord(rec);
-    setSelectedStage((rec.growth_stage as GrowthStage) || "果実肥大");
+    setSelectedStage((rec.growth_stage as GrowthStage) || '果実肥大');
     setHeightCm(rec.height_cm || 75);
-    setSelectedWorks(rec.work_types || ["水やり"]);
-    const tagCrop = rec.notes?.match(/【(.*?)】/)?.[1] || "";
-    setCustomCropName(tagCrop || (currentBed?.crop_name && currentBed.crop_name !== "未確定 🌱" ? currentBed.crop_name : ""));
-    setNotes((rec.notes || "").replace(/【.*?】/g, "").replace(/\[IMG:[\s\S]+?\]/g, "").trim());
-    setHarvestAmount(rec.harvest_amount || "");
+    setSelectedWorks(rec.work_types || ['水やり']);
+    const tagCrop = rec.notes?.match(/【(.*?)】/)?.[1] || '';
+    setCustomCropName(
+      tagCrop ||
+        (currentBed?.crop_name && currentBed.crop_name !== '未確定 🌱' ? currentBed.crop_name : '')
+    );
+    setNotes(
+      (rec.notes || '')
+        .replace(/【.*?】/g, '')
+        .replace(/\[IMG:[\s\S]+?\]/g, '')
+        .trim()
+    );
+    setHarvestAmount(rec.harvest_amount || '');
     setShowInputModal(true);
   };
 
   // 🌟【要件3】過去の記録の削除 🗑️ 🌟
   const handleDeleteRecord = (recId: string) => {
-    if (confirm("この過去の観察記録を削除してもよろしいですか？")) {
+    if (confirm('この過去の観察記録を削除してもよろしいですか？')) {
       deleteCropRecord(recId);
-      setToastMessage("🗑️ 過去の観察記録を削除しました");
+      setToastMessage('🗑️ 過去の観察記録を削除しました');
       setShowToast(true);
     }
   };
@@ -335,16 +361,16 @@ export default function StudentFarmRecordView({
 
     try {
       const { data, error } = await supabase
-        .from("journals")
-        .select("*")
-        .eq("student_id", targetStudentId)
-        .order("created_at", { ascending: false });
+        .from('journals')
+        .select('*')
+        .eq('student_id', targetStudentId)
+        .order('created_at', { ascending: false });
 
       if (data && !error) {
         setStudentJournals(data);
       }
     } catch (err) {
-      console.warn("fetchStudentJournals error:", err);
+      console.warn('fetchStudentJournals error:', err);
     }
   }, [studentId, myPlot?.student_id]);
 
@@ -353,7 +379,7 @@ export default function StudentFarmRecordView({
 
     let bc: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = () => {
         fetchStudentJournals();
       };
@@ -363,14 +389,14 @@ export default function StudentFarmRecordView({
       fetchStudentJournals();
     };
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("nouato_sync_event", handleSync);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nouato_sync_event', handleSync);
     }
 
     return () => {
       if (bc) bc.close();
-      if (typeof window !== "undefined") {
-        window.removeEventListener("nouato_sync_event", handleSync);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nouato_sync_event', handleSync);
       }
     };
   }, [fetchStudentJournals]);
@@ -379,20 +405,23 @@ export default function StudentFarmRecordView({
   const currentBedRecords = currentBed
     ? records
         .filter((r) => r.bed_id === currentBed.id)
-        .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()
+        )
     : [];
 
   // 観察記録 (cropRecords) と 講師からの返信 (journals) を合成したタイムラインリスト
   type ObservationTimelineItem = {
     id: string;
-    type: "observation";
+    type: 'observation';
     timestamp: number;
     record: CropRecord;
   };
 
   type TeacherReplyTimelineItem = {
     id: string;
-    type: "teacher_reply";
+    type: 'teacher_reply';
     timestamp: number;
     dateStr: string;
     teacherName: string;
@@ -402,14 +431,14 @@ export default function StudentFarmRecordView({
 
   type CombinedTimelineItem = ObservationTimelineItem | TeacherReplyTimelineItem;
 
-  const bedNumberStr = currentBed ? String(currentBed.bed_number) : "";
+  const bedNumberStr = currentBed ? String(currentBed.bed_number) : '';
 
   const synthesizedTimelineItems = (() => {
     if (!currentBed) return [];
 
     const observationItems: CombinedTimelineItem[] = currentBedRecords.map((rec) => ({
       id: `rec_${rec.id}`,
-      type: "observation",
+      type: 'observation',
       timestamp: new Date(rec.created_at || rec.date).getTime(),
       record: rec,
     }));
@@ -418,8 +447,8 @@ export default function StudentFarmRecordView({
     const seenReplyTexts = new Set<string>();
 
     studentJournals.forEach((j) => {
-      const content = String(j.content || j.text || "");
-      const replyText = String(j.reply || "").trim();
+      const content = String(j.content || j.text || '');
+      const replyText = String(j.reply || '').trim();
 
       // 送信元の畝・作物の厳密一致判定
       const bedTagMatch = content.match(/【畝\s*([0-9]+)/) || content.match(/畝\s*([0-9]+)/);
@@ -430,15 +459,19 @@ export default function StudentFarmRecordView({
         }
       } else {
         // 畝指定がない場合、現在選択されている畝の作物品種名で厳密判定
-        const currentCrop = currentBed.crop_name ? currentBed.crop_name.replace(/🌱/g, "").trim() : "";
-        const isValidCurrentCrop = Boolean(currentCrop && currentCrop !== "未確定");
+        const currentCrop = currentBed.crop_name
+          ? currentBed.crop_name.replace(/🌱/g, '').trim()
+          : '';
+        const isValidCurrentCrop = Boolean(currentCrop && currentCrop !== '未確定');
 
         let isCropMatched = false;
         if (isValidCurrentCrop) {
           if (content.includes(currentCrop)) {
             isCropMatched = true;
           } else {
-            const bracketMatches = Array.from(content.matchAll(/【([^】]+)】/g)).map((m) => m[1].trim());
+            const bracketMatches = Array.from(content.matchAll(/【([^】]+)】/g)).map((m) =>
+              m[1].trim()
+            );
             for (const tag of bracketMatches) {
               if (tag && (currentCrop.includes(tag) || tag.includes(currentCrop))) {
                 isCropMatched = true;
@@ -453,33 +486,46 @@ export default function StudentFarmRecordView({
         }
       }
 
-      if (replyText && replyText !== "講師からの返信") {
+      if (replyText && replyText !== '講師からの返信') {
         if (!seenReplyTexts.has(replyText)) {
           seenReplyTexts.add(replyText);
-          const dateObj = j.updated_at ? new Date(j.updated_at) : j.created_at ? new Date(j.created_at) : new Date();
-          const timeStr = dateObj.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+          const dateObj = j.updated_at
+            ? new Date(j.updated_at)
+            : j.created_at
+              ? new Date(j.created_at)
+              : new Date();
+          const timeStr = dateObj.toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
           replyItems.push({
             id: `reply_${j.id}`,
-            type: "teacher_reply",
+            type: 'teacher_reply',
             timestamp: dateObj.getTime(),
             dateStr: `${formatDate(dateObj.toISOString())} ${timeStr}`,
-            teacherName: "講師",
+            teacherName: '講師',
             replyContent: replyText,
             originalQuestion: content,
           });
         }
-      } else if (j.role === "broadcast" && (j.text === "【返信】講師から相談への回答が届きました" || j.reply === "講師からの返信")) {
-        const bContent = String(j.content || "").trim();
+      } else if (
+        j.role === 'broadcast' &&
+        (j.text === '【返信】講師から相談への回答が届きました' || j.reply === '講師からの返信')
+      ) {
+        const bContent = String(j.content || '').trim();
         if (bContent && !seenReplyTexts.has(bContent)) {
           seenReplyTexts.add(bContent);
           const dateObj = j.created_at ? new Date(j.created_at) : new Date();
-          const timeStr = dateObj.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+          const timeStr = dateObj.toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
           replyItems.push({
             id: `reply_bc_${j.id}`,
-            type: "teacher_reply",
+            type: 'teacher_reply',
             timestamp: dateObj.getTime(),
             dateStr: `${formatDate(dateObj.toISOString())} ${timeStr}`,
-            teacherName: "講師",
+            teacherName: '講師',
             replyContent: bContent,
           });
         }
@@ -514,7 +560,9 @@ export default function StudentFarmRecordView({
 
         <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-xs text-center space-y-3">
           <span className="text-4xl">🧑‍🌾</span>
-          <h3 className="font-black text-gray-900 text-base">担当の畑区画はまだ割り当てられていません</h3>
+          <h3 className="font-black text-gray-900 text-base">
+            担当の畑区画はまだ割り当てられていません
+          </h3>
           <p className="text-xs text-gray-500 font-bold max-w-sm mx-auto leading-relaxed">
             講師が「畑管理」画面であなたのアカウントに区画を割り当てると、ここに区画とベッドが表示され、観察日記や成長記録を保存できるようになります。
           </p>
@@ -543,7 +591,9 @@ export default function StudentFarmRecordView({
           <div className="flex items-center gap-2">
             <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
               <span>🌱 {myPlot.name} の畝一覧</span>
-              <span className="text-xs font-bold text-gray-400">({activeBeds.length}畝 栽培中)</span>
+              <span className="text-xs font-bold text-gray-400">
+                ({activeBeds.length}畝 栽培中)
+              </span>
             </h3>
           </div>
 
@@ -560,7 +610,7 @@ export default function StudentFarmRecordView({
             </button>
 
             <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              {currentBed ? `畝 ${currentBed.bed_number} 選択中` : "畝をタップして記録を表示"}
+              {currentBed ? `畝 ${currentBed.bed_number} 選択中` : '畝をタップして記録を表示'}
             </span>
           </div>
         </div>
@@ -577,7 +627,7 @@ export default function StudentFarmRecordView({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
             {activeBeds.map((bed) => {
               const isSelected = selectedBedId === bed.id;
-              const isPending = bed.status === "completed_pending";
+              const isPending = bed.status === 'completed_pending';
 
               // 生徒の観察記録・投稿画像のサムネイル検索
               const bedRecs = records.filter((r) => r.bed_id === bed.id);
@@ -585,16 +635,21 @@ export default function StudentFarmRecordView({
 
               // 成長段階・進捗率 (0〜100%) に応じた色の濃淡カラーマップ
               const progress = (bed as { progress_percent?: number }).progress_percent || 0;
-              let colorClasses = "bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100";
+              let colorClasses =
+                'bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100';
 
               if (isPending) {
-                colorClasses = "bg-gradient-to-br from-amber-100 to-orange-100 text-amber-950 border-amber-400 ring-2 ring-amber-400 shadow-xs";
+                colorClasses =
+                  'bg-gradient-to-br from-amber-100 to-orange-100 text-amber-950 border-amber-400 ring-2 ring-amber-400 shadow-xs';
               } else if (progress >= 80) {
-                colorClasses = "bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 border-emerald-900 shadow-sm";
+                colorClasses =
+                  'bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 border-emerald-900 shadow-sm';
               } else if (progress >= 50) {
-                colorClasses = "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-xs";
+                colorClasses =
+                  'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-xs';
               } else if (progress >= 25) {
-                colorClasses = "bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200";
+                colorClasses =
+                  'bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200';
               }
 
               return (
@@ -604,8 +659,8 @@ export default function StudentFarmRecordView({
                   onClick={() => setSelectedBedId(selectedBedId === bed.id ? null : bed.id)}
                   className={`relative py-2 px-2.5 rounded-2xl border-2 transition font-black text-xs text-center flex flex-col items-center justify-center space-y-0.5 overflow-hidden cursor-pointer ${colorClasses} ${
                     isSelected
-                      ? "ring-4 ring-amber-400 border-amber-400 scale-105 shadow-md z-10"
-                      : "opacity-90 hover:opacity-100 hover:scale-[1.02]"
+                      ? 'ring-4 ring-amber-400 border-amber-400 scale-105 shadow-md z-10'
+                      : 'opacity-90 hover:opacity-100 hover:scale-[1.02]'
                   }`}
                 >
                   {/* 投稿画像プレビューサムネイル */}
@@ -618,7 +673,7 @@ export default function StudentFarmRecordView({
 
                   <span className="text-xs font-black leading-tight">畝 {bed.bed_number}</span>
                   <span className="text-[10.5px] opacity-80 font-bold max-w-[70px] truncate leading-tight">
-                    {bed.crop_name || "未設定"}
+                    {bed.crop_name || '未設定'}
                   </span>
                 </button>
               );
@@ -629,7 +684,7 @@ export default function StudentFarmRecordView({
 
       {/* 🌟 3. 畝をクリックしたときだけ表示される記録セクション 🌟 */}
       {/* 🌟 講師からの差し戻し通知バナー 🌟 */}
-      {activeBeds.some(b => b.status === "rejected") && (
+      {activeBeds.some((b) => b.status === 'rejected') && (
         <div className="bg-rose-50 border-2 border-red-400 p-4 rounded-3xl shadow-sm text-xs text-red-950 space-y-2 animate-bounce-short">
           <div className="flex items-center gap-2">
             <span className="text-xl">⚠️</span>
@@ -637,24 +692,33 @@ export default function StudentFarmRecordView({
               収穫完了報告が講師より差し戻されました
             </h4>
           </div>
-          {activeBeds.filter(b => b.status === "rejected").map(rb => (
-            <div key={rb.id} className="bg-white/90 p-3 rounded-2xl border border-red-200 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-black text-red-900 mr-2">【畝 #{rb.bed_number} ({rb.crop_name})】</span>
-                <span className="text-gray-700 font-bold">理由: {rb.reject_reason || rb.completion_notes || "内容の再確認をお願いします"}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedBedId(rb.id);
-                  setShowCompletionModal(true);
-                }}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs shadow-xs cursor-pointer"
+          {activeBeds
+            .filter((b) => b.status === 'rejected')
+            .map((rb) => (
+              <div
+                key={rb.id}
+                className="bg-white/90 p-3 rounded-2xl border border-red-200 flex flex-wrap items-center justify-between gap-2"
               >
-                📝 内容を修正して再提出
-              </button>
-            </div>
-          ))}
+                <div>
+                  <span className="font-black text-red-900 mr-2">
+                    【畝 #{rb.bed_number} ({rb.crop_name})】
+                  </span>
+                  <span className="text-gray-700 font-bold">
+                    理由: {rb.reject_reason || rb.completion_notes || '内容の再確認をお願いします'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedBedId(rb.id);
+                    setShowCompletionModal(true);
+                  }}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs shadow-xs cursor-pointer"
+                >
+                  📝 内容を修正して再提出
+                </button>
+              </div>
+            ))}
         </div>
       )}
 
@@ -664,32 +728,33 @@ export default function StudentFarmRecordView({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-black text-gray-900 text-base">
-                  📅 畝 {currentBed.bed_number} {currentBed.crop_name ? `(${currentBed.crop_name})` : ""} の記録
+                  📅 畝 {currentBed.bed_number}{' '}
+                  {currentBed.crop_name ? `(${currentBed.crop_name})` : ''} の記録
                 </h3>
                 <span className="text-xs text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold">
                   全 {currentBedRecords.length} 件
                 </span>
-                {currentBed.status === "completed_pending" && (
+                {currentBed.status === 'completed_pending' && (
                   <span className="text-xs text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-full font-black animate-pulse">
                     ⏳ 収穫完了・講師確認待ち (記録ロック中)
                   </span>
                 )}
-                {currentBed.status === "rejected" && (
+                {currentBed.status === 'rejected' && (
                   <span className="text-xs text-red-900 bg-red-200 px-2.5 py-0.5 rounded-full font-black animate-pulse">
                     ⚠️ 差し戻し（要再提出）
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-gray-400 font-bold">
-                {currentBed.status === "completed_pending"
-                  ? "※ 講師の確認待ちのため、この畝の記録は閲覧専用（編集・新規追加不可）となります"
-                  : "過去の記録は「編集」または「削除」できます"}
+                {currentBed.status === 'completed_pending'
+                  ? '※ 講師の確認待ちのため、この畝の記録は閲覧専用（編集・新規追加不可）となります'
+                  : '過去の記録は「編集」または「削除」できます'}
               </p>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
               {/* 🏆 収穫完了報告ボタン */}
-              {currentBed.status !== "completed_pending" && (
+              {currentBed.status !== 'completed_pending' && (
                 <button
                   type="button"
                   onClick={() => setShowCompletionModal(true)}
@@ -699,11 +764,11 @@ export default function StudentFarmRecordView({
                 </button>
               )}
 
-              {currentBed.status === "completed_pending" ? (
+              {currentBed.status === 'completed_pending' ? (
                 <div className="px-3 py-1.5 bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 flex items-center gap-1">
                   <span>🔒 承認待ち（入力不可）</span>
                 </div>
-              ) : currentBed.status === "rejected" ? (
+              ) : currentBed.status === 'rejected' ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -717,8 +782,8 @@ export default function StudentFarmRecordView({
                 <button
                   onClick={() => {
                     setEditingRecord(null);
-                    setNotes("");
-                    setHarvestAmount("");
+                    setNotes('');
+                    setHarvestAmount('');
                     setShowInputModal(true);
                   }}
                   className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-xs rounded-xl shadow-xs transition transform active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer"
@@ -730,180 +795,190 @@ export default function StudentFarmRecordView({
           </div>
 
           {/* 承認待ちバナー */}
-          {currentBed.status === "completed_pending" && (
+          {currentBed.status === 'completed_pending' && (
             <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-300 text-xs text-amber-950 font-bold flex items-center gap-2.5">
               <span className="text-xl">⏳</span>
               <div>
                 <p className="font-black text-amber-900">この畝は収穫完了報告済みです</p>
                 <p className="text-[11px] text-amber-800 font-medium">
-                  講師が確認・承認すると、この畝は過去ログ（「📦 過去の作物を見る」）に保存され、新しい畝が自動的に追加されます。承認までしばらくお待ちください。
+                  講師が確認・承認すると、この畝は過去ログ（「📦
+                  過去の作物を見る」）に保存され、新しい畝が自動的に追加されます。承認までしばらくお待ちください。
                 </p>
               </div>
             </div>
           )}
 
           {/* 🌟 差し戻し理由バナー 🌟 */}
-          {currentBed.status === "rejected" && (
+          {currentBed.status === 'rejected' && (
             <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-300 text-xs text-red-950 font-bold space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-xl">⚠️</span>
                 <p className="font-black text-red-900 text-sm">講師からの差し戻しメッセージ</p>
               </div>
               <div className="bg-white p-3 rounded-xl border border-red-200 text-gray-800 font-bold">
-                {currentBed.reject_reason || currentBed.completion_notes || "内容の再確認をお願いします"}
+                {currentBed.reject_reason ||
+                  currentBed.completion_notes ||
+                  '内容の再確認をお願いします'}
               </div>
               <p className="text-[11px] text-red-700">
-                上記の内容をご確認の上、「📝 修正して再提出する」ボタンから修正内容を送信してください。
+                上記の内容をご確認の上、「📝
+                修正して再提出する」ボタンから修正内容を送信してください。
               </p>
             </div>
           )}
 
-        {synthesizedTimelineItems.length === 0 ? (
-          <div className="py-12 text-center text-gray-400 font-bold text-sm space-y-3">
-            <p>この畝にはまだ記録が登録されていません。</p>
-            {currentBed.status !== "completed_pending" && (
-              <button
-                onClick={() => {
-                  setEditingRecord(null);
-                  setShowInputModal(true);
-                }}
-                className="px-4 py-2 app-accent-btn font-bold text-xs rounded-xl shadow-xs"
-              >
-                ＋ 初めての観察ログを登録する
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="relative border-l-2 border-emerald-200 ml-4 pl-6 space-y-6 my-2">
-            {synthesizedTimelineItems.map((item) => {
-              if (item.type === "teacher_reply") {
+          {synthesizedTimelineItems.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 font-bold text-sm space-y-3">
+              <p>この畝にはまだ記録が登録されていません。</p>
+              {currentBed.status !== 'completed_pending' && (
+                <button
+                  onClick={() => {
+                    setEditingRecord(null);
+                    setShowInputModal(true);
+                  }}
+                  className="px-4 py-2 app-accent-btn font-bold text-xs rounded-xl shadow-xs"
+                >
+                  ＋ 初めての観察ログを登録する
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="relative border-l-2 border-emerald-200 ml-4 pl-6 space-y-6 my-2">
+              {synthesizedTimelineItems.map((item) => {
+                if (item.type === 'teacher_reply') {
+                  return (
+                    <div key={item.id} className="relative group">
+                      <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-amber-500 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
+
+                      <div className="bg-amber-50/90 p-4 rounded-2xl border-2 border-amber-300 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-800">
+                        <div className="flex justify-between items-center border-b border-amber-200/80 pb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black text-[11px] flex items-center gap-1">
+                              <span>💬 講師からの返信</span>
+                            </span>
+                            <span className="font-extrabold text-xs text-gray-800">
+                              {item.teacherName}
+                            </span>
+                          </div>
+                          <span className="font-bold text-[11px] text-gray-500">
+                            📅 {item.dateStr}
+                          </span>
+                        </div>
+
+                        {item.originalQuestion && (
+                          <div className="text-[11px] text-gray-600 bg-white/70 p-2.5 rounded-xl border border-amber-200/60 font-medium">
+                            <span className="text-[10px] text-amber-900 font-bold block mb-0.5">
+                              📌 対象の相談・質問:
+                            </span>
+                            <p className="line-clamp-2 leading-relaxed">{item.originalQuestion}</p>
+                          </div>
+                        )}
+
+                        <div className="bg-white p-3.5 rounded-xl border border-amber-200 text-gray-900 font-medium leading-relaxed whitespace-pre-wrap text-xs shadow-2xs">
+                          {item.replyContent}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const rec = item.record;
                 return (
-                  <div key={item.id} className="relative group">
-                    <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-amber-500 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
+                  <div key={rec.id} className="relative group">
+                    <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-emerald-600 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
 
-                    <div className="bg-amber-50/90 p-4 rounded-2xl border-2 border-amber-300 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-800">
-                      <div className="flex justify-between items-center border-b border-amber-200/80 pb-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black text-[11px] flex items-center gap-1">
-                            <span>💬 講師からの返信</span>
-                          </span>
-                          <span className="font-extrabold text-xs text-gray-800">
-                            {item.teacherName}
-                          </span>
-                        </div>
-                        <span className="font-bold text-[11px] text-gray-500">
-                          📅 {item.dateStr}
+                    <div className="bg-gray-50/90 p-4 rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-700">
+                      <div className="flex justify-between items-center border-b border-gray-200/80 pb-2">
+                        <span className="font-black text-sm text-emerald-950">
+                          📅 {formatDate(rec.date)}
                         </span>
-                      </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full text-[11px]">
+                            {rec.growth_stage || '作業完了'}
+                          </span>
 
-                      {item.originalQuestion && (
-                        <div className="text-[11px] text-gray-600 bg-white/70 p-2.5 rounded-xl border border-amber-200/60 font-medium">
-                          <span className="text-[10px] text-amber-900 font-bold block mb-0.5">📌 対象の相談・質問:</span>
-                          <p className="line-clamp-2 leading-relaxed">{item.originalQuestion}</p>
+                          {/* 🌟 承認待ち以外の場合のみ「✏️ 編集」「🗑️ 削除」を表示 🌟 */}
+                          {currentBed.status !== 'completed_pending' && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditModal(rec)}
+                                className="px-2 py-1 bg-gray-200 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 rounded-lg text-[10px] font-extrabold transition"
+                              >
+                                ✏️ 編集
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRecord(rec.id)}
+                                className="px-2 py-1 bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-700 rounded-lg text-[10px] font-extrabold transition"
+                              >
+                                🗑️ 削除
+                              </button>
+                            </>
+                          )}
                         </div>
-                      )}
-
-                      <div className="bg-white p-3.5 rounded-xl border border-amber-200 text-gray-900 font-medium leading-relaxed whitespace-pre-wrap text-xs shadow-2xs">
-                        {item.replyContent}
                       </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1 text-[11px]">
+                        <div>
+                          <span className="text-gray-400">草丈: </span>
+                          <span className="text-gray-800 font-black">{rec.height_cm || 75} cm</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">実施内容: </span>
+                          <span className="text-emerald-900 font-black">
+                            {rec.work_types?.join(', ') || '観察・手入れ'}
+                          </span>
+                        </div>
+                        {rec.harvest_amount && (
+                          <div className="text-amber-800 font-black">
+                            <span>成果: </span>
+                            <span>{formatHarvestAmount(rec.harvest_amount)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="bg-white p-3 rounded-xl border text-gray-800 font-medium leading-relaxed">
+                        {rec.notes}
+                      </p>
                     </div>
                   </div>
                 );
-              }
+              })}
+            </div>
+          )}
 
-              const rec = item.record;
-              return (
-                <div key={rec.id} className="relative group">
-                  <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-emerald-600 border-4 border-white shadow-xs group-hover:scale-125 transition"></div>
-
-                  <div className="bg-gray-50/90 p-4 rounded-2xl border border-gray-200 shadow-2xs hover:shadow-md transition space-y-2 text-xs font-bold text-gray-700">
-                    <div className="flex justify-between items-center border-b border-gray-200/80 pb-2">
-                      <span className="font-black text-sm text-emerald-950">
-                        📅 {formatDate(rec.date)}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full text-[11px]">
-                          {rec.growth_stage || "作業完了"}
-                        </span>
-
-                        {/* 🌟 承認待ち以外の場合のみ「✏️ 編集」「🗑️ 削除」を表示 🌟 */}
-                        {currentBed.status !== "completed_pending" && (
-                          <>
-                            <button
-                              onClick={() => handleOpenEditModal(rec)}
-                              className="px-2 py-1 bg-gray-200 hover:bg-emerald-100 text-gray-700 hover:text-emerald-900 rounded-lg text-[10px] font-extrabold transition"
-                            >
-                              ✏️ 編集
-                            </button>
-                            <button
-                              onClick={() => handleDeleteRecord(rec.id)}
-                              className="px-2 py-1 bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-700 rounded-lg text-[10px] font-extrabold transition"
-                            >
-                              🗑️ 削除
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1 text-[11px]">
-                      <div>
-                        <span className="text-gray-400">草丈: </span>
-                        <span className="text-gray-800 font-black">{rec.height_cm || 75} cm</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">実施内容: </span>
-                        <span className="text-emerald-900 font-black">{rec.work_types?.join(", ") || "観察・手入れ"}</span>
-                      </div>
-                      {rec.harvest_amount && (
-                        <div className="text-amber-800 font-black">
-                          <span>成果: </span>
-                          <span>{formatHarvestAmount(rec.harvest_amount)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <p className="bg-white p-3 rounded-xl border text-gray-800 font-medium leading-relaxed">
-                      {rec.notes}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 🌟 畝観察ノートの下に移設した「気づきメモ・講師への報告」 🌟 */}
-        <div className="pt-4 border-t border-gray-200 space-y-2">
-          <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
-            <span>📝 気づきメモ・講師への報告</span>
-            <span className="text-[11px] text-gray-400 font-normal">（畝 #{currentBed.bed_number} の状況も踏まえて講師へ送信）</span>
-          </h4>
-          <div className="space-y-2">
-            <textarea
-              value={newJournal || ""}
-              onChange={(e) => setNewJournal && setNewJournal(e.target.value)}
-              placeholder={`畝 ${currentBed.bed_number} (${currentBed.crop_name || "作物"}) についての気づきや相談、講師への日誌メモを入力...`}
-              rows={3}
-              className="w-full p-3 rounded-2xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs font-medium leading-relaxed"
-            />
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onAddJournal}
-                disabled={!newJournal || !newJournal.trim()}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition shadow-xs flex items-center gap-1.5 ${
-                  newJournal && newJournal.trim()
-                    ? "bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
-              >
-                <span>✉️ 講師へメモを送信</span>
-              </button>
+          {/* 🌟 畝観察ノートの下に移設した「気づきメモ・講師への報告」 🌟 */}
+          <div className="pt-4 border-t border-gray-200 space-y-2">
+            <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+              <span>📝 気づきメモ・講師への報告</span>
+              <span className="text-[11px] text-gray-400 font-normal">
+                （畝 #{currentBed.bed_number} の状況も踏まえて講師へ送信）
+              </span>
+            </h4>
+            <div className="space-y-2">
+              <textarea
+                value={newJournal || ''}
+                onChange={(e) => setNewJournal && setNewJournal(e.target.value)}
+                placeholder={`畝 ${currentBed.bed_number} (${currentBed.crop_name || '作物'}) についての気づきや相談、講師への日誌メモを入力...`}
+                rows={3}
+                className="w-full p-3 rounded-2xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs font-medium leading-relaxed"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={onAddJournal}
+                  disabled={!newJournal || !newJournal.trim()}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition shadow-xs flex items-center gap-1.5 ${
+                    newJournal && newJournal.trim()
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <span>✉️ 講師へメモを送信</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       ) : (
         <div className="bg-white/90 p-8 rounded-3xl border border-dashed border-emerald-300 text-center space-y-2 text-gray-500 shadow-2xs">
           <span className="text-3xl">👆</span>
@@ -920,32 +995,44 @@ export default function StudentFarmRecordView({
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-gray-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-black text-gray-900 text-base flex items-center gap-2">
-                <span>{editingRecord ? "✏️ 過去の観察記録を編集" : "📝 観察ノート・作業結果の登録"}</span>
+                <span>
+                  {editingRecord ? '✏️ 過去の観察記録を編集' : '📝 観察ノート・作業結果の登録'}
+                </span>
               </h3>
-              <button onClick={() => setShowInputModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
+              <button
+                onClick={() => setShowInputModal(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmitRecord} onPaste={handlePaste} className="space-y-4 text-xs font-bold">
+            <form
+              onSubmit={handleSubmitRecord}
+              onPaste={handlePaste}
+              className="space-y-4 text-xs font-bold"
+            >
               <div>
                 <label className="block text-gray-700 mb-1">対象の畝(ベッド) *</label>
                 <select
-                  value={selectedBedId || activeBeds[0]?.id || ""}
+                  value={selectedBedId || activeBeds[0]?.id || ''}
                   onChange={(e) => setSelectedBedId(e.target.value)}
                   disabled={!!editingRecord}
                   className="w-full p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-sm"
                 >
                   {activeBeds.map((b) => (
                     <option key={b.id} value={b.id}>
-                      畝 {b.bed_number} {b.crop_name && b.crop_name !== "未確定 🌱" ? `(${b.crop_name})` : ""}
+                      畝 {b.bed_number}{' '}
+                      {b.crop_name && b.crop_name !== '未確定 🌱' ? `(${b.crop_name})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-1">栽培中の作物品種 (自由入力・変更可)</label>
+                <label className="block text-gray-700 mb-1">
+                  栽培中の作物品種 (自由入力・変更可)
+                </label>
                 <input
                   type="text"
                   placeholder="例: 桃太郎トマト、メークイン、中玉トマト"
@@ -973,17 +1060,22 @@ export default function StudentFarmRecordView({
                     className="w-full p-2 text-xs border border-gray-300 rounded-xl bg-gray-50 font-bold"
                   />
                   <p className="text-[10px] text-gray-400 font-medium">
-                    💡 端末の写真選択のほか、画像をコピーしてこの画面で貼り付け（Ctrl+V）やドラッグ＆ドロップも可能です。
+                    💡
+                    端末の写真選択のほか、画像をコピーしてこの画面で貼り付け（Ctrl+V）やドラッグ＆ドロップも可能です。
                   </p>
                   {imageUrl && (
                     <div className="mt-2 flex items-center gap-3">
                       <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-sm shrink-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={imageUrl} alt="添付写真プレビュー" className="w-full h-full object-cover" />
+                        <img
+                          src={imageUrl}
+                          alt="添付写真プレビュー"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <button
                         type="button"
-                        onClick={() => setImageUrl("")}
+                        onClick={() => setImageUrl('')}
                         className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 text-[11px] font-bold transition cursor-pointer"
                       >
                         ✕ 画像を解除
@@ -1003,8 +1095,8 @@ export default function StudentFarmRecordView({
                       onClick={() => setSelectedStage(stg)}
                       className={`p-2.5 rounded-xl border text-[11px] font-extrabold transition ${
                         selectedStage === stg
-                          ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
-                          : "bg-gray-50 text-gray-700 border-gray-200"
+                          ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs'
+                          : 'bg-gray-50 text-gray-700 border-gray-200'
                       }`}
                     >
                       {stg}
@@ -1035,11 +1127,12 @@ export default function StudentFarmRecordView({
                         onClick={() => handleToggleWork(wk)}
                         className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
                           isChecked
-                            ? "bg-amber-500 text-amber-950 border-amber-600 font-black"
-                            : "bg-gray-50 text-gray-600 border-gray-200"
+                            ? 'bg-amber-500 text-amber-950 border-amber-600 font-black'
+                            : 'bg-gray-50 text-gray-600 border-gray-200'
                         }`}
                       >
-                        {isChecked ? "✓ " : ""}{wk}
+                        {isChecked ? '✓ ' : ''}
+                        {wk}
                       </button>
                     );
                   })}
@@ -1056,8 +1149,6 @@ export default function StudentFarmRecordView({
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-xs"
                 />
               </div>
-
-              
 
               <div>
                 <label className="block text-gray-700 mb-1">観察ノート・感想 *</label>
@@ -1077,14 +1168,14 @@ export default function StudentFarmRecordView({
                 <label className="flex items-center space-x-2 font-black text-amber-950 text-xs cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={notes.includes("❗ [相談]")}
+                    checked={notes.includes('❗ [相談]')}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        if (!notes.includes("❗ [相談]")) {
-                          setNotes("❗ [相談] " + notes);
+                        if (!notes.includes('❗ [相談]')) {
+                          setNotes('❗ [相談] ' + notes);
                         }
                       } else {
-                        setNotes(notes.replace("❗ [相談] ", "").replace("❗ [相談]", ""));
+                        setNotes(notes.replace('❗ [相談] ', '').replace('❗ [相談]', ''));
                       }
                     }}
                     className="w-4 h-4 text-amber-600 rounded"
@@ -1109,11 +1200,15 @@ export default function StudentFarmRecordView({
                   disabled={isSubmittingRecord}
                   className={`px-6 py-2.5 font-black rounded-xl shadow-md transition ${
                     isSubmittingRecord
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-amber-500 hover:bg-amber-600 text-amber-950 cursor-pointer active:scale-[0.98]"
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-amber-500 hover:bg-amber-600 text-amber-950 cursor-pointer active:scale-[0.98]'
                   }`}
                 >
-                  {isSubmittingRecord ? "登録中..." : editingRecord ? "変更内容を更新する" : "結果を登録する"}
+                  {isSubmittingRecord
+                    ? '登録中...'
+                    : editingRecord
+                      ? '変更内容を更新する'
+                      : '結果を登録する'}
                 </button>
               </div>
             </form>
@@ -1129,9 +1224,11 @@ export default function StudentFarmRecordView({
         onComplete={async (details) => {
           if (currentBed && myPlot) {
             // 即時ローカルロック（UI即座切り替え）
-            
+
             await completeBedCrop(myPlot.id || myPlot.code, currentBed.id, details);
-            setToastMessage(`🎉 畝 ${currentBed.bed_number} の収穫完了報告を講師へ送信しました！講師の承認をお待ちください。`);
+            setToastMessage(
+              `🎉 畝 ${currentBed.bed_number} の収穫完了報告を講師へ送信しました！講師の承認をお待ちください。`
+            );
             setShowToast(true);
           }
         }}
