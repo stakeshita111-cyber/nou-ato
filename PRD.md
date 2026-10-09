@@ -248,7 +248,7 @@ CREATE TABLE public.reservations (
 3. **✏️ 過去ログの「編集」＆「🗑️ 削除」【実装済 ✅】**:
    - 「✏️ 編集」ボタンで過去ログの上書き更新 (Supabase UPDATE)。
    - 「🗑️ 削除」ボタンで誤投稿データの削除 (Supabase DELETE)。
-4. **📖 クエスト・完了報告モーダル (`TaskDetailModel`)【実装済 ✅】**:
+4. **📖 クエスト・完了報告モーダル (`TaskDetailModal`)【実装済 ✅】**:
    - クエスト完了時に対象畝(ベッド)を選択、草丈、作業内容、現場写真、観察ノートを添付送信。
    - 畝の栽培完了報告（`BedCompletionModal`）から講師への修了承認申請フロー。
 5. **🤖 AI相棒「しるべぇ」リアルタイム相談トーク (`StudentTalkView`)【実装済 ✅】**:

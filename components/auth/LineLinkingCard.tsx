@@ -35,7 +35,13 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
     };
   }, [supabase]);
 
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+
   const handleLinkLine = async () => {
+    if (isLineDisabled) {
+      setMessage("💡 LINEアカウント連携機能は現在準備中です。");
+      return;
+    }
     setLoading(true);
     setMessage("");
     try {
@@ -49,13 +55,14 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
       });
 
       if (error) {
-        setMessage(`連携失敗: ${error.message}`);
+        console.error("LINE link identity error:", error);
+        setMessage("💡 LINEアカウント連携機能は現在準備中です（未設定環境）。");
       } else if (data?.url) {
         window.location.href = data.url;
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      setMessage(`エラーが発生しました: ${msg}`);
+      console.error("LINE link identity exception:", err);
+      setMessage("💡 LINEアカウント連携機能は現在準備中です（未設定環境）。");
     } finally {
       setLoading(false);
     }
@@ -108,12 +115,14 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
         {isLinked !== null && (
           <span
             className={`text-xs px-3 py-1 rounded-full font-bold ${
-              isLinked
+              isLineDisabled
+                ? "bg-amber-100 text-amber-800"
+                : isLinked
                 ? "bg-green-100 text-green-800"
                 : "bg-gray-100 text-gray-600"
             }`}
           >
-            {isLinked ? "連携済み" : "未連携"}
+            {isLineDisabled ? "準備中" : isLinked ? "連携済み" : "未連携"}
           </span>
         )}
       </div>
@@ -138,11 +147,15 @@ export default function LineLinkingCard({ onStatusChange }: LineLinkingCardProps
           <button
             type="button"
             onClick={handleLinkLine}
-            disabled={loading}
-            className="w-full py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-2"
+            disabled={loading || isLineDisabled}
+            className={`w-full py-2.5 font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-2 ${
+              isLineDisabled
+                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+            }`}
           >
             <span>💬</span>
-            <span>{loading ? "LINEへ移動中..." : "LINEアカウントと連携する"}</span>
+            <span>{isLineDisabled ? "LINE連携 (準備中)" : loading ? "LINEへ移動中..." : "LINEアカウントと連携する"}</span>
           </button>
         )}
       </div>
