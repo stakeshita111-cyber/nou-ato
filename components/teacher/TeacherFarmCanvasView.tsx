@@ -391,7 +391,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     });
 
     setPlots(updatedPlots);
-    localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
     await savePlotsGridIndicesToSupabase(updatedPlots);
 
     // 🌟 過去の crop_records の bed_id を一時退避経由で安全にスワップ書き換え (ID衝突ゼロ) 🌟
@@ -520,7 +519,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     });
 
     setPlots(updatedPlots);
-    localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
     await savePlotsGridIndicesToSupabase(updatedPlots, {
       cols: newCols,
       rows: gridRows,
@@ -620,7 +618,6 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
     });
 
     setPlots(updatedPlots);
-    localStorage.setItem("nouato_farm_plots", JSON.stringify(updatedPlots));
     await savePlotsGridIndicesToSupabase(updatedPlots, {
       cols: gridCols,
       rows: newRows,
