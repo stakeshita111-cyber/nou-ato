@@ -6,7 +6,6 @@ import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
 export default function TeacherSignUpPage() {
-
   // フォームステート
   const [farmName, setFarmName] = useState("");
   const [teacherName, setTeacherName] = useState("");
@@ -85,61 +84,30 @@ export default function TeacherSignUpPage() {
         return;
       }
 
-      // 2. farms テーブルに農園情報保存 (UUID形式)
-      const farmId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined;
-      const farmPayload: { id?: string; name: string; owner_id: string } = {
-        name: farmName.trim(),
-        owner_id: userId,
-      };
-      if (farmId) {
-        farmPayload.id = farmId;
-      }
+      // 2. 表示名の更新
+      await supabase.from("users").update({ display_name: teacherName.trim() }).eq("id", userId);
 
-      const { data: insertedFarm, error: farmError } = await supabase
-        .from("farms")
-        .insert([farmPayload])
-        .select("id")
-        .single();
+      // 3. Postgres 関数 register_teacher (SECURITY DEFINER) を呼び出して講師昇格 & 農園開設
+      const { data: rpcResult, error: rpcError } = await supabase.rpc("register_teacher", {
+        farm_name: farmName.trim(),
+      });
 
-      if (farmError) {
-        console.error("farms table insert error:", farmError);
-        setToastMessage(`農園の作成に失敗しました: ${farmError.message}`);
+      if (rpcError) {
+        console.error("register_teacher error:", rpcError);
+        setToastMessage(`講師登録に失敗しました: ${rpcError.message}`);
         setShowToast(true);
         setLoading(false);
         return;
       }
 
-      const assignedFarmId = insertedFarm?.id || farmId;
-      if (!assignedFarmId) {
-        setToastMessage("農園IDの発行に失敗しました。再度お試しください。");
-        setShowToast(true);
-        setLoading(false);
-        return;
-      }
-
-      // 3. users テーブルに講師情報保存 (role: 'teacher' と UUID farm_id)
-      const { error: userError } = await supabase.from("users").upsert([
-        {
-          id: userId,
-          email: email.trim(),
-          display_name: teacherName.trim(),
-          role: "teacher",
-          farm_id: assignedFarmId,
-        },
-      ], { onConflict: "id" });
-
-      if (userError) {
-        console.error("users table upsert error:", userError);
-        setToastMessage(`講師プロフィールの保存に失敗しました: ${userError.message}`);
-        setShowToast(true);
-        setLoading(false);
-        return;
-      }
+      const createdFarmId = rpcResult?.farm_id;
 
       if (typeof window !== "undefined") {
         localStorage.setItem("nouato_owner_name", teacherName.trim());
         localStorage.setItem("nouato_current_farm_name", farmName.trim());
-        localStorage.setItem("nouato_active_farm_id", assignedFarmId);
+        if (createdFarmId) {
+          localStorage.setItem("nouato_active_farm_id", createdFarmId);
+        }
       }
 
       setToastMessage("🎉 講師アカウントおよび農場を開設しました！ダッシュボードへ移動します");
@@ -196,7 +164,7 @@ export default function TeacherSignUpPage() {
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       <div className="w-full max-w-[420px] bg-white rounded-3xl shadow-xl border border-gray-200/90 p-8 space-y-6 animate-fade-in">
-        {/* ロゴ ＆ タイトル (デザインモックに完全一致) */}
+        {/* ロゴ ＆ タイトル */}
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-black text-[#1c4d21] tracking-tight">NOU-ATO</h1>
           <p className="text-xs text-gray-500 font-bold">講師アカウント作成</p>
@@ -305,7 +273,7 @@ export default function TeacherSignUpPage() {
           </button>
         </form>
 
-        {/* フッターリンク (すでにアカウントをお持ちですか？ ログイン) */}
+        {/* フッターリンク */}
         <div className="pt-2 text-center text-xs font-medium text-gray-500">
           すでにアカウントをお持ちですか？{" "}
           <Link href="/login" className="text-[#1c4d21] font-bold hover:underline">

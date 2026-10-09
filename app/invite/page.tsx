@@ -7,20 +7,13 @@ import type { Provider } from "@supabase/supabase-js";
 import Toast from "@/components/ui/Toast";
 import Link from "next/link";
 
-interface FarmOption {
-  id: string;
-  name: string;
-  owner_name?: string;
-}
-
 function InviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const farmIdParam = searchParams.get("farm_id");
+  const farmIdParam = searchParams.get("farm_id") || searchParams.get("code");
 
   // 農園選択・情報
-  const [farmsList, setFarmsList] = useState<FarmOption[]>([]);
-  const [selectedFarmId, setSelectedFarmId] = useState<string>(farmIdParam || "tanaka_farm");
+  const [selectedFarmId, setSelectedFarmId] = useState<string>(farmIdParam || "");
   const [farmName, setFarmName] = useState("たなか自然農園 (体験デモ)");
   const [teacherName, setTeacherName] = useState("田中 太郎");
   const [isDemo, setIsDemo] = useState(!farmIdParam);
@@ -35,29 +28,30 @@ function InviteContent() {
   const [showToast, setShowToast] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Supabase から農園・講師情報をリアルタイム取得
+  // 特定の農園情報を取得 (未ログイン時にも農園一覧全件取得を行わないようセキュリティ向上)
   useEffect(() => {
-    const fetchFarmsAndCurrent = async () => {
+    const fetchCurrentFarm = async () => {
       try {
-        // 1. 全登録農園リストの取得
-        const { data: dbFarms } = await supabase.from("farms").select("*");
-
-        if (dbFarms && dbFarms.length > 0) {
-          const formattedFarms: FarmOption[] = (dbFarms as Array<{ id: string; name?: string | null; owner_name?: string | null }>).map((f) => ({
-            id: f.id,
-            name: f.name || "自然農園",
-            owner_name: f.owner_name || "講師",
-          }));
-          setFarmsList(formattedFarms);
-        }
-
-        // 2. URLパラメータ指定の農園を直検索 (最優先)
         if (farmIdParam) {
-          const { data: farm, error: farmErr } = await supabase
+          // IDによる直検索
+          let { data: farm, error: farmErr } = await supabase
             .from("farms")
-            .select("*")
+            .select("id, name, owner_id, owner_name, invite_code")
             .eq("id", farmIdParam)
             .single();
+
+          if (farmErr || !farm) {
+            // invite_code での検索を試行
+            const { data: farmByCode, error: codeErr } = await supabase
+              .from("farms")
+              .select("id, name, owner_id, owner_name, invite_code")
+              .eq("invite_code", farmIdParam)
+              .single();
+            if (!codeErr && farmByCode) {
+              farm = farmByCode;
+              farmErr = null;
+            }
+          }
 
           if (!farmErr && farm) {
             setFarmName(farm.name || "自然農園");
@@ -66,7 +60,7 @@ function InviteContent() {
 
             let teacherDisplayName = farm.owner_name || "";
 
-            // owner_id があれば users テーブルからお名前を取得
+            // owner_id があれば users テーブルから表示名を取得
             if (!teacherDisplayName && farm.owner_id) {
               const { data: ownerUser } = await supabase
                 .from("users")
@@ -81,56 +75,22 @@ function InviteContent() {
               }
             }
 
-            // それでも取得できない場合、DB上の講師ユーザー (role = 'teacher') を検索
-            if (!teacherDisplayName) {
-              const { data: teacherUser } = await supabase
-                .from("users")
-                .select("display_name, email")
-                .eq("role", "teacher")
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .single();
-
-              if (teacherUser?.display_name) {
-                teacherDisplayName = teacherUser.display_name;
-              } else if (teacherUser?.email) {
-                teacherDisplayName = teacherUser.email.split("@")[0];
-              }
-            }
-
-            setTeacherName(teacherDisplayName || "");
+            setTeacherName(teacherDisplayName || "講師");
             return;
           }
         }
 
-        // 指定がない場合、または見つからない場合はデモ設定
+        // URLに農園ID指定がない、または該当なしの場合はデモ設定
         setFarmName("たなか自然農園 (体験デモ)");
         setTeacherName("田中 太郎");
         setIsDemo(true);
       } catch (err) {
-        console.error("fetchFarmsAndCurrent error:", err);
+        console.error("fetchCurrentFarm error:", err);
       }
     };
 
-    fetchFarmsAndCurrent();
+    fetchCurrentFarm();
   }, [farmIdParam]);
-
-  // 手動で所属農園を切り替えた場合
-  const handleFarmSelectChange = (farmId: string) => {
-    setSelectedFarmId(farmId);
-    if (farmId === "tanaka_farm") {
-      setFarmName("たなか自然農園 (体験デモ)");
-      setTeacherName("田中 太郎");
-      setIsDemo(true);
-    } else {
-      const selected = farmsList.find((f) => f.id === farmId);
-      if (selected) {
-        setFarmName(selected.name);
-        setTeacherName(selected.owner_name || "講師");
-        setIsDemo(false);
-      }
-    }
-  };
 
   const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
 
@@ -196,22 +156,7 @@ function InviteContent() {
     setLoading(true);
 
     try {
-      // 参加先農園IDの厳格解決 (デモUUIDフォールバックを完全撤廃)
-      let targetFarmId = selectedFarmId;
-      if (!targetFarmId || targetFarmId === "tanaka_farm") {
-        if (farmIdParam) {
-          targetFarmId = farmIdParam;
-        } else if (farmsList.length > 0) {
-          targetFarmId = farmsList[0].id;
-        }
-      }
-
-      if (!targetFarmId || targetFarmId === "tanaka_farm") {
-        setToastMessage("参加する農園を選択してください");
-        setShowToast(true);
-        setLoading(false);
-        return;
-      }
+      const targetFarmId = selectedFarmId || farmIdParam || "";
 
       // 1. まずログインを試行
       const { data: signInData, error: loginError } = await supabase.auth.signInWithPassword({
@@ -219,18 +164,9 @@ function InviteContent() {
         password,
       });
 
-      if (!loginError && signInData.user) {
-        // ログイン成功時は農園IDと名前を補正更新
-        await supabase.from("users").upsert([
-          {
-            id: signInData.user.id,
-            email: email.trim(),
-            display_name: name.trim() || signInData.user.email?.split("@")[0] || "受講生",
-            role: "student",
-            farm_id: targetFarmId,
-          },
-        ], { onConflict: "id" });
-      } else {
+      let userId = signInData?.user?.id;
+
+      if (loginError || !userId) {
         // 未登録（または初回）の場合は新規アカウント登録
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
@@ -248,20 +184,26 @@ function InviteContent() {
           return;
         }
 
-        const userId = authData?.user?.id || `user_${Date.now()}`;
-        await supabase.from("users").upsert([
-          {
-            id: userId,
-            email: email.trim(),
-            display_name: name.trim(),
-            role: "student",
-            farm_id: targetFarmId,
-          },
-        ], { onConflict: "id" });
+        userId = authData?.user?.id;
       }
 
-      if (selectedFarmId) {
-        localStorage.setItem("nouato_invite_farm_id", selectedFarmId);
+      if (userId) {
+        // 表示名の更新
+        if (name.trim()) {
+          await supabase.from("users").update({ display_name: name.trim() }).eq("id", userId);
+        }
+
+        // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を呼び出し)
+        if (targetFarmId && targetFarmId !== "tanaka_farm") {
+          const { error: joinErr } = await supabase.rpc("join_farm", { invite_code: targetFarmId });
+          if (joinErr) {
+            console.error("join_farm error:", joinErr);
+          }
+        }
+      }
+
+      if (targetFarmId) {
+        localStorage.setItem("nouato_invite_farm_id", targetFarmId);
       }
 
       setToastMessage(`🎉 「${farmName}」への参加登録が完了しました！`);
@@ -284,7 +226,7 @@ function InviteContent() {
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       <div className="w-full max-w-[390px] bg-white rounded-3xl shadow-xl border border-gray-200/90 overflow-hidden animate-fade-in">
-        {/* 動的農園招待バナー (招待された農園名「〇〇農園へようこそ！」を表示) */}
+        {/* 動的農園招待バナー */}
         <div className="relative h-48 w-full bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80')` }}>
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent flex flex-col justify-end p-5 text-white">
             <div className="flex items-center gap-1.5 mb-0.5">
@@ -309,27 +251,6 @@ function InviteContent() {
 
         {/* コンテンツ本文 */}
         <div className="p-6 space-y-5">
-          {/* 農園選択ドロップダウン (URL招待でない場合、実在の農園を選択可能) */}
-          {!farmIdParam && farmsList.length > 0 && (
-            <div className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-2xl space-y-1">
-              <label className="block text-[11px] font-bold text-emerald-950">
-                🌱 参加する農園を選択
-              </label>
-              <select
-                value={selectedFarmId}
-                onChange={(e) => handleFarmSelectChange(e.target.value)}
-                className="w-full p-2 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-gray-800 focus:outline-none"
-              >
-                <option value="tanaka_farm">たなか自然農園 (体験デモ)</option>
-                {farmsList.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.owner_name} 先生)
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* キャッチコピー */}
           <div className="text-center space-y-0.5">
             <h3 className="font-black text-gray-900 text-sm">農園に参加する</h3>
