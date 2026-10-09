@@ -1134,7 +1134,7 @@ export function useFarmManager() {
     localStorage.setItem("nouato_farm_plots", JSON.stringify(nextPlots));
 
     try {
-      await supabase.from("farm_beds").upsert({
+      const { error: bedErr } = await supabase.from("farm_beds").upsert({
         id: newBedId,
         plot_id: targetPlot.id,
         bed_number: String(nextNum),
@@ -1145,8 +1145,12 @@ export function useFarmManager() {
         student_name: targetPlot.student_name || null,
         progress_percent: 0,
       });
+      if (bedErr) throw bedErr;
     } catch (e) {
       console.error("farm_beds addBedToPlot upsert error:", e);
+      if (typeof window !== "undefined") {
+        alert("畝の追加保存に失敗しました。通信環境を確認して再度お試しください。");
+      }
     }
 
     notifyBroadcast();

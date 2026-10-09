@@ -136,6 +136,10 @@ export default function TaskDetailModel({
     let finalPhotoUrl = photoPreview;
     if (photoPreview && photoPreview.startsWith("data:")) {
       finalPhotoUrl = await uploadImageToStorage(photoPreview, "tasks");
+      if (!finalPhotoUrl) {
+        alert("画像のアップロードに失敗しました。通信環境を確認して再度お試しください。");
+        return;
+      }
     }
 
     const targetBed = myBeds.find((b) => b.id === selectedBedId) || myBeds[0];

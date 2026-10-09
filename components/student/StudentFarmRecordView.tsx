@@ -209,6 +209,11 @@ export default function StudentFarmRecordView({
       let finalImageUrl = imageUrl;
       if (imageUrl && imageUrl.startsWith("data:")) {
         finalImageUrl = await uploadImageToStorage(imageUrl, "records");
+        if (!finalImageUrl) {
+          alert("画像のアップロードに失敗しました。通信環境を確認して再度お試しください。");
+          setIsSubmittingRecord(false);
+          return;
+        }
       }
 
       // 🌟 生徒が入力した品種名 (未入力時は既存品種を引き継ぐ) 🌟

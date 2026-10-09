@@ -460,10 +460,12 @@ export function useStudentDashboard() {
     try {
       const cleanT = (taskTitle || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
 
-      const { data: userSts } = await supabase
+      const { data: userSts, error: fetchErr } = await supabase
         .from("student_tasks")
         .select("id, title")
         .eq("student_id", currentStudentId);
+
+      if (fetchErr) throw fetchErr;
 
       let found = false;
       if (userSts && userSts.length > 0) {
@@ -524,10 +526,12 @@ export function useStudentDashboard() {
     try {
       const cleanT = (taskTitle || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "");
 
-      const { data: userSts } = await supabase
+      const { data: userSts, error: fetchErr } = await supabase
         .from("student_tasks")
         .select("id, title")
         .eq("student_id", currentStudentId);
+
+      if (fetchErr) throw fetchErr;
 
       let found = false;
       if (userSts && userSts.length > 0) {

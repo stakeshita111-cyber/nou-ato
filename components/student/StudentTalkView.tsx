@@ -159,6 +159,8 @@ export default function StudentTalkView({
         timestamp: "現在",
       });
 
+      const seenMsgIds = new Set<string>();
+
       (targetList || []).forEach((j: any) => {
         const c = (j.content || "").trim();
 
@@ -183,24 +185,32 @@ export default function StudentTalkView({
         }
 
         if (j.content) {
-          formatted.push({
-            id: "q_" + j.id,
-            sender: "student",
-            text: j.content,
-            timestamp: j.created_at
-              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-              : (j.date || "過去のメッセージ"),
-          });
+          const qId = "q_" + j.id;
+          if (!seenMsgIds.has(qId)) {
+            seenMsgIds.add(qId);
+            formatted.push({
+              id: qId,
+              sender: "student",
+              text: j.content,
+              timestamp: j.created_at
+                ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+                : (j.date || "過去のメッセージ"),
+            });
+          }
         }
         if (j.reply) {
-          formatted.push({
-            id: "a_" + j.id,
-            sender: "teacher",
-            text: j.reply,
-            timestamp: j.created_at
-              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-              : (j.date || "回答済み"),
-          });
+          const aId = "a_" + j.id;
+          if (!seenMsgIds.has(aId)) {
+            seenMsgIds.add(aId);
+            formatted.push({
+              id: aId,
+              sender: "teacher",
+              text: j.reply,
+              timestamp: j.created_at
+                ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+                : (j.date || "回答済み"),
+            });
+          }
         }
       });
 
