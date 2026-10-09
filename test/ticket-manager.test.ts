@@ -4,7 +4,9 @@ import {
   getTicketState,
   consumeTicket,
   grantTicket,
+  isSecretTicketSpell,
   addQuestionStock,
+
   getQuestionStock,
   clearQuestionStock,
   formatStockText,
@@ -34,6 +36,13 @@ describe("ticketManager", () => {
   it("returns JST date string in YYYY-MM-DD format", () => {
     const d = getJstDateString();
     expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("returns false for secret ticket spell (deprecated feature)", () => {
+    expect(isSecretTicketSpell("チケットください")).toBe(false);
+    expect(isSecretTicketSpell("ちけっと復活")).toBe(false);
+    expect(isSecretTicketSpell("チケットちょうだい")).toBe(false);
+    expect(isSecretTicketSpell("トマトの育て方を教えて")).toBe(false);
   });
 
   it("initializes default ticket state with 3 tickets", () => {
@@ -81,6 +90,7 @@ describe("ticketManager", () => {
     const grantedAgain = grantTicket("user1", 2);
     expect(grantedAgain.count).toBe(3);
   });
+
 
   it("manages question stocks correctly (add, get, clear, format)", () => {
     addQuestionStock("user1", "ナスに虫がついた");

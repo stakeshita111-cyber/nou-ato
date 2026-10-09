@@ -2,8 +2,8 @@
  * NOU-ATO AI相談チケット管理モジュール
  * - JST 日本時間0時自動リセット
  * - 講師からの受講生追加チケット付与機能（秘密の呪文廃止版）
- * - 将来の「相談し放題（無制限プラン）」や「1日の回数制限変更」に完全対応
- * - 🌟 チケット終了時の「質問ストック・累積メモ」機能（次回コピー用）
+ * - 1日3回制限 (サーバー側 ai_usage 連動)
+ * - 🌟【機能】チケット終了時の「質問ストック・累積メモ」機能（次回コピー用）
  */
 
 export type TicketPlanType = "limited" | "unlimited" | "memo_only";
@@ -34,8 +34,16 @@ export function getJstDateString(): string {
 }
 
 /**
+ * 秘密の呪文判定（廃止のため常に false を返却）
+ */
+export function isSecretTicketSpell(_text: string): boolean {
+  return false;
+}
+
+/**
  * ローカルストレージからチケット情報を取得（JST 0:00 を過ぎていれば自動リセット）
  */
+
 export function getTicketState(
   userId: string = "default",
   customLimit: number = DEFAULT_DAILY_TICKETS,
@@ -208,8 +216,9 @@ export function grantTicket(
   return updated;
 }
 
+
 // ==========================================
-// 🌟【新機能】質問ストック（累積メモ）管理 🌟
+// 🌟【機能】質問ストック（累積メモ）管理 🌟
 // ==========================================
 
 /**
@@ -258,5 +267,5 @@ export function clearQuestionStock(userId: string = "default"): void {
  */
 export function formatStockText(items: string[]): string {
   if (!items || items.length === 0) return "";
-  return items.map((it, i) => `・${it}`).join("\n");
+  return items.map((it) => `・${it}`).join("\n");
 }

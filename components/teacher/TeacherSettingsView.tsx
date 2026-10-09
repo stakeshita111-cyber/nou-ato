@@ -11,6 +11,24 @@ export default function TeacherSettingsView() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // DBから最新の設定値を同期取得
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.showStudentTalkTab !== undefined) {
+            updateSettings({ showStudentTalkTab: data.showStudentTalkTab !== false });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings:", err);
+      }
+    };
+    fetchSettings();
+  }, [updateSettings]);
+
   const handleToggleContrast = (enabled: boolean) => {
     updateSettings({ outdoorHighContrast: enabled });
     setToastMessage(`✨ 高コントラスト表示を ${enabled ? "ON" : "OFF"} に切り替えました！`);

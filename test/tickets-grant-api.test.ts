@@ -1,7 +1,67 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "@/app/api/tickets/grant/route";
 
+const mockSessionUser = { id: "teacher-user-123", email: "teacher@example.com" };
+const mockDbUser = { role: "teacher" };
+
+vi.mock("@/utils/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: mockSessionUser }, error: null })),
+    },
+    from: vi.fn((table: string) => {
+      if (table === "users") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn(async () => ({ data: mockDbUser, error: null })),
+            })),
+          })),
+        };
+      }
+      if (table === "ai_tickets") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { count: 3, granted_count: 0 }, error: null })),
+              })),
+            })),
+          })),
+          upsert: vi.fn(async () => ({ data: null, error: null })),
+        };
+      }
+      return {
+        select: vi.fn(() => ({ eq: vi.fn(() => ({})) })),
+      };
+    }),
+    rpc: vi.fn(async (_fn: string, _args: any) => ({
+      data: [{ count: 4 }],
+      error: null,
+    })),
+  })),
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: mockSessionUser }, error: null })),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({})) })),
+    })),
+    rpc: vi.fn(async () => ({
+      data: [{ count: 4 }],
+      error: null,
+    })),
+  },
+}));
+
 describe("/api/tickets/grant Route Handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("POST validates studentId and returns 400 when missing", async () => {
     const request = new Request("http://localhost/api/tickets/grant", {
       method: "POST",

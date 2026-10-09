@@ -1,68 +1,114 @@
+import { z } from "zod";
 import { generateRagAnswer, ChatHistoryItem, ReferencedQA } from "@/lib/rag/qaKnowledgeRetriever";
+import { getJstDateString } from "@/lib/ticketManager";
 import { createClient } from "@/utils/supabase/server";
 import { ApiResponse } from "@/lib/apiResponse";
 import { logger } from "@/lib/logger";
 
-interface ChatRequestBody {
-  message?: string;
-  studentName?: string;
-  studentId?: string | null;
-  history?: ChatHistoryItem[];
-  isMemoOnly?: boolean;
-}
+const chatRequestBodySchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(1, "メッセージが空です")
+    .max(1000, "メッセージは1000文字以内で入力してください"),
+  studentName: z.string().optional(),
+  isMemoOnly: z.boolean().optional(),
+});
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as ChatRequestBody;
-    const {
-      message,
-      studentName = "受講生",
-      studentId,
-      history = [] as ChatHistoryItem[],
-      isMemoOnly = false, // 🌟 チケット0枚時のメモ専用モード
-    } = body;
+    const rawBody = await request.json().catch(() => ({}));
+    const parseResult = chatRequestBodySchema.safeParse(rawBody);
 
-    if (!message || !message.trim()) {
-      return ApiResponse.badRequest("メッセージが空です");
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
+      return ApiResponse.badRequest(issue?.message || "リクエスト内容が正しくありません");
     }
+
+    const { message, studentName = "受講生", isMemoOnly = false } = parseResult.data;
 
     const supabase = await createClient();
-    
-    // ログイン中の認証ユーザー情報があれば優先利用
-    let effectiveStudentId = studentId;
-    let effectiveStudentName = studentName;
 
-    try {
-      const { data: { user: sessionUser } } = await supabase.auth.getUser();
-      if (sessionUser) {
-        if (!effectiveStudentId) effectiveStudentId = sessionUser.id;
-        if (!effectiveStudentName || effectiveStudentName === "受講生") {
-          effectiveStudentName =
-            sessionUser.user_metadata?.full_name ||
-            sessionUser.user_metadata?.name ||
-            sessionUser.email?.split("@")[0] ||
-            "受講生";
-        }
-      }
-    } catch (authErr) {
-      logger.warn("Auth user resolution in /api/chat/rag:", "api/chat/rag", undefined, authErr);
+    // 1. 多層防御①: 認証ユーザーチェック (未ログインは 401 即時返却)
+    const { data: { user: sessionUser }, error: authErr } = await supabase.auth.getUser();
+
+    if (authErr || !sessionUser) {
+      logger.warn("Unauthorized call to /api/chat/rag", "api/chat/rag", undefined, authErr);
+      return ApiResponse.unauthorized("AI相談機能の利用にはログインが必要です");
     }
 
-    if (!effectiveStudentId) {
-      effectiveStudentId = null;
+    const studentId = sessionUser.id;
+    const effectiveStudentName =
+      sessionUser.user_metadata?.full_name ||
+      sessionUser.user_metadata?.name ||
+      sessionUser.email?.split("@")[0] ||
+      studentName;
+
+    const todayJst = getJstDateString();
+
+    // 2. 多層防御②: サーバー側回数制限 (1日3回制限)
+    if (!isMemoOnly) {
+      const { data: allowed, error: rpcErr } = await supabase.rpc("check_and_increment_ai_usage", {
+        p_user_id: studentId,
+        p_date: todayJst,
+        p_limit: 3,
+      });
+
+      if (rpcErr) {
+        logger.warn("check_and_increment_ai_usage RPC error, falling back to table query", "api/chat/rag", undefined, rpcErr);
+        // フォールバック: テーブルから直接判定＆更新
+        const { data: usageData } = await supabase
+          .from("ai_usage")
+          .select("count")
+          .eq("user_id", studentId)
+          .eq("date", todayJst)
+          .single();
+
+        const currentCount = usageData?.count ?? 0;
+        if (currentCount >= 3) {
+          return ApiResponse.tooManyRequests("本日のAI相談チケット（1日3回）上限に達しました");
+        }
+
+        await supabase.from("ai_usage").upsert({
+          user_id: studentId,
+          date: todayJst,
+          count: currentCount + 1,
+          updated_at: new Date().toISOString(),
+        });
+      } else if (allowed === false) {
+        return ApiResponse.tooManyRequests("本日のAI相談チケット（1日3回）上限に達しました");
+      }
+    }
+
+    // 3. 多層防御③: 会話履歴をブラウザ信頼せず、サーバー側でDB(journals)から最新履歴を取得・構築
+    const { data: dbJournals } = await supabase
+      .from("journals")
+      .select("content, reply, role, created_at")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    const history: ChatHistoryItem[] = [];
+    if (dbJournals && dbJournals.length > 0) {
+      const reversed = [...dbJournals].reverse();
+      for (const j of reversed) {
+        if (j.content) {
+          history.push({ sender: "student", text: j.content });
+        }
+        if (j.reply) {
+          history.push({ sender: "teacher", text: j.reply });
+        }
+      }
     }
 
     let reply = "";
     let referencedQa: ReferencedQA[] = [];
 
-    // 🌟 1. チケット0枚・メモ専用モードの場合 (AIは呼ばずにルールベースで記録) 🌟
     if (isMemoOnly) {
       reply = `📝【質問メモをお預かりしました】🌱\n\n本日のAI相談チケット（1日3回）を使い切ったため、AIによる即時回答はお休みとなります。\nご相談内容は農園ノートに記録しましたので、次回の来園時に講師より詳しくアドバイスいたしますね！\n\n※チケットは毎晩日本時間0:00に復活します✨`;
-    } 
-    // 🌟 2. 通常のAIチケット消費モード (Gemini Flash-Lite + 農園ナレッジ) 🌟
-    else {
+    } else {
       const ragRes = await generateRagAnswer(
-        message.trim(),
+        message,
         effectiveStudentName,
         history
       );
@@ -70,16 +116,17 @@ export async function POST(request: Request) {
       referencedQa = ragRes.referencedQa;
     }
 
-    // Supabase の journals テーブルに対話履歴・質問メモを確実に保存
+    // 4. Supabase の journals テーブルに対話履歴・質問メモを保存 (is_privateフラグ & is_approved: false)
+    const isPrivate = message.startsWith("【非公開相談】");
     try {
       const { error: insertErr } = await supabase.from("journals").insert([
         {
-          student_id: effectiveStudentId,
-          content: message.trim(),
-          // メモ専用の場合は講師の対応待ちとするため、replyをnullにして講師未回答扱いにする（生徒画面には上記案内を即時表示）
+          student_id: studentId,
+          content: message,
           reply: isMemoOnly ? null : reply,
           role: "student",
-          is_approved: false, // デフォルトで未承認
+          is_private: isPrivate,
+          is_approved: false, // 承認不可制約により is_private が true の場合は承認不可を保障
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
