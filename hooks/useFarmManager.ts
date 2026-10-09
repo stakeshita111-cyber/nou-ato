@@ -677,17 +677,25 @@ export function useFarmManager() {
 
     setPlots(nextPlots);
 
-    await insertBedDb({
-      id: newBedId,
-      plot_id: targetPlot.id,
-      bed_number: String(nextNum),
-      crop_name: "未確定 🌱",
-      status: "active",
-      season: "2026年 秋冬",
-      student_id: targetPlot.student_id || null,
-      student_name: targetPlot.student_name || null,
-      progress_percent: 0,
-    });
+    try {
+      await insertBedDb({
+        id: newBedId,
+        plot_id: targetPlot.id,
+        bed_number: String(nextNum),
+        crop_name: "未確定 🌱",
+        status: "active",
+        season: "2026年 秋冬",
+        student_id: targetPlot.student_id || null,
+        student_name: targetPlot.student_name || null,
+        progress_percent: 0,
+      });
+    } catch (e) {
+      console.error("farm_beds addBedToPlot upsert error:", e);
+      if (typeof window !== "undefined") {
+        alert("畝の追加保存に失敗しました。通信環境を確認して再度お試しください。");
+      }
+    }
+
 
     notifyBroadcast();
     return newBed;

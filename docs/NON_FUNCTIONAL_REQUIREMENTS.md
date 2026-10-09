@@ -36,8 +36,10 @@
 - **Supabase Auth & Session Management**:
   - JWT (JSON Web Token) ベースのセキュアな認証。HTTP-only Cookie 運用。
   - Middleware による受講生・講師ロール判定と不正アクセス即時リダイレクト。
-- **Row Level Security (RLS)**:
+- **Row Level Security (RLS) & Supabase Security Advisor 監査全件適合**:
   - 全テーブルで RLS を有効化（`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`）。
+  - 全 PostgreSQL ビュー (`farm_beds_with_students` 等) に `security_invoker = true` (`security_invoker = on`) を適用し、ビュー経由の Definer 権限 RLS バイパスを完全に遮断。受講生アカウントによる他生徒のメールアドレス閲覧を防止。
+  - すべての `SECURITY DEFINER` 関数で `SET search_path = public` を明示設定し、search_path 乗っ取り脆弱性を排除。
   - 受講生は自身の割当畝・日誌のみ操作可能。他者の個人情報アクセスをDB層で遮断。
   - 論理退会済みユーザー (`deleted_at IS NOT NULL`) のアクセスを全テーブルで拒絶。
 
@@ -48,12 +50,16 @@
 - **機密情報保護**:
   - APIキー、トークンはサーバー側環境変数 (`.env.local`) で管理。構造化ロガーで自動マスキング処理。
 
-### 3.3 レート制限 (Rate Limiting) & 乱用防止
+### 3.3 レート制限 (Rate Limiting) & コスト防衛 (Cost Defense)
 - **AI 相談チケット制**:
   - 1人あたり 1日3回 のチケット制限（深夜0:00リセット）。
   - チケット枯渇時は即座にメモ専用モードへ切り替え、無制限なLLM API呼び出しを防止。
 - **リクエスト頻度制御**:
   - ナレッジ照合API (`/api/chat/check-knowledge`): フロントエンド側で 300ms のデバウンス処理。
+- **Google Cloud インフラ層物理上限 & 予算アラート (GCP Cost Defense)**:
+  - **Gemini API Quota 上限**: 15 RPM / 1,500 RPD に物理キャップを設定し、無限ループやスパムによる膨大課金を遮断。
+  - **月額予算アラート (Budgets & Alerts)**: 1,000円 (20%) / 3,000円 (60%) / 5,000円 (100%) 到達時のメール/Slack通知。
+  - **キルスイッチ運用プロトコル**: 詳細は [`docs/SECURITY_RUNBOOK.md`](SECURITY_RUNBOOK.md) を参照。
 
 ---
 

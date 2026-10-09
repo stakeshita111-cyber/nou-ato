@@ -305,7 +305,7 @@ erDiagram
         <p class="text-xs text-slate-500 mt-0.5">マルチテナント保護と受講生・講師のアクセス厳格分離</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
         <div class="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-2">
           <p class="font-black text-emerald-900">👨‍🎓 受講生 (student) 認可ルール</p>
           <ul class="list-disc list-inside text-slate-700 space-y-1">
@@ -320,6 +320,14 @@ erDiagram
             <li>所属農園 (<code>farm_id</code>) に紐づく全受講生・全畝・全日誌の閲覧・編集権限</li>
             <li>受講生の日誌に対する承認 (<code>is_approved = true</code>) および返信権限</li>
             <li>タスクテンプレートの作成・割当・編集権限</li>
+          </ul>
+        </div>
+        <div class="p-4 bg-purple-50/50 border border-purple-200 rounded-2xl space-y-2">
+          <p class="font-black text-purple-900">🔐 Supabase Security Advisor 適合規準</p>
+          <ul class="list-disc list-inside text-slate-700 space-y-1">
+            <li>全ビュー (<code>farm_beds_with_students</code>等) に <code>security_invoker = true</code> 適用</li>
+            <li>全リレーショナルテーブルに <code>ENABLE ROW LEVEL SECURITY</code> を完全適用</li>
+            <li>全 <code>SECURITY DEFINER</code> 関数に <code>SET search_path = public</code> を明示適用</li>
           </ul>
         </div>
       </div>

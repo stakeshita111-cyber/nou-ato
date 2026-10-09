@@ -10,6 +10,7 @@ import QRCodeModal from "@/components/ui/QRCodeModal";
 import { SproutLoader } from "@/components/SproutLoader";
 import { useFarmStore } from "@/store/useFarmStore";
 import { formatDate } from "@/lib/utils/formatHelper";
+import { grantTicket } from "@/lib/ticketManager";
 
 interface StudentData {
   id: string;
@@ -281,57 +282,29 @@ export default function TeacherStudentsView() {
           const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
 
           baseTasks.forEach((taskObj) => {
-            const taskTitle = String(taskObj.title || "");
-            const cTitle = cleanStr(taskTitle);
+            const taskId = String(taskObj.id || "");
 
-            // ① Supabase DB (student_tasks) の status === "completed" を照合
+            // ① Supabase DB (student_tasks) の status === "completed" を ID で厳密照合
             const isStDone = userStRows.some((st: Record<string, unknown>) => {
               if (st.status !== "completed") return false;
-              const stTasks = st.tasks as { title?: string } | undefined;
-              const stClean = cleanStr(String(st.title || stTasks?.title || ""));
-              return st.task_id === taskObj.id || st.base_task_id === taskObj.id || (cTitle && stClean && (cTitle === stClean || cTitle.includes(stClean) || stClean.includes(cTitle)));
+              const baseId = String(st.base_task_id || st.task_id || st.id || "");
+              return baseId === taskId;
             });
 
-            // ② 日誌 (journals) からの完了報告を照合
-            const isJournalDone = Array.from(userJournalTitles).some((jt) => {
-              const jClean = cleanStr(jt);
-              return cTitle && jClean && (cTitle === jClean || cTitle.includes(jClean) || jClean.includes(cTitle));
-            });
-
-            if (isStDone || isJournalDone) {
+            if (isStDone) {
               completedTasks++;
             } else if (!uncompletedTaskObj) {
               uncompletedTaskObj = taskObj;
             }
           });
 
-          // 生徒個別追加タスク（baseTasks にないもの）で完了しているものも合流
+          // 生徒個別追加タスク (base_task_id なしで student_tasks に直接登録されたもの) で完了しているものも加算
           userStRows.forEach((st: Record<string, unknown>) => {
-            if (st.status === "completed") {
-              const stTitle = cleanStr(String(st.title || ""));
-              const alreadyCounted = baseTasks.some((bt) => {
-                const btTitle = cleanStr(String(bt.title || ""));
-                return bt.id === st.task_id || bt.id === st.base_task_id || (stTitle && btTitle && (stTitle === btTitle || stTitle.includes(btTitle) || btTitle.includes(stTitle)));
-              });
+            if (st.status === "completed" && !st.base_task_id) {
+              const alreadyCounted = baseTasks.some((bt) => String(bt.id) === String(st.id));
               if (!alreadyCounted) {
                 completedTasks++;
               }
-            }
-          });
-
-          // 日誌で完了報告されたが baseTasks や student_tasks に未登録の個別タスクも加算
-          userJournalTitles.forEach((jt) => {
-            const jClean = cleanStr(jt);
-            const inBase = baseTasks.some((bt) => {
-              const bClean = cleanStr(String(bt.title || ""));
-              return bClean && jClean && (bClean === jClean || bClean.includes(jClean) || jClean.includes(bClean));
-            });
-            const inSt = userStRows.some((st: Record<string, unknown>) => {
-              const stClean = cleanStr(String(st.title || ""));
-              return st.status === "completed" && stClean && jClean && (stClean === jClean || stClean.includes(jClean) || jClean.includes(stClean));
-            });
-            if (!inBase && !inSt) {
-              completedTasks++;
             }
           });
 
@@ -462,6 +435,38 @@ export default function TeacherStudentsView() {
       setShowToast(true);
     } catch {
       setToastMessage("URLのコピーに失敗しました");
+      setShowToast(true);
+    }
+  };
+
+  // 🎟️ 講師から特定受講生へ追加チケットを付与する処理
+  const handleGrantTicket = async (student: StudentData) => {
+    try {
+      // 1. サーバーAPIのエンドポイント POST /api/tickets/grant を呼出
+      await fetch("/api/tickets/grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, amount: 1 }),
+      });
+
+      // 2. クライアント側のチケットストレージも即時アトミック加算
+      const updated = grantTicket(student.id, 1);
+
+      setToastMessage(`🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日残: ${updated.count}枚）`);
+      setShowToast(true);
+
+      // 3. リアルタイム同期イベントを発行
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "TICKETS_UPDATED", userId: student.id, updated, timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+    } catch (err) {
+      console.error("handleGrantTicket error:", err);
+      setToastMessage("チケット付与中にエラーが発生しました");
       setShowToast(true);
     }
   };
@@ -734,24 +739,29 @@ export default function TeacherStudentsView() {
 
 
       if (deleteMode === "purge") {
-        // 完全消去モード: 関連データも DELETE
-        try {
-          await supabase.from("student_tasks").delete().eq("student_id", studentId);
-          await supabase.from("journals").delete().eq("student_id", studentId);
-          // users テーブルからも削除
-          await supabase.from("users").delete().eq("id", studentId);
-        } catch {}
+        // 完全消去モード: CASCADE制約/トリガーに任せて users テーブルから単一DELETE実行
+        const { error: delErr } = await supabase.from("users").delete().eq("id", studentId);
+        if (delErr) {
+          console.error("Purge user error:", delErr);
+          setToastMessage(`❌ 生徒の完全削除に失敗しました: ${delErr.message}`);
+          setShowToast(true);
+          return;
+        }
       } else {
         // アクセス遮断（推奨）モード: farm_id 解除 & deleted_at 記録
-        try {
-          await supabase
-            .from("users")
-            .update({
-              farm_id: null,
-              deleted_at: new Date().toISOString(),
-            })
-            .eq("id", studentId);
-        } catch {}
+        const { error: updateErr } = await supabase
+          .from("users")
+          .update({
+            farm_id: null,
+            deleted_at: new Date().toISOString(),
+          })
+          .eq("id", studentId);
+        if (updateErr) {
+          console.error("Deactivate user error:", updateErr);
+          setToastMessage(`❌ 退会処理に失敗しました: ${updateErr.message}`);
+          setShowToast(true);
+          return;
+        }
       }
 
       // 画面とキャッシュの更新
@@ -1044,8 +1054,8 @@ export default function TeacherStudentsView() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5">
+                <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1072,9 +1082,21 @@ export default function TeacherStudentsView() {
                     >
                       <span>💬 個別配信</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleGrantTicket(student);
+                      }}
+                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-[11px] rounded-xl border border-blue-200 transition flex items-center gap-1 active:scale-95"
+                      title="この受講生にAI相談チケットを1枚追加付与"
+                    >
+                      <span>🎟️ チケット+1</span>
+                    </button>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-50">
                     <button
                       type="button"
                       title="この受講生を退会・削除する"
