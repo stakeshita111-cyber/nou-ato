@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { sanitizeNextUrl } from "@/app/auth/callback/route";
 
 // middleware のリダイレクトロジックの振る舞い検証
 function evaluateAccessControl(pathname: string, user: { id: string; role: "teacher" | "student" } | null) {
@@ -77,6 +78,31 @@ describe("Security & Authorization Tests (認可・セキュリティ検証)", (
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input);
         expect(isUuid).toBe(false);
       });
+    });
+  });
+
+  describe("4. OAuthコールバック next パラメータのオープンリダイレクト検証", () => {
+    it("正常な相対パス (/student, /teacher/dashboard, /invite) はそのまま許可されること", () => {
+      expect(sanitizeNextUrl("/student")).toBe("/student");
+      expect(sanitizeNextUrl("/teacher/dashboard")).toBe("/teacher/dashboard");
+      expect(sanitizeNextUrl("/invite?farm_id=123")).toBe("/invite?farm_id=123");
+    });
+
+    it("外部絶対URL (https://evil.com, http://attacker.org) はデフォルト (/student) へフォールバックされること", () => {
+      expect(sanitizeNextUrl("https://evil.com")).toBe("/student");
+      expect(sanitizeNextUrl("http://attacker.org/phishing")).toBe("/student");
+    });
+
+    it("プロトコル相対URL (//evil.com) やバックスラッシュ回避 (/\\evil.com) は拒否されること", () => {
+      expect(sanitizeNextUrl("//evil.com")).toBe("/student");
+      expect(sanitizeNextUrl("/\\evil.com")).toBe("/student");
+    });
+
+    it("javascript: や data: スキーム、null/empty はフォールバックされること", () => {
+      expect(sanitizeNextUrl("javascript:alert(1)")).toBe("/student");
+      expect(sanitizeNextUrl("data:text/html,<script>alert(1)</script>")).toBe("/student");
+      expect(sanitizeNextUrl(null)).toBe("/student");
+      expect(sanitizeNextUrl("")).toBe("/student");
     });
   });
 });

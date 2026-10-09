@@ -1,10 +1,27 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+export function sanitizeNextUrl(nextParam: string | null, fallbackUrl = '/student'): string {
+  if (!nextParam) return fallbackUrl;
+
+  const trimmed = nextParam.trim();
+  if (
+    trimmed.startsWith('/') &&
+    !trimmed.startsWith('//') &&
+    !trimmed.startsWith('/\\') &&
+    !trimmed.includes('://')
+  ) {
+    return trimmed;
+  }
+
+  return fallbackUrl;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/student';
+  const rawNext = searchParams.get('next');
+  const sanitizedNext = sanitizeNextUrl(rawNext, '/student');
   const cookieHeader = request.headers.get('cookie') || '';
   const cookieFarmId = cookieHeader.split(';').find(c => c.trim().startsWith('nouato_invite_farm_id='))?.split('=')[1];
   const farmIdParam = searchParams.get('farm_id') || cookieFarmId || '';
@@ -25,7 +42,7 @@ export async function GET(request: Request) {
 
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser();
-      let targetNext = next;
+      let targetNext = sanitizedNext;
 
       if (user) {
         const meta = user.user_metadata || {};
@@ -41,7 +58,9 @@ export async function GET(request: Request) {
 
           const userRole = existingUser?.role || "student";
           if (userRole === "teacher") {
-            targetNext = "/teacher/dashboard";
+            if (targetNext === "/student" || !rawNext || targetNext !== sanitizeNextUrl(rawNext, "")) {
+              targetNext = "/teacher/dashboard";
+            }
           }
 
           // farm_id が指定されている場合は優先して紐づけ（空や既存のままで上書きされることを防止）
