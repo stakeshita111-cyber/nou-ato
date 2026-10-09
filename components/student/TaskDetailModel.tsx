@@ -30,7 +30,9 @@ export default function TaskDetailModel({
     null;
   const myBeds = (myPlot?.beds || [])
     .filter((b: { id?: string; status?: string; bed_number?: string | number }) => b.status !== "archived" && !b.id?.startsWith("archived_"))
-    .sort((a: { bed_number?: string | number }, b: { bed_number?: string | number }) => (Number(a.bed_number) || 0) - (Number(b.bed_number) || 0));
+    .sort((a: { bed_number?: string | number }, b: { bed_number?: string | number }) =>
+      String(a.bed_number ?? "").localeCompare(String(b.bed_number ?? ""), undefined, { numeric: true, sensitivity: "base" })
+    );
 
   const [selectedBedId, setSelectedBedId] = useState<string>(myBeds[0]?.id || "");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);

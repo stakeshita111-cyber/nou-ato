@@ -1847,7 +1847,7 @@ export function useFarmManager() {
     let targetStudentName = "受講生徒";
     let targetStudentId: string | null = null;
     let targetPlotCode = "C3";
-    let targetBedNum = 1;
+    let targetBedNum: number | string = 1;
 
     const nextPlots = plots.map((plot) => {
       const isMatchPlot =
@@ -1942,7 +1942,7 @@ export function useFarmManager() {
     newCropName: string = "未確定 🌱",
     newSeason: string = "2026年 秋冬"
   ) => {
-    let targetBedNumber = 1;
+    let targetBedNumber: number | string = 1;
     let targetPlotCode = "C3";
     let oldCropName = "野菜";
     let oldHarvest = "";
@@ -2104,7 +2104,7 @@ export function useFarmManager() {
 
   const rejectBedCompletion = async (plotId: string, bedId: string, rejectReason: string = "内容の再確認をお願いします") => {
     let targetPlotCode = "C3";
-    let targetBedNum = 1;
+    let targetBedNum: number | string = 1;
     let targetStudentName = "受講生徒";
 
     const nextPlots = plots.map((plot) => {

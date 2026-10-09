@@ -78,7 +78,7 @@ export default function TeacherFarmCanvasView({ initialPlotCode, initialFarmId }
 
   const fetchBedRecords = async (
     plotCode: string,
-    bedNumber: number,
+    bedNumber: number | string,
     bedId?: string,
     studentName?: string,
     latestRec?: any,

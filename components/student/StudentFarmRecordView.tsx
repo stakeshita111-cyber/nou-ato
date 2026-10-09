@@ -78,13 +78,15 @@ export default function StudentFarmRecordView({
   const unarchivedBeds = rawBeds.filter((b) => b.status !== "archived");
   const archivedBeds = rawBeds.filter((b) => b.status === "archived");
 
-  // 🌟 2. 稼働中ベッドを bed_number 順に整列（講師画面と完全一致） 🌟
+  // 🌟 2. 稼働中ベッドを bed_number 順に整列（講師画面と完全一致、文字列・枝番に対応） 🌟
   const activeBeds: FarmBed[] = [...unarchivedBeds]
-    .sort((a, b) => (Number(a.bed_number) || 0) - (Number(b.bed_number) || 0))
+    .sort((a, b) =>
+      String(a.bed_number ?? "").localeCompare(String(b.bed_number ?? ""), undefined, { numeric: true, sensitivity: "base" })
+    )
     .map((b, idx) => ({
       ...b,
       id: b.id || `plot_cell_${plotCode}_bed_${b.bed_number || idx + 1}`,
-      bed_number: Number(b.bed_number) || idx + 1,
+      bed_number: b.bed_number ?? idx + 1,
       status: b.status || "active",
       crop_name: b.crop_name || "未確定 🌱",
     }));

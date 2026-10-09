@@ -23,7 +23,7 @@ export type BedStatus = "active" | "completed_pending" | "rejected" | "archived"
 export type FarmBed = {
   id: string;
   plot_id: string;
-  bed_number: number;
+  bed_number: number | string;
   crop_name?: string;
   crop_icon?: string;
   progress_percent?: number;
