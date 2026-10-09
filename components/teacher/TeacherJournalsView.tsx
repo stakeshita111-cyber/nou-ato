@@ -6,6 +6,7 @@ import { useFarmStore } from "@/store/useFarmStore";
 import Toast from "@/components/ui/Toast";
 import SlideSettingsModal, { SlideSettings } from "@/components/teacher/SlideSettingsModal";
 import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
+import { sanitizePersonalNames } from "@/lib/rag/qaKnowledgeRetriever";
 
 interface JournalItem {
   id: string;
@@ -18,6 +19,7 @@ interface JournalItem {
   imageUrl?: string;
   reply?: string;
   is_approved: boolean;
+  is_private?: boolean;
 }
 
 export interface SlideItemRecord {
@@ -105,6 +107,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [approveOnReply, setApproveOnReply] = useState<{ [key: string]: boolean }>({});
+
+  // 🌟【新機能】農園ナレッジ登録確認モーダル State 🌟
+  const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
+  const [knowledgeModalTarget, setKnowledgeModalTarget] = useState<{
+    journal: JournalItem;
+    replyText: string;
+    isFromReplyAction: boolean;
+  } | null>(null);
+  const [publicTitle, setPublicTitle] = useState("");
+  const [publicReply, setPublicReply] = useState("");
+  const [isSavingKnowledge, setIsSavingKnowledge] = useState(false);
 
   // 🌟【新機能】スライド表示設定 State (各生徒直近3回分・ソート順・速度) 🌟
   const [slideSettings, setSlideSettings] = useState<SlideSettings>({
@@ -241,6 +254,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
         }
 
+        const isPrivate =
+          Boolean(j.is_private) ||
+          cleanContent.includes("【非公開相談】") ||
+          cleanContent.includes("【非公開】") ||
+          cleanContent.includes("非公開希望") ||
+          cleanContent.includes("完全個別相談");
+
         return {
           id: j.id,
           student_id: j.student_id,
@@ -257,6 +277,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           imageUrl: imgUrl,
           reply: j.reply || "",
           is_approved: j.is_approved || false,
+          is_private: isPrivate,
         };
       });
 
@@ -276,12 +297,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     const text = replyInput[id];
     if (!text?.trim()) return;
 
+    const targetJournal = journals.find((j) => j.id === id);
+
     const shouldApprove = approveOnReply[id] || false;
 
     const { error } = await supabase
       .from("journals")
       .update({
-        reply: text,
+        reply: text.trim(),
         ...(shouldApprove ? { is_approved: true } : {}),
       })
       .eq("id", id);
@@ -289,10 +312,47 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     if (error) {
       setToastMessage("返信の保存に失敗しました: " + error.message);
     } else {
+      // 生徒宛ての個別通知レコードを insert
+      try {
+        const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        const effectiveFarmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+        const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+        const validStudentId = targetJournal?.student_id && isUuid(targetJournal.student_id) ? targetJournal.student_id : (targetJournal?.student_id || null);
+
+        if (validStudentId) {
+          const { error: insErr } = await supabase.from("journals").insert([
+            {
+              role: "broadcast",
+              student_id: validStudentId,
+              farm_id: validFarmId,
+              text: "【返信】講師から相談への回答が届きました",
+              content: text.trim(),
+              reply: "講師からの返信",
+              created_at: new Date().toISOString(),
+            },
+          ]);
+          if (insErr) {
+            console.warn("Reply broadcast insert warn:", insErr);
+          }
+        }
+      } catch (e) {
+        console.warn("Reply broadcast insert exception:", e);
+      }
+
+      // 送信後、BroadcastChannel 及び nouato_sync_event を送信
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nouato_sync_event"));
+        try {
+          const bc = new BroadcastChannel("nouato_farm_sync_channel");
+          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+
       setJournals(
         journals.map((j) =>
           j.id === id
-            ? { ...j, reply: text, ...(shouldApprove ? { is_approved: true } : {}) }
+            ? { ...j, reply: text.trim(), ...(shouldApprove ? { is_approved: true } : {}) }
             : j
         )
       );
@@ -312,27 +372,145 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     setReplyInput({ ...replyInput, [journal.id]: journal.reply || "" });
   };
 
-  // AIナレッジ化（承認）
-  const handleToggleApprove = async (id: string, currentApproved: boolean) => {
-    const nextApproved = !currentApproved;
-    const { error } = await supabase
-      .from("journals")
-      .update({ is_approved: nextApproved })
-      .eq("id", id);
-
-    if (error) {
-      setToastMessage("承認状態の更新に失敗しました: " + error.message);
-    } else {
-      setJournals(
-        journals.map((j) => (j.id === id ? { ...j, is_approved: nextApproved } : j))
-      );
-      setToastMessage(
-        nextApproved
-          ? "✨ AI知識として承認保存しました"
-          : "承認を取り消しました"
-      );
+  // 一般化モーダルを開く処理 (返信時またはナレッジ承認ボタン押下時)
+  const openKnowledgeModal = (journal: JournalItem, replyText: string, isFromReplyAction: boolean) => {
+    if (journal.is_private) {
+      setToastMessage("🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。");
+      setShowToast(true);
+      return;
     }
-    setShowToast(true);
+
+    // 生徒質問から個人情報・挨拶を除去＆一般化
+    const rawQuestion = journal.content || "";
+    const cleanQuestion = sanitizePersonalNames(rawQuestion);
+    // タイトルが未設定またはデフォルトの場合は質問本文の冒頭から一般的な質問タイトルを生成
+    let initialTitle = journal.taskTitle && journal.taskTitle !== "💡 気づきメモ・質問相談" ? journal.taskTitle : "";
+    if (!initialTitle) {
+      const firstLine = cleanQuestion.split("\n")[0] || "農園栽培・お手入れの質問";
+      initialTitle = firstLine.length > 30 ? firstLine.slice(0, 30) + "..." : firstLine;
+    }
+    // 質問タイトルの個人名・呼びかけもクリーンアップ
+    initialTitle = sanitizePersonalNames(initialTitle);
+
+    // 講師返信から個人名呼びかけ・個別挨拶を一般化
+    const cleanReplyText = sanitizePersonalNames(replyText || journal.reply || "");
+
+    setKnowledgeModalTarget({ journal, replyText, isFromReplyAction });
+    setPublicTitle(initialTitle);
+    setPublicReply(cleanReplyText);
+    setShowKnowledgeModal(true);
+  };
+
+  // モーダルで「ナレッジとして登録・承認」を押した際の確定処理
+  const handleConfirmSaveKnowledge = async () => {
+    if (!knowledgeModalTarget) return;
+    const { journal, replyText, isFromReplyAction } = knowledgeModalTarget;
+
+    setIsSavingKnowledge(true);
+    try {
+      const finalReply = isFromReplyAction ? (replyText.trim() || publicReply.trim()) : (journal.reply || publicReply.trim());
+      const { error } = await supabase
+        .from("journals")
+        .update({
+          task_title: publicTitle.trim(),
+          reply: finalReply,
+          is_approved: true,
+        })
+        .eq("id", journal.id);
+
+      if (error) {
+        setToastMessage("ナレッジの登録・承認に失敗しました: " + error.message);
+      } else {
+        // 返信アクション経由の場合は生徒宛て通知を挿入
+        if (isFromReplyAction && replyText.trim()) {
+          try {
+            const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+            const effectiveFarmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+            const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+            const validStudentId = journal.student_id && isUuid(journal.student_id) ? journal.student_id : null;
+
+            if (validStudentId) {
+              await supabase.from("journals").insert([
+                {
+                  role: "broadcast",
+                  student_id: validStudentId,
+                  farm_id: validFarmId,
+                  text: "【返信】講師から相談への回答が届きました",
+                  content: replyText.trim(),
+                  reply: "講師からの返信",
+                  created_at: new Date().toISOString(),
+                },
+              ]);
+            }
+          } catch (e) {
+            console.warn("Broadcast insert warn:", e);
+          }
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("nouato_sync_event"));
+            try {
+              const bc = new BroadcastChannel("nouato_farm_sync_channel");
+              bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+              bc.close();
+            } catch {}
+          }
+        }
+
+        setJournals(
+          journals.map((j) =>
+            j.id === journal.id
+              ? {
+                  ...j,
+                  taskTitle: publicTitle.trim(),
+                  reply: finalReply,
+                  is_approved: true,
+                }
+              : j
+          )
+        );
+        setShowKnowledgeModal(false);
+        setEditingReplyId(null);
+        setToastMessage("💡 個人情報を確認・一般化し、農園FAQナレッジとして承認登録しました！✨");
+      }
+    } catch (e: any) {
+      setToastMessage("エラーが発生しました: " + e.message);
+    } finally {
+      setIsSavingKnowledge(false);
+      setShowToast(true);
+    }
+  };
+
+  // AIナレッジ化（承認・解除切り替え）
+  const handleToggleApprove = async (id: string, currentApproved: boolean) => {
+    const targetJournal = journals.find((j) => j.id === id);
+    if (!targetJournal) return;
+
+    if (targetJournal.is_private) {
+      setToastMessage("🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。");
+      setShowToast(true);
+      return;
+    }
+
+    if (!currentApproved) {
+      // 未承認から承認へ変更する場合: 確認・一般化モーダルを表示
+      openKnowledgeModal(targetJournal, targetJournal.reply || "", false);
+    } else {
+      // 承認解除の場合
+      const { error } = await supabase
+        .from("journals")
+        .update({ is_approved: false })
+        .eq("id", id);
+
+      if (error) {
+        setToastMessage("承認解除に失敗しました: " + error.message);
+      } else {
+        setJournals(
+          journals.map((j) => (j.id === id ? { ...j, is_approved: false } : j))
+        );
+        setToastMessage("承認を取り消しました");
+      }
+      setShowToast(true);
+    }
   };
 
   // 🌟 日誌・相談ログの削除 (不要データやテストデータの完全クリーンアップ) 🌟
@@ -507,12 +685,35 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       // 4. 区画情報 (farm_plots) を取得
       const { data: plotsData } = await supabase
         .from("farm_plots")
-        .select("id, code, student_id");
+        .select("id, code, student_id, farm_id");
 
       const plotMap: { [id: string]: any } = {};
+      const studentPlotMap: { [studentId: string]: { plotCode: string; farmId?: string } } = {};
+
       if (plotsData) {
         plotsData.forEach((p: any) => {
           if (p.id) plotMap[p.id] = p;
+          if (p.student_id && p.code) {
+            studentPlotMap[p.student_id] = {
+              plotCode: p.code,
+              farmId: p.farm_id,
+            };
+          }
+        });
+      }
+
+      if (bedsData) {
+        bedsData.forEach((b: any) => {
+          if (b.student_id && b.plot_id && !studentPlotMap[b.student_id]) {
+            const plotInfo = plotMap[b.plot_id];
+            const code = plotInfo?.code || b.plot_id.replace(/^plot_cell_/, "");
+            if (code) {
+              studentPlotMap[b.student_id] = {
+                plotCode: code,
+                farmId: plotInfo?.farm_id,
+              };
+            }
+          }
         });
       }
 
@@ -563,10 +764,20 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
           }
 
+          const studentMapped = resolvedStudentId ? studentPlotMap[resolvedStudentId] : null;
+
           const derivedPlotCode =
             r.plot_code ||
             plotInfo?.code ||
-            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : "B3");
+            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : undefined) ||
+            studentMapped?.plotCode;
+
+          const derivedFarmId =
+            r.farm_id ||
+            plotInfo?.farm_id ||
+            studentMapped?.farmId ||
+            farmId ||
+            undefined;
 
           allRecords.push({
             itemType: "record",
@@ -583,7 +794,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             timeStr,
             timestamp,
             plotCode: derivedPlotCode,
-            farmId: farmId || undefined,
+            farmId: derivedFarmId,
           });
         });
       }
@@ -618,6 +829,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
             }
 
+            const studentMapped = j.student_id ? studentPlotMap[j.student_id] : null;
+            const derivedPlotCode = j.plot_code || studentMapped?.plotCode;
+            const derivedFarmId = j.farm_id || studentMapped?.farmId || farmId || undefined;
+
             if (!allRecords.some((r) => r.content === cleanContent)) {
               allRecords.push({
                 itemType: "record",
@@ -630,7 +845,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 dateStr: formatDate(rawDate),
                 timeStr,
                 timestamp,
-                plotCode: "B3",
+                plotCode: derivedPlotCode,
+                farmId: derivedFarmId,
               });
             }
           });
@@ -1064,6 +1280,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         >
                           {currentJournal.taskTitle}
                         </span>
+                        {/* 🔒 非公開相談バッジ */}
+                        {currentJournal.is_private && (
+                          <span className="text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                            <span>🔒</span>
+                            <span>完全個別相談（非公開希望）</span>
+                          </span>
+                        )}
                         {/* 🚨 緊急度・要注意キーワードバッジ */}
                         {isUrgentJournal(currentJournal.content) && (
                           <span className="text-[10px] font-black bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
@@ -1081,10 +1304,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleToggleApprove(currentJournal.id, currentJournal.is_approved)}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer ${
-                        currentJournal.is_approved
-                          ? "bg-amber-100 text-amber-800 border border-amber-300"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      disabled={currentJournal.is_private}
+                      title={currentJournal.is_private ? "非公開相談のためナレッジ承認はできません" : undefined}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition ${
+                        currentJournal.is_private
+                          ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border border-gray-200"
+                          : currentJournal.is_approved
+                          ? "bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer"
                       }`}
                     >
                       <span>{currentJournal.is_approved ? "★ AIナレッジ承認済み" : "☆ AI知識として承認"}</span>
@@ -1170,19 +1397,30 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         {/* ★ 返信と同時にAIナレッジとして承認するチェックボックス */}
-                        <label className="flex items-center space-x-2 text-xs font-bold text-amber-900 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 cursor-pointer">
+                        <label
+                          className={`flex items-center space-x-2 text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                            currentJournal.is_private
+                              ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200"
+                              : "text-amber-900 bg-amber-50 border-amber-200 cursor-pointer"
+                          }`}
+                        >
                           <input
                             type="checkbox"
-                            checked={approveOnReply[currentJournal.id] || false}
+                            disabled={currentJournal.is_private}
+                            checked={!currentJournal.is_private && (approveOnReply[currentJournal.id] || false)}
                             onChange={(e) =>
                               setApproveOnReply({
                                 ...approveOnReply,
                                 [currentJournal.id]: e.target.checked,
                               })
                             }
-                            className="rounded text-amber-600 focus:ring-amber-500"
+                            className="rounded text-amber-600 focus:ring-amber-500 disabled:cursor-not-allowed"
                           />
-                          <span>🌟 この回答を農園AIナレッジとしても登録（承認）する</span>
+                          <span>
+                            {currentJournal.is_private
+                              ? "🔒 完全個別相談（非公開）のためナレッジ登録不可"
+                              : "🌟 この回答を農園AIナレッジとしても登録（承認）する"}
+                          </span>
                         </label>
 
                         <div className="flex justify-end space-x-2">
@@ -1294,10 +1532,15 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     <div
                       key={`rec_${item.id}_${colIdx}_${rowIdx}`}
                       onClick={() => {
-                        if (onNavigateToFarm) {
-                          onNavigateToFarm(item.plotCode, item.farmId);
+                        if (item.plotCode) {
+                          if (onNavigateToFarm) {
+                            onNavigateToFarm(item.plotCode, item.farmId);
+                          } else {
+                            setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
+                            setShowToast(true);
+                          }
                         } else {
-                          setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
+                          setToastMessage(`⚠️ ${item.studentName} さんは担当区画が未設定です`);
                           setShowToast(true);
                         }
                       }}
@@ -1434,6 +1677,88 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 💡 農園ナレッジ登録確認モーダル (個人情報確認・一般化モーダル) 🌟 */}
+      {showKnowledgeModal && knowledgeModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl space-y-5 border border-amber-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">💡</span>
+                <h3 className="font-extrabold text-gray-900 text-base">農園ナレッジ登録確認</h3>
+              </div>
+              <button
+                onClick={() => setShowKnowledgeModal(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed font-medium bg-amber-50/70 p-3 rounded-xl border border-amber-200">
+              全生徒向けAI知識（FAQ）として共有・保存するため、生徒個人宛の呼びかけや個人情報が除去されているかご確認ください。必要に応じて内容を編集・調整できます。
+            </p>
+
+            <div className="space-y-4 text-xs">
+              {/* 公開用質問タイトル */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-gray-800 flex items-center justify-between">
+                  <span>📌 公開用質問タイトル:</span>
+                  <span className="text-[10px] text-gray-400 font-normal">（一般化した短いタイトル）</span>
+                </label>
+                <input
+                  type="text"
+                  value={publicTitle}
+                  onChange={(e) => setPublicTitle(e.target.value)}
+                  placeholder="例: トマトの芽かきの時期と方法について"
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* 生徒の原文プレビュー (読み取り専用参照) */}
+              <div className="space-y-1">
+                <span className="font-bold text-gray-500 text-[11px]">📝 生徒の質問原文 (参照):</span>
+                <div className="p-2.5 bg-gray-100 rounded-xl text-gray-600 text-[11px] line-clamp-3">
+                  {knowledgeModalTarget.journal.content}
+                </div>
+              </div>
+
+              {/* 公開用回答内容 */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-gray-800 flex items-center justify-between">
+                  <span>💬 公開用回答内容:</span>
+                  <span className="text-[10px] text-amber-800 font-semibold">✨ 個人名を自動で匿名化済み</span>
+                </label>
+                <textarea
+                  rows={5}
+                  value={publicReply}
+                  onChange={(e) => setPublicReply(e.target.value)}
+                  placeholder="一般化した回答を入力してください..."
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowKnowledgeModal(false)}
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSaveKnowledge}
+                disabled={isSavingKnowledge || !publicTitle.trim() || !publicReply.trim()}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer flex items-center space-x-1.5"
+              >
+                <span>{isSavingKnowledge ? "保存中..." : "★ ナレッジとして登録・承認"}</span>
+              </button>
             </div>
           </div>
         </div>

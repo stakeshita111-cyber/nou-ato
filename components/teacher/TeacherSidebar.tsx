@@ -291,7 +291,6 @@ export default function TeacherSidebar({
               </svg>
               <span>画面設定</span>
             </button>
-
           </nav>
         </div>
 
@@ -319,7 +318,7 @@ export default function TeacherSidebar({
                 <span className="ml-auto text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">別窓</span>
               </Link>
 
-              {/* 3. 🚪 ログアウト */}
+              {/* 2. 🚪 ログアウト */}
               <button
                 type="button"
                 onClick={handleLogout}

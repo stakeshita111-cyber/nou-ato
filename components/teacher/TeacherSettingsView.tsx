@@ -11,6 +11,24 @@ export default function TeacherSettingsView() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // DBから最新の設定値を同期取得
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.showStudentTalkTab !== undefined) {
+            updateSettings({ showStudentTalkTab: data.showStudentTalkTab !== false });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings:", err);
+      }
+    };
+    fetchSettings();
+  }, [updateSettings]);
+
   const handleToggleContrast = (enabled: boolean) => {
     updateSettings({ outdoorHighContrast: enabled });
     setToastMessage(`✨ 高コントラスト表示を ${enabled ? "ON" : "OFF"} に切り替えました！`);
@@ -91,13 +109,13 @@ export default function TeacherSettingsView() {
               <span className="text-[10px] text-gray-400 font-bold">
                 ✨ 下の設定ボタンを押すと各項目がプレビューにリアルタイム反映されます
               </span>
-              <button
-                type="button"
-                className={`text-white font-bold transition-all shadow-xs ${getBorderRadiusClass(settings.borderRadius)} ${getButtonPaddingClass(settings.buttonPadding)}`}
+              <div
+                aria-hidden="true"
+                className={`text-white font-bold transition-all shadow-xs pointer-events-none select-none ${getBorderRadiusClass(settings.borderRadius)} ${getButtonPaddingClass(settings.buttonPadding)}`}
                 style={{ backgroundColor: settings.primaryColor }}
               >
-                ＋ サンプルボタン (保存・追加)
-              </button>
+                ＋ サンプルボタン (見た目プレビュー)
+              </div>
             </div>
 
           </div>

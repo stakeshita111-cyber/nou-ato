@@ -1,9 +1,9 @@
 /**
  * NOU-ATO AI相談チケット管理モジュール
  * - JST 日本時間0時自動リセット
- * - 秘密の呪文対応
- * - 将来の「相談し放題（無制限プラン）」や「1日の回数制限変更」に完全対応
- * - 🌟【新機能】チケット終了時の「質問ストック・累積メモ」機能（次回コピー用）
+ * - 講師からの受講生追加チケット付与機能（秘密の呪文廃止版）
+ * - 1日3回制限 (サーバー側 ai_usage 連動)
+ * - 🌟【機能】チケット終了時の「質問ストック・累積メモ」機能（次回コピー用）
  */
 
 export type TicketPlanType = "limited" | "unlimited" | "memo_only";
@@ -14,7 +14,7 @@ export interface TicketState {
   date: string; // YYYY-MM-DD (JST)
   count: number; // 残り枚数 (0〜dailyLimit)
   plan: TicketPlanType; // "limited" | "unlimited" | "memo_only"
-  dailyLimit: number; // 1日の上限枚数
+  dailyLimit: number; // 1日の基本上限枚数
   isUnlimited: boolean; // 相談し放題フラグ
 }
 
@@ -34,18 +34,16 @@ export function getJstDateString(): string {
 }
 
 /**
- * 秘密のチケット復活の呪文かどうかを判定
- * 例: 「チケットください」「チケット下さい」「チケットくれ」「チケットちょうだい」「ちけっと復活」など
+ * 秘密の呪文判定（廃止のため常に false を返却）
  */
-export function isSecretTicketSpell(text: string): boolean {
-  const clean = text.trim().toLowerCase();
-  const pattern = /(?:チケット|ちけっと).*(?:ください|下さい|くれ|ちょうだい|復活|ほしい|増やして|リセット)/;
-  return pattern.test(clean);
+export function isSecretTicketSpell(_text: string): boolean {
+  return false;
 }
 
 /**
  * ローカルストレージからチケット情報を取得（JST 0:00 を過ぎていれば自動リセット）
  */
+
 export function getTicketState(
   userId: string = "default",
   customLimit: number = DEFAULT_DAILY_TICKETS,
@@ -73,7 +71,7 @@ export function getTicketState(
     };
   }
 
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !window.localStorage) {
     return {
       date: todayJst,
       count: customLimit,
@@ -156,7 +154,7 @@ export function consumeTicket(
     isUnlimited: false,
   };
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && window.localStorage) {
     const storageKey = `nouato_ai_tickets_${userId}`;
     localStorage.setItem(storageKey, JSON.stringify(updated));
   }
@@ -165,37 +163,69 @@ export function consumeTicket(
 }
 
 /**
- * 秘密の呪文によりチケットを全回復
+ * 講師権限などで特定受講生に追加チケットを付与する関数
  */
-export function restoreTicketsBySpell(
+export function grantTicket(
   userId: string = "default",
-  customLimit: number = DEFAULT_DAILY_TICKETS
+  amount: number = 1,
+  customLimit: number = DEFAULT_DAILY_TICKETS,
+  plan: TicketPlanType = "limited"
 ): TicketState {
+  const current = getTicketState(userId, customLimit, plan);
+
+  if (current.isUnlimited) {
+    return current;
+  }
+
+  const nextCount = current.count + amount;
   const updated: TicketState = {
     date: getJstDateString(),
-    count: customLimit,
-    plan: "limited",
-    dailyLimit: customLimit,
+    count: nextCount,
+    plan: current.plan,
+    dailyLimit: Math.max(current.dailyLimit, nextCount),
     isUnlimited: false,
   };
 
   if (typeof window !== "undefined") {
-    const storageKey = `nouato_ai_tickets_${userId}`;
-    localStorage.setItem(storageKey, JSON.stringify(updated));
+    if (window.localStorage) {
+      const storageKey = `nouato_ai_tickets_${userId}`;
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    }
+
+    // リアルタイム反映用イベント＆BroadcastChannel発火
+    if (typeof window.dispatchEvent === "function") {
+      try {
+        window.dispatchEvent(new CustomEvent("nouato_tickets_updated", { detail: { userId, updated } }));
+        window.dispatchEvent(new Event("nouato_sync_event"));
+      } catch (e) {
+        // ignore event errors
+      }
+    }
+
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("nouato_farm_sync_channel");
+        bc.postMessage({ type: "TICKETS_UPDATED", userId, updated, timestamp: Date.now() });
+        bc.close();
+      }
+    } catch (e) {
+      // ignore channel errors
+    }
   }
 
   return updated;
 }
 
+
 // ==========================================
-// 🌟【新機能】質問ストック（累積メモ）管理 🌟
+// 🌟【機能】質問ストック（累積メモ）管理 🌟
 // ==========================================
 
 /**
  * 蓄積された質問ストックリストを取得
  */
 export function getQuestionStock(userId: string = "default"): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !window.localStorage) return [];
   const storageKey = `nouato_question_stock_${userId}`;
   try {
     const raw = localStorage.getItem(storageKey);
@@ -215,7 +245,7 @@ export function addQuestionStock(userId: string = "default", text: string): stri
 
   // 重複追加を防ぎつつ追記
   const nextList = [...current, trimmed];
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && window.localStorage) {
     const storageKey = `nouato_question_stock_${userId}`;
     localStorage.setItem(storageKey, JSON.stringify(nextList));
   }
@@ -226,7 +256,7 @@ export function addQuestionStock(userId: string = "default", text: string): stri
  * 質問ストックをクリア（次回チケットで質問送信した時などにリセット可能）
  */
 export function clearQuestionStock(userId: string = "default"): void {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && window.localStorage) {
     const storageKey = `nouato_question_stock_${userId}`;
     localStorage.removeItem(storageKey);
   }
@@ -237,5 +267,5 @@ export function clearQuestionStock(userId: string = "default"): void {
  */
 export function formatStockText(items: string[]): string {
   if (!items || items.length === 0) return "";
-  return items.map((it, i) => `・${it}`).join("\n");
+  return items.map((it) => `・${it}`).join("\n");
 }

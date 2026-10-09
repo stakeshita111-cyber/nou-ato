@@ -1,6 +1,6 @@
 import {
   searchSimilarKnowledge,
-  sanitizePersonalNames,
+  sanitizePiiText,
   CROPS_LIST,
   STOP_WORDS,
 } from "@/lib/rag/qaKnowledgeRetriever";
@@ -82,22 +82,26 @@ export async function POST(request: Request) {
     }
 
     // 2. Supabase DB (journals承認済みナレッジ) の厳格検索
+    // 🌟 生徒の生相談文には依存せず、回答文(k.answer)および回答内から抽出された相談トピック(k.question)のみから一致キーワードを抽出 🌟
     const dbKnowledge = await searchSimilarKnowledge(qClean);
     if (dbKnowledge && dbKnowledge.length > 0) {
       for (const k of dbKnowledge) {
         if ((k.similarityScore || 0) >= 4) {
           if (!matches.some((m) => m.question === k.question)) {
-            // 一致した具体的キーワードを抽出 (STOP_WORDSは除外)
-            const words = (k.question + " " + k.answer).match(/[\u4e00-\u9fa5]{2,}|[\u30a1-\u30f6]{2,}/g) || [];
+            // 一致した具体的キーワードを抽出 (k.question は回答から抽出された相談トピック、k.answer は回答テキスト)
+            const topicAndAnswer = k.question + " " + k.answer;
+            const words = topicAndAnswer.match(/[\u4e00-\u9fa5]{2,}|[\u30a1-\u30f6]{2,}/g) || [];
             const hits = words.filter(
               (w) => qClean.includes(w) && w.length >= 2 && !STOP_WORDS.includes(w)
             );
-            const uniqueHits = Array.from(new Set([...queryCrops.filter((c) => (k.question + k.answer).includes(c)), ...hits]));
+            const uniqueHits = Array.from(
+              new Set([...queryCrops.filter((c) => topicAndAnswer.includes(c)), ...hits])
+            );
 
             // 意味のあるキーワードがヒットしている場合のみ追加
             if (uniqueHits.length > 0) {
-              const cleanQ = sanitizePersonalNames(k.question);
-              const cleanA = sanitizePersonalNames(k.answer);
+              const cleanQ = sanitizePiiText(k.question);
+              const cleanA = sanitizePiiText(k.answer);
               matches.push({
                 id: `db_${k.id || Math.random().toString(36).slice(2)}`,
                 question: cleanQ,

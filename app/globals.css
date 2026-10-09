@@ -236,3 +236,54 @@ select:focus {
   width: max-content;
   animation: marquee 25s linear infinite;
 }
+
+/* 🌀 バッジ3Dコイン縦軸回転アニメーション (rotateY) 🌀 */
+@keyframes spin-3d-y {
+  0% {
+    transform: perspective(600px) rotateY(0deg);
+  }
+  50% {
+    transform: perspective(600px) rotateY(180deg);
+  }
+  100% {
+    transform: perspective(600px) rotateY(360deg);
+  }
+}
+
+.animate-spin-3d-slow {
+  animation: spin-3d-y 8s linear infinite;
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  backface-visibility: visible;
+}
+
+/* ↔️ スライド（スワイプ）ページ切り替えアニメーション ↔️ */
+@keyframes slideInLeft {
+  from {
+    opacity: 0.4;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0.4;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

@@ -30,4 +30,48 @@ describe("taskTemplates and taskMaster data integrity", () => {
       expect(task.exp).toBeGreaterThan(0);
     });
   });
+
+  it("creates a valid TaskTemplate object from Task input data", () => {
+    const taskInput = {
+      id: "task-123",
+      title: "ミニトマトの脇芽かき",
+      status: "pool",
+      category: "果菜",
+      target_crop: "ミニトマト",
+      estimated_time: "20分",
+      tools_needed: "ハサミ, 手袋",
+      description: "・脇芽をポキッと摘み取る",
+      exp: 40,
+      difficulty: 2,
+      require_photo: true,
+      badge_name: "芽かきマスター",
+      badge_icon: "✂️",
+    };
+
+    const newTemplate = {
+      id: "tpl-456",
+      title: taskInput.title,
+      category: taskInput.category,
+      target_crop: taskInput.target_crop,
+      estimated_time: taskInput.estimated_time,
+      tools_needed: taskInput.tools_needed,
+      description: taskInput.description,
+      memo: "",
+      exp: taskInput.exp,
+      difficulty: taskInput.difficulty,
+      require_photo: taskInput.require_photo,
+      badge_name: taskInput.badge_name,
+      badge_icon: taskInput.badge_icon,
+      season: "通年",
+      phase: "育成・管理",
+    };
+
+    expect(newTemplate.title).toBe("ミニトマトの脇芽かき");
+    expect(newTemplate.target_crop).toBe("ミニトマト");
+    expect(newTemplate.badge_name).toBe("芽かきマスター");
+    expect(newTemplate.badge_icon).toBe("✂️");
+    expect(newTemplate.require_photo).toBe(true);
+    expect(newTemplate.season).toBe("通年");
+    expect(newTemplate.phase).toBe("育成・管理");
+  });
 });

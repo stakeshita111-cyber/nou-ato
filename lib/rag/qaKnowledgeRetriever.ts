@@ -14,7 +14,8 @@ export const CROPS_LIST = [
   "ジャガイモ", "じゃがいも", "馬鈴薯", "サツマイモ", "さつまいも",
   "枝豆", "えだまめ", "エダマメ", "インゲン", "いんげん", "オクラ", "おくら",
   "キャベツ", "レタス", "白菜", "ハクサイ", "ほうれん草", "小松菜",
-  "大根", "ダイコン", "人参", "ニンジン", "カブ", "イチゴ", "いちご", "スイカ", "ネギ", "ねぎ"
+  "大根", "ダイコン", "人参", "ニンジン", "カブ", "イチゴ", "いちご", "スイカ", "ネギ", "ねぎ",
+  "カボチャ", "かぼちゃ", "南瓜"
 ];
 
 // 一般的すぎてマッチングに使ってはいけない動詞・副詞・助詞
@@ -23,15 +24,60 @@ export const STOP_WORDS = [
   "ある", "いる", "も", "する", "から", "な", "こと", "として", "について",
   "教えて", "ください", "どうすれば", "いいですか", "方法", "どう",
   "たくさん", "いっぱい", "育てる", "育て方", "栽培", "収穫", "収穫した", "採れた", "とれた",
-  "コツ", "ポイント", "時期", "タイミング", "おすすめ", "やり方", "仕方", "大きく", "美味しく"
+  "コツ", "ポイント", "時期", "タイミング", "おすすめ", "やり方", "仕方", "大きく", "美味しく",
+  "相談", "質問", "おねがい", "お願い"
 ];
 
 /**
- * 過去ナレッジから個人名や呼びかけ（竹下翔さん、〇〇さん等）を完全に自動除去・匿名化
+ * DBから受講生の表示名（display_name）リストを動的取得
  */
-export function sanitizePersonalNames(text: string): string {
+export async function fetchStudentDisplayNames(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("display_name")
+      .not("display_name", "is", null)
+      .neq("display_name", "");
+
+    if (error || !data) return [];
+    return data
+      .map((u) => u.display_name?.trim())
+      .filter((name): name is string => Boolean(name && name.length >= 2));
+  } catch (e) {
+    console.error("fetchStudentDisplayNames error:", e);
+    return [];
+  }
+}
+
+/**
+ * 過去ナレッジから全般的なPII（氏名・電話番号・メール・住所・SNS・家族情報等）を包括的に検知・安全な表現に変換
+ * （ハードコードされた特定の個人名を排除し、パターンマッチングおよび受講生リストに基づいて置換）
+ */
+export function sanitizePiiText(
+  text: string,
+  studentNames: string | string[] = []
+): string {
+
   if (!text) return "";
   let clean = text;
+
+  // 0. 動的に取得された受講生表示名リスト（display_name）に基づく汎用置換
+  const namesArray = typeof studentNames === "string" ? [studentNames] : studentNames;
+  if (namesArray && namesArray.length > 0) {
+    const sortedNames = Array.from(
+      new Set(
+        namesArray
+          .map((n) => (n || "").trim())
+          .filter((n) => n.length >= 2 && n !== "受講生")
+      )
+    ).sort((a, b) => b.length - a.length);
+
+    for (const name of sortedNames) {
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const namePattern = new RegExp(`${escapedName}(?:さん|様|くん|ちゃん|氏)?`, "g");
+      clean = clean.replace(namePattern, "[受講生]");
+    }
+  }
 
   // 1. 文頭の「〇〇さん、こんにちは！😊」等の個人向け挨拶ブロックを除去
   clean = clean.replace(/^[^\n\r]{1,30}さん[、,!\s]*(?:こんにちは|メッセージありがとうございます|おはようございます|お疲れ様です)[^\n\r]*[\n\r]*/gm, "");
@@ -39,19 +85,86 @@ export function sanitizePersonalNames(text: string): string {
   // 2. 「チケット無事に復活しましたね✨」などの個人対話文脈行を除去
   clean = clean.replace(/^[^\n\r]*(?:チケット無事|復活しました)[^\n\r]*[\n\r]*/gm, "");
 
-  // 3. 残っている個人名呼びかけ「〇〇さん、」「竹下翔さん」等の除去
+  // 3. 電話番号 (例: 090-xxxx-xxxx, 03-xxxx-xxxx, 09012345678)
+  clean = clean.replace(/(?:0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{3,4})|(?:0[789]0[-\s]?\d{4}[-\s]?\d{4})/g, "[個人情報]");
+
+  // 4. メールアドレス (例: xxxx@example.com)
+  clean = clean.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, "[個人情報]");
+
+  // 5. 郵便番号・住所・地名
+  clean = clean.replace(/〒?\s*\d{3}-\d{4}/g, "[個人情報]");
+  clean = clean.replace(/(?:東京都|北海道|(?:京都|大阪)府|.{2,3}県)[^\s\n\r,。!！]{2,20}(?:市|区|町|村|丁目|番地|号)[^\s\n\r,。!！]*/g, "[個人情報]");
+
+  // 6. LINE ID・SNSアカウント
+  clean = clean.replace(/(?:LINE\s*ID|ライン\s*ID|Instagram|Twitter|X|インスタ|ツイッター)[:：\s]*@?[a-zA-Z0-9._-]+/gi, "[個人情報]");
+  clean = clean.replace(/(?:^|\s)@[a-zA-Z0-9_]{3,15}(?=\s|$|[、,。!！])/g, " [個人情報]");
+
+  // 7. 個人名呼びかけ・氏名単体「受講生の〇〇さん」「〇〇さん、」等の除去/一般化 (名乗り処理の前に実行)
   clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+(?:さん|様|くん|ちゃん)/g, "受講生の方");
   clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, "");
-  clean = clean.replace(/(?:竹下|翔|たけした)[^ \n\r!！🌱〜]*(?:さん|様|くん|ちゃん)?[、,!\s]*/g, "");
 
-  // 4. 文頭の余分な改行の整理
+
+  // 8. 氏名・自己紹介名乗り（例: 山田太郎です、〜と申します）
+  clean = clean.replace(/(?:[一-龠ぁ-んァ-ヶ]{1,10})と申します/g, "[受講生]と申します");
+  clean = clean.replace(/(?:私|僕|俺|名前)(?:は|が)?\s*([一-龠ぁ-んァ-ヶ]{2,10})です/g, "[受講生]です");
+  clean = clean.replace(/(?:[一-龠]{2,4}\s+[一-龠]{1,4}|[一-龠]{2,4}[一-龠]{2})です/g, (match) => {
+    if (/(?:時期|方法|対策|栽培|管理|作業|状態|目安|結果|様子|予定|確認|報告|相談|質問|感謝|初心者|追肥|病気|害虫|水やり|野菜|農園|収穫|土作り)です$/.test(match)) {
+      return match;
+    }
+    return "[受講生]です";
+  });
+
+  // 9. 家庭・家族情報（例: うちの娘が、息子の〇〇が）
+  clean = clean.replace(/(?:うちの|私の|僕の|俺の|我が家の)?(?:娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母|お父さん|お母さん)(?:の[^\s\n\r,。!！]{1,10})?/g, "[ご家族]");
+
+  // 10. 文頭の余分な改行・空白の整理
   clean = clean.trim();
 
   return clean || text.trim();
 }
 
 /**
+ * 後方互換性のためのエイリアス
+ */
+export function sanitizePersonalNames(text: string, dynamicNames: string[] = []): string {
+  return sanitizePiiText(text, dynamicNames);
+}
+
+/**
+ * AI回答または講師回答（reply）からサニタイズされた【相談トピック】を抽出
+ * 回答内に【相談トピック: 〇〇】等があればそれを抽出し、なければ本文の冒頭見出しまたは一般化見出しを返す
+ */
+export function extractTopicFromReply(reply: string): string {
+  if (!reply) return "【相談トピック: 野菜の栽培・管理について】";
+
+  // 1. 【相談トピック: ...】または【相談概要: ...】のパターンを抽出
+  const topicMatch = reply.match(/【(?:相談トピック|相談概要|トピック|概要)[：:]\s*([^】\n\r]+)】/);
+  if (topicMatch && topicMatch[1]) {
+    return `【相談トピック: ${topicMatch[1].trim()}】`;
+  }
+
+  // 2. 【農園アドバイス: ...】などのパターンがある場合
+  const adviceMatch = reply.match(/【(?:農園アドバイス|アドバイス)[：:]\s*([^】\n\r]+)】/);
+  if (adviceMatch && adviceMatch[1]) {
+    const cleanAdv = adviceMatch[1].replace(/[🌱🍅🐛💧✨🧑‍🌾]/g, "").trim();
+    return `【相談トピック: ${cleanAdv}】`;
+  }
+
+  // 3. 回答の1行目に【...】で囲まれた見出しがある場合
+  const firstLine = reply.split(/[\n\r]+/)[0].trim();
+  const headerMatch = firstLine.match(/^【([^】]+)】/);
+  if (headerMatch && headerMatch[1]) {
+    return `【相談トピック: ${headerMatch[1].trim()}】`;
+  }
+
+  // 4. フォールバック
+  return "【相談トピック: 野菜の栽培・管理について】";
+}
+
+/**
  * ユーザーの質問と過去のナレッジを比較し、関連性の高い順にソートして抽出
+ * 🌟 生徒の生相談文(content)の参照を完全廃止し、サニタイズされたreply(回答・トピック)のみから照合 🌟
+ * 🌟 非公開相談(is_private = true)はDB層で厳密に除外 🌟
  */
 export async function searchSimilarKnowledge(
   userQuestion: string
@@ -59,10 +172,11 @@ export async function searchSimilarKnowledge(
   try {
     const { data: dbData, error } = await supabase
       .from("journals")
-      .select("id, content, reply, is_approved, student_id")
+      .select("id, reply, is_approved, is_private, student_id")
+      .eq("is_approved", true)
+      .eq("is_private", false)
       .not("reply", "is", null)
       .neq("reply", "")
-      .order("is_approved", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -98,29 +212,25 @@ export async function searchSimilarKnowledge(
     });
 
     dbData.forEach((item: any) => {
-      if (!item.content || !item.reply) return;
+      if (!item.reply) return;
 
-      const itemContent = item.content.toLowerCase();
       const itemReply = item.reply.toLowerCase();
-      const fullText = itemContent + " " + itemReply;
 
       // 🌟【重要】作物の厳格チェック: ユーザーが作物を指定している場合、他作物のノウハウは除外 🌟
       if (queryCrops.length > 0) {
-        // このQ&Aに対象作物が含まれているか？
-        const containsTargetCrop = queryCrops.some((crop) => fullText.includes(crop.toLowerCase()));
+        // この回答（および相談トピック）に対象作物が含まれているか？
+        const containsTargetCrop = queryCrops.some((crop) => itemReply.includes(crop.toLowerCase()));
         if (!containsTargetCrop) {
-          return; // 対象作物が含まれていなければスキップ（枝豆の質問にピーマンやジャガイモを出さない）
+          return; // 対象作物が含まれていなければスキップ
         }
       }
 
       let score = 0;
 
-      // 1. 重要キーワードの一致
+      // 1. 重要キーワードの一致 (生徒の生質問文contentは完全未参照・replyのみから照合)
       questionKeywords.forEach((kw) => {
-        if (itemContent.includes(kw)) {
-          score += kw.length >= 3 ? 6 : 4; // 質問文にキーワードが含まれる場合は高スコア
-        } else if (fullText.includes(kw)) {
-          score += kw.length >= 3 ? 3 : 1.5;
+        if (itemReply.includes(kw)) {
+          score += kw.length >= 3 ? 6 : 4;
         }
       });
 
@@ -131,10 +241,11 @@ export async function searchSimilarKnowledge(
 
       // スコアが十分に高い（明確な重要語一致がある）ものだけ抽出
       if (score >= 4) {
+        const extractedTopic = extractTopicFromReply(item.reply);
         pastQa.push({
           id: (item.id || "").toString(),
-          question: sanitizePersonalNames(item.content),
-          answer: sanitizePersonalNames(item.reply),
+          question: extractedTopic,
+          answer: sanitizePiiText(item.reply),
           similarityScore: score,
         });
       }
@@ -150,13 +261,14 @@ export async function searchSimilarKnowledge(
 }
 
 /**
- * 過去のQ&Aナレッジをプロンプトに注入し、最適なAI回答を生成 (Gemini Lite最優先・自動カスケード)
+ * 過去のQ&Aナレッジをプロンプトに注入し、最適なAI回答を生成 (systemInstruction分離・ヘッダー認証・タイムアウト・自動カスケード)
  */
 export async function getAnswerWithRag(
   userQuestion: string,
   studentName: string = "受講生",
   recentHistoryText: string = ""
 ): Promise<{ reply: string; referencedQa: ReferencedQA[] }> {
+
   // 🌟「大量質問テスト」トリガーの即時ルールベース返信 🌟
   if (userQuestion.includes("大量質問テスト")) {
     return {
@@ -166,8 +278,17 @@ export async function getAnswerWithRag(
     };
   }
 
+  // 🌟 DBから受講生表示名リストを取得 & Gemini送信前サニタイズパイプライン 🌟
+  const studentDisplayNames = await fetchStudentDisplayNames();
+  const allStudentNames = Array.from(
+    new Set([...studentDisplayNames, studentName].filter(Boolean))
+  );
+
+  const cleanUserQuestion = sanitizePiiText(userQuestion, allStudentNames);
+  const cleanRecentHistoryText = sanitizePiiText(recentHistoryText, allStudentNames);
+
   // 1. 類似ナレッジを検索 (重み1.2倍を優先)
-  const referencedQa = await searchSimilarKnowledge(userQuestion);
+  const referencedQa = await searchSimilarKnowledge(cleanUserQuestion);
 
   // 2. Gemini API 呼び出し
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -186,24 +307,25 @@ export async function getAnswerWithRag(
           referencedQa
             .map(
               (qa, i) =>
-                `[事例${i + 1}] 過去の質問:「${qa.question}」➔ 講師の回答:「${qa.answer}」 (関連度スコア: ${
+                `[事例${i + 1}] 過去の相談トピック:「${sanitizePiiText(qa.question, allStudentNames)}」➔ 講師の回答:「${sanitizePiiText(qa.answer, allStudentNames)}」 (関連度スコア: ${
                   qa.similarityScore?.toFixed(1) || 1.2
                 })`
             )
             .join("\n\n")
         : `【農園DBナレッジ】該当する過去の指導データはありません。一般的な自然栽培・有機栽培の知見と親身な日常会話で対応してください。`;
 
-    const historySection = recentHistoryText
-      ? `【これまでの直近の会話の流れ】\n${recentHistoryText}\n\n`
-      : "";
-
-    const systemPrompt = `
-あなたは体験農園「NOU-ATO」の優しく親しみやすい講師アドバイザーAI「しるべぇ（講師AI）」です。
+    const systemInstruction = `あなたは体験農園「NOU-ATO」の優しく親しみやすい講師アドバイザーAI「しるべぇ（講師AI）」です。
 体験農園の受講生から相談・メッセージが届きました。
 
 【⚠️ 最重要：プライバシー保護とナレッジ共有の絶対ルール】
-回答文の中に、生徒の個人名（「〇〇さん」など）を絶対に含めないでください。
-この回答は将来、他の受講生が同じ悩みを抱えた際にも共有ナレッジとして参照されるため、名前を呼ばずに「こんにちは！🌱」「ご質問ありがとうございます！」のように温かく親身なトーンで回答してください。
+1. **回答の冒頭フォーマット (必須):**
+   回答の1行目（冒頭）には、生徒の生テキストから個人情報を排除し、相談テーマを一般化した見出しを『【相談トピック: 〇〇について】』という形式で必ず記載してください。
+   例: 【相談トピック: トマトの葉の黄変と追肥について】
+   その後、改行を入れてから回答本文を開始してください。
+
+2. **個人情報の排除:**
+   回答文の中に、生徒の個人名（「〇〇さん」など）や電話番号、住所等の個人情報を絶対に含めないでください。
+   この回答は将来、他の受講生が同じ悩みを抱えた際にも共有ナレッジとして参照されるため、名前を呼ばずに「こんにちは！🌱」「ご質問ありがとうございます！」のように温かく親身なトーンで回答してください。
 
 【対話の基本指針】
 1. **普段の気軽な日常会話・挨拶:**
@@ -219,10 +341,12 @@ export async function getAnswerWithRag(
    - 優しく寄り添う話し方（「〜してみてくださいね🌱」「何かあればいつでも気軽に聞いてくださいね！」）。
    - 読みやすい適度な文章量（200〜450文字程度、箇条書きや絵文字を適度に活用）。文章は途中で途切れず、最後まで丁寧に完結させてください。
 
-${knowledgeSection}
+${knowledgeSection}`;
 
-${historySection}受講生の新しい相談メッセージ: 「${userQuestion}」
-`;
+    const userPrompt = cleanRecentHistoryText
+      ? `【これまでの直近の会話の流れ】\n${cleanRecentHistoryText}\n\n受講生の新しい相談メッセージ: 「${cleanUserQuestion}」`
+      : `受講生の新しい相談メッセージ: 「${cleanUserQuestion}」`;
+
 
     const preferredModel = process.env.GEMINI_MODEL;
     const modelsToTry = [
@@ -241,12 +365,24 @@ ${historySection}受講生の新しい相談メッセージ: 「${userQuestion}�
     for (const modelName of uniqueModels) {
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiApiKey,
+            },
+            signal: AbortSignal.timeout(15000),
             body: JSON.stringify({
-              contents: [{ parts: [{ text: systemPrompt }] }],
+              systemInstruction: {
+                parts: [{ text: systemInstruction }],
+              },
+              contents: [
+                {
+                  role: "user",
+                  parts: [{ text: userPrompt }],
+                },
+              ],
               generationConfig: {
                 temperature: 0.7,
                 maxOutputTokens: 2500,

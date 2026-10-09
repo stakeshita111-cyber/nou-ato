@@ -103,7 +103,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   const [loading, setLoading] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-  const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const [showMobileDetails, setShowMobileDetails] = useState(true);
 
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
@@ -1111,7 +1111,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
               ℹ️
             </span>
             <span className="font-bold underline decoration-dashed underline-offset-2 text-gray-600 group-hover:text-emerald-800 text-[10px]">
-              データ出典: Open-Meteo & 気象庁推計 (ホバー詳細)
+              データ出典: Open-Meteo & 気象庁推計
             </span>
 
             {/* マウスオーバー詳細ポップオーバー */}
@@ -1127,10 +1127,6 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
               </div>
             )}
           </div>
-
-          <span className="text-[9.5px] text-gray-400 font-bold hidden sm:inline-block">
-            ※1時間毎最新同期中
-          </span>
         </div>
 
         {/* 【下部】気象サマリー ＆ 農業判断指標 (不要メッセージ排除・スッキリ配置) */}
@@ -1636,7 +1632,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
             <div className="flex justify-end space-x-2 pt-2 border-t">
               <button
-                onClick={() => setIsLocationModalOpen(false)}
+                onClick={() => setIsBroadcastModalOpen(false)}
                 className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-xs"
               >
                 キャンセル
