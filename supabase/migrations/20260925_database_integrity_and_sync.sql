@@ -85,14 +85,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    default_role text;
     user_name text;
-    invited_farm_id uuid;
 BEGIN
-    -- メタデータからロールを抽出（デフォルトは 'student'）
-    default_role := COALESCE(new.raw_user_meta_data->>'role', 'student');
-    
-    -- メタデータから表示名を抽出（full_name, name, または email プレフィックス）
+    -- メタデータから表示名を抽出（full_name, name, display_name または email プレフィックス）
     user_name := COALESCE(
         new.raw_user_meta_data->>'full_name',
         new.raw_user_meta_data->>'name',
@@ -100,14 +95,8 @@ BEGIN
         split_part(new.email, '@', 1)
     );
 
-    -- 招待メタデータに農園IDがあれば抽出
-    IF (new.raw_user_meta_data->>'farm_id') IS NOT NULL AND (new.raw_user_meta_data->>'farm_id') ~ '^[0-9a-fA-F-]{36}$' THEN
-        invited_farm_id := (new.raw_user_meta_data->>'farm_id')::uuid;
-    ELSE
-        invited_farm_id := NULL;
-    END IF;
-
     -- public.users テーブルへ UPSERT
+    -- セキュリティ強化: メタデータの role や farm_id は一切信用せず、常に role = 'student', farm_id = NULL
     INSERT INTO public.users (
         id,
         email,
@@ -121,8 +110,8 @@ BEGIN
         new.id,
         new.email,
         user_name,
-        default_role,
-        invited_farm_id,
+        'student',
+        NULL,
         NOW(),
         NOW()
     )
@@ -130,7 +119,6 @@ BEGIN
     SET
         email = EXCLUDED.email,
         display_name = COALESCE(public.users.display_name, EXCLUDED.display_name),
-        farm_id = COALESCE(public.users.farm_id, EXCLUDED.farm_id),
         updated_at = NOW();
 
     RETURN NEW;
