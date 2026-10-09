@@ -934,6 +934,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           });
       }
 
+      // 🌟 重複レコードの厳格な除外 (同一ID、または同一生徒・同一日時・同一タイトルの重複を排除) 🌟
+      const uniqueRecords: SlideItemRecord[] = [];
+      const seenRecordKeys = new Set<string>();
+
+      allRecords.forEach((r) => {
+        const dedupKey =
+          r.id || `${r.studentName}_${r.dateStr}_${r.timeStr}_${r.title}_${r.content}`;
+        if (!seenRecordKeys.has(dedupKey)) {
+          seenRecordKeys.add(dedupKey);
+          uniqueRecords.push(r);
+        }
+      });
+
       // 🌟【要件: 各生徒の直近N回分のみに厳密制限 (デフォルト: 直近3回分)】🌟
       const limit = slideSettings.limitPerStudent;
       let filteredByStudentRecords: SlideItemRecord[] = [];
@@ -941,7 +954,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (limit > 0) {
         // 生徒ごとにグルーピング
         const studentMap: { [name: string]: SlideItemRecord[] } = {};
-        allRecords.forEach((r) => {
+        uniqueRecords.forEach((r) => {
           if (!studentMap[r.studentName]) {
             studentMap[r.studentName] = [];
           }
@@ -954,7 +967,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           filteredByStudentRecords.push(...list.slice(0, limit));
         });
       } else {
-        filteredByStudentRecords = [...allRecords];
+        filteredByStudentRecords = [...uniqueRecords];
       }
 
       // 🌟【要件: ソート・並べ替えの適用】🌟
@@ -1001,13 +1014,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         }
       }
 
-      // ループのスムーズさ確保のため、少数の場合は必要十分な長さに複製
-      let filledCols = [...cols];
-      while (filledCols.length < 8 && filledCols.length > 0) {
-        filledCols = [...filledCols, ...cols];
-      }
-
-      setSlideColumns(filledCols);
+      // 🌟 実データのみを正確にセット（同じ日誌が何重にもループして流れる水増し複製を撤廃） 🌟
+      setSlideColumns(cols);
     } catch (err) {
       console.error('fetchCropRecords error:', err);
       setSlideColumns([]);
@@ -1060,6 +1068,16 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       if (sliderRef.current && trackRef.current) {
         const totalTrackWidth = trackRef.current.scrollWidth;
+        const containerWidth = sliderRef.current.clientWidth;
+        const shouldScroll = slideColumns.length >= 4 && totalTrackWidth / 2 > containerWidth;
+
+        if (!shouldScroll) {
+          scrollPosRef.current = 0;
+          sliderRef.current.scrollLeft = 0;
+          animId = requestAnimationFrame(loop);
+          return;
+        }
+
         const halfWidth = totalTrackWidth / 2;
 
         let baseSpeed = 0.65;
@@ -1622,99 +1640,111 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           onMouseLeave={handleSliderMouseLeave}
           className="relative w-full overflow-x-hidden rounded-2xl bg-emerald-50/30 p-3 border border-emerald-100/80 select-none cursor-pointer"
         >
-          <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-emerald-100/40 to-transparent pointer-events-none z-10 flex items-center justify-start pl-1">
-            <span className="text-emerald-700/40 text-xs font-black">◀</span>
-          </div>
+          {slideColumns.length >= 4 && (
+            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-emerald-100/40 to-transparent pointer-events-none z-10 flex items-center justify-start pl-1">
+              <span className="text-emerald-700/40 text-xs font-black">◀</span>
+            </div>
+          )}
 
-          <div ref={trackRef} className="flex space-x-3 w-max">
-            {[...slideColumns, ...slideColumns].map((col, colIdx) => (
-              <div key={`col_${colIdx}`} className="flex flex-col space-y-2.5 shrink-0">
-                {col.map((item, rowIdx) => {
-                  const hasRealImage =
-                    item.imageUrl &&
-                    item.imageUrl.trim() &&
-                    item.imageUrl !== 'undefined' &&
-                    !item.imageUrl.includes('undefined');
+          {slideColumns.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-500 font-medium">
+              🌱 表示対象の作業・観察記録がありません
+            </div>
+          ) : (
+            <div ref={trackRef} className="flex space-x-3 w-max">
+              {(slideColumns.length >= 4 ? [...slideColumns, ...slideColumns] : slideColumns).map(
+                (col, colIdx) => (
+                  <div key={`col_${colIdx}`} className="flex flex-col space-y-2.5 shrink-0">
+                    {col.map((item, rowIdx) => {
+                      const hasRealImage =
+                        item.imageUrl &&
+                        item.imageUrl.trim() &&
+                        item.imageUrl !== 'undefined' &&
+                        !item.imageUrl.includes('undefined');
 
-                  return (
-                    <div
-                      key={`rec_${item.id}_${colIdx}_${rowIdx}`}
-                      onClick={() => {
-                        if (item.plotCode) {
-                          if (onNavigateToFarm) {
-                            onNavigateToFarm(item.plotCode, item.farmId);
-                          } else {
-                            setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
-                            setShowToast(true);
-                          }
-                        } else {
-                          setToastMessage(`⚠️ ${item.studentName} さんは担当区画が未設定です`);
-                          setShowToast(true);
-                        }
-                      }}
-                      className="w-80 sm:w-96 h-[126px] shrink-0 bg-white p-2.5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:bg-emerald-50/20 transition-all duration-200 flex space-x-3 group text-left relative overflow-hidden cursor-pointer"
-                    >
-                      {hasRealImage && (
-                        <div className="w-24 sm:w-28 h-full rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-2xs bg-emerald-50 relative group-hover:scale-[1.02] transition-transform duration-300">
-                          <img
-                            src={item.imageUrl}
-                            alt="観察写真"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-[10px] font-black text-emerald-900 bg-emerald-100/90 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
-                              <span>📅</span>
-                              <span>{item.dateStr}</span>
-                              <span className="text-emerald-700 font-semibold">{item.timeStr}</span>
-                            </span>
-
-                            <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 truncate max-w-[120px]">
-                              {item.title}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center space-x-1.5">
-                            <div className="w-4.5 h-4.5 rounded-full bg-emerald-600 text-white font-black text-[9px] flex items-center justify-center shadow-2xs shrink-0">
-                              {item.studentAvatar}
+                      return (
+                        <div
+                          key={`rec_${item.id}_${colIdx}_${rowIdx}`}
+                          onClick={() => {
+                            if (item.plotCode) {
+                              if (onNavigateToFarm) {
+                                onNavigateToFarm(item.plotCode, item.farmId);
+                              } else {
+                                setToastMessage(`📍 畑管理画面を開きます (${item.studentName})`);
+                                setShowToast(true);
+                              }
+                            } else {
+                              setToastMessage(`⚠️ ${item.studentName} さんは担当区画が未設定です`);
+                              setShowToast(true);
+                            }
+                          }}
+                          className="w-80 sm:w-96 h-[126px] shrink-0 bg-white p-2.5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:bg-emerald-50/20 transition-all duration-200 flex space-x-3 group text-left relative overflow-hidden cursor-pointer"
+                        >
+                          {hasRealImage && (
+                            <div className="w-24 sm:w-28 h-full rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-2xs bg-emerald-50 relative group-hover:scale-[1.02] transition-transform duration-300">
+                              <img
+                                src={item.imageUrl}
+                                alt="観察写真"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = 'none';
+                                }}
+                              />
                             </div>
-                            <span className="font-extrabold text-gray-900 text-xs truncate max-w-[140px]">
-                              {item.studentName}
-                            </span>
-                          </div>
-
-                          <p className="text-[11px] text-gray-700 font-medium line-clamp-2 leading-snug">
-                            {item.content}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[9px] text-gray-400 font-semibold border-t border-gray-100 pt-0.5">
-                          {item.harvestAmount ? (
-                            <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-200">
-                              {item.harvestAmount}
-                            </span>
-                          ) : (
-                            <span className="text-emerald-700 font-bold">✓ 記録済み</span>
                           )}
 
-                          <span className="text-emerald-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                            畑を開く ↗
-                          </span>
+                          <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-black text-emerald-900 bg-emerald-100/90 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                                  <span>📅</span>
+                                  <span>{item.dateStr}</span>
+                                  <span className="text-emerald-700 font-semibold">
+                                    {item.timeStr}
+                                  </span>
+                                </span>
+
+                                <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 truncate max-w-[120px]">
+                                  {item.title}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center space-x-1.5">
+                                <div className="w-4.5 h-4.5 rounded-full bg-emerald-600 text-white font-black text-[9px] flex items-center justify-center shadow-2xs shrink-0">
+                                  {item.studentAvatar}
+                                </div>
+                                <span className="font-extrabold text-gray-900 text-xs truncate max-w-[140px]">
+                                  {item.studentName}
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-gray-700 font-medium line-clamp-2 leading-snug">
+                                {item.content}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[9px] text-gray-400 font-semibold border-t border-gray-100 pt-0.5">
+                              {item.harvestAmount ? (
+                                <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-200">
+                                  {item.harvestAmount}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700 font-bold">✓ 記録済み</span>
+                              )}
+
+                              <span className="text-emerald-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                畑を開く ↗
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+            </div>
+          )}
         </div>
       </div>
 
