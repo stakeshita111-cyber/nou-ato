@@ -1196,7 +1196,7 @@ export function useFarmManager() {
 
     let targetBeds: FarmBed[] = [];
     const nextPlots = plots.map((plot) => {
-      if (plot.id === plotId || plot.code === "B3") {
+      if (plot.id === plotId || plot.code === plotId) {
         const reordered = [...plot.beds];
         const [movedBed] = reordered.splice(fromIndex, 1);
         reordered.splice(toIndex, 0, movedBed);
