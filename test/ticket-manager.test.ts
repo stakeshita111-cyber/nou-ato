@@ -10,7 +10,7 @@ import {
   clearQuestionStock,
   formatStockText,
   DEFAULT_DAILY_TICKETS,
-} from "@/lib/ticketManager";
+} from "@/lib/utils/ticketManager";
 
 describe("ticketManager", () => {
   const mockStorage: Record<string, string> = {};
