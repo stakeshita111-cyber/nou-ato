@@ -179,6 +179,7 @@ nou-ato/
 | :--- | :--- | :--- | :--- |
 | **要件定義書 (PRD)** | [ブラウザで開く](docs/markdown-viewer.html?doc=prd) | [`PRD.md`](PRD.md) | プロダクト要求仕様書、ユーザーストーリー、機能要件一覧 |
 | **非機能要件定義書** | [ブラウザで開く](docs/markdown-viewer.html?doc=nfr) | [`docs/NON_FUNCTIONAL_REQUIREMENTS.md`](docs/NON_FUNCTIONAL_REQUIREMENTS.md) | パフォーマンスSLO、可用性99.9%、セキュリティRLS監査規準 |
+| **セキュリティ & コスト防衛ランブック** | [ブラウザで開く](docs/markdown-viewer.html?doc=sec) | [`docs/SECURITY_RUNBOOK.md`](docs/SECURITY_RUNBOOK.md) | GCP 予算アラート設定、Gemini API Quota 上限、緊急キルスイッチ運用 |
 | **ログ設計書** | [ブラウザで開く](docs/markdown-viewer.html?doc=log) | [`docs/LOGGING_DESIGN.md`](docs/LOGGING_DESIGN.md) | RFC 7807 統一エラー、機密マスキング、Supabase監査ログ |
 | **データベース設計書 (ERD)** | [ブラウザで開く](docs/markdown-viewer.html?doc=erd) | [`docs/ERD.md`](docs/ERD.md) | スキーマ設計、テーブルリレーション、インデックス設計 |
 | **API cURLサンプル集** | [ブラウザで開く](docs/markdown-viewer.html?doc=curl) | [`docs/API_CURL_SAMPLES.md`](docs/API_CURL_SAMPLES.md) | 各エンドポイントへのリクエスト例・レスポンス定義 |
