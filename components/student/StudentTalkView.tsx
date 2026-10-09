@@ -127,6 +127,39 @@ export default function StudentTalkView({
     setTicketState(current);
   }, [studentId, customDailyLimit, planType]);
 
+  // リアルタイム・クロス cellophane チケット残数同期
+  useEffect(() => {
+    const updateState = () => {
+      const current = getTicketState(studentId || "default", customDailyLimit, planType);
+      setTicketState(current);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("nouato_tickets_updated", updateState);
+      window.addEventListener("nouato_sync_event", updateState);
+      window.addEventListener("storage", updateState);
+    }
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc.onmessage = (event) => {
+        if (event.data?.type === "TICKETS_UPDATED") {
+          updateState();
+        }
+      };
+    } catch {}
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("nouato_tickets_updated", updateState);
+        window.removeEventListener("nouato_sync_event", updateState);
+        window.removeEventListener("storage", updateState);
+      }
+      if (bc) bc.close();
+    };
+  }, [studentId, customDailyLimit, planType]);
+
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
   const loadChatHistory = useCallback(async () => {
     try {
@@ -843,8 +876,8 @@ export default function StudentTalkView({
               )}
             </button>
 
-            <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / 3 回"}>
-              {Array.from({ length: 3 }).map((_, i) => (
+            <div className="flex items-center space-x-1" title={"本日残り " + ticketState.count + " / " + ticketState.dailyLimit + " 回"}>
+              {Array.from({ length: Math.max(3, ticketState.count) }).map((_, i) => (
                 <span
                   key={i}
                   className={"w-1.5 h-1.5 rounded-full transition-all " + (
