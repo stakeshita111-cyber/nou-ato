@@ -177,25 +177,58 @@ export default function StudentTalkView({
           return;
         }
 
-        if (j.content) {
-          formatted.push({
-            id: "q_" + j.id,
-            sender: "student",
-            text: j.content,
-            timestamp: j.created_at
-              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-              : (j.date || "過去のメッセージ"),
-          });
+        const isTeacherRole = j.role === "broadcast" || j.role === "teacher" || j.role === "announcement";
+
+        // 🌟 講師返信時に自動作成される通知用重複レコード（例: role="broadcast", text="【返信】...", reply="講師からの返信"）は除外 🌟
+        // （返信本文は元の相談レコード j.reply に保持されており、そちらから講師吹き出しとしてレンダリングされるため）
+        if (
+          isTeacherRole &&
+          (j.text === "【返信】講師から相談への回答が届きました" ||
+            j.text?.startsWith("【返信】") ||
+            j.reply === "講師からの返信")
+        ) {
+          return;
         }
-        if (j.reply) {
-          formatted.push({
-            id: "a_" + j.id,
-            sender: "teacher",
-            text: j.reply,
-            timestamp: j.created_at
-              ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-              : (j.date || "回答済み"),
-          });
+
+        const formattedTimestamp = j.created_at
+          ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+          : (j.date || "過去のメッセージ");
+
+        if (isTeacherRole) {
+          // 講師起点の配信・メッセージ（j.content が講師メッセージ本文）
+          if (j.content) {
+            formatted.push({
+              id: "t_" + j.id,
+              sender: "teacher",
+              text: j.content,
+              timestamp: formattedTimestamp,
+            });
+          }
+        } else {
+          // 生徒起点の相談・質問日誌
+          if (j.content) {
+            formatted.push({
+              id: "q_" + j.id,
+              sender: "student",
+              text: j.content,
+              timestamp: formattedTimestamp,
+            });
+          }
+          if (
+            j.reply &&
+            j.reply !== "講師からの返信" &&
+            !j.reply.startsWith("講師配信") &&
+            !j.reply.startsWith("講師個別連絡")
+          ) {
+            formatted.push({
+              id: "a_" + j.id,
+              sender: "teacher",
+              text: j.reply,
+              timestamp: j.created_at
+                ? new Date(j.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+                : (j.date || "回答済み"),
+            });
+          }
         }
       });
 
