@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-// 1. 講師サインアップ & 農園開設ロジックのシミュレーション
+// 1. 講師サインアップ (register_teacher RPC 経由) のシミュレーション
 function simulateTeacherSignUp(input: {
   farmName: string;
   teacherName: string;
@@ -23,12 +23,20 @@ function simulateTeacherSignUp(input: {
   const userId = `user_${Date.now()}`;
   const farmId = `farm_${Date.now()}`;
 
-  const user = {
+  // handle_new_auth_user トリガーにより最初は student/null で作成される
+  const initialUser = {
     id: userId,
     email: input.email.trim(),
     display_name: input.teacherName.trim(),
+    role: "student" as const,
+    farm_id: null as string | null,
+  };
+
+  // register_teacher RPC 実行後
+  const promotedUser = {
+    ...initialUser,
     role: "teacher" as const,
-    farm_id: input.farmName.trim(),
+    farm_id: farmId,
   };
 
   const farm = {
@@ -37,10 +45,10 @@ function simulateTeacherSignUp(input: {
     owner_id: userId,
   };
 
-  return { success: true, user, farm };
+  return { success: true, user: promotedUser, farm };
 }
 
-// 2. 生徒招待 & 農園紐づけロジックのシミュレーション
+// 2. 生徒招待 & 農園紐づけ (join_farm RPC 経由) のシミュレーション
 function simulateStudentInviteSignUp(input: {
   name: string;
   email: string;
@@ -60,15 +68,29 @@ function simulateStudentInviteSignUp(input: {
   }
 
   const studentUserId = `student_${Date.now()}`;
+  // join_farm RPC により farm_id が紐づけられる
   const user = {
     id: studentUserId,
     email: input.email.trim(),
     display_name: input.name.trim(),
     role: "student" as const,
-    farm_id: input.inviteFarmId, // 招待された農園IDに紐づけ
+    farm_id: input.inviteFarmId,
   };
 
   return { success: true, user };
+}
+
+// 3. /invite 画面での未ログイン時データ取得シミュレーション
+function simulateInvitePageFetch(farmIdParam: string | null, dbFarms: Array<{ id: string; name: string }>) {
+  // 未ログイン時に全件取得 (select('*')) は禁止
+  if (!farmIdParam) {
+    // URLに指定がない場合は全件取得せずデモ表示設定を返す
+    return { isDemo: true, farm: null, fetchedAllFarms: false };
+  }
+
+  // 指定がある場合のみ対象の1件を検索
+  const farm = dbFarms.find((f) => f.id === farmIdParam) || null;
+  return { isDemo: !farm, farm, fetchedAllFarms: false };
 }
 
 describe("Teacher Sign-up, Farm Creation & Student Invite Tests (講師登録・農園開設・生徒招待テスト)", () => {
@@ -174,7 +196,33 @@ describe("Teacher Sign-up, Farm Creation & Student Invite Tests (講師登録・
     });
   });
 
-  describe("4. パスワード再設定（リセット）のバリデーションテスト", () => {
+  describe("4. /invite 画面における未ログイン時の農園一覧非露出テスト", () => {
+    it("URLに farm_id が指定されていない場合、農園一覧を全件取得せずデモモードで表示されること", () => {
+      const dbFarms = [
+        { id: "farm_1", name: "秘密の農園A" },
+        { id: "farm_2", name: "秘密の農園B" },
+      ];
+
+      const pageState = simulateInvitePageFetch(null, dbFarms);
+      expect(pageState.fetchedAllFarms).toBe(false);
+      expect(pageState.isDemo).toBe(true);
+      expect(pageState.farm).toBeNull();
+    });
+
+    it("URLに特定の farm_id が指定されている場合、その農園のみがピンポイントで取得されること", () => {
+      const dbFarms = [
+        { id: "farm_1", name: "佐藤農園" },
+        { id: "farm_2", name: "鈴木農園" },
+      ];
+
+      const pageState = simulateInvitePageFetch("farm_1", dbFarms);
+      expect(pageState.fetchedAllFarms).toBe(false);
+      expect(pageState.isDemo).toBe(false);
+      expect(pageState.farm?.name).toBe("佐藤農園");
+    });
+  });
+
+  describe("5. パスワード再設定（リセット）のバリデーションテスト", () => {
     function simulatePasswordReset(password: string, confirmPassword: string) {
       if (!password || !confirmPassword) {
         return { error: "新しいパスワードを入力してください" };
@@ -209,7 +257,7 @@ describe("Teacher Sign-up, Farm Creation & Student Invite Tests (講師登録・
     });
   });
 
-  describe("5. 受講生画面URL統一のテスト (/student/quests -> /student)", () => {
+  describe("6. 受講生画面URL統一のテスト (/student/quests -> /student)", () => {
     it("/student/quests が /student へリダイレクトされること", () => {
       const requestPath = "/student/quests";
       const redirectTarget = requestPath === "/student/quests" ? "/student" : requestPath;

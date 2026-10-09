@@ -82,10 +82,38 @@ export default function UnifiedLoginPage() {
     }
   };
 
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+
   // LINE サインイン処理
   const handleLineLogin = async () => {
-    setToastMessage("LINEログイン機能は現在準備中です。メールアドレスログインをご利用ください。");
-    setShowToast(true);
+    if (isLineDisabled) {
+      setToastMessage("💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。");
+      setShowToast(true);
+      return;
+    }
+    setLoading(true);
+    try {
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "custom:line" as unknown as Provider,
+        options: {
+          scopes: "openid profile email",
+          redirectTo: `${origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error("LINE login error:", error);
+        setToastMessage("💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。");
+        setShowToast(true);
+      }
+    } catch (err: unknown) {
+      console.error("LINE login exception:", err);
+      setToastMessage("💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。");
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -104,13 +132,17 @@ export default function UnifiedLoginPage() {
           <button
             type="button"
             onClick={handleLineLogin}
-            disabled={loading}
-            className="w-full py-3.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm"
+            disabled={loading || isLineDisabled}
+            className={`w-full py-3.5 font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm ${
+              isLineDisabled
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed opacity-80"
+                : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+            }`}
           >
             <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
             </svg>
-            <span>LINEでサインイン（準備中）</span>
+            <span>{isLineDisabled ? "LINEでサインイン (準備中)" : loading ? "LINEへ接続中..." : "LINEでサインイン"}</span>
           </button>
 
           <p className="text-[10px] text-gray-400 text-center leading-tight">

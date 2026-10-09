@@ -8,12 +8,14 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    "https://xejkbgbfktvvcfehjwsg.supabase.co";
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlamtiZ2Jma3R2dmNmZWhqd3NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNjgwNjksImV4cCI6MjEwNjc0NDA2OX0.Y0OhIrlizZczqdIPkmEex1UzsmKqj6IH4W3wHT8vuyg";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be configured."
+    );
+  }
 
   const pathname = request.nextUrl.pathname;
 
@@ -49,6 +51,21 @@ export async function proxy(request: NextRequest) {
           loginUrl.searchParams.set("redirect", pathname);
         }
         return NextResponse.redirect(loginUrl);
+      }
+    } else {
+      // 2. 講師専用画面 (/teacher) のアクセス制御: ユーザーのロールが 'teacher' でない場合は即座にサーバー側で遮断・リダイレクト
+      if (pathname.startsWith("/teacher")) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (userData?.role !== "teacher") {
+          const studentUrl = request.nextUrl.clone();
+          studentUrl.pathname = "/student";
+          return NextResponse.redirect(studentUrl);
+        }
       }
     }
   } catch (error) {

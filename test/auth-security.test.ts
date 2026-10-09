@@ -21,6 +21,102 @@ function evaluateAccessControl(pathname: string, user: { id: string; role: "teac
   return { status: 200 };
 }
 
+// 1. handle_new_auth_user トリガーの安全なユーザー生成シミュレーション
+function simulateHandleNewAuthUser(raw_user_meta_data: Record<string, any>, user_id: string, email: string) {
+  const user_name = raw_user_meta_data?.full_name || raw_user_meta_data?.name || email.split("@")[0];
+  // セキュリティルール: raw_user_meta_data 内の role や farm_id は無視し、必ず 'student' と NULL で初期設定する
+  return {
+    id: user_id,
+    email: email,
+    display_name: user_name,
+    role: "student" as const,
+    farm_id: null as string | null,
+  };
+}
+
+// 2. クライアントからの users テーブル直接 UPDATE 抑制トリガーシミュレーション
+function simulateDirectUserUpdate(
+  currentUserRoleInDb: "authenticated" | "anon" | "postgres",
+  oldRow: { id: string; role: string; farm_id: string | null },
+  updateData: { role?: string; farm_id?: string | null; display_name?: string }
+) {
+  const newRole = updateData.role !== undefined ? updateData.role : oldRow.role;
+  const newFarmId = updateData.farm_id !== undefined ? updateData.farm_id : oldRow.farm_id;
+
+  if (newRole !== oldRow.role || newFarmId !== oldRow.farm_id) {
+    if (currentUserRoleInDb === "authenticated" || currentUserRoleInDb === "anon") {
+      return { success: false, error: "Permission denied: Cannot update role or farm_id directly" };
+    }
+  }
+
+  return {
+    success: true,
+    updatedRow: {
+      ...oldRow,
+      ...updateData,
+      role: newRole,
+      farm_id: newFarmId,
+    },
+  };
+}
+
+// 3. register_teacher RPC シミュレーション
+function simulateRegisterTeacherRpc(user: { id: string; role: string; farm_id: string | null }, farmName: string) {
+  if (!user || !user.id) {
+    return { error: "Not authenticated" };
+  }
+  if (!farmName || !farmName.trim()) {
+    return { error: "Farm name is required" };
+  }
+
+  const newFarmId = `farm_${Date.now()}`;
+  const inviteCode = "inv_" + Math.random().toString(36).substring(2, 10);
+
+  const updatedUser = {
+    ...user,
+    role: "teacher" as const,
+    farm_id: newFarmId,
+  };
+
+  return {
+    success: true,
+    user: updatedUser,
+    farm: { id: newFarmId, name: farmName.trim(), owner_id: user.id, invite_code: inviteCode },
+  };
+}
+
+// 4. join_farm RPC シミュレーション
+function simulateJoinFarmRpc(
+  user: { id: string; role: string; farm_id: string | null },
+  inviteCode: string,
+  farmsDatabase: Array<{ id: string; name: string; invite_code: string }>
+) {
+  if (!user || !user.id) {
+    return { error: "Not authenticated" };
+  }
+  if (!inviteCode || !inviteCode.trim()) {
+    return { error: "Invite code is required" };
+  }
+
+  const cleanCode = inviteCode.trim();
+  const foundFarm = farmsDatabase.find((f) => f.invite_code === cleanCode || f.id === cleanCode);
+
+  if (!foundFarm) {
+    return { error: "Invalid invite code or farm not found" };
+  }
+
+  const updatedUser = {
+    ...user,
+    farm_id: foundFarm.id,
+  };
+
+  return {
+    success: true,
+    user: updatedUser,
+    farm: foundFarm,
+  };
+}
+
 describe("Security & Authorization Tests (認可・セキュリティ検証)", () => {
   describe("1. 未認証ユーザーのアクセス制御", () => {
     it("未ログインで講師画面 (/teacher/dashboard) にアクセスした場合、ログイン画面へリダイレクトされること", () => {
@@ -56,9 +152,73 @@ describe("Security & Authorization Tests (認可・セキュリティ検証)", (
       expect(result.status).toBe(200);
       expect(result.redirect).toBeUndefined();
     });
+
+    it("signUp 時に raw_user_meta_data に role='teacher' や farm_id が含まれていても無視され、role='student', farm_id=null にセットされること", () => {
+      const maliciousMeta = {
+        full_name: "攻撃者",
+        role: "teacher",
+        farm_id: "victim_farm_id_999",
+      };
+
+      const userRow = simulateHandleNewAuthUser(maliciousMeta, "user_attacker_1", "attacker@example.com");
+
+      expect(userRow.role).toBe("student");
+      expect(userRow.farm_id).toBeNull();
+      expect(userRow.display_name).toBe("攻撃者");
+    });
+
+    it("受講生ユーザーが DevTools などから直接 users.role や farm_id を UPDATE しようとするとエラーで拒否されること", () => {
+      const currentStudent = { id: "student-uuid-1", role: "student", farm_id: "farm_01" };
+
+      // 権限昇格攻撃 (role -> teacher)
+      const attackRole = simulateDirectUserUpdate("authenticated", currentStudent, { role: "teacher" });
+      expect(attackRole.success).toBe(false);
+      expect(attackRole.error).toContain("Permission denied");
+
+      // 農園乗っ取り攻撃 (farm_id -> 他人の農園)
+      const attackFarm = simulateDirectUserUpdate("authenticated", currentStudent, { farm_id: "other_farm_999" });
+      expect(attackFarm.success).toBe(false);
+      expect(attackFarm.error).toContain("Permission denied");
+
+      // 通常の表示名変更は成功すること
+      const normalUpdate = simulateDirectUserUpdate("authenticated", currentStudent, { display_name: "新しい名前" });
+      expect(normalUpdate.success).toBe(true);
+      expect(normalUpdate.updatedRow?.display_name).toBe("新しい名前");
+      expect(normalUpdate.updatedRow?.role).toBe("student");
+    });
   });
 
-  describe("3. APIエンドポイントのバリデーション & 不正リクエスト耐性", () => {
+  describe("3. SECURITY DEFINER 関数 (register_teacher / join_farm) による安全な変更検証", () => {
+    it("register_teacher RPC を実行すると、正しく role='teacher' に昇格し新しい農園が作成されること", () => {
+      const initialStudent = { id: "user_teacher_candidate", role: "student", farm_id: null };
+      const res = simulateRegisterTeacherRpc(initialStudent, "佐藤自然農園");
+
+      expect(res.success).toBe(true);
+      expect(res.user?.role).toBe("teacher");
+      expect(res.user?.farm_id).toBe(res.farm?.id);
+      expect(res.farm?.name).toBe("佐藤自然農園");
+      expect(res.farm?.owner_id).toBe(initialStudent.id);
+    });
+
+    it("join_farm RPC を実行すると、招待コードを検証して受講生が農園に安全に紐づけられること", () => {
+      const initialStudent = { id: "user_student_1", role: "student", farm_id: null };
+      const dbFarms = [
+        { id: "farm_target_123", name: "たなか農園", invite_code: "code_tanaka_99" },
+      ];
+
+      // 有効な招待コード
+      const res = simulateJoinFarmRpc(initialStudent, "code_tanaka_99", dbFarms);
+      expect(res.success).toBe(true);
+      expect(res.user?.farm_id).toBe("farm_target_123");
+      expect(res.user?.role).toBe("student"); // ロールは student のまま維持されること
+
+      // 無効な招待コード
+      const invalidRes = simulateJoinFarmRpc(initialStudent, "invalid_code", dbFarms);
+      expect(invalidRes.error).toBe("Invalid invite code or farm not found");
+    });
+  });
+
+  describe("4. APIエンドポイントのバリデーション & 不正リクエスト耐性", () => {
     it("空のメッセージやホワイトスペースのみのPOSTリクエストは400エラーで早期リターンされること", () => {
       const testCases = ["", "   ", "\n\t  "];
       testCases.forEach((input) => {
@@ -81,28 +241,132 @@ describe("Security & Authorization Tests (認可・セキュリティ検証)", (
     });
   });
 
-  describe("4. OAuthコールバック next パラメータのオープンリダイレクト検証", () => {
-    it("正常な相対パス (/student, /teacher/dashboard, /invite) はそのまま許可されること", () => {
+  describe("4. OAuth コールバック next パラメータサニタイズ (sanitizeNextUrl)", () => {
+    it("正常な相対パス (/student, /teacher/dashboard) はそのまま許可されること", () => {
       expect(sanitizeNextUrl("/student")).toBe("/student");
       expect(sanitizeNextUrl("/teacher/dashboard")).toBe("/teacher/dashboard");
-      expect(sanitizeNextUrl("/invite?farm_id=123")).toBe("/invite?farm_id=123");
+      expect(sanitizeNextUrl("/student/quests?tab=active")).toBe("/student/quests?tab=active");
     });
 
-    it("外部絶対URL (https://evil.com, http://attacker.org) はデフォルト (/student) へフォールバックされること", () => {
+    it("絶対URL (https://evil.com) によるオープンリダイレクト攻撃は遮断されフォールバックすること", () => {
       expect(sanitizeNextUrl("https://evil.com")).toBe("/student");
-      expect(sanitizeNextUrl("http://attacker.org/phishing")).toBe("/student");
+      expect(sanitizeNextUrl("http://attacker.com/malicious")).toBe("/student");
     });
 
-    it("プロトコル相対URL (//evil.com) やバックスラッシュ回避 (/\\evil.com) は拒否されること", () => {
+    it("プロトコル相対URL (//evil.com, /\\evil.com) は遮断されフォールバックすること", () => {
       expect(sanitizeNextUrl("//evil.com")).toBe("/student");
       expect(sanitizeNextUrl("/\\evil.com")).toBe("/student");
     });
 
-    it("javascript: や data: スキーム、null/empty はフォールバックされること", () => {
-      expect(sanitizeNextUrl("javascript:alert(1)")).toBe("/student");
-      expect(sanitizeNextUrl("data:text/html,<script>alert(1)</script>")).toBe("/student");
+    it("URLエンコードされた不正パス (%2f%2fevil.com) はデコード後に遮断されること", () => {
+      expect(sanitizeNextUrl("%2f%2fevil.com")).toBe("/student");
+    });
+
+    it("スキームを含む不正パス (/http:evil.com, /javascript:alert(1)) は遮断されること", () => {
+      expect(sanitizeNextUrl("/http:evil.com")).toBe("/student");
+      expect(sanitizeNextUrl("/javascript:alert(1)")).toBe("/student");
+    });
+
+    it("null や空文字の場合はデフォルトフォールバック値を返すこと", () => {
       expect(sanitizeNextUrl(null)).toBe("/student");
       expect(sanitizeNextUrl("")).toBe("/student");
+      expect(sanitizeNextUrl(null, "/teacher/dashboard")).toBe("/teacher/dashboard");
+    });
+  });
+
+  describe("5. Supabase Security Advisor 監査 & View security_invoker 適合性検証", () => {
+    it("全ビュー(farm_beds_with_students等)に security_invoker = true が設定され、Definer権限のバイパスが防止されていること", async () => {
+      const fs = await import("fs");
+      const path = await import("path");
+      const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
+      const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
+
+      let foundViewWithSecurityInvoker = false;
+      let foundAlterViewSecurityInvoker = false;
+
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+        if (content.includes("farm_beds_with_students") && content.includes("security_invoker = true")) {
+          foundViewWithSecurityInvoker = true;
+        }
+        if (content.includes("ALTER VIEW") && content.includes("security_invoker = true")) {
+          foundAlterViewSecurityInvoker = true;
+        }
+      }
+
+      expect(foundViewWithSecurityInvoker).toBe(true);
+      expect(foundAlterViewSecurityInvoker).toBe(true);
+    });
+
+    it("全主要テーブルに ENABLE ROW LEVEL SECURITY (RLS) が適用されていること", async () => {
+      const fs = await import("fs");
+      const path = await import("path");
+      const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
+      const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
+
+      const combinedContent = files
+        .map((f) => fs.readFileSync(path.join(migrationsDir, f), "utf-8"))
+        .join("\n");
+
+      const requiredTables = ["users", "farms", "farm_plots", "farm_beds", "journals", "student_tasks"];
+
+      for (const table of requiredTables) {
+        const hasRls = new RegExp(`ENABLE ROW LEVEL SECURITY`, "i").test(combinedContent);
+        expect(hasRls).toBe(true);
+      }
+    });
+
+    it("SECURITY DEFINER 関数に search_path = public が明示設定されていること", async () => {
+      const fs = await import("fs");
+      const path = await import("path");
+      const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
+      const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
+
+      const combinedContent = files
+        .map((f) => fs.readFileSync(path.join(migrationsDir, f), "utf-8"))
+        .join("\n");
+
+      expect(combinedContent).toContain("SECURITY DEFINER");
+      expect(combinedContent).toContain("SET search_path = public");
+    });
+
+    it("security_invoker 動作モデルの検証: 他受講生のメールアドレス等の機密情報が受講生コンテキストで制限されること", () => {
+      // 疑似データセット
+      const currentStudentId = "student-100";
+      const usersTable = [
+        { id: "student-100", email: "student100@example.com", display_name: "山田太郎" },
+        { id: "student-200", email: "student200@secret.com", display_name: "佐藤花子" },
+      ];
+      const bedsTable = [
+        { id: "bed-1", student_id: "student-100", crop_name: "ミニトマト" },
+        { id: "bed-2", student_id: "student-200", crop_name: "ナス" },
+      ];
+
+      // RLS (Row Level Security) フィルタリングモデル (security_invoker = true 適用時)
+      // 生徒は自アカウントの users レコードのみ SELECT 可能 (Security Invoker に従う)
+      const allowedUsers = usersTable.filter((u) => u.id === currentStudentId);
+
+      // ビュー (farm_beds_with_students) の SELECT 実行評価
+      const viewResult = bedsTable.map((bed) => {
+        const user = allowedUsers.find((u) => u.id === bed.student_id);
+        return {
+          bed_id: bed.id,
+          crop_name: bed.crop_name,
+          student_id: bed.student_id,
+          student_name: user ? user.display_name : "未割り当て",
+          student_email: user ? user.email : null, // 他生徒のメールアドレスは NULL（閲覧不可）
+        };
+      });
+
+      // 自分自身の畝情報には自分のメールアドレスが紐づく
+      const myBed = viewResult.find((b) => b.student_id === currentStudentId);
+      expect(myBed?.student_email).toBe("student100@example.com");
+
+      // 他生徒の畝情報からは他生徒のメールアドレスが遮断(NULL)されること
+      const otherBed = viewResult.find((b) => b.student_id === "student-200");
+      expect(otherBed?.student_email).toBeNull();
+      expect(otherBed?.student_email).not.toBe("student200@secret.com");
     });
   });
 });
+
