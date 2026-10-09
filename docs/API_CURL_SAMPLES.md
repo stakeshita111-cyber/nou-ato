@@ -7,9 +7,11 @@
 ## 1. AI しるべぇ (RAG) チャット相談 API
 
 ### エンドポイント
+
 `POST /api/chat/rag`
 
 ### 実行例 (通常の質問相談)
+
 ```bash
 curl -X POST http://localhost:3000/api/chat/rag \
   -H "Content-Type: application/json" \
@@ -27,9 +29,11 @@ curl -X POST http://localhost:3000/api/chat/rag \
 ## 2. 講師からの受講生追加チケット付与 API
 
 ### エンドポイント
+
 `POST /api/tickets/grant`
 
 ### 実行例 (受講生へ追加チケット1枚付与)
+
 ```bash
 curl -X POST http://localhost:3000/api/tickets/grant \
   -H "Content-Type: application/json" \
@@ -44,9 +48,11 @@ curl -X POST http://localhost:3000/api/tickets/grant \
 ## 3. 農園ナレッジ・リアルタイム類似照合 API
 
 ### エンドポイント
+
 `POST /api/chat/check-knowledge`
 
 ### 実行例 (FAQ類似一致)
+
 ```bash
 curl -X POST http://localhost:3000/api/chat/check-knowledge \
   -H "Content-Type: application/json" \
@@ -60,11 +66,13 @@ curl -X POST http://localhost:3000/api/chat/check-knowledge \
 ## 4. システム設定 API
 
 ### 取得: `GET /api/settings`
+
 ```bash
 curl -X GET http://localhost:3000/api/settings
 ```
 
 ### 更新: `POST /api/settings`
+
 ```bash
 curl -X POST http://localhost:3000/api/settings \
   -H "Content-Type: application/json" \
@@ -78,6 +86,7 @@ curl -X POST http://localhost:3000/api/settings \
 ## 5. RFC 7807 エラーハンドリング検証
 
 ### メッセージ空での 400 Bad Request 検証
+
 ```bash
 curl -i -X POST http://localhost:3000/api/chat/rag \
   -H "Content-Type: application/json" \
@@ -85,6 +94,7 @@ curl -i -X POST http://localhost:3000/api/chat/rag \
 ```
 
 **期待されるレスポンス (Content-Type: application/problem+json)**:
+
 ```json
 {
   "type": "https://httpstatuses.com/400",

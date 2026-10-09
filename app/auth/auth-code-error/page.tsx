@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
-import Link from "next/link";
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+import Link from 'next/link';
 
 function AuthCodeErrorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const error = searchParams.get("error");
+  const error = searchParams.get('error');
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
 
     // URLハッシュに access_token が含まれている場合（認証成功時）、セッションを取得して遷移
-    if (window.location.hash.includes("access_token")) {
+    if (window.location.hash.includes('access_token')) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          router.replace("/student");
+          router.replace('/student');
           return;
         }
         setCheckingSession(false);
@@ -44,7 +44,9 @@ function AuthCodeErrorContent() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-xl font-black text-gray-900 tracking-tight">認証エラーが発生しました</h1>
+        <h1 className="text-xl font-black text-gray-900 tracking-tight">
+          認証エラーが発生しました
+        </h1>
         <p className="text-xs text-gray-600 leading-relaxed">
           LINE認証またはログインセッションの処理中に問題が発生しました。
         </p>

@@ -146,19 +146,20 @@ erDiagram
 
 ## 2. Row Level Security (RLS) ポリシー方針 & View セキュリティ
 
-| テーブル / ビュー | 受講生 (student) 権限 | 講師 (teacher) 権限 | サービスロール | セキュリティ設定 |
-| :--- | :--- | :--- | :--- | :--- |
-| **users** | 自身のアカウントのみ SELECT / UPDATE | 同一農園内の全受講生 SELECT / UPDATE / DELETE | ALL | RLS Enabled |
-| **farms** | 所属農園のみ SELECT | 自身が所有する農園の ALL | ALL | RLS Enabled |
-| **farm_plots** | 所属農園内の区画を SELECT | 同一農園内の区画の ALL | ALL | RLS Enabled |
-| **farm_beds** | 自身の割当畝を SELECT / UPDATE | 農園内の全畝の ALL | ALL | RLS Enabled |
-| **tasks** | 公開テンプレートを SELECT | 農園内のタスクテンプレート ALL | ALL | RLS Enabled |
-| **student_tasks** | 自身のタスクのみ SELECT / UPDATE | 農園内受講生のタスク ALL | ALL | RLS Enabled |
-| **journals** | 自身の日誌の SELECT / INSERT / UPDATE | 全生徒の日誌 SELECT / 返信 UPDATE / 承認 | ALL | RLS Enabled |
-| **events** | 公開イベントの SELECT / 参加申込 UPDATE | イベント作成・更新・削除 ALL | ALL | RLS Enabled |
-| **farm_beds_with_students (VIEW)** | Invoker 権限で参照 (他生徒のメールアドレス等の機密情報は RLS により遮断) | Invoker 権限で参照 | ALL | `security_invoker = true` |
+| テーブル / ビュー                  | 受講生 (student) 権限                                                    | 講師 (teacher) 権限                           | サービスロール | セキュリティ設定          |
+| :--------------------------------- | :----------------------------------------------------------------------- | :-------------------------------------------- | :------------- | :------------------------ |
+| **users**                          | 自身のアカウントのみ SELECT / UPDATE                                     | 同一農園内の全受講生 SELECT / UPDATE / DELETE | ALL            | RLS Enabled               |
+| **farms**                          | 所属農園のみ SELECT                                                      | 自身が所有する農園の ALL                      | ALL            | RLS Enabled               |
+| **farm_plots**                     | 所属農園内の区画を SELECT                                                | 同一農園内の区画の ALL                        | ALL            | RLS Enabled               |
+| **farm_beds**                      | 自身の割当畝を SELECT / UPDATE                                           | 農園内の全畝の ALL                            | ALL            | RLS Enabled               |
+| **tasks**                          | 公開テンプレートを SELECT                                                | 農園内のタスクテンプレート ALL                | ALL            | RLS Enabled               |
+| **student_tasks**                  | 自身のタスクのみ SELECT / UPDATE                                         | 農園内受講生のタスク ALL                      | ALL            | RLS Enabled               |
+| **journals**                       | 自身の日誌の SELECT / INSERT / UPDATE                                    | 全生徒の日誌 SELECT / 返信 UPDATE / 承認      | ALL            | RLS Enabled               |
+| **events**                         | 公開イベントの SELECT / 参加申込 UPDATE                                  | イベント作成・更新・削除 ALL                  | ALL            | RLS Enabled               |
+| **farm_beds_with_students (VIEW)** | Invoker 権限で参照 (他生徒のメールアドレス等の機密情報は RLS により遮断) | Invoker 権限で参照                            | ALL            | `security_invoker = true` |
 
 ### Supabase Security Advisor 監査準拠基準
+
 1. **全ビューにおける Definer 権限バイパス遮断**: すべての Postgres ビュー (`farm_beds_with_students` 等) に `security_invoker = true` (`security_invoker = on`) を明示的に設定し、呼び出し元の RLS ポリシーを評価します。
 2. **全テーブルへの RLS 適用**: public スキーマのすべてのリレーショナルテーブルで `ENABLE ROW LEVEL SECURITY` を有効化。
 3. **SECURITY DEFINER 関数の search_path 保護**: `handle_user_deletion_or_deactivation()` および `handle_new_auth_user()` に `SET search_path = public` を適用し、search_path 乗っ取り攻撃を完全に防止。

@@ -1,11 +1,17 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useMemo } from "react";
-import { VEGETABLE_TASK_TEMPLATES, TaskTemplate, TaskSeason, TaskPhase, TaskCategory } from "@/lib/taskTemplates";
-import Toast from "@/components/ui/Toast";
-import StudentTaskPreviewModal from "@/components/templates/StudentTaskPreviewModal";
-import { supabase } from "@/lib/supabase";
-import { useFarmStore } from "@/store/useFarmStore";
+import { useEffect, useState, useMemo } from 'react';
+import {
+  VEGETABLE_TASK_TEMPLATES,
+  TaskTemplate,
+  TaskSeason,
+  TaskPhase,
+  TaskCategory,
+} from '@/lib/taskTemplates';
+import Toast from '@/components/ui/Toast';
+import StudentTaskPreviewModal from '@/components/templates/StudentTaskPreviewModal';
+import { supabase } from '@/lib/supabase';
+import { useFarmStore } from '@/store/useFarmStore';
 
 // 公式テンプレートとカスタムテンプレートを安全にマージする関数
 const mergeTemplates = (customList: TaskTemplate[]): TaskTemplate[] => {
@@ -22,16 +28,16 @@ export default function TeacherTemplatesView() {
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
 
   // 絞り込み状態 (4軸 + 検索 + ソート)
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedSeason, setSelectedSeason] = useState<string>("all");
-  const [selectedPhase, setSelectedPhase] = useState<string>("all");
-  const [selectedCrop, setSelectedCrop] = useState<string>("all");
-  const [sortOrder, setSortOrder] = useState<string>("default");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedSeason, setSelectedSeason] = useState<string>('all');
+  const [selectedPhase, setSelectedPhase] = useState<string>('all');
+  const [selectedCrop, setSelectedCrop] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<string>('default');
 
   // 生徒視点プレビューモーダル状態
   const [previewTemplate, setPreviewTemplate] = useState<TaskTemplate | null>(null);
@@ -47,40 +53,40 @@ export default function TeacherTemplatesView() {
       // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元
       try {
         const { data: dbTemplates } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("is_template", true)
-          .is("deleted_at", null);
+          .from('tasks')
+          .select('*')
+          .eq('is_template', true)
+          .is('deleted_at', null);
 
         if (dbTemplates && dbTemplates.length > 0) {
           customTemplates = dbTemplates.map((t: any) => {
-            const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+            const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
             return {
               id: t.id,
               title: t.title,
-              category: t.category || "共通",
-              target_crop: t.target_crop || "共通",
-              phase: cl.phase || "育成管理",
-              season: cl.season || "通年",
-              estimated_time: t.estimated_time || "30分",
-              tools_needed: t.tools_needed || "軍手",
-              description: t.description || "",
-              memo: t.memo || "",
+              category: t.category || '共通',
+              target_crop: t.target_crop || '共通',
+              phase: cl.phase || '育成管理',
+              season: cl.season || '通年',
+              estimated_time: t.estimated_time || '30分',
+              tools_needed: t.tools_needed || '軍手',
+              description: t.description || '',
+              memo: t.memo || '',
               exp: t.exp || 50,
               difficulty: t.difficulty || 1,
               require_photo: Boolean(t.require_photo),
-              badge_name: cl.badge_name || "栽培マスター",
-              badge_icon: cl.badge_icon || "🌿",
+              badge_name: cl.badge_name || '栽培マスター',
+              badge_icon: cl.badge_icon || '🌿',
             };
           });
         }
       } catch (e) {
-        console.warn("DB custom templates fetch fallback:", e);
+        console.warn('DB custom templates fetch fallback:', e);
       }
 
       // 2. localStorage からのキャッシュ補完
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("nouato_custom_templates");
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('nouato_custom_templates');
         if (saved) {
           try {
             const localArr: TaskTemplate[] = JSON.parse(saved);
@@ -90,7 +96,7 @@ export default function TeacherTemplatesView() {
               }
             });
           } catch (e) {
-            console.error("Failed to parse custom templates:", e);
+            console.error('Failed to parse custom templates:', e);
           }
         }
       }
@@ -104,14 +110,14 @@ export default function TeacherTemplatesView() {
   // Escapeキーでモーダルを閉じる
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         if (editingTemplate) setEditingTemplate(null);
         if (previewTemplate) setPreviewTemplate(null);
         if (isMobileFilterOpen) setIsMobileFilterOpen(false);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editingTemplate, previewTemplate, isMobileFilterOpen]);
 
   // ストレージおよび Supabase DB (tasks: is_template = true) への完全永続保存
@@ -121,31 +127,31 @@ export default function TeacherTemplatesView() {
     deleteId?: string
   ) => {
     setTemplates(updatedList);
-    const customOnly = updatedList.filter((t) => !t.id.startsWith("tpl_"));
+    const customOnly = updatedList.filter((t) => !t.id.startsWith('tpl_'));
     try {
-      localStorage.setItem("nouato_custom_templates", JSON.stringify(customOnly));
+      localStorage.setItem('nouato_custom_templates', JSON.stringify(customOnly));
     } catch (e) {
-      console.error("Failed to save to localStorage:", e);
+      console.error('Failed to save to localStorage:', e);
     }
 
     // 🌟 Supabase DB (tasks テーブル: is_template = true) へのクラウド完全永続同期 🌟
     try {
-      if (deleteId && !deleteId.startsWith("tpl_")) {
-        await supabase.from("tasks").delete().eq("id", deleteId);
-      } else if (savedTemplate && !savedTemplate.id.startsWith("tpl_")) {
+      if (deleteId && !deleteId.startsWith('tpl_')) {
+        await supabase.from('tasks').delete().eq('id', deleteId);
+      } else if (savedTemplate && !savedTemplate.id.startsWith('tpl_')) {
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id;
         const farmId =
           useFarmStore.getState().activeFarmId ||
-          (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
 
         if (userId) {
-          await supabase.from("tasks").upsert({
+          await supabase.from('tasks').upsert({
             id: savedTemplate.id,
             title: savedTemplate.title,
-            description: savedTemplate.description || "",
-            category: savedTemplate.category || "共通",
-            status: "template",
+            description: savedTemplate.description || '',
+            category: savedTemplate.category || '共通',
+            status: 'template',
             is_template: true,
             target_crop: savedTemplate.target_crop || null,
             estimated_time: savedTemplate.estimated_time || null,
@@ -166,7 +172,7 @@ export default function TeacherTemplatesView() {
         }
       }
     } catch (err) {
-      console.warn("tasks template db sync notice:", err);
+      console.warn('tasks template db sync notice:', err);
     }
   };
 
@@ -180,29 +186,29 @@ export default function TeacherTemplatesView() {
 
       let farmId =
         useFarmStore.getState().activeFarmId ||
-        (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
 
       if (!farmId && user) {
         const { data: userData } = await supabase
-          .from("users")
-          .select("farm_id")
-          .eq("id", user.id)
+          .from('users')
+          .select('farm_id')
+          .eq('id', user.id)
           .maybeSingle();
         if (userData?.farm_id) farmId = userData.farm_id;
       }
 
       const memoContent = [
-        tpl.memo || "",
-        tpl.timing ? `【実施目安】${tpl.timing}` : "",
-        tpl.source ? `【出典】${tpl.source}` : "",
+        tpl.memo || '',
+        tpl.timing ? `【実施目安】${tpl.timing}` : '',
+        tpl.source ? `【出典】${tpl.source}` : '',
       ]
         .filter(Boolean)
-        .join("\n\n");
+        .join('\n\n');
 
       const newTaskData = {
         title: tpl.title,
-        status: "pool", // 教材準備レーンへ
-        category: tpl.category || "work",
+        status: 'pool', // 教材準備レーンへ
+        category: tpl.category || 'work',
         description: tpl.description,
         tools_needed: tpl.tools_needed,
         memo: memoContent || null,
@@ -218,14 +224,14 @@ export default function TeacherTemplatesView() {
         farm_id: farmId || null,
       };
 
-      const { error } = await supabase.from("tasks").insert([newTaskData]);
+      const { error } = await supabase.from('tasks').insert([newTaskData]);
       if (error) {
         throw error;
       }
 
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_tasks_updated"));
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_tasks_updated'));
+        window.dispatchEvent(new Event('nouato_sync_event'));
       }
 
       setToastMessage(
@@ -233,8 +239,8 @@ export default function TeacherTemplatesView() {
       );
       setShowToast(true);
     } catch (e: any) {
-      console.error("handleAddToTasks error:", e);
-      setToastMessage(`❌ タスクの追加に失敗しました: ${e?.message || "不明なエラー"}`);
+      console.error('handleAddToTasks error:', e);
+      setToastMessage(`❌ タスクの追加に失敗しました: ${e?.message || '不明なエラー'}`);
       setShowToast(true);
     } finally {
       setAddingId(null);
@@ -244,22 +250,25 @@ export default function TeacherTemplatesView() {
   // 新規テンプレート作成の開始
   const handleStartCreate = () => {
     const newTpl: TaskTemplate = {
-      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `custom_tpl_${Date.now()}`,
-      title: "🌱 新しい栽培タスクテンプレート",
-      target_crop: "野菜",
-      variety: "",
-      category: "果菜",
-      season: "春夏",
-      phase: "準備・植付",
-      estimated_time: "30分",
-      tools_needed: "軍手, ハサミ",
-      description: "・作業手順1\n・作業手順2",
-      memo: "師匠からのアドバイスを記入...",
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `custom_tpl_${Date.now()}`,
+      title: '🌱 新しい栽培タスクテンプレート',
+      target_crop: '野菜',
+      variety: '',
+      category: '果菜',
+      season: '春夏',
+      phase: '準備・植付',
+      estimated_time: '30分',
+      tools_needed: '軍手, ハサミ',
+      description: '・作業手順1\n・作業手順2',
+      memo: '師匠からのアドバイスを記入...',
       exp: 50,
       difficulty: 2,
       require_photo: true,
-      badge_name: "栽培マスター",
-      badge_icon: "🌿",
+      badge_name: '栽培マスター',
+      badge_icon: '🌿',
     };
     setEditingTemplate(newTpl);
     setIsCreatingNew(true);
@@ -269,7 +278,10 @@ export default function TeacherTemplatesView() {
   const handleDuplicateOfficial = (tpl: TaskTemplate) => {
     const duplicatedTpl: TaskTemplate = {
       ...tpl,
-      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `custom_tpl_${Date.now()}`,
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `custom_tpl_${Date.now()}`,
       title: `【コピー】${tpl.title}`,
     };
     setEditingTemplate(duplicatedTpl);
@@ -282,10 +294,16 @@ export default function TeacherTemplatesView() {
     if (!editingTemplate) return;
 
     // UUID形式の担保
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingTemplate.id);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      editingTemplate.id
+    );
     const finalTemplate: TaskTemplate = {
       ...editingTemplate,
-      id: isUuid ? editingTemplate.id : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : editingTemplate.id),
+      id: isUuid
+        ? editingTemplate.id
+        : typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : editingTemplate.id,
     };
 
     let nextList: TaskTemplate[];
@@ -298,31 +316,37 @@ export default function TeacherTemplatesView() {
     await saveTemplatesToStorage(nextList, finalTemplate);
     setEditingTemplate(null);
     setIsCreatingNew(false);
-    setToastMessage("✨ タスクテンプレートを保存しました！クラウドDBに同期されたため、別ブラウザでも利用可能です。");
+    setToastMessage(
+      '✨ タスクテンプレートを保存しました！クラウドDBに同期されたため、別ブラウザでも利用可能です。'
+    );
     setShowToast(true);
   };
 
   // 削除処理（カスタムテンプレートのみ）
   const handleDeleteTemplate = async (id: string, title: string) => {
-    if (id.startsWith("tpl_")) {
-      alert("公式テンプレートは削除できません。");
+    if (id.startsWith('tpl_')) {
+      alert('公式テンプレートは削除できません。');
       return;
     }
     if (!confirm(`テンプレート「${title}」を削除しますか？`)) return;
     const nextList = templates.filter((t) => t.id !== id);
     await saveTemplatesToStorage(nextList, undefined, id);
-    setToastMessage("🗑 テンプレートを削除しました。");
+    setToastMessage('🗑 テンプレートを削除しました。');
     setShowToast(true);
   };
 
   // 初期状態にリセット
   const handleResetTemplates = () => {
-    if (confirm("公式テンプレートを初期状態に戻しますか？（※ご自身で作成されたカスタムテンプレートは維持されます）")) {
-      const customOnly = templates.filter((t) => !t.id.startsWith("tpl_"));
+    if (
+      confirm(
+        '公式テンプレートを初期状態に戻しますか？（※ご自身で作成されたカスタムテンプレートは維持されます）'
+      )
+    ) {
+      const customOnly = templates.filter((t) => !t.id.startsWith('tpl_'));
       const resetTemplates = mergeTemplates(customOnly);
       setTemplates(resetTemplates);
-      localStorage.setItem("nouato_custom_templates", JSON.stringify(customOnly));
-      setToastMessage("🔄 テンプレートを初期状態にリセットしました。");
+      localStorage.setItem('nouato_custom_templates', JSON.stringify(customOnly));
+      setToastMessage('🔄 テンプレートを初期状態にリセットしました。');
       setShowToast(true);
     }
   };
@@ -335,18 +359,16 @@ export default function TeacherTemplatesView() {
     templates.forEach((tpl) => {
       // 1. カテゴリ一致
       const matchesCategory =
-        selectedCategory === "all" ||
+        selectedCategory === 'all' ||
         tpl.category === selectedCategory ||
-        (selectedCategory === "共通" && (tpl.category === "土作り" || tpl.category === "共通"));
+        (selectedCategory === '共通' && (tpl.category === '土作り' || tpl.category === '共通'));
 
       // 2. 季節一致 (通年は春夏・秋冬どちらにも含める)
       const matchesSeason =
-        selectedSeason === "all" ||
-        tpl.season === selectedSeason ||
-        tpl.season === "通年";
+        selectedSeason === 'all' || tpl.season === selectedSeason || tpl.season === '通年';
 
       // 3. 作業工程一致
-      const matchesPhase = selectedPhase === "all" || tpl.phase === selectedPhase;
+      const matchesPhase = selectedPhase === 'all' || tpl.phase === selectedPhase;
 
       // 4. キーワード検索 (作物名以外でマッチするか)
       const query = searchQuery.toLowerCase().trim();
@@ -357,22 +379,22 @@ export default function TeacherTemplatesView() {
         (tpl.target_crop && tpl.target_crop.toLowerCase().includes(query));
 
       if (matchesCategory && matchesSeason && matchesPhase && matchesSearch) {
-        const crop = tpl.target_crop || "共通";
+        const crop = tpl.target_crop || '共通';
         counts.set(crop, (counts.get(crop) || 0) + 1);
       }
     });
 
     return Array.from(counts.entries())
       .map(([crop, count]) => ({ crop, count }))
-      .sort((a, b) => b.count - a.count || a.crop.localeCompare(b.crop, "ja"));
+      .sort((a, b) => b.count - a.count || a.crop.localeCompare(b.crop, 'ja'));
   }, [templates, selectedCategory, selectedSeason, selectedPhase, searchQuery]);
 
   // 他のフィルター変更により、選択中の作物が候補から外れた場合は安全に "all" へリセット
   useEffect(() => {
-    if (selectedCrop !== "all") {
+    if (selectedCrop !== 'all') {
       const exists = availableCrops.some((c) => c.crop === selectedCrop);
       if (!exists) {
-        setSelectedCrop("all");
+        setSelectedCrop('all');
       }
     }
   }, [availableCrops, selectedCrop]);
@@ -382,18 +404,16 @@ export default function TeacherTemplatesView() {
     return templates
       .filter((tpl) => {
         const matchesCategory =
-          selectedCategory === "all" ||
+          selectedCategory === 'all' ||
           tpl.category === selectedCategory ||
-          (selectedCategory === "共通" && (tpl.category === "土作り" || tpl.category === "共通"));
+          (selectedCategory === '共通' && (tpl.category === '土作り' || tpl.category === '共通'));
 
         const matchesSeason =
-          selectedSeason === "all" ||
-          tpl.season === selectedSeason ||
-          tpl.season === "通年";
+          selectedSeason === 'all' || tpl.season === selectedSeason || tpl.season === '通年';
 
-        const matchesPhase = selectedPhase === "all" || tpl.phase === selectedPhase;
+        const matchesPhase = selectedPhase === 'all' || tpl.phase === selectedPhase;
 
-        const matchesCrop = selectedCrop === "all" || tpl.target_crop === selectedCrop;
+        const matchesCrop = selectedCrop === 'all' || tpl.target_crop === selectedCrop;
 
         const query = searchQuery.toLowerCase().trim();
         const matchesSearch =
@@ -405,28 +425,36 @@ export default function TeacherTemplatesView() {
         return matchesCategory && matchesSeason && matchesPhase && matchesCrop && matchesSearch;
       })
       .sort((a, b) => {
-        if (sortOrder === "title_asc") return a.title.localeCompare(b.title, "ja");
-        if (sortOrder === "title_desc") return b.title.localeCompare(a.title, "ja");
-        if (sortOrder === "exp_desc") return (b.exp || 0) - (a.exp || 0);
-        if (sortOrder === "difficulty_asc") return (a.difficulty || 1) - (b.difficulty || 1);
+        if (sortOrder === 'title_asc') return a.title.localeCompare(b.title, 'ja');
+        if (sortOrder === 'title_desc') return b.title.localeCompare(a.title, 'ja');
+        if (sortOrder === 'exp_desc') return (b.exp || 0) - (a.exp || 0);
+        if (sortOrder === 'difficulty_asc') return (a.difficulty || 1) - (b.difficulty || 1);
         return 0;
       });
-  }, [templates, selectedCategory, selectedSeason, selectedPhase, selectedCrop, searchQuery, sortOrder]);
+  }, [
+    templates,
+    selectedCategory,
+    selectedSeason,
+    selectedPhase,
+    selectedCrop,
+    searchQuery,
+    sortOrder,
+  ]);
 
   // アクティブなフィルター件数
   const activeFilterCount =
-    (selectedCategory !== "all" ? 1 : 0) +
-    (selectedSeason !== "all" ? 1 : 0) +
-    (selectedPhase !== "all" ? 1 : 0) +
-    (selectedCrop !== "all" ? 1 : 0) +
-    (searchQuery.trim() !== "" ? 1 : 0);
+    (selectedCategory !== 'all' ? 1 : 0) +
+    (selectedSeason !== 'all' ? 1 : 0) +
+    (selectedPhase !== 'all' ? 1 : 0) +
+    (selectedCrop !== 'all' ? 1 : 0) +
+    (searchQuery.trim() !== '' ? 1 : 0);
 
   const handleResetFilters = () => {
-    setSelectedCategory("all");
-    setSelectedSeason("all");
-    setSelectedPhase("all");
-    setSelectedCrop("all");
-    setSearchQuery("");
+    setSelectedCategory('all');
+    setSelectedSeason('all');
+    setSelectedPhase('all');
+    setSelectedCrop('all');
+    setSearchQuery('');
   };
 
   // ────────────── サイドバーUIコンポーネント ──────────────
@@ -461,9 +489,9 @@ export default function TeacherTemplatesView() {
         </label>
         <div className="grid grid-cols-3 gap-1.5 font-bold">
           {[
-            { id: "all", label: "すべて" },
-            { id: "春夏", label: "🌸☀️ 春夏" },
-            { id: "秋冬", label: "🍂❄️ 秋冬" },
+            { id: 'all', label: 'すべて' },
+            { id: '春夏', label: '🌸☀️ 春夏' },
+            { id: '秋冬', label: '🍂❄️ 秋冬' },
           ].map((s) => (
             <button
               key={s.id}
@@ -471,8 +499,8 @@ export default function TeacherTemplatesView() {
               onClick={() => setSelectedSeason(s.id)}
               className={`py-2 px-1 rounded-xl text-center transition cursor-pointer text-[11px] ${
                 selectedSeason === s.id
-                  ? "bg-emerald-700 text-white font-black shadow-xs"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  ? 'bg-emerald-700 text-white font-black shadow-xs'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}
             >
               {s.label}
@@ -489,11 +517,11 @@ export default function TeacherTemplatesView() {
         </label>
         <div className="space-y-1">
           {[
-            { id: "all", label: "すべてのカテゴリ", icon: "🌱" },
-            { id: "果菜", label: "果菜 (トマト・ナス等)", icon: "🍅" },
-            { id: "根菜", label: "根菜 (イモ・ダイコン等)", icon: "🥔" },
-            { id: "葉菜", label: "葉菜 (キャベツ・ネギ等)", icon: "🥬" },
-            { id: "共通", label: "共通・農園管理 (土・草・苗・事務)", icon: "🚜" },
+            { id: 'all', label: 'すべてのカテゴリ', icon: '🌱' },
+            { id: '果菜', label: '果菜 (トマト・ナス等)', icon: '🍅' },
+            { id: '根菜', label: '根菜 (イモ・ダイコン等)', icon: '🥔' },
+            { id: '葉菜', label: '葉菜 (キャベツ・ネギ等)', icon: '🥬' },
+            { id: '共通', label: '共通・農園管理 (土・草・苗・事務)', icon: '🚜' },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -501,8 +529,8 @@ export default function TeacherTemplatesView() {
               onClick={() => setSelectedCategory(cat.id)}
               className={`w-full text-left px-3 py-2 rounded-xl transition cursor-pointer flex items-center justify-between font-bold ${
                 selectedCategory === cat.id
-                  ? "bg-emerald-100 text-emerald-950 font-black border border-emerald-300 shadow-xs"
-                  : "hover:bg-gray-100 text-gray-700 border border-transparent"
+                  ? 'bg-emerald-100 text-emerald-950 font-black border border-emerald-300 shadow-xs'
+                  : 'hover:bg-gray-100 text-gray-700 border border-transparent'
               }`}
             >
               <div className="flex items-center space-x-2">
@@ -523,10 +551,10 @@ export default function TeacherTemplatesView() {
         </label>
         <div className="space-y-1">
           {[
-            { id: "all", label: "すべての工程" },
-            { id: "準備・植付", label: "🌱 1. 準備・植え付け" },
-            { id: "育成・管理", label: "✂️ 2. 育成・管理" },
-            { id: "収穫・片付け", label: "🧺 3. 収穫・片付け" },
+            { id: 'all', label: 'すべての工程' },
+            { id: '準備・植付', label: '🌱 1. 準備・植え付け' },
+            { id: '育成・管理', label: '✂️ 2. 育成・管理' },
+            { id: '収穫・片付け', label: '🧺 3. 収穫・片付け' },
           ].map((p) => (
             <button
               key={p.id}
@@ -534,8 +562,8 @@ export default function TeacherTemplatesView() {
               onClick={() => setSelectedPhase(p.id)}
               className={`w-full text-left px-3 py-2 rounded-xl transition cursor-pointer flex items-center justify-between font-bold ${
                 selectedPhase === p.id
-                  ? "bg-emerald-100 text-emerald-950 font-black border border-emerald-300 shadow-xs"
-                  : "hover:bg-gray-100 text-gray-700 border border-transparent"
+                  ? 'bg-emerald-100 text-emerald-950 font-black border border-emerald-300 shadow-xs'
+                  : 'hover:bg-gray-100 text-gray-700 border border-transparent'
               }`}
             >
               <span className="text-[11px]">{p.label}</span>
@@ -559,11 +587,11 @@ export default function TeacherTemplatesView() {
         <div className="max-h-48 overflow-y-auto pr-1 space-y-1">
           <button
             type="button"
-            onClick={() => setSelectedCrop("all")}
+            onClick={() => setSelectedCrop('all')}
             className={`w-full text-left px-3 py-1.5 rounded-lg text-[11px] transition cursor-pointer flex items-center justify-between font-bold ${
-              selectedCrop === "all"
-                ? "bg-emerald-600 text-white font-black"
-                : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+              selectedCrop === 'all'
+                ? 'bg-emerald-600 text-white font-black'
+                : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
             }`}
           >
             <span>すべて</span>
@@ -577,14 +605,14 @@ export default function TeacherTemplatesView() {
               onClick={() => setSelectedCrop(crop)}
               className={`w-full text-left px-3 py-1.5 rounded-lg text-[11px] transition cursor-pointer flex items-center justify-between font-bold ${
                 selectedCrop === crop
-                  ? "bg-emerald-600 text-white font-black"
-                  : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                  ? 'bg-emerald-600 text-white font-black'
+                  : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
               }`}
             >
               <span className="truncate pr-1">{crop}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  selectedCrop === crop ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"
+                  selectedCrop === crop ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
                 }`}
               >
                 {count}
@@ -614,7 +642,9 @@ export default function TeacherTemplatesView() {
       {/* ヘッダーエリア */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900">📝 教材・タスクテンプレート作成・管理</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900">
+            📝 教材・タスクテンプレート作成・管理
+          </h2>
           <p className="text-xs text-gray-500 mt-1">
             作物の作業手順や獲得バッジをテンプレート化して保存・編集できます。生徒視点での見え方も直接確認できます。
           </p>
@@ -689,7 +719,7 @@ export default function TeacherTemplatesView() {
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
                 >
                   ✕
@@ -723,34 +753,50 @@ export default function TeacherTemplatesView() {
               <span className="text-gray-400 font-medium">/ 全 {templates.length} 件</span>
 
               {/* 選択中のタグ表示 */}
-              {selectedSeason !== "all" && (
+              {selectedSeason !== 'all' && (
                 <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   季節: {selectedSeason}
-                  <button type="button" onClick={() => setSelectedSeason("all")} className="hover:text-red-500">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSeason('all')}
+                    className="hover:text-red-500"
+                  >
                     ✕
                   </button>
                 </span>
               )}
-              {selectedCategory !== "all" && (
+              {selectedCategory !== 'all' && (
                 <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   カテゴリ: {selectedCategory}
-                  <button type="button" onClick={() => setSelectedCategory("all")} className="hover:text-red-500">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className="hover:text-red-500"
+                  >
                     ✕
                   </button>
                 </span>
               )}
-              {selectedPhase !== "all" && (
+              {selectedPhase !== 'all' && (
                 <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   工程: {selectedPhase}
-                  <button type="button" onClick={() => setSelectedPhase("all")} className="hover:text-red-500">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPhase('all')}
+                    className="hover:text-red-500"
+                  >
                     ✕
                   </button>
                 </span>
               )}
-              {selectedCrop !== "all" && (
+              {selectedCrop !== 'all' && (
                 <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   作物: {selectedCrop}
-                  <button type="button" onClick={() => setSelectedCrop("all")} className="hover:text-red-500">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCrop('all')}
+                    className="hover:text-red-500"
+                  >
                     ✕
                   </button>
                 </span>
@@ -772,7 +818,9 @@ export default function TeacherTemplatesView() {
           {filteredAndSortedTemplates.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 text-center border app-border space-y-3">
               <span className="text-4xl">🔍</span>
-              <h3 className="font-black text-gray-800 text-base">該当するテンプレートが見つかりませんでした</h3>
+              <h3 className="font-black text-gray-800 text-base">
+                該当するテンプレートが見つかりませんでした
+              </h3>
               <p className="text-xs text-gray-500 font-medium max-w-md mx-auto">
                 条件を変更するか、右上の「条件リセット」を押してすべてのテンプレートを表示してください。
               </p>
@@ -787,7 +835,7 @@ export default function TeacherTemplatesView() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {filteredAndSortedTemplates.map((tpl) => {
-                const isOfficial = tpl.id.startsWith("tpl_");
+                const isOfficial = tpl.id.startsWith('tpl_');
                 return (
                   <div
                     key={tpl.id}
@@ -799,11 +847,11 @@ export default function TeacherTemplatesView() {
                           <span
                             className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                               isOfficial
-                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                : "bg-purple-50 text-purple-700 border border-purple-200"
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : 'bg-purple-50 text-purple-700 border border-purple-200'
                             }`}
                           >
-                            {isOfficial ? "公式" : "カスタム"}
+                            {isOfficial ? '公式' : 'カスタム'}
                           </span>
                           <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
                             {tpl.category} • 想定{tpl.estimated_time}
@@ -827,12 +875,16 @@ export default function TeacherTemplatesView() {
                         <span className="text-xs font-bold text-gray-400">+{tpl.exp} EXP</span>
                       </div>
 
-                      <h3 className="font-extrabold text-gray-900 text-base leading-snug">{tpl.title}</h3>
+                      <h3 className="font-extrabold text-gray-900 text-base leading-snug">
+                        {tpl.title}
+                      </h3>
                       <p className="text-xs text-gray-500 font-semibold flex flex-wrap gap-x-2">
                         <span>
                           🌱 対象作物: {tpl.target_crop}
                           {tpl.variety && (
-                            <span className="text-emerald-700 ml-1 font-bold">（{tpl.variety}）</span>
+                            <span className="text-emerald-700 ml-1 font-bold">
+                              （{tpl.variety}）
+                            </span>
                           )}
                         </span>
                         <span>|</span>
@@ -881,7 +933,7 @@ export default function TeacherTemplatesView() {
                           disabled={addingId === tpl.id}
                           className="px-3.5 py-2 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition active:scale-95 flex items-center space-x-1 cursor-pointer disabled:opacity-50"
                         >
-                          <span>{addingId === tpl.id ? "追加中..." : "＋ 教材/タスクに追加"}</span>
+                          <span>{addingId === tpl.id ? '追加中...' : '＋ 教材/タスクに追加'}</span>
                         </button>
                       </div>
 
@@ -965,7 +1017,7 @@ export default function TeacherTemplatesView() {
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5 border border-gray-200">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-black text-gray-900 text-base">
-                {isCreatingNew ? "📝 新しいタスクテンプレートを作成" : "✏️ テンプレートの編集"}
+                {isCreatingNew ? '📝 新しいタスクテンプレートを作成' : '✏️ テンプレートの編集'}
               </h3>
               <button
                 type="button"
@@ -984,7 +1036,9 @@ export default function TeacherTemplatesView() {
                   type="text"
                   required
                   value={editingTemplate.title}
-                  onChange={(e) => setEditingTemplate({ ...editingTemplate, title: e.target.value })}
+                  onChange={(e) =>
+                    setEditingTemplate({ ...editingTemplate, title: e.target.value })
+                  }
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 text-sm font-bold focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -994,7 +1048,9 @@ export default function TeacherTemplatesView() {
                   <label className="block text-gray-700 mb-1">カテゴリ</label>
                   <select
                     value={editingTemplate.category}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, category: e.target.value as any })}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, category: e.target.value as any })
+                    }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="果菜">果菜 (トマト等)</option>
@@ -1007,8 +1063,10 @@ export default function TeacherTemplatesView() {
                 <div>
                   <label className="block text-gray-700 mb-1">シーズン</label>
                   <select
-                    value={editingTemplate.season || "春夏"}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, season: e.target.value as any })}
+                    value={editingTemplate.season || '春夏'}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, season: e.target.value as any })
+                    }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="春夏">🌸☀️ 春夏</option>
@@ -1020,8 +1078,10 @@ export default function TeacherTemplatesView() {
                 <div>
                   <label className="block text-gray-700 mb-1">作業工程</label>
                   <select
-                    value={editingTemplate.phase || "準備・植付"}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, phase: e.target.value as any })}
+                    value={editingTemplate.phase || '準備・植付'}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, phase: e.target.value as any })
+                    }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="準備・植付">🌱 1. 準備・植付</option>
@@ -1035,7 +1095,9 @@ export default function TeacherTemplatesView() {
                   <input
                     type="text"
                     value={editingTemplate.target_crop}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, target_crop: e.target.value })}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, target_crop: e.target.value })
+                    }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -1045,8 +1107,10 @@ export default function TeacherTemplatesView() {
                 <label className="block text-gray-700 mb-1">代表品種 (任意)</label>
                 <input
                   type="text"
-                  value={editingTemplate.variety || ""}
-                  onChange={(e) => setEditingTemplate({ ...editingTemplate, variety: e.target.value })}
+                  value={editingTemplate.variety || ''}
+                  onChange={(e) =>
+                    setEditingTemplate({ ...editingTemplate, variety: e.target.value })
+                  }
                   placeholder="例: 千果、アイコ など"
                   className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
@@ -1058,7 +1122,9 @@ export default function TeacherTemplatesView() {
                   <input
                     type="text"
                     value={editingTemplate.estimated_time}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, estimated_time: e.target.value })}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, estimated_time: e.target.value })
+                    }
                     className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="例: 30分"
                   />
@@ -1068,8 +1134,10 @@ export default function TeacherTemplatesView() {
                   <label className="block text-gray-700 mb-1">実施目安時期 (任意)</label>
                   <input
                     type="text"
-                    value={editingTemplate.timing || ""}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, timing: e.target.value })}
+                    value={editingTemplate.timing || ''}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, timing: e.target.value })
+                    }
                     className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="例: 5月上旬〜中旬"
                   />
@@ -1081,27 +1149,35 @@ export default function TeacherTemplatesView() {
                 <input
                   type="text"
                   value={editingTemplate.tools_needed}
-                  onChange={(e) => setEditingTemplate({ ...editingTemplate, tools_needed: e.target.value })}
+                  onChange={(e) =>
+                    setEditingTemplate({ ...editingTemplate, tools_needed: e.target.value })
+                  }
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="例: 軍手, ハサミ, 支柱"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-1">作業の手順・チェックリスト (1行に1つ)</label>
+                <label className="block text-gray-700 mb-1">
+                  作業の手順・チェックリスト (1行に1つ)
+                </label>
                 <textarea
                   rows={4}
                   value={editingTemplate.description}
-                  onChange={(e) => setEditingTemplate({ ...editingTemplate, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditingTemplate({ ...editingTemplate, description: e.target.value })
+                  }
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 resize-none font-medium focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-1">師匠からのアドバイス・補足メモ (任意)</label>
+                <label className="block text-gray-700 mb-1">
+                  師匠からのアドバイス・補足メモ (任意)
+                </label>
                 <textarea
                   rows={3}
-                  value={editingTemplate.memo || ""}
+                  value={editingTemplate.memo || ''}
                   onChange={(e) => setEditingTemplate({ ...editingTemplate, memo: e.target.value })}
                   className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 resize-none font-medium focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="現場の知恵や失敗しないコツを記入..."
@@ -1113,12 +1189,17 @@ export default function TeacherTemplatesView() {
                   <label className="block text-gray-700 mb-1">難易度 (1〜5)</label>
                   <select
                     value={editingTemplate.difficulty}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, difficulty: parseInt(e.target.value) || 1 })}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        difficulty: parseInt(e.target.value) || 1,
+                      })
+                    }
                     className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none"
                   >
                     {[1, 2, 3, 4, 5].map((level) => (
                       <option key={level} value={level}>
-                        {level} {level === 1 ? "(簡単)" : level === 5 ? "(難しい)" : ""}
+                        {level} {level === 1 ? '(簡単)' : level === 5 ? '(難しい)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1130,7 +1211,9 @@ export default function TeacherTemplatesView() {
                     type="number"
                     min="0"
                     value={editingTemplate.exp}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, exp: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, exp: parseInt(e.target.value) || 0 })
+                    }
                     className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none"
                   />
                 </div>
@@ -1140,7 +1223,9 @@ export default function TeacherTemplatesView() {
                     <input
                       type="checkbox"
                       checked={editingTemplate.require_photo}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, require_photo: e.target.checked })}
+                      onChange={(e) =>
+                        setEditingTemplate({ ...editingTemplate, require_photo: e.target.checked })
+                      }
                       className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
                     />
                     <span className="text-gray-700 font-bold text-xs">写真提出必須</span>
@@ -1159,8 +1244,10 @@ export default function TeacherTemplatesView() {
                     <label className="block text-[11px] text-amber-800 mb-1">バッジアイコン</label>
                     <input
                       type="text"
-                      value={editingTemplate.badge_icon || ""}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, badge_icon: e.target.value })}
+                      value={editingTemplate.badge_icon || ''}
+                      onChange={(e) =>
+                        setEditingTemplate({ ...editingTemplate, badge_icon: e.target.value })
+                      }
                       className="w-full p-2.5 rounded-xl border border-gray-300 bg-white text-center font-bold"
                     />
                   </div>
@@ -1168,8 +1255,10 @@ export default function TeacherTemplatesView() {
                     <label className="block text-[11px] text-amber-800 mb-1">獲得バッジ名</label>
                     <input
                       type="text"
-                      value={editingTemplate.badge_name || ""}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, badge_name: e.target.value })}
+                      value={editingTemplate.badge_name || ''}
+                      onChange={(e) =>
+                        setEditingTemplate({ ...editingTemplate, badge_name: e.target.value })
+                      }
                       className="w-full p-2.5 rounded-xl border border-gray-300 bg-white font-bold"
                     />
                   </div>

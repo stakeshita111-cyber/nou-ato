@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { EventItem } from "@/types/event";
-import { formatDate } from "@/lib/utils/formatHelper";
+import { useState } from 'react';
+import { EventItem } from '@/types/event';
+import { formatDate } from '@/lib/utils/formatHelper';
 
 interface EventCalendarProps {
   events: EventItem[];
-  mode: "teacher" | "student";
+  mode: 'teacher' | 'student';
   studentName?: string;
   onSelectEvent?: (event: EventItem) => void;
   onReserveEvent?: (eventId: string) => void;
@@ -29,22 +29,22 @@ export default function EventCalendar({
   const today = new Date();
   const todayYear = today.getFullYear();
   const todayMonth = today.getMonth() + 1; // 1-indexed
-  const todayDateFormatted = `${todayYear}-${String(todayMonth).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayDateFormatted = `${todayYear}-${String(todayMonth).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const [currentYear, setCurrentYear] = useState(todayYear);
   const [currentMonth, setCurrentMonth] = useState(todayMonth);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateFormatted);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // 現在表示されている年月以外の月にある予定をチェック
-  const currentMonthPrefix = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
+  const currentMonthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
   const otherMonthEvents = events.filter((e) => !e.date.startsWith(currentMonthPrefix));
   const upcomingOtherEvent = otherMonthEvents
     .filter((e) => e.date > currentMonthPrefix)
     .sort((a, b) => a.date.localeCompare(b.date))[0];
 
   const navigateToDate = (targetDateStr: string) => {
-    const parts = targetDateStr.split("-");
+    const parts = targetDateStr.split('-');
     if (parts.length >= 2) {
       setCurrentYear(Number(parts[0]));
       setCurrentMonth(Number(parts[1]));
@@ -79,12 +79,12 @@ export default function EventCalendar({
   const calendarCells = [];
   // 前月埋め
   for (let i = 0; i < firstDayOfWeek; i++) {
-    calendarCells.push({ day: null, dateStr: "" });
+    calendarCells.push({ day: null, dateStr: '' });
   }
   // 今月日
   for (let d = 1; d <= daysInMonth; d++) {
-    const dayFormatted = String(d).padStart(2, "0");
-    const monthFormatted = String(currentMonth).padStart(2, "0");
+    const dayFormatted = String(d).padStart(2, '0');
+    const monthFormatted = String(currentMonth).padStart(2, '0');
     const dateStr = `${currentYear}-${monthFormatted}-${dayFormatted}`;
     calendarCells.push({ day: d, dateStr });
   }
@@ -102,17 +102,17 @@ export default function EventCalendar({
           </h3>
           <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-xl text-xs font-bold">
             <button
-              onClick={() => setViewMode("grid")}
+              onClick={() => setViewMode('grid')}
               className={`px-2.5 py-1 rounded-lg transition ${
-                viewMode === "grid" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"
+                viewMode === 'grid' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500'
               }`}
             >
               📅 月表示
             </button>
             <button
-              onClick={() => setViewMode("list")}
+              onClick={() => setViewMode('list')}
               className={`px-2.5 py-1 rounded-lg transition ${
-                viewMode === "list" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500"
+                viewMode === 'list' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500'
               }`}
             >
               📜 一覧
@@ -132,7 +132,7 @@ export default function EventCalendar({
               const t = new Date();
               const y = t.getFullYear();
               const m = t.getMonth() + 1;
-              const dStr = `${y}-${String(m).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+              const dStr = `${y}-${String(m).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
               setCurrentYear(y);
               setCurrentMonth(m);
               setSelectedDateStr(dStr);
@@ -156,7 +156,8 @@ export default function EventCalendar({
           <div className="flex items-center space-x-2 text-amber-900 font-bold">
             <span className="text-base">💡</span>
             <span>
-              次の予定: <b>{formatDate(upcomingOtherEvent.date)}</b> 「{upcomingOtherEvent.title}」があります
+              次の予定: <b>{formatDate(upcomingOtherEvent.date)}</b> 「{upcomingOtherEvent.title}
+              」があります
             </span>
           </div>
           <button
@@ -169,7 +170,7 @@ export default function EventCalendar({
       )}
 
       {/* 2. 7列 カレンダーグリッド (viewMode === 'grid') */}
-      {viewMode === "grid" ? (
+      {viewMode === 'grid' ? (
         <div className="app-bg-card rounded-3xl border app-border shadow-sm overflow-hidden p-3 sm:p-4 space-y-2">
           {/* 曜日ヘッダー */}
           <div className="grid grid-cols-7 text-center font-bold text-xs py-2 border-b border-gray-100">
@@ -186,13 +187,18 @@ export default function EventCalendar({
           <div className="grid grid-cols-7 gap-1">
             {calendarCells.map((cell, idx) => {
               if (!cell.day) {
-                return <div key={`empty_${idx}`} className="h-14 sm:h-24 bg-gray-50/50 rounded-2xl"></div>;
+                return (
+                  <div
+                    key={`empty_${idx}`}
+                    className="h-14 sm:h-24 bg-gray-50/50 rounded-2xl"
+                  ></div>
+                );
               }
 
               const dayEvents = events.filter((e) => e.date === cell.dateStr);
               const isSelected = selectedDateStr === cell.dateStr;
-              const isSunday = (idx % 7) === 0;
-              const isSaturday = (idx % 7) === 6;
+              const isSunday = idx % 7 === 0;
+              const isSaturday = idx % 7 === 6;
 
               return (
                 <div
@@ -200,49 +206,53 @@ export default function EventCalendar({
                   onClick={() => setSelectedDateStr(cell.dateStr)}
                   className={`h-14 sm:h-24 p-1 sm:p-1.5 rounded-2xl border transition cursor-pointer flex flex-col justify-between overflow-hidden ${
                     isSelected
-                      ? "border-2 border-emerald-600 bg-emerald-50/60 shadow-md ring-2 ring-emerald-300"
-                      : "border-gray-200 hover:border-gray-400 bg-white"
+                      ? 'border-2 border-emerald-600 bg-emerald-50/60 shadow-md ring-2 ring-emerald-300'
+                      : 'border-gray-200 hover:border-gray-400 bg-white'
                   }`}
                 >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`font-black text-xs ${
-                      isSunday ? "text-red-500" : isSaturday ? "text-blue-600" : "text-gray-900"
-                    }`}
-                  >
-                    {cell.day}
-                  </span>
-                  {dayEvents.length > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                  )}
-                </div>
-
-                {/* セル内のイベントチップ */}
-                <div className="space-y-1 overflow-hidden">
-                  {dayEvents.map((ev) => (
-                    <div
-                      key={ev.id}
-                      className="bg-amber-100 text-amber-900 font-extrabold text-[9px] px-1.5 py-0.5 rounded-md truncate border border-amber-200 shadow-2xs"
-                      title={ev.title}
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`font-black text-xs ${
+                        isSunday ? 'text-red-500' : isSaturday ? 'text-blue-600' : 'text-gray-900'
+                      }`}
                     >
-                      {ev.title}
-                    </div>
-                  ))}
+                      {cell.day}
+                    </span>
+                    {dayEvents.length > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    )}
+                  </div>
+
+                  {/* セル内のイベントチップ */}
+                  <div className="space-y-1 overflow-hidden">
+                    {dayEvents.map((ev) => (
+                      <div
+                        key={ev.id}
+                        className="bg-amber-100 text-amber-900 font-extrabold text-[9px] px-1.5 py-0.5 rounded-md truncate border border-amber-200 shadow-2xs"
+                        title={ev.title}
+                      >
+                        {ev.title}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
       ) : (
         /* 📜 リスト (アジェンダ) 表示 */
         <div className="app-bg-card rounded-3xl border app-border shadow-sm p-4 space-y-3">
           <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-1.5 border-b pb-2">
             <span>📜</span>
-            <span>{currentYear}年 {currentMonth}月の予定・イベント一覧 ({events.length}件)</span>
+            <span>
+              {currentYear}年 {currentMonth}月の予定・イベント一覧 ({events.length}件)
+            </span>
           </h4>
           {events.length === 0 ? (
-            <p className="text-center py-6 text-xs text-gray-400 font-bold">今月予定されているイベントはありません。</p>
+            <p className="text-center py-6 text-xs text-gray-400 font-bold">
+              今月予定されているイベントはありません。
+            </p>
           ) : (
             <div className="space-y-2">
               {events.map((ev) => (
@@ -250,7 +260,9 @@ export default function EventCalendar({
                   key={ev.id}
                   onClick={() => setSelectedDateStr(ev.date)}
                   className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between text-xs ${
-                    selectedDateStr === ev.date ? "bg-emerald-50 border-emerald-500 font-bold" : "bg-white border-gray-200"
+                    selectedDateStr === ev.date
+                      ? 'bg-emerald-50 border-emerald-500 font-bold'
+                      : 'bg-white border-gray-200'
                   }`}
                 >
                   <div className="space-y-0.5">
@@ -278,7 +290,7 @@ export default function EventCalendar({
             </h4>
           </div>
 
-          {mode === "teacher" && onAddNewEventClick && (
+          {mode === 'teacher' && onAddNewEventClick && (
             <button
               onClick={() => onAddNewEventClick(selectedDateStr)}
               className="px-3.5 py-1.5 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition"
@@ -300,41 +312,60 @@ export default function EventCalendar({
                 studentName && ev.attendees.some((a) => a.name === studentName);
 
               return (
-                <div key={ev.id} className="bg-gray-50/80 p-5 rounded-2xl border border-gray-200 space-y-3">
+                <div
+                  key={ev.id}
+                  className="bg-gray-50/80 p-5 rounded-2xl border border-gray-200 space-y-3"
+                >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200 pb-3">
                     <div>
                       <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
                         {ev.time}
                       </span>
                       <h5 className="font-black text-gray-900 text-base mt-1">{ev.title}</h5>
-                      <p className="text-xs text-gray-500">📍 場所: {ev.location} • 参加費: {ev.fee}</p>
+                      <p className="text-xs text-gray-500">
+                        📍 場所: {ev.location} • 参加費: {ev.fee}
+                      </p>
                     </div>
 
                     <div className="text-right shrink-0">
                       <span className="text-xs font-bold text-gray-700 block">
-                        予約: <b className="text-emerald-700">{ev.reservedCount}</b> / {ev.capacity} 名
+                        予約: <b className="text-emerald-700">{ev.reservedCount}</b> / {ev.capacity}{' '}
+                        名
                       </span>
                       <span className="text-[10px] text-gray-400 font-medium">
-                        {isFull ? "満員御礼" : `残り ${ev.capacity - ev.reservedCount} 枠`}
+                        {isFull ? '満員御礼' : `残り ${ev.capacity - ev.reservedCount} 枠`}
                       </span>
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-700 font-medium leading-relaxed">{ev.description}</p>
+                  <p className="text-xs text-gray-700 font-medium leading-relaxed">
+                    {ev.description}
+                  </p>
 
                   {/* 講師モード: 参加承認表示 */}
-                  {mode === "teacher" && (
+                  {mode === 'teacher' && (
                     <div className="pt-2 border-t border-gray-200 space-y-2">
-                      <span className="text-[11px] font-bold text-gray-700 block">👥 参加申し込み状況:</span>
+                      <span className="text-[11px] font-bold text-gray-700 block">
+                        👥 参加申し込み状況:
+                      </span>
                       <div className="flex flex-wrap gap-2">
                         {ev.attendees.map((at, i) => (
-                          <div key={i} className="bg-white px-3 py-1.5 rounded-xl border border-gray-200 text-xs flex items-center space-x-2">
-                            <span className="font-bold text-gray-900">{at.name} ({at.plot})</span>
-                            {at.status === "confirmed" ? (
-                              <span className="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.2 rounded">確定</span>
+                          <div
+                            key={i}
+                            className="bg-white px-3 py-1.5 rounded-xl border border-gray-200 text-xs flex items-center space-x-2"
+                          >
+                            <span className="font-bold text-gray-900">
+                              {at.name} ({at.plot})
+                            </span>
+                            {at.status === 'confirmed' ? (
+                              <span className="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.2 rounded">
+                                確定
+                              </span>
                             ) : (
                               <button
-                                onClick={() => onApproveAttendee && onApproveAttendee(ev.id, at.name)}
+                                onClick={() =>
+                                  onApproveAttendee && onApproveAttendee(ev.id, at.name)
+                                }
                                 className="app-accent-btn text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs"
                               >
                                 承認
@@ -347,7 +378,7 @@ export default function EventCalendar({
                   )}
 
                   {/* 生徒モード: 参加予約ボタン連動 */}
-                  {mode === "student" && (
+                  {mode === 'student' && (
                     <div className="pt-2 flex justify-end">
                       {hasAlreadyReserved ? (
                         <span className="bg-green-100 text-[#2e7d32] border border-green-300 font-bold text-xs px-4 py-2 rounded-xl">
@@ -368,11 +399,15 @@ export default function EventCalendar({
                     </div>
                   )}
                   {/* 講師モード: 削除ボタン */}
-                  {mode === "teacher" && onDeleteEvent && (
+                  {mode === 'teacher' && onDeleteEvent && (
                     <div className="pt-2 flex justify-end">
                       <button
                         onClick={() => {
-                          if (window.confirm(`「${ev.title}」をカレンダーから削除してもよろしいですか？`)) {
+                          if (
+                            window.confirm(
+                              `「${ev.title}」をカレンダーから削除してもよろしいですか？`
+                            )
+                          ) {
                             onDeleteEvent(ev.id);
                           }
                         }}

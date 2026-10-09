@@ -1,0 +1,9 @@
+.next
+node_modules
+coverage
+build
+out
+.vercel
+package-lock.json
+scratch
+supabase/.temp

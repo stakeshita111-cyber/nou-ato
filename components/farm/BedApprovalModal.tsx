@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { FarmPlot, FarmBed } from "@/types/farm";
+import { useState } from 'react';
+import { FarmPlot, FarmBed } from '@/types/farm';
 
 interface BedApprovalModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export default function BedApprovalModal({
 }: BedApprovalModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
+  const [rejectReason, setRejectReason] = useState('');
 
   if (!isOpen || !plot || !bed) return null;
 
@@ -40,7 +40,7 @@ export default function BedApprovalModal({
     if (!onReject) return;
     setIsSubmitting(true);
     try {
-      await onReject(plot.id, bed.id, rejectReason || "内容の再確認をお願いします");
+      await onReject(plot.id, bed.id, rejectReason || '内容の再確認をお願いします');
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -60,7 +60,7 @@ export default function BedApprovalModal({
             <div>
               <h3 className="font-black text-base">収穫完了報告の確認と承認</h3>
               <p className="text-xs text-emerald-200 font-bold">
-                区画 {plot.code}（{plot.student_name || "生徒"}さん） / 畝 #{bed.bed_number}
+                区画 {plot.code}（{plot.student_name || '生徒'}さん） / 畝 #{bed.bed_number}
               </p>
             </div>
           </div>
@@ -75,7 +75,9 @@ export default function BedApprovalModal({
         {/* 🌟 2. 画面上部のアクションバー (承認 ＆ 差し戻し) 🌟 */}
         <div className="bg-amber-50/90 border-b border-amber-200 p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
           <div className="text-xs">
-            <span className="font-black text-amber-950 block">報告を確認後、操作を選択してください</span>
+            <span className="font-black text-amber-950 block">
+              報告を確認後、操作を選択してください
+            </span>
             <span className="text-[10px] text-amber-800 font-bold">
               ※承認すると畝 #{bed.bed_number} の位置に新しい畝（未設定 🌱）が準備されます
             </span>
@@ -150,7 +152,7 @@ export default function BedApprovalModal({
                 src={bed.completion_image_url}
                 alt="収穫記念写真"
                 className="w-full h-full object-cover cursor-pointer group-hover:scale-102 transition duration-300"
-                onClick={() => window.open(bed.completion_image_url, "_blank")}
+                onClick={() => window.open(bed.completion_image_url, '_blank')}
               />
               <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                 クリックで拡大 🔍
@@ -168,22 +170,24 @@ export default function BedApprovalModal({
               <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
                 <span className="text-gray-400 font-bold text-[10px] block">対象作物</span>
                 <span className="font-black text-emerald-950 text-sm">
-                  {bed.crop_name || "未登録 🌱"}
+                  {bed.crop_name || '未登録 🌱'}
                 </span>
               </div>
               <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
                 <span className="text-gray-400 font-bold text-[10px] block">総収穫量</span>
                 <span className="font-black text-amber-900 text-sm">
-                  {bed.total_harvest || "未記載"}
+                  {bed.total_harvest || '未記載'}
                 </span>
               </div>
             </div>
 
             {/* 振り返りメモ */}
             <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs space-y-1">
-              <span className="text-gray-400 font-bold text-[10px] block">生徒からの振り返り・感想</span>
+              <span className="text-gray-400 font-bold text-[10px] block">
+                生徒からの振り返り・感想
+              </span>
               <p className="text-xs font-bold text-gray-800 leading-relaxed whitespace-pre-wrap">
-                {bed.completion_notes || "（感想メモなし）"}
+                {bed.completion_notes || '（感想メモなし）'}
               </p>
             </div>
           </div>

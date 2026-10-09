@@ -3,8 +3,8 @@ import { persist } from 'zustand/middleware';
 
 export interface ThemeSettings {
   // 1. カラー・文字サイズ
-  primaryColor: string;      // 農園のメインカラー（例：トマトレッド、キャベツグリーン）
-  secondaryColor: string;    // アクセントカラー
+  primaryColor: string; // 農園のメインカラー（例：トマトレッド、キャベツグリーン）
+  secondaryColor: string; // アクセントカラー
   fontSize: 'small' | 'medium' | 'large' | 'xlarge'; // 屋外用「極大」
 
   // 2. タイポグラフィ
@@ -22,8 +22,8 @@ export interface ThemeSettings {
   numberFormat: 'raw' | 'comma' | 'unit'; // 「1500」 or 「1,500」 or 「1,500g」
 
   // 5. 機能・画面表示ON/OFF設定
-  showPaymentsMenu: boolean;     // 講師画面: 収支シミュレーションメニューの表示ON/OFF (基本非表示)
-  showStudentTalkTab: boolean;   // 生徒画面: 相談・質問タブの表示ON/OFF
+  showPaymentsMenu: boolean; // 講師画面: 収支シミュレーションメニューの表示ON/OFF (基本非表示)
+  showStudentTalkTab: boolean; // 生徒画面: 相談・質問タブの表示ON/OFF
 }
 
 interface ThemeState {
@@ -76,11 +76,20 @@ export const useThemeStore = create<ThemeState>()(
           if (typeof window !== 'undefined') {
             try {
               if (newSettings.showStudentTalkTab !== undefined) {
-                localStorage.setItem('nouato_show_student_talk_tab', String(newSettings.showStudentTalkTab));
+                localStorage.setItem(
+                  'nouato_show_student_talk_tab',
+                  String(newSettings.showStudentTalkTab)
+                );
               }
               if (newSettings.outdoorHighContrast !== undefined) {
-                localStorage.setItem('nouato_outdoor_contrast', String(newSettings.outdoorHighContrast));
-                document.documentElement.setAttribute('data-contrast', newSettings.outdoorHighContrast ? 'high' : 'normal');
+                localStorage.setItem(
+                  'nouato_outdoor_contrast',
+                  String(newSettings.outdoorHighContrast)
+                );
+                document.documentElement.setAttribute(
+                  'data-contrast',
+                  newSettings.outdoorHighContrast ? 'high' : 'normal'
+                );
               }
               const bc = getBroadcastChannel();
               if (bc) {

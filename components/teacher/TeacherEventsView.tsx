@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Toast from "@/components/ui/Toast";
-import EventCalendar from "@/components/ui/EventCalendar";
-import { useEvents } from "@/hooks/useEvents";
-import { formatDate } from "@/lib/utils/formatHelper";
+import { useState } from 'react';
+import Toast from '@/components/ui/Toast';
+import EventCalendar from '@/components/ui/EventCalendar';
+import { useEvents } from '@/hooks/useEvents';
+import { formatDate } from '@/lib/utils/formatHelper';
 
 export default function TeacherEventsView() {
   const { events, addEvent, approveAttendee, deleteEvent } = useEvents();
 
   const getTodayStr = () => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
+  const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState(getTodayStr());
-  const [newTime, setNewTime] = useState("10:00 - 12:30");
+  const [newTime, setNewTime] = useState('10:00 - 12:30');
   const [newCapacity, setNewCapacity] = useState(10);
-  const [newDescription, setNewDescription] = useState("");
+  const [newDescription, setNewDescription] = useState('');
 
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [farmName, setFarmName] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("nouato_current_farm_name") || "当農園";
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('nouato_current_farm_name') || '当農園';
     }
-    return "当農園";
+    return '当農園';
   });
 
   // カレンダーの日付から直接追加モーダルを開く
@@ -48,15 +48,15 @@ export default function TeacherEventsView() {
       time: newTime,
       location: `${farmName} メインエリア`,
       capacity: newCapacity,
-      fee: "無料 (受講生特典)",
-      category: "harvest",
-      description: newDescription || "農園での体験イベントです。",
+      fee: '無料 (受講生特典)',
+      category: 'harvest',
+      description: newDescription || '農園での体験イベントです。',
     });
 
     setShowAddModal(false);
-    setNewTitle("");
-    setNewDescription("");
-    setToastMessage("📅 カレンダーに新しいイベントを登録し、生徒画面へ即時共有しました！");
+    setNewTitle('');
+    setNewDescription('');
+    setToastMessage('📅 カレンダーに新しいイベントを登録し、生徒画面へ即時共有しました！');
     setShowToast(true);
   };
 
@@ -70,7 +70,7 @@ export default function TeacherEventsView() {
   // イベント削除
   const handleDelete = async (eventId: string) => {
     await deleteEvent(eventId);
-    setToastMessage("🗑️ イベントをカレンダーから削除しました");
+    setToastMessage('🗑️ イベントをカレンダーから削除しました');
     setShowToast(true);
   };
 
@@ -80,7 +80,9 @@ export default function TeacherEventsView() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900">📅 カレンダー予約 ＆ イベント管理</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900">
+            📅 カレンダー予約 ＆ イベント管理
+          </h2>
           <p className="text-xs text-gray-500 mt-1">
             Googleカレンダー風ビューでイベントを管理し、登録したイベントは生徒受講画面とリアルタイム共有されます。
           </p>
@@ -109,8 +111,15 @@ export default function TeacherEventsView() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-gray-800">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-200">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-gray-900 text-base">🎉 カレンダーにイベントを登録 (生徒共有)</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+              <h3 className="font-black text-gray-900 text-base">
+                🎉 カレンダーにイベントを登録 (生徒共有)
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold"
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleCreateEvent} className="space-y-4 text-xs font-bold">

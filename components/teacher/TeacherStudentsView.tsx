@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { MASTER_TASKS } from "@/lib/taskMaster";
-import Toast from "@/components/ui/Toast";
-import IndividualTaskAssignModal from "@/components/teacher/IndividualTaskAssignModal";
-import StudentPreviewModal from "@/components/teacher/StudentPreviewModal";
-import QRCodeModal from "@/components/ui/QRCodeModal";
-import { SproutLoader } from "@/components/SproutLoader";
-import { useFarmStore } from "@/store/useFarmStore";
-import { formatDate } from "@/lib/utils/formatHelper";
-import { grantTicket } from "@/lib/ticketManager";
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { MASTER_TASKS } from '@/lib/taskMaster';
+import Toast from '@/components/ui/Toast';
+import IndividualTaskAssignModal from '@/components/teacher/IndividualTaskAssignModal';
+import StudentPreviewModal from '@/components/teacher/StudentPreviewModal';
+import QRCodeModal from '@/components/ui/QRCodeModal';
+import { SproutLoader } from '@/components/SproutLoader';
+import { useFarmStore } from '@/store/useFarmStore';
+import { formatDate } from '@/lib/utils/formatHelper';
+import { grantTicket } from '@/lib/ticketManager';
 
 interface StudentData {
   id: string;
@@ -54,8 +54,8 @@ export interface BroadcastRecordItem {
 export default function TeacherStudentsView() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [sortOption, setSortOption] = useState<string>("name_asc");
+  const [filter, setFilter] = useState('all');
+  const [sortOption, setSortOption] = useState<string>('name_asc');
   const [pageSize, setPageSize] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
@@ -63,18 +63,18 @@ export default function TeacherStudentsView() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
-  const [broadcastTitle, setBroadcastTitle] = useState("");
-  const [broadcastBody, setBroadcastBody] = useState("");
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
 
   // 🌟 個別配信モーダル用ステート 🌟
   const [individualStudent, setIndividualStudent] = useState<StudentData | null>(null);
   const [showIndividualModal, setShowIndividualModal] = useState(false);
-  const [individualTitle, setIndividualTitle] = useState("");
-  const [individualBody, setIndividualBody] = useState("");
+  const [individualTitle, setIndividualTitle] = useState('');
+  const [individualBody, setIndividualBody] = useState('');
   const [sendingIndividual, setSendingIndividual] = useState(false);
 
   // 🌟 配信履歴・CRUD管理用ステート 🌟
@@ -85,275 +85,332 @@ export default function TeacherStudentsView() {
   // 🌟 受講生退会・削除確認モーダル用ステート 🌟
   const [deleteTargetStudent, setDeleteTargetStudent] = useState<StudentData | null>(null);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-  const [deleteMode, setDeleteMode] = useState<"deactivate" | "purge">("deactivate");
+  const [deleteMode, setDeleteMode] = useState<'deactivate' | 'purge'>('deactivate');
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { activeFarmId, activeFarmName } = useFarmStore();
-  const [origin] = useState(() => (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"));
+  const [origin] = useState(() =>
+    typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  );
   const [farmId, setFarmId] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("nouato_active_farm_id") || "";
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('nouato_active_farm_id') || '';
     }
-    return "";
+    return '';
   });
   const [farmName, setFarmName] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("nouato_current_farm_name") || "農園";
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('nouato_current_farm_name') || '農園';
     }
-    return "農園";
+    return '農園';
   });
 
   const effectiveFarmId = activeFarmId || farmId;
   const effectiveFarmName = activeFarmName || farmName;
 
-  const fetchStudents = useCallback(async (targetFarmId?: string) => {
-    const currentFarmId = targetFarmId || effectiveFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("nouato_student_task_statuses");
-        localStorage.removeItem("nouato_student_all_completed_status");
-      } catch {}
-    }
-    try {
-      // 1. まず public.users (display_name) から受講生データを取得 (自農園限定・未退会のみ)
-      let usersQuery = supabase
-        .from("users")
-        .select("*")
-        .eq("role", "student")
-        .is("deleted_at", null);
-
-      if (currentFarmId) {
-        usersQuery = usersQuery.eq("farm_id", currentFarmId);
-      }
-
-      const { data: usersData, error: usersError } = await usersQuery;
-
-      // 2. 農地・区画・畝 (farm_plots / farm_beds) からユーザーの割り当て区画を取得
-      const plotMap: Record<string, string> = {};
-      try {
-        // ① farm_plots (主たる区画割り当てテーブル) から取得
-        const { data: dbPlots } = await supabase
-          .from("farm_plots")
-          .select("id, code, student_id, student_name, name, description");
-        if (dbPlots && dbPlots.length > 0) {
-          dbPlots.forEach((p: Record<string, unknown>) => {
-            const sid = String(p.student_id || "");
-            const sname = String(p.student_name || "");
-            const code = String(p.code || "").toUpperCase();
-            const label = code ? `区画 ${code}` : String(p.name || "区画");
-            if (sid) plotMap[sid] = label;
-            if (sname) plotMap[sname] = label;
-          });
-        }
-      } catch (err) {
-        console.warn("fetchStudents plots lookup info:", err);
-      }
-
-      try {
-        // ② farm_beds (畝レベルの割当) からも取得して補完
-        const { data: dbBeds } = await supabase
-          .from("farm_beds")
-          .select("id, student_id, user_id, student_name, user_name, plot_id, bed_number");
-        if (dbBeds && dbBeds.length > 0) {
-          dbBeds.forEach((b: Record<string, unknown>) => {
-            const assignedUser = String(b.student_id || b.user_id || "");
-            const assignedName = String(b.student_name || b.user_name || "");
-            const plotCellMatch = String(b.plot_id || "").match(/plot_cell_([A-Za-z0-9]+)/);
-            const plotLabel = plotCellMatch ? `区画 ${plotCellMatch[1].toUpperCase()}` : (b.plot_id ? String(b.plot_id).replace(/^plot_cell_/, "区画 ") : `畝 ${b.bed_number || 1}`);
-            if (assignedUser && !plotMap[assignedUser]) plotMap[assignedUser] = plotLabel;
-            if (assignedName && !plotMap[assignedName]) plotMap[assignedName] = plotLabel;
-          });
-        }
-      } catch (err) {
-        console.warn("fetchStudents beds lookup info:", err);
-      }
-
-      const farmPlotKey = currentFarmId ? `nouato_farm_plots_${currentFarmId}` : "nouato_farm_plots";
-      const savedPlotsStr = typeof window !== "undefined" ? (localStorage.getItem(farmPlotKey) || localStorage.getItem("nouato_farm_plots")) : null;
-      if (savedPlotsStr) {
+  const fetchStudents = useCallback(
+    async (targetFarmId?: string) => {
+      const currentFarmId =
+        targetFarmId ||
+        effectiveFarmId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+      if (typeof window !== 'undefined') {
         try {
-          JSON.parse(savedPlotsStr);
+          localStorage.removeItem('nouato_student_task_statuses');
+          localStorage.removeItem('nouato_student_all_completed_status');
         } catch {}
       }
-
-      // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
-      let publicTasks: Record<string, unknown>[] = [];
       try {
-        let pTasksQuery = supabase
-          .from("tasks")
-          .select("*")
-          .eq("status", "todo")
-          .is("deleted_at", null);
+        // 1. まず public.users (display_name) から受講生データを取得 (自農園限定・未退会のみ)
+        let usersQuery = supabase
+          .from('users')
+          .select('*')
+          .eq('role', 'student')
+          .is('deleted_at', null);
+
         if (currentFarmId) {
-          pTasksQuery = pTasksQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+          usersQuery = usersQuery.eq('farm_id', currentFarmId);
         }
-        const { data: ptData } = await pTasksQuery.order("created_at", { ascending: true });
-        if (ptData && ptData.length > 0) {
-          publicTasks = ptData as Record<string, unknown>[];
-        }
-      } catch (err) {
-        console.warn("fetchStudents public tasks lookup:", err);
-      }
 
-      // Supabase の student_tasks 取得 (実在するカラムのみクエリしエラーを防止)
-      let studentTasksRaw: Record<string, unknown>[] = [];
-      try {
-        const { data: stData, error: stErr } = await supabase
-          .from("student_tasks")
-          .select("id, student_id, status, base_task_id, title");
-        if (stErr) {
-          console.warn("fetchStudents student_tasks query notice:", stErr);
-        } else if (stData) {
-          studentTasksRaw = stData as Record<string, unknown>[];
-        }
-      } catch (err) {
-        console.warn("fetchStudents student_tasks lookup:", err);
-      }
+        const { data: usersData, error: usersError } = await usersQuery;
 
-      // Supabase の journals 完了ノート取得
-      const journalCompletedTitlesMap: Record<string, Set<string>> = {};
-      const lastJournalMap: Record<string, { content?: string; photo_url?: string; created_at?: string }> = {};
-      const globalJournalCompletedTitles = new Set<string>();
-
-      try {
-        let jDataQuery = supabase
-          .from("journals")
-          .select("id, student_id, farm_id, content, memo, task_title, photo_url, image_url, created_at")
-          .order("created_at", { ascending: false });
-        if (currentFarmId) {
-          jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+        // 2. 農地・区画・畝 (farm_plots / farm_beds) からユーザーの割り当て区画を取得
+        const plotMap: Record<string, string> = {};
+        try {
+          // ① farm_plots (主たる区画割り当てテーブル) から取得
+          const { data: dbPlots } = await supabase
+            .from('farm_plots')
+            .select('id, code, student_id, student_name, name, description');
+          if (dbPlots && dbPlots.length > 0) {
+            dbPlots.forEach((p: Record<string, unknown>) => {
+              const sid = String(p.student_id || '');
+              const sname = String(p.student_name || '');
+              const code = String(p.code || '').toUpperCase();
+              const label = code ? `区画 ${code}` : String(p.name || '区画');
+              if (sid) plotMap[sid] = label;
+              if (sname) plotMap[sname] = label;
+            });
+          }
+        } catch (err) {
+          console.warn('fetchStudents plots lookup info:', err);
         }
-        const { data: jData } = await jDataQuery;
-        if (jData && jData.length > 0) {
-          jData.forEach((j: Record<string, unknown>) => {
-            const sid = String(j.student_id || "student_default");
-            if (!lastJournalMap[sid]) {
-              lastJournalMap[sid] = {
-                content: String(j.content || j.memo || ""),
-                photo_url: j.photo_url ? String(j.photo_url) : j.image_url ? String(j.image_url) : undefined,
-                created_at: j.created_at ? formatDate(String(j.created_at)) : "最近",
+
+        try {
+          // ② farm_beds (畝レベルの割当) からも取得して補完
+          const { data: dbBeds } = await supabase
+            .from('farm_beds')
+            .select('id, student_id, user_id, student_name, user_name, plot_id, bed_number');
+          if (dbBeds && dbBeds.length > 0) {
+            dbBeds.forEach((b: Record<string, unknown>) => {
+              const assignedUser = String(b.student_id || b.user_id || '');
+              const assignedName = String(b.student_name || b.user_name || '');
+              const plotCellMatch = String(b.plot_id || '').match(/plot_cell_([A-Za-z0-9]+)/);
+              const plotLabel = plotCellMatch
+                ? `区画 ${plotCellMatch[1].toUpperCase()}`
+                : b.plot_id
+                  ? String(b.plot_id).replace(/^plot_cell_/, '区画 ')
+                  : `畝 ${b.bed_number || 1}`;
+              if (assignedUser && !plotMap[assignedUser]) plotMap[assignedUser] = plotLabel;
+              if (assignedName && !plotMap[assignedName]) plotMap[assignedName] = plotLabel;
+            });
+          }
+        } catch (err) {
+          console.warn('fetchStudents beds lookup info:', err);
+        }
+
+        const farmPlotKey = currentFarmId
+          ? `nouato_farm_plots_${currentFarmId}`
+          : 'nouato_farm_plots';
+        const savedPlotsStr =
+          typeof window !== 'undefined'
+            ? localStorage.getItem(farmPlotKey) || localStorage.getItem('nouato_farm_plots')
+            : null;
+        if (savedPlotsStr) {
+          try {
+            JSON.parse(savedPlotsStr);
+          } catch {}
+        }
+
+        // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
+        let publicTasks: Record<string, unknown>[] = [];
+        try {
+          let pTasksQuery = supabase
+            .from('tasks')
+            .select('*')
+            .eq('status', 'todo')
+            .is('deleted_at', null);
+          if (currentFarmId) {
+            pTasksQuery = pTasksQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+          }
+          const { data: ptData } = await pTasksQuery.order('created_at', { ascending: true });
+          if (ptData && ptData.length > 0) {
+            publicTasks = ptData as Record<string, unknown>[];
+          }
+        } catch (err) {
+          console.warn('fetchStudents public tasks lookup:', err);
+        }
+
+        // Supabase の student_tasks 取得 (実在するカラムのみクエリしエラーを防止)
+        let studentTasksRaw: Record<string, unknown>[] = [];
+        try {
+          const { data: stData, error: stErr } = await supabase
+            .from('student_tasks')
+            .select('id, student_id, status, base_task_id, title');
+          if (stErr) {
+            console.warn('fetchStudents student_tasks query notice:', stErr);
+          } else if (stData) {
+            studentTasksRaw = stData as Record<string, unknown>[];
+          }
+        } catch (err) {
+          console.warn('fetchStudents student_tasks lookup:', err);
+        }
+
+        // Supabase の journals 完了ノート取得
+        const journalCompletedTitlesMap: Record<string, Set<string>> = {};
+        const lastJournalMap: Record<
+          string,
+          { content?: string; photo_url?: string; created_at?: string }
+        > = {};
+        const globalJournalCompletedTitles = new Set<string>();
+
+        try {
+          let jDataQuery = supabase
+            .from('journals')
+            .select(
+              'id, student_id, farm_id, content, memo, task_title, photo_url, image_url, created_at'
+            )
+            .order('created_at', { ascending: false });
+          if (currentFarmId) {
+            jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+          }
+          const { data: jData } = await jDataQuery;
+          if (jData && jData.length > 0) {
+            jData.forEach((j: Record<string, unknown>) => {
+              const sid = String(j.student_id || 'student_default');
+              if (!lastJournalMap[sid]) {
+                lastJournalMap[sid] = {
+                  content: String(j.content || j.memo || ''),
+                  photo_url: j.photo_url
+                    ? String(j.photo_url)
+                    : j.image_url
+                      ? String(j.image_url)
+                      : undefined,
+                  created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
+                };
+              }
+              const journalText = String(j.content || j.task_title || '');
+              if (
+                journalText &&
+                (journalText.includes('タスク完了') || journalText.includes('完了'))
+              ) {
+                if (!journalCompletedTitlesMap[sid]) {
+                  journalCompletedTitlesMap[sid] = new Set();
+                }
+                const cleanedTitle = journalText.replace('✅【タスク完了】', '').trim();
+                journalCompletedTitlesMap[sid].add(cleanedTitle);
+                globalJournalCompletedTitles.add(cleanedTitle);
+              }
+            });
+          }
+        } catch {}
+
+        if (!usersError && usersData && usersData.length > 0) {
+          const colors = [
+            'bg-emerald-800 text-white',
+            'bg-[#e89980] text-white',
+            'bg-[#0b548b] text-white',
+            'bg-purple-800 text-white',
+          ];
+
+          // 同一受講生(多対1)のカード重複防止と名寄せグループ化
+          const uniqueUsers: Record<string, unknown>[] = [];
+          const seenNames = new Set<string>();
+          usersData.forEach((u: Record<string, unknown>) => {
+            const normName = String(u.display_name || u.name || '').replace(/\s+/g, '');
+            if (!seenNames.has(normName) && normName.length > 0) {
+              seenNames.add(normName);
+              uniqueUsers.push(u);
+            }
+          });
+
+          const formatted: StudentData[] = uniqueUsers.map(
+            (u: Record<string, unknown>, idx: number) => {
+              const studentName = String(u.display_name || u.name || `受講生 ${idx + 1}`);
+              const uId = String(u.id || '');
+              const plotName = String(
+                plotMap[uId] ||
+                  plotMap[studentName] ||
+                  u.plot ||
+                  u.plot_name ||
+                  u.assigned_plot ||
+                  '未割り当て'
+              );
+
+              // 生徒画面 (useStudentDashboard) と完全に一致する教材タスク一覧を構築
+              const baseTasks =
+                publicTasks.length > 0
+                  ? publicTasks
+                  : (MASTER_TASKS as unknown as Record<string, unknown>[]);
+
+              // Supabase DB (student_tasks) レコードの集約
+              const userStRows = studentTasksRaw.filter(
+                (st: Record<string, unknown>) => st.student_id === uId
+              );
+              // 日誌 (journals) による完了タイトルの集約
+              const userJournalTitles =
+                journalCompletedTitlesMap[uId] ||
+                journalCompletedTitlesMap[studentName] ||
+                new Set<string>();
+
+              let completedTasks = 0;
+              let uncompletedTaskObj: Record<string, unknown> | null = null;
+
+              const cleanStr = (s: string) =>
+                (s || '')
+                  .replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, '')
+                  .trim();
+
+              baseTasks.forEach((taskObj) => {
+                const taskId = String(taskObj.id || '');
+
+                // ① Supabase DB (student_tasks) の status === "completed" を ID で厳密照合
+                const isStDone = userStRows.some((st: Record<string, unknown>) => {
+                  if (st.status !== 'completed') return false;
+                  const baseId = String(st.base_task_id || st.task_id || st.id || '');
+                  return baseId === taskId;
+                });
+
+                if (isStDone) {
+                  completedTasks++;
+                } else if (!uncompletedTaskObj) {
+                  uncompletedTaskObj = taskObj;
+                }
+              });
+
+              // 生徒個別追加タスク (base_task_id なしで student_tasks に直接登録されたもの) で完了しているものも加算
+              userStRows.forEach((st: Record<string, unknown>) => {
+                if (st.status === 'completed' && !st.base_task_id) {
+                  const alreadyCounted = baseTasks.some((bt) => String(bt.id) === String(st.id));
+                  if (!alreadyCounted) {
+                    completedTasks++;
+                  }
+                }
+              });
+
+              // 出題全数: baseTasks の件数（完了数が多い場合は完了数以上）
+              const totalTasks = Math.max(baseTasks.length, completedTasks);
+
+              // 進捗率 (%) 算定
+              const calcProgress =
+                totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
+
+              let stepText = '受講開始';
+              if (calcProgress >= 100 && totalTasks > 0) stepText = '全課題完了 🏆';
+              else if (calcProgress >= 60) stepText = '応用作業中 🌱';
+              else if (calcProgress >= 20 || completedTasks > 0) stepText = '基礎作業中 🌿';
+
+              const activeTaskRaw = uncompletedTaskObj || baseTasks[0] || null;
+              const activeTask = activeTaskRaw
+                ? {
+                    title: String(activeTaskRaw.title || ''),
+                    description: String(activeTaskRaw.description || ''),
+                    target_crop: String(activeTaskRaw.target_crop || ''),
+                    exp: Number(activeTaskRaw.exp || 50),
+                  }
+                : null;
+
+              return {
+                id: uId,
+                name: studentName,
+                avatar: studentName.slice(0, 2),
+                avatarBg: colors[idx % colors.length],
+                plot: plotName,
+                step: stepText,
+                progress: calcProgress,
+                completedCount: completedTasks,
+                totalTaskCount: totalTasks,
+                unreadCount: 0,
+                lastReport: u.created_at ? formatDate(String(u.created_at)) : '最近',
+                hasOverdue: false,
+                activeTask,
+                lastJournal: lastJournalMap[uId] || null,
               };
             }
-            const journalText = String(j.content || j.task_title || "");
-            if (journalText && (journalText.includes("タスク完了") || journalText.includes("完了"))) {
-              if (!journalCompletedTitlesMap[sid]) {
-                journalCompletedTitlesMap[sid] = new Set();
-              }
-              const cleanedTitle = journalText.replace("✅【タスク完了】", "").trim();
-              journalCompletedTitlesMap[sid].add(cleanedTitle);
-              globalJournalCompletedTitles.add(cleanedTitle);
-            }
-          });
+          );
+          setStudents(formatted);
+          return;
         }
-      } catch {}
 
-      if (!usersError && usersData && usersData.length > 0) {
-        const colors = ["bg-emerald-800 text-white", "bg-[#e89980] text-white", "bg-[#0b548b] text-white", "bg-purple-800 text-white"];
-
-        // 同一受講生(多対1)のカード重複防止と名寄せグループ化
-        const uniqueUsers: Record<string, unknown>[] = [];
-        const seenNames = new Set<string>();
-        usersData.forEach((u: Record<string, unknown>) => {
-          const normName = String(u.display_name || u.name || "").replace(/\s+/g, "");
-          if (!seenNames.has(normName) && normName.length > 0) {
-            seenNames.add(normName);
-            uniqueUsers.push(u);
-          }
-        });
-
-        const formatted: StudentData[] = uniqueUsers.map((u: Record<string, unknown>, idx: number) => {
-          const studentName = String(u.display_name || u.name || `受講生 ${idx + 1}`);
-          const uId = String(u.id || "");
-          const plotName = String(plotMap[uId] || plotMap[studentName] || u.plot || u.plot_name || u.assigned_plot || "未割り当て");
-
-          // 生徒画面 (useStudentDashboard) と完全に一致する教材タスク一覧を構築
-          const baseTasks = publicTasks.length > 0 ? publicTasks : (MASTER_TASKS as unknown as Record<string, unknown>[]);
-
-          // Supabase DB (student_tasks) レコードの集約
-          const userStRows = studentTasksRaw.filter((st: Record<string, unknown>) => st.student_id === uId);
-          // 日誌 (journals) による完了タイトルの集約
-          const userJournalTitles = journalCompletedTitlesMap[uId] || journalCompletedTitlesMap[studentName] || new Set<string>();
-
-          let completedTasks = 0;
-          let uncompletedTaskObj: Record<string, unknown> | null = null;
-
-          const cleanStr = (s: string) => (s || "").replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, "").trim();
-
-          baseTasks.forEach((taskObj) => {
-            const taskId = String(taskObj.id || "");
-
-            // ① Supabase DB (student_tasks) の status === "completed" を ID で厳密照合
-            const isStDone = userStRows.some((st: Record<string, unknown>) => {
-              if (st.status !== "completed") return false;
-              const baseId = String(st.base_task_id || st.task_id || st.id || "");
-              return baseId === taskId;
-            });
-
-            if (isStDone) {
-              completedTasks++;
-            } else if (!uncompletedTaskObj) {
-              uncompletedTaskObj = taskObj;
-            }
-          });
-
-          // 生徒個別追加タスク (base_task_id なしで student_tasks に直接登録されたもの) で完了しているものも加算
-          userStRows.forEach((st: Record<string, unknown>) => {
-            if (st.status === "completed" && !st.base_task_id) {
-              const alreadyCounted = baseTasks.some((bt) => String(bt.id) === String(st.id));
-              if (!alreadyCounted) {
-                completedTasks++;
-              }
-            }
-          });
-
-          // 出題全数: baseTasks の件数（完了数が多い場合は完了数以上）
-          const totalTasks = Math.max(baseTasks.length, completedTasks);
-
-          // 進捗率 (%) 算定
-          const calcProgress = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
-
-          let stepText = "受講開始";
-          if (calcProgress >= 100 && totalTasks > 0) stepText = "全課題完了 🏆";
-          else if (calcProgress >= 60) stepText = "応用作業中 🌱";
-          else if (calcProgress >= 20 || completedTasks > 0) stepText = "基礎作業中 🌿";
-
-          const activeTaskRaw = uncompletedTaskObj || baseTasks[0] || null;
-          const activeTask = activeTaskRaw ? {
-            title: String(activeTaskRaw.title || ""),
-            description: String(activeTaskRaw.description || ""),
-            target_crop: String(activeTaskRaw.target_crop || ""),
-            exp: Number(activeTaskRaw.exp || 50),
-          } : null;
-
-          return {
-            id: uId,
-            name: studentName,
-            avatar: studentName.slice(0, 2),
-            avatarBg: colors[idx % colors.length],
-            plot: plotName,
-            step: stepText,
-            progress: calcProgress,
-            completedCount: completedTasks,
-            totalTaskCount: totalTasks,
-            unreadCount: 0,
-            lastReport: u.created_at ? formatDate(String(u.created_at)) : "最近",
-            hasOverdue: false,
-            activeTask,
-            lastJournal: lastJournalMap[uId] || null,
-          };
-        });
-        setStudents(formatted);
-        return;
+        setStudents([]);
+      } catch (e) {
+        console.error('fetchStudents exception:', e);
+        setStudents([]);
+      } finally {
+        setLoading(false);
       }
-
-      setStudents([]);
-    } catch (e) {
-      console.error("fetchStudents exception:", e);
-      setStudents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [effectiveFarmId]);
+    },
+    [effectiveFarmId]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -367,20 +424,20 @@ export default function TeacherStudentsView() {
 
     // 🌟 Supabase Realtime で生徒のタスク完了・畝変更・日誌提出を検知し即時自動反映 🌟
     const channel = supabase
-      .channel("teacher_students_realtime_channel")
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_tasks" }, () => {
+      .channel('teacher_students_realtime_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_tasks' }, () => {
         if (isMounted) void fetchStudents();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
         if (isMounted) void fetchStudents();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_beds' }, () => {
         if (isMounted) void fetchStudents();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () => {
         if (isMounted) void fetchStudents();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
         if (isMounted) void fetchStudents();
       })
       .subscribe();
@@ -388,21 +445,21 @@ export default function TeacherStudentsView() {
     const handleSync = () => {
       if (isMounted) void fetchStudents();
     };
-    if (typeof window !== "undefined") {
-      window.addEventListener("nouato_tasks_updated", handleSync);
-      window.addEventListener("nouato_task_completed", handleSync);
-      window.addEventListener("nouato_sync_event", handleSync);
-      window.addEventListener("storage", handleSync);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nouato_tasks_updated', handleSync);
+      window.addEventListener('nouato_task_completed', handleSync);
+      window.addEventListener('nouato_sync_event', handleSync);
+      window.addEventListener('storage', handleSync);
     }
 
     return () => {
       isMounted = false;
       supabase.removeChannel(channel);
-      if (typeof window !== "undefined") {
-        window.removeEventListener("nouato_tasks_updated", handleSync);
-        window.removeEventListener("nouato_task_completed", handleSync);
-        window.removeEventListener("nouato_sync_event", handleSync);
-        window.removeEventListener("storage", handleSync);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nouato_tasks_updated', handleSync);
+        window.removeEventListener('nouato_task_completed', handleSync);
+        window.removeEventListener('nouato_sync_event', handleSync);
+        window.removeEventListener('storage', handleSync);
       }
     };
   }, [fetchStudents]);
@@ -418,9 +475,9 @@ export default function TeacherStudentsView() {
         void fetchStudents(newFarmId);
       }
     };
-    window.addEventListener("nouato_active_farm_changed", handleFarmChanged);
+    window.addEventListener('nouato_active_farm_changed', handleFarmChanged);
     return () => {
-      window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
+      window.removeEventListener('nouato_active_farm_changed', handleFarmChanged);
     };
   }, [fetchStudents]);
 
@@ -429,10 +486,10 @@ export default function TeacherStudentsView() {
   const handleCopyInviteUrl = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      setToastMessage("📋 招待URLをクリップボードにコピーしました！受講生へ共有してください");
+      setToastMessage('📋 招待URLをクリップボードにコピーしました！受講生へ共有してください');
       setShowToast(true);
     } catch {
-      setToastMessage("URLのコピーに失敗しました");
+      setToastMessage('URLのコピーに失敗しました');
       setShowToast(true);
     }
   };
@@ -441,30 +498,37 @@ export default function TeacherStudentsView() {
   const handleGrantTicket = async (student: StudentData) => {
     try {
       // 1. サーバーAPIのエンドポイント POST /api/tickets/grant を呼出
-      await fetch("/api/tickets/grant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      await fetch('/api/tickets/grant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: student.id, amount: 1 }),
       });
 
       // 2. クライアント側のチケットストレージも即時アトミック加算
       const updated = grantTicket(student.id, 1);
 
-      setToastMessage(`🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日残: ${updated.count}枚）`);
+      setToastMessage(
+        `🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日残: ${updated.count}枚）`
+      );
       setShowToast(true);
 
       // 3. リアルタイム同期イベントを発行
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
         try {
-          const bc = new BroadcastChannel("nouato_farm_sync_channel");
-          bc.postMessage({ type: "TICKETS_UPDATED", userId: student.id, updated, timestamp: Date.now() });
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({
+            type: 'TICKETS_UPDATED',
+            userId: student.id,
+            updated,
+            timestamp: Date.now(),
+          });
           bc.close();
         } catch {}
       }
     } catch (err) {
-      console.error("handleGrantTicket error:", err);
-      setToastMessage("チケット付与中にエラーが発生しました");
+      console.error('handleGrantTicket error:', err);
+      setToastMessage('チケット付与中にエラーが発生しました');
       setShowToast(true);
     }
   };
@@ -481,34 +545,39 @@ export default function TeacherStudentsView() {
         id: `bc_${Date.now()}`,
         title: broadcastTitle.trim(),
         content: broadcastBody.trim(),
-        sender: `講師 (${effectiveFarmName || "当農園"})`,
+        sender: `講師 (${effectiveFarmName || '当農園'})`,
         created_at: nowStr,
       };
 
       // 1. LocalStorageに一括配信リストをアペンド (農園IDスコープ)
-      const bcKey = effectiveFarmId ? `nouato_broadcast_announcements_${effectiveFarmId}` : "nouato_broadcast_announcements";
+      const bcKey = effectiveFarmId
+        ? `nouato_broadcast_announcements_${effectiveFarmId}`
+        : 'nouato_broadcast_announcements';
       const existingStr = localStorage.getItem(bcKey);
       let list = [];
       if (existingStr) {
-        try { list = JSON.parse(existingStr); } catch {}
+        try {
+          list = JSON.parse(existingStr);
+        } catch {}
       }
       list.unshift(broadcastObj);
       localStorage.setItem(bcKey, JSON.stringify(list));
-      localStorage.setItem("nouato_broadcast_announcements", JSON.stringify(list));
+      localStorage.setItem('nouato_broadcast_announcements', JSON.stringify(list));
 
       // 2. Supabase の journals テーブルにも講師配信として保存 (全体向け + 各登録生徒個別宛て)
       try {
-        const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        const isUuid = (str: string) =>
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
         const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
 
         const journalInserts: Array<Record<string, unknown>> = [
           {
-            role: "broadcast",
+            role: 'broadcast',
             student_id: null,
             farm_id: validFarmId,
             text: broadcastTitle.trim(),
             content: broadcastBody.trim(),
-            reply: `講師配信: ${effectiveFarmName || "当農園"}`,
+            reply: `講師配信: ${effectiveFarmName || '当農園'}`,
             created_at: nowStr,
           },
         ];
@@ -516,12 +585,12 @@ export default function TeacherStudentsView() {
         // 農園未特定環境・デモ環境でも全受講生に確実に届くよう、farm_id: null の全体配信レコードも併せて追加
         if (validFarmId) {
           journalInserts.push({
-            role: "broadcast",
+            role: 'broadcast',
             student_id: null,
             farm_id: null,
             text: broadcastTitle.trim(),
             content: broadcastBody.trim(),
-            reply: `講師配信: ${effectiveFarmName || "当農園"}`,
+            reply: `講師配信: ${effectiveFarmName || '当農園'}`,
             created_at: nowStr,
           });
         }
@@ -531,32 +600,32 @@ export default function TeacherStudentsView() {
           students.forEach((s) => {
             if (s.id && isUuid(s.id)) {
               journalInserts.push({
-                role: "broadcast",
+                role: 'broadcast',
                 student_id: s.id,
                 farm_id: validFarmId,
                 text: broadcastTitle.trim(),
                 content: broadcastBody.trim(),
-                reply: `講師配信: ${effectiveFarmName || "当農園"}`,
+                reply: `講師配信: ${effectiveFarmName || '当農園'}`,
                 created_at: nowStr,
               });
             }
           });
         }
 
-        const { error: insErr } = await supabase.from("journals").insert(journalInserts);
+        const { error: insErr } = await supabase.from('journals').insert(journalInserts);
         if (insErr) {
-          console.warn("Supabase broadcast insert warn:", insErr);
+          console.warn('Supabase broadcast insert warn:', insErr);
         }
       } catch (err) {
-        console.warn("Supabase broadcast insert exception:", err);
+        console.warn('Supabase broadcast insert exception:', err);
       }
 
       // 3. 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
         try {
-          const bc = new BroadcastChannel("nouato_farm_sync_channel");
-          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
           bc.close();
         } catch {}
       }
@@ -564,11 +633,11 @@ export default function TeacherStudentsView() {
       setToastMessage(`🎉 登録中 ${students.length} 名の受講生全員へ一括配信を完了しました！`);
       setShowToast(true);
       setShowBroadcastModal(false);
-      setBroadcastTitle("");
-      setBroadcastBody("");
+      setBroadcastTitle('');
+      setBroadcastBody('');
     } catch (err) {
-      console.error("handleSendBroadcastAll error:", err);
-      setToastMessage("一括配信中にエラーが発生しました");
+      console.error('handleSendBroadcastAll error:', err);
+      setToastMessage('一括配信中にエラーが発生しました');
       setShowToast(true);
     } finally {
       setSendingBroadcast(false);
@@ -583,31 +652,32 @@ export default function TeacherStudentsView() {
     setSendingIndividual(true);
     try {
       const nowStr = new Date().toISOString();
-      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const isUuid = (str: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
 
-      const { error: insErr } = await supabase.from("journals").insert([
+      const { error: insErr } = await supabase.from('journals').insert([
         {
-          role: "broadcast",
+          role: 'broadcast',
           student_id: individualStudent.id,
           farm_id: validFarmId,
           text: individualTitle.trim(),
           content: individualBody.trim(),
-          reply: `講師個別連絡: ${effectiveFarmName || "当農園"}`,
+          reply: `講師個別連絡: ${effectiveFarmName || '当農園'}`,
           created_at: nowStr,
         },
       ]);
 
       if (insErr) {
-        console.warn("Individual broadcast insert warn:", insErr);
+        console.warn('Individual broadcast insert warn:', insErr);
       }
 
       // 配信完了時に同期イベントを発行
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
         try {
-          const bc = new BroadcastChannel("nouato_farm_sync_channel");
-          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
           bc.close();
         } catch {}
       }
@@ -615,12 +685,12 @@ export default function TeacherStudentsView() {
       setToastMessage(`🎉 ${individualStudent.name} さんへ個別連絡を配信しました！`);
       setShowToast(true);
       setShowIndividualModal(false);
-      setIndividualTitle("");
-      setIndividualBody("");
+      setIndividualTitle('');
+      setIndividualBody('');
       setIndividualStudent(null);
     } catch (err) {
-      console.error("handleSendIndividual error:", err);
-      setToastMessage("個別配信中にエラーが発生しました");
+      console.error('handleSendIndividual error:', err);
+      setToastMessage('個別配信中にエラーが発生しました');
       setShowToast(true);
     } finally {
       setSendingIndividual(false);
@@ -631,13 +701,14 @@ export default function TeacherStudentsView() {
   const fetchBroadcastHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const isUuid = (str?: string | null) =>
+        !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
       let query = supabase
-        .from("journals")
-        .select("*")
-        .in("role", ["broadcast", "announcement"])
-        .order("created_at", { ascending: false })
+        .from('journals')
+        .select('*')
+        .in('role', ['broadcast', 'announcement'])
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (effectiveFarmId && isUuid(effectiveFarmId)) {
@@ -653,20 +724,20 @@ export default function TeacherStudentsView() {
           const key = `${item.text}_${item.content}_${item.created_at}_${item.student_id}`;
           if (!seen.has(key)) {
             seen.add(key);
-            let targetName = "受講生全員";
+            let targetName = '受講生全員';
             if (item.student_id) {
               const matchedStudent = students.find((s) => s.id === item.student_id);
-              targetName = matchedStudent ? `${matchedStudent.name} さん（個別）` : "個別配信";
+              targetName = matchedStudent ? `${matchedStudent.name} さん（個別）` : '個別配信';
             }
             list.push({
               id: String(item.id),
-              role: String(item.role || "broadcast"),
+              role: String(item.role || 'broadcast'),
               student_id: item.student_id ? String(item.student_id) : null,
               farm_id: item.farm_id ? String(item.farm_id) : null,
-              text: item.text ? String(item.text) : "",
-              content: item.content ? String(item.content) : "",
-              reply: item.reply ? String(item.reply) : "",
-              created_at: String(item.created_at || ""),
+              text: item.text ? String(item.text) : '',
+              content: item.content ? String(item.content) : '',
+              reply: item.reply ? String(item.reply) : '',
+              created_at: String(item.created_at || ''),
               targetName,
             });
           }
@@ -674,10 +745,10 @@ export default function TeacherStudentsView() {
         setBroadcastHistory(list);
       }
       if (error) {
-        console.warn("fetchBroadcastHistory error:", error);
+        console.warn('fetchBroadcastHistory error:', error);
       }
     } catch (e) {
-      console.error("fetchBroadcastHistory error:", e);
+      console.error('fetchBroadcastHistory error:', e);
     } finally {
       setLoadingHistory(false);
     }
@@ -685,30 +756,31 @@ export default function TeacherStudentsView() {
 
   // 🗑️ 配信履歴の削除処理 (Delete - CRUD)
   const handleDeleteBroadcast = async (broadcastId: string) => {
-    if (!confirm("この配信を削除してもよろしいですか？受講生の通知一覧からも削除されます。")) return;
+    if (!confirm('この配信を削除してもよろしいですか？受講生の通知一覧からも削除されます。'))
+      return;
     try {
-      const { error } = await supabase.from("journals").delete().eq("id", broadcastId);
+      const { error } = await supabase.from('journals').delete().eq('id', broadcastId);
       if (error) {
         setToastMessage(`削除に失敗しました: ${error.message}`);
         setShowToast(true);
         return;
       }
       setBroadcastHistory((prev) => prev.filter((b) => b.id !== broadcastId));
-      setToastMessage("🗑️ 配信メッセージを削除しました");
+      setToastMessage('🗑️ 配信メッセージを削除しました');
       setShowToast(true);
 
       // 受講生側の画面同期イベントを発行
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
         try {
-          const bc = new BroadcastChannel("nouato_farm_sync_channel");
-          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
           bc.close();
         } catch {}
       }
     } catch (err) {
-      console.error("handleDeleteBroadcast error:", err);
-      setToastMessage("削除中にエラーが発生しました");
+      console.error('handleDeleteBroadcast error:', err);
+      setToastMessage('削除中にエラーが発生しました');
       setShowToast(true);
     }
   };
@@ -725,22 +797,21 @@ export default function TeacherStudentsView() {
       // 1. farm_beds で該当生徒が割り当てられていた区画・畝を解放
       try {
         await supabase
-          .from("farm_beds")
+          .from('farm_beds')
           .update({
             student_id: null,
             student_name: null,
           })
           .or(`student_id.eq.${studentId},student_name.eq.${studentName}`);
       } catch (err) {
-        console.warn("farm_beds release error:", err);
+        console.warn('farm_beds release error:', err);
       }
 
-
-      if (deleteMode === "purge") {
+      if (deleteMode === 'purge') {
         // 完全消去モード: CASCADE制約/トリガーに任せて users テーブルから単一DELETE実行
-        const { error: delErr } = await supabase.from("users").delete().eq("id", studentId);
+        const { error: delErr } = await supabase.from('users').delete().eq('id', studentId);
         if (delErr) {
-          console.error("Purge user error:", delErr);
+          console.error('Purge user error:', delErr);
           setToastMessage(`❌ 生徒の完全削除に失敗しました: ${delErr.message}`);
           setShowToast(true);
           return;
@@ -748,14 +819,14 @@ export default function TeacherStudentsView() {
       } else {
         // アクセス遮断（推奨）モード: farm_id 解除 & deleted_at 記録
         const { error: updateErr } = await supabase
-          .from("users")
+          .from('users')
           .update({
             farm_id: null,
             deleted_at: new Date().toISOString(),
           })
-          .eq("id", studentId);
+          .eq('id', studentId);
         if (updateErr) {
-          console.error("Deactivate user error:", updateErr);
+          console.error('Deactivate user error:', updateErr);
           setToastMessage(`❌ 退会処理に失敗しました: ${updateErr.message}`);
           setShowToast(true);
           return;
@@ -766,52 +837,53 @@ export default function TeacherStudentsView() {
       setShowDeleteConfirmModal(false);
       setSelectedStudent(null);
       setDeleteTargetStudent(null);
-      setToastMessage(`👋 ${studentName} さんの退会処理が完了しました（農園へのアクセスを遮断し、区画を解放しました）`);
+      setToastMessage(
+        `👋 ${studentName} さんの退会処理が完了しました（農園へのアクセスを遮断し、区画を解放しました）`
+      );
       setShowToast(true);
 
       // 他の画面（畑管理など）へ同調発火
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
         try {
-          const bc = new BroadcastChannel("nouato_farm_sync_channel");
-          bc.postMessage({ type: "FARMS_UPDATED", timestamp: Date.now() });
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({ type: 'FARMS_UPDATED', timestamp: Date.now() });
           bc.close();
         } catch {}
       }
 
       await fetchStudents(effectiveFarmId);
     } catch (e) {
-      console.error("handleExecuteStudentDelete error:", e);
-      setToastMessage("退会処理中にエラーが発生しました");
+      console.error('handleExecuteStudentDelete error:', e);
+      setToastMessage('退会処理中にエラーが発生しました');
       setShowToast(true);
     } finally {
       setIsDeleting(false);
     }
   };
 
-
   const filteredStudents = students.filter((s) => {
-    if (filter === "unread") return s.unreadCount > 0;
-    if (filter === "overdue") return s.hasOverdue;
+    if (filter === 'unread') return s.unreadCount > 0;
+    if (filter === 'overdue') return s.hasOverdue;
     return true;
   });
 
   // 🌟 並べ替え（ソート）ロジック 🌟
   const sortedStudents = [...filteredStudents].sort((a, b) => {
-    if (sortOption === "name_asc") {
-      return a.name.localeCompare(b.name, "ja");
+    if (sortOption === 'name_asc') {
+      return a.name.localeCompare(b.name, 'ja');
     }
-    if (sortOption === "name_desc") {
-      return b.name.localeCompare(a.name, "ja");
+    if (sortOption === 'name_desc') {
+      return b.name.localeCompare(a.name, 'ja');
     }
-    if (sortOption === "progress_desc") {
+    if (sortOption === 'progress_desc') {
       return b.progress - a.progress;
     }
-    if (sortOption === "progress_asc") {
+    if (sortOption === 'progress_asc') {
       return a.progress - b.progress;
     }
-    if (sortOption === "newest") {
-      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    if (sortOption === 'newest') {
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
     }
     return 0;
   });
@@ -899,22 +971,26 @@ export default function TeacherStudentsView() {
           <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 text-xs font-bold">
             <button
               onClick={() => {
-                setFilter("all");
+                setFilter('all');
                 setCurrentPage(1);
               }}
               className={`px-3.5 py-2 rounded-xl transition ${
-                filter === "all" ? "bg-white text-emerald-900 shadow-xs font-black" : "text-gray-600 hover:text-gray-900"
+                filter === 'all'
+                  ? 'bg-white text-emerald-900 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               全員
             </button>
             <button
               onClick={() => {
-                setFilter("unread");
+                setFilter('unread');
                 setCurrentPage(1);
               }}
               className={`px-3.5 py-2 rounded-xl transition ${
-                filter === "unread" ? "bg-white text-emerald-900 shadow-xs font-black" : "text-gray-600 hover:text-gray-900"
+                filter === 'unread'
+                  ? 'bg-white text-emerald-900 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               未確認あり
@@ -928,8 +1004,11 @@ export default function TeacherStudentsView() {
         <div className="text-xs font-bold text-gray-500">
           {totalCount > 0 ? (
             <span>
-              全 <strong className="text-gray-900 font-black">{totalCount}</strong> 名中{" "}
-              <strong className="text-emerald-800 font-black">{startIndex + 1}〜{endIndex}</strong> 名を表示
+              全 <strong className="text-gray-900 font-black">{totalCount}</strong> 名中{' '}
+              <strong className="text-emerald-800 font-black">
+                {startIndex + 1}〜{endIndex}
+              </strong>{' '}
+              名を表示
             </span>
           ) : (
             <span>0名</span>
@@ -939,7 +1018,12 @@ export default function TeacherStudentsView() {
         <div className="flex flex-wrap items-center gap-3">
           {/* 並べ替えセレクト */}
           <div className="flex items-center space-x-1.5 text-xs">
-            <label htmlFor="student-sort-select" className="text-gray-500 font-bold text-[11px] whitespace-nowrap">並べ替え:</label>
+            <label
+              htmlFor="student-sort-select"
+              className="text-gray-500 font-bold text-[11px] whitespace-nowrap"
+            >
+              並べ替え:
+            </label>
             <select
               id="student-sort-select"
               value={sortOption}
@@ -959,7 +1043,12 @@ export default function TeacherStudentsView() {
 
           {/* 表示件数切り替えセレクト */}
           <div className="flex items-center space-x-1.5 text-xs">
-            <label htmlFor="student-page-size-select" className="text-gray-500 font-bold text-[11px] whitespace-nowrap">表示件数:</label>
+            <label
+              htmlFor="student-page-size-select"
+              className="text-gray-500 font-bold text-[11px] whitespace-nowrap"
+            >
+              表示件数:
+            </label>
             <select
               id="student-page-size-select"
               value={pageSize}
@@ -986,8 +1075,12 @@ export default function TeacherStudentsView() {
         <div className="bg-white rounded-3xl p-12 text-center text-gray-500 font-bold text-sm border border-gray-200 space-y-4 shadow-xs">
           <span className="text-4xl block">🧑‍🌾</span>
           <div className="space-y-1">
-            <p className="text-base font-black text-gray-900">登録された受講生アカウントはまだありません</p>
-            <p className="text-xs text-gray-400 font-medium">LINE招待リンクまたはQRコードを受講生に共有して登録を始めましょう。</p>
+            <p className="text-base font-black text-gray-900">
+              登録された受講生アカウントはまだありません
+            </p>
+            <p className="text-xs text-gray-400 font-medium">
+              LINE招待リンクまたはQRコードを受講生に共有して登録を始めましょう。
+            </p>
           </div>
 
           <div className="pt-2 flex items-center justify-center gap-3">
@@ -1013,7 +1106,10 @@ export default function TeacherStudentsView() {
                 key={student.id}
                 className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs hover:shadow-lg transition space-y-4 group relative overflow-hidden flex flex-col justify-between"
               >
-                <div className="space-y-4 cursor-pointer" onClick={() => setSelectedStudent(student)}>
+                <div
+                  className="space-y-4 cursor-pointer"
+                  onClick={() => setSelectedStudent(student)}
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
                       <div
@@ -1039,7 +1135,8 @@ export default function TeacherStudentsView() {
                       <div className="flex justify-between text-[11px]">
                         <span className="text-gray-400">受講進捗 (完了/出題全数)</span>
                         <span className="text-emerald-800 font-black">
-                          {student.progress}% ({student.completedCount ?? 0}/{student.totalTaskCount ?? 0}件完了)
+                          {student.progress}% ({student.completedCount ?? 0}/
+                          {student.totalTaskCount ?? 0}件完了)
                         </span>
                       </div>
                       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -1071,8 +1168,8 @@ export default function TeacherStudentsView() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setIndividualStudent(student);
-                        setIndividualTitle("");
-                        setIndividualBody("");
+                        setIndividualTitle('');
+                        setIndividualBody('');
                         setShowIndividualModal(true);
                       }}
                       className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-[11px] rounded-xl border border-amber-200 transition flex items-center gap-1"
@@ -1125,7 +1222,8 @@ export default function TeacherStudentsView() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-2xs mt-4">
               <div className="text-xs font-bold text-gray-500">
-                ページ <strong className="text-emerald-900 font-black">{validCurrentPage}</strong> / {totalPages}
+                ページ <strong className="text-emerald-900 font-black">{validCurrentPage}</strong> /{' '}
+                {totalPages}
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -1161,8 +1259,8 @@ export default function TeacherStudentsView() {
                         onClick={() => setCurrentPage(pageNum)}
                         className={`w-8 h-8 rounded-xl text-xs font-black transition ${
                           validCurrentPage === pageNum
-                            ? "bg-emerald-600 text-white shadow-xs"
-                            : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                         }`}
                       >
                         {pageNum}
@@ -1205,9 +1303,7 @@ export default function TeacherStudentsView() {
             </div>
 
             <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-              <label className="block text-xs font-bold text-gray-700">
-                招待専用URL
-              </label>
+              <label className="block text-xs font-bold text-gray-700">招待専用URL</label>
               <div className="bg-white p-3 rounded-xl border text-xs font-mono break-all text-gray-700">
                 {inviteUrl}
               </div>
@@ -1252,7 +1348,9 @@ export default function TeacherStudentsView() {
       {/* 個別タスク割り当て Modal */}
       {showAssignModal && (
         <IndividualTaskAssignModal
-          targetStudent={assignModalStudent ? { id: assignModalStudent.id, name: assignModalStudent.name } : null}
+          targetStudent={
+            assignModalStudent ? { id: assignModalStudent.id, name: assignModalStudent.name } : null
+          }
           onClose={() => {
             setShowAssignModal(false);
             setAssignModalStudent(null);
@@ -1291,7 +1389,8 @@ export default function TeacherStudentsView() {
                 <span>📢 受講生全員へ一括配信</span>
               </h3>
               <p className="text-xs text-gray-500 font-bold mt-1">
-                登録中の受講生全員のアプリ画面（上部お知らせバナー ＆ Talk）へ一括でメッセージ・連絡事項を届けることができます。
+                登録中の受講生全員のアプリ画面（上部お知らせバナー ＆
+                Talk）へ一括でメッセージ・連絡事項を届けることができます。
               </p>
             </div>
 
@@ -1333,7 +1432,7 @@ export default function TeacherStudentsView() {
                   disabled={sendingBroadcast}
                   className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-md transition"
                 >
-                  {sendingBroadcast ? "配信中..." : "受講生全員へ一括配信する 🚀"}
+                  {sendingBroadcast ? '配信中...' : '受講生全員へ一括配信する 🚀'}
                 </button>
               </div>
             </form>
@@ -1361,7 +1460,7 @@ export default function TeacherStudentsView() {
                   個別連絡
                 </span>
                 <span className="text-xs text-gray-500 font-bold">
-                  {individualStudent.plot || "区画未定"}
+                  {individualStudent.plot || '区画未定'}
                 </span>
               </div>
               <h3 className="text-lg font-black text-gray-900 mt-1 flex items-center gap-1.5">
@@ -1413,7 +1512,7 @@ export default function TeacherStudentsView() {
                   disabled={sendingIndividual}
                   className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-md transition"
                 >
-                  {sendingIndividual ? "送信中..." : `${individualStudent.name} さんへ送信する 🚀`}
+                  {sendingIndividual ? '送信中...' : `${individualStudent.name} さんへ送信する 🚀`}
                 </button>
               </div>
             </form>
@@ -1468,11 +1567,11 @@ export default function TeacherStudentsView() {
                         <span
                           className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
                             item.student_id
-                              ? "bg-blue-100 text-blue-900"
-                              : "bg-amber-100 text-amber-900"
+                              ? 'bg-blue-100 text-blue-900'
+                              : 'bg-amber-100 text-amber-900'
                           }`}
                         >
-                          {item.student_id ? "個別配信" : "📢 全員一括"}
+                          {item.student_id ? '個別配信' : '📢 全員一括'}
                         </span>
                         <span className="font-bold text-gray-800 text-[11px]">
                           宛先: {item.targetName}
@@ -1480,13 +1579,15 @@ export default function TeacherStudentsView() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-[10px] text-gray-400 font-semibold">
-                          {item.created_at ? new Date(item.created_at).toLocaleString("ja-JP", {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }) : ""}
+                          {item.created_at
+                            ? new Date(item.created_at).toLocaleString('ja-JP', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : ''}
                         </span>
                         <button
                           type="button"
@@ -1500,7 +1601,7 @@ export default function TeacherStudentsView() {
                     </div>
 
                     <h4 className="font-black text-sm text-gray-900 leading-snug">
-                      {item.text || "（タイトルなし）"}
+                      {item.text || '（タイトルなし）'}
                     </h4>
                     <p className="text-xs text-gray-700 font-medium whitespace-pre-wrap leading-relaxed bg-white p-3 rounded-xl border border-gray-200/60">
                       {item.content}
@@ -1549,7 +1650,7 @@ export default function TeacherStudentsView() {
                   受講生「{deleteTargetStudent.name}」さんを退会処理しますか？
                 </h3>
                 <p className="text-[11px] text-gray-500 font-bold mt-0.5">
-                  区画: {deleteTargetStudent.plot || "未割り当て"}
+                  区画: {deleteTargetStudent.plot || '未割り当て'}
                 </p>
               </div>
             </div>
@@ -1574,12 +1675,14 @@ export default function TeacherStudentsView() {
                     type="radio"
                     name="deleteMode"
                     value="deactivate"
-                    checked={deleteMode === "deactivate"}
-                    onChange={() => setDeleteMode("deactivate")}
+                    checked={deleteMode === 'deactivate'}
+                    onChange={() => setDeleteMode('deactivate')}
                     className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
                   />
                   <div>
-                    <span className="font-black text-emerald-950">農園から除名・アクセス遮断（推奨）</span>
+                    <span className="font-black text-emerald-950">
+                      農園から除名・アクセス遮断（推奨）
+                    </span>
                     <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
                       過去の提出写真や質問・収穫実績は農園の活動ナレッジとして保持されます。
                     </p>
@@ -1591,12 +1694,14 @@ export default function TeacherStudentsView() {
                     type="radio"
                     name="deleteMode"
                     value="purge"
-                    checked={deleteMode === "purge"}
-                    onChange={() => setDeleteMode("purge")}
+                    checked={deleteMode === 'purge'}
+                    onChange={() => setDeleteMode('purge')}
                     className="mt-0.5 text-red-600 focus:ring-red-500"
                   />
                   <div>
-                    <span className="font-black text-red-950">生徒データも完全消去（物理削除）</span>
+                    <span className="font-black text-red-950">
+                      生徒データも完全消去（物理削除）
+                    </span>
                     <p className="text-[11px] text-red-800 font-medium mt-0.5">
                       生徒のアカウント情報・日誌・タスク履歴を含めて完全にデータベースから抹消します。
                     </p>

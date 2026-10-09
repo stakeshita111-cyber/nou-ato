@@ -1,37 +1,37 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.1.26"],
+  allowedDevOrigins: ['192.168.1.26'],
   async redirects() {
     return [
       {
-        source: "/board",
-        destination: "/teacher/dashboard",
+        source: '/board',
+        destination: '/teacher/dashboard',
         permanent: true,
       },
       {
-        source: "/board/:path*",
-        destination: "/teacher/dashboard",
+        source: '/board/:path*',
+        destination: '/teacher/dashboard',
         permanent: true,
       },
       {
-        source: "/students",
-        destination: "/teacher/dashboard",
+        source: '/students',
+        destination: '/teacher/dashboard',
         permanent: true,
       },
       {
-        source: "/journals",
-        destination: "/teacher/dashboard",
+        source: '/journals',
+        destination: '/teacher/dashboard',
         permanent: true,
       },
       {
-        source: "/templates",
-        destination: "/teacher/dashboard",
+        source: '/templates',
+        destination: '/teacher/dashboard',
         permanent: true,
       },
       {
-        source: "/student/quests",
-        destination: "/student",
+        source: '/student/quests',
+        destination: '/student',
         permanent: true,
       },
     ];

@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { VEGETABLE_TASK_TEMPLATES, TaskTemplate } from "@/lib/taskTemplates";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from 'react';
+import { VEGETABLE_TASK_TEMPLATES, TaskTemplate } from '@/lib/taskTemplates';
+import { supabase } from '@/lib/supabase';
 
 interface TaskTemplateModalProps {
   onClose: () => void;
@@ -10,9 +10,9 @@ interface TaskTemplateModalProps {
 }
 
 export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTemplateModalProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortOrder, setSortOrder] = useState<string>("default");
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<string>('default');
   const [allTemplates, setAllTemplates] = useState<TaskTemplate[]>(VEGETABLE_TASK_TEMPLATES);
 
   useEffect(() => {
@@ -22,40 +22,40 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
       // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元
       try {
         const { data: dbTemplates } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("is_template", true)
-          .is("deleted_at", null);
+          .from('tasks')
+          .select('*')
+          .eq('is_template', true)
+          .is('deleted_at', null);
 
         if (dbTemplates && dbTemplates.length > 0) {
           customTemplates = dbTemplates.map((t: any) => {
-            const cl = t.checklist && typeof t.checklist === "object" ? t.checklist : {};
+            const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
             return {
               id: t.id,
               title: t.title,
-              category: t.category || "共通",
-              target_crop: t.target_crop || "共通",
-              phase: cl.phase || "育成管理",
-              season: cl.season || "通年",
-              estimated_time: t.estimated_time || "30分",
-              tools_needed: t.tools_needed || "軍手",
-              description: t.description || "",
-              memo: t.memo || "",
+              category: t.category || '共通',
+              target_crop: t.target_crop || '共通',
+              phase: cl.phase || '育成管理',
+              season: cl.season || '通年',
+              estimated_time: t.estimated_time || '30分',
+              tools_needed: t.tools_needed || '軍手',
+              description: t.description || '',
+              memo: t.memo || '',
               exp: t.exp || 50,
               difficulty: t.difficulty || 1,
               require_photo: Boolean(t.require_photo),
-              badge_name: cl.badge_name || "栽培マスター",
-              badge_icon: cl.badge_icon || "🌿",
+              badge_name: cl.badge_name || '栽培マスター',
+              badge_icon: cl.badge_icon || '🌿',
             };
           });
         }
       } catch (e) {
-        console.warn("TaskTemplateModal db load notice:", e);
+        console.warn('TaskTemplateModal db load notice:', e);
       }
 
       // 2. localStorage からのキャッシュ補完
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("nouato_custom_templates");
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('nouato_custom_templates');
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
@@ -82,16 +82,16 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
   }, []);
 
   const categories = [
-    { id: "all", label: "すべて" },
-    { id: "果菜", label: "🍅 果菜 (トマト・ナス等)" },
-    { id: "根菜", label: "🥔 根菜 (ジャガイモ等)" },
-    { id: "葉菜", label: "🥬 葉菜 (コマツナ等)" },
-    { id: "土作り", label: "🌱 土作り・畝立て" },
+    { id: 'all', label: 'すべて' },
+    { id: '果菜', label: '🍅 果菜 (トマト・ナス等)' },
+    { id: '根菜', label: '🥔 根菜 (ジャガイモ等)' },
+    { id: '葉菜', label: '🥬 葉菜 (コマツナ等)' },
+    { id: '土作り', label: '🌱 土作り・畝立て' },
   ];
 
   const filteredAndSortedTemplates = allTemplates
     .filter((t) => {
-      const matchesCategory = selectedCategory === "all" || t.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'all' || t.category === selectedCategory;
       const query = searchQuery.toLowerCase();
       const matchesSearch =
         !query ||
@@ -101,11 +101,11 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
       return matchesCategory && matchesSearch;
     })
     .sort((a, b) => {
-      if (sortOrder === "title_asc") {
-        return a.title.localeCompare(b.title, "ja");
+      if (sortOrder === 'title_asc') {
+        return a.title.localeCompare(b.title, 'ja');
       }
-      if (sortOrder === "title_desc") {
-        return b.title.localeCompare(a.title, "ja");
+      if (sortOrder === 'title_desc') {
+        return b.title.localeCompare(a.title, 'ja');
       }
       return 0; // default
     });
@@ -123,7 +123,10 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
               プロ農家の標準作業手順や自作テンプレートをワンタップで教材・タスク化できます。
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 font-bold text-xl p-1">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 font-bold text-xl p-1"
+          >
             ✕
           </button>
         </div>
@@ -137,8 +140,8 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition ${
                   selectedCategory === cat.id
-                    ? "app-accent-btn shadow-xs"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                    ? 'app-accent-btn shadow-xs'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
                 }`}
               >
                 {cat.label}
@@ -195,7 +198,9 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
                   )}
                 </div>
 
-                <h3 className="font-extrabold text-gray-900 text-sm leading-snug">{template.title}</h3>
+                <h3 className="font-extrabold text-gray-900 text-sm leading-snug">
+                  {template.title}
+                </h3>
 
                 <p className="text-[11px] text-gray-500 font-semibold">
                   🌱 対象: {template.target_crop}
@@ -210,7 +215,9 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
               </div>
 
               <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-[11px] text-gray-400 font-medium">獲得: +{template.exp} EXP</span>
+                <span className="text-[11px] text-gray-400 font-medium">
+                  獲得: +{template.exp} EXP
+                </span>
                 <button
                   onClick={() => {
                     onSelectTemplate(template);
@@ -227,7 +234,10 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
 
         {/* フッター */}
         <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-3xl flex justify-end">
-          <button onClick={onClose} className="px-5 py-2 bg-white border text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-100">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-white border text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-100"
+          >
             閉じる
           </button>
         </div>

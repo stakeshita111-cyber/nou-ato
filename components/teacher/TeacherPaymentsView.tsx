@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useFarmStore } from "@/store/useFarmStore";
-import Toast from "@/components/ui/Toast";
-import { formatMoney } from "@/lib/utils/formatHelper";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useFarmStore } from '@/store/useFarmStore';
+import Toast from '@/components/ui/Toast';
+import { formatMoney } from '@/lib/utils/formatHelper';
 
 interface PaymentRecord {
   id: string;
@@ -13,16 +13,16 @@ interface PaymentRecord {
   itemTitle: string; // 請求項目
   amount: number;
   dueDate: string;
-  status: "paid" | "unpaid" | "reminded";
-  method: "credit_card" | "line_pay" | "cash";
+  status: 'paid' | 'unpaid' | 'reminded';
+  method: 'credit_card' | 'line_pay' | 'cash';
 }
 
 export default function TeacherPaymentsView() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
-  const [filter, setFilter] = useState<"all" | "unpaid">("all");
+  const [filter, setFilter] = useState<'all' | 'unpaid'>('all');
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
 
   // ----------------------------------------------------
   // 📊 収支シミュレーション用ステート (生徒数×年間受講料 - 経費 - システム利用料(1%))
@@ -35,26 +35,27 @@ export default function TeacherPaymentsView() {
   useEffect(() => {
     const fetchStudentCount = async () => {
       try {
-        let fid = useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+        let fid =
+          useFarmStore.getState().activeFarmId ||
+          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
         if (!fid) {
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           if (user) {
             const { data: userData } = await supabase
-              .from("users")
-              .select("farm_id")
-              .eq("id", user.id)
+              .from('users')
+              .select('farm_id')
+              .eq('id', user.id)
               .maybeSingle();
             if (userData?.farm_id) fid = userData.farm_id;
           }
         }
 
-        let query = supabase
-          .from("users")
-          .select("*", { count: "exact" })
-          .eq("role", "student");
+        let query = supabase.from('users').select('*', { count: 'exact' }).eq('role', 'student');
 
         if (fid) {
-          query = query.eq("farm_id", fid);
+          query = query.eq('farm_id', fid);
         }
 
         const { count } = await query;
@@ -63,21 +64,21 @@ export default function TeacherPaymentsView() {
         // 自農園の受講生データをもとに請求リストを構築
         if (fid) {
           const { data: farmStudents } = await supabase
-            .from("users")
-            .select("id, display_name")
-            .eq("role", "student")
-            .eq("farm_id", fid);
+            .from('users')
+            .select('id, display_name')
+            .eq('role', 'student')
+            .eq('farm_id', fid);
 
           if (farmStudents && farmStudents.length > 0) {
             const dynamicPayments: PaymentRecord[] = farmStudents.map((s, idx) => ({
               id: `p_${s.id}`,
               studentName: s.display_name || `受講生 ${idx + 1}`,
               plot: `区画 ${idx + 1}`,
-              itemTitle: "月額農園利用料 (今月分)",
+              itemTitle: '月額農園利用料 (今月分)',
               amount: 9800,
-              dueDate: new Date().toISOString().split("T")[0],
-              status: "paid" as const,
-              method: "credit_card" as const,
+              dueDate: new Date().toISOString().split('T')[0],
+              status: 'paid' as const,
+              method: 'credit_card' as const,
             }));
             setPayments(dynamicPayments);
           } else {
@@ -85,7 +86,7 @@ export default function TeacherPaymentsView() {
           }
         }
       } catch (err) {
-        console.error("fetchStudentCount error:", err);
+        console.error('fetchStudentCount error:', err);
       }
     };
     fetchStudentCount();
@@ -99,31 +100,27 @@ export default function TeacherPaymentsView() {
   // 現行実績のサマリー計算
   const totalRevenue = payments.reduce((acc, cur) => acc + cur.amount, 0);
   const paidRevenue = payments
-    .filter((p) => p.status === "paid")
+    .filter((p) => p.status === 'paid')
     .reduce((acc, cur) => acc + cur.amount, 0);
   const unpaidRevenue = totalRevenue - paidRevenue;
   const collectionRate = totalRevenue > 0 ? Math.round((paidRevenue / totalRevenue) * 100) : 0;
 
   // 支払い催促LINE送信
   const handleSendRemind = (id: string, studentName: string) => {
-    setPayments(
-      payments.map((p) => (p.id === id ? { ...p, status: "reminded" } : p))
-    );
+    setPayments(payments.map((p) => (p.id === id ? { ...p, status: 'reminded' } : p)));
     setToastMessage(`📱 ${studentName} さんへLINEで未払い利用料の催促メッセージを送信しました`);
     setShowToast(true);
   };
 
   // 手動で支払済みに変更
   const handleMarkAsPaid = (id: string, studentName: string) => {
-    setPayments(
-      payments.map((p) => (p.id === id ? { ...p, status: "paid" } : p))
-    );
+    setPayments(payments.map((p) => (p.id === id ? { ...p, status: 'paid' } : p)));
     setToastMessage(`✅ ${studentName} さんの支払いを「支払済み」に更新しました`);
     setShowToast(true);
   };
 
   const filteredPayments = payments.filter((p) => {
-    if (filter === "unpaid") return p.status !== "paid";
+    if (filter === 'unpaid') return p.status !== 'paid';
     return true;
   });
 
@@ -219,14 +216,16 @@ export default function TeacherPaymentsView() {
                   <span>📈 収支内訳比率グラフ (想定総収入: {formatMoney(grossRevenue)})</span>
                 </span>
                 <span className="text-emerald-800 font-black bg-emerald-100 px-2.5 py-0.5 rounded-md">
-                  純利益率: {grossRevenue > 0 ? Math.round((Math.max(0, netProfit) / grossRevenue) * 100) : 0}%
+                  純利益率:{' '}
+                  {grossRevenue > 0 ? Math.round((Math.max(0, netProfit) / grossRevenue) * 100) : 0}
+                  %
                 </span>
               </div>
 
               {/* 積み上げバーグラフ */}
               <div className="w-full h-7 bg-gray-200 rounded-xl overflow-hidden flex shadow-inner">
                 {netProfit > 0 && (
-                  <div 
+                  <div
                     style={{ width: `${(netProfit / grossRevenue) * 100}%` }}
                     className="bg-emerald-600 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
                     title={`純利益: ${formatMoney(netProfit)}`}
@@ -235,7 +234,7 @@ export default function TeacherPaymentsView() {
                   </div>
                 )}
                 {annualExpenses > 0 && (
-                  <div 
+                  <div
                     style={{ width: `${(annualExpenses / grossRevenue) * 100}%` }}
                     className="bg-slate-600 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
                     title={`年間経費: ${formatMoney(annualExpenses)}`}
@@ -244,7 +243,7 @@ export default function TeacherPaymentsView() {
                   </div>
                 )}
                 {systemFee > 0 && (
-                  <div 
+                  <div
                     style={{ width: `${(systemFee / grossRevenue) * 100}%` }}
                     className="bg-amber-500 h-full flex items-center justify-center text-[10px] font-black text-white px-1 transition-all duration-500 overflow-hidden"
                     title={`システム利用料: ${formatMoney(systemFee)}`}
@@ -265,8 +264,8 @@ export default function TeacherPaymentsView() {
                   🛠️ 想定経費: <strong>{formatMoney(annualExpenses)}</strong>
                 </span>
                 <span className="flex items-center gap-1 text-amber-900">
-                  <span className="w-3 h-3 bg-amber-500 rounded-sm inline-block" />
-                  ⚡ システム手数料(1%): <strong>{formatMoney(systemFee)}</strong>
+                  <span className="w-3 h-3 bg-amber-500 rounded-sm inline-block" />⚡
+                  システム手数料(1%): <strong>{formatMoney(systemFee)}</strong>
                 </span>
               </div>
             </div>
@@ -290,13 +289,19 @@ export default function TeacherPaymentsView() {
           </div>
 
           <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-1">
-            <span className="text-[11px] font-bold text-amber-900 block">⚡ システム利用料 (1%)</span>
+            <span className="text-[11px] font-bold text-amber-900 block">
+              ⚡ システム利用料 (1%)
+            </span>
             <span className="text-2xl font-black text-amber-900">{formatMoney(systemFee)}</span>
-            <span className="text-[10px] text-amber-700 font-medium block">総収入の 1.0% 仮設定</span>
+            <span className="text-[10px] text-amber-700 font-medium block">
+              総収入の 1.0% 仮設定
+            </span>
           </div>
 
           <div className="bg-emerald-800 text-white p-4 rounded-2xl shadow-md space-y-1">
-            <span className="text-[11px] font-bold text-emerald-200 block">🌟 年間手取り想定純利益</span>
+            <span className="text-[11px] font-bold text-emerald-200 block">
+              🌟 年間手取り想定純利益
+            </span>
             <span className="text-2xl font-black text-white">{formatMoney(netProfit)}</span>
             <span className="text-[10px] text-emerald-100 font-medium block">
               月換算: 約 {formatMoney(Math.round(netProfit / 12))}/月
@@ -316,14 +321,16 @@ export default function TeacherPaymentsView() {
         <div className="bg-white p-5 rounded-2xl border border-green-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-[#2e7d32] block">回収済み入金額</span>
           <span className="text-2xl font-black text-[#2e7d32]">{formatMoney(paidRevenue)}</span>
-          <span className="text-[10px] text-green-700 font-bold block">回収率 {collectionRate}%</span>
+          <span className="text-[10px] text-green-700 font-bold block">
+            回収率 {collectionRate}%
+          </span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-red-600 block">未回収・未払い金</span>
           <span className="text-2xl font-black text-red-600">{formatMoney(unpaidRevenue)}</span>
           <span className="text-[10px] text-red-500 font-bold block">
-            {payments.filter((p) => p.status !== "paid").length} 件 未完了
+            {payments.filter((p) => p.status !== 'paid').length} 件 未完了
           </span>
         </div>
 
@@ -344,16 +351,16 @@ export default function TeacherPaymentsView() {
           {/* フィルタータブ */}
           <div className="bg-gray-100 p-1 rounded-xl flex text-xs font-bold space-x-1">
             <button
-              onClick={() => setFilter("all")}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === "all" ? "bg-white text-gray-900 shadow-xs font-black" : "text-gray-500"}`}
+              onClick={() => setFilter('all')}
+              className={`px-3 py-1.5 rounded-lg transition ${filter === 'all' ? 'bg-white text-gray-900 shadow-xs font-black' : 'text-gray-500'}`}
             >
               全員 ({payments.length})
             </button>
             <button
-              onClick={() => setFilter("unpaid")}
-              className={`px-3 py-1.5 rounded-lg transition ${filter === "unpaid" ? "bg-white text-gray-900 shadow-xs font-black" : "text-gray-500"}`}
+              onClick={() => setFilter('unpaid')}
+              className={`px-3 py-1.5 rounded-lg transition ${filter === 'unpaid' ? 'bg-white text-gray-900 shadow-xs font-black' : 'text-gray-500'}`}
             >
-              未払いのみ ({payments.filter((p) => p.status !== "paid").length})
+              未払いのみ ({payments.filter((p) => p.status !== 'paid').length})
             </button>
           </div>
         </div>
@@ -378,26 +385,24 @@ export default function TeacherPaymentsView() {
                     <span className="text-xs text-gray-400 font-medium">{p.plot}</span>
                   </td>
 
-                  <td className="py-4 px-6 text-xs text-gray-700 font-semibold">
-                    {p.itemTitle}
-                  </td>
+                  <td className="py-4 px-6 text-xs text-gray-700 font-semibold">{p.itemTitle}</td>
 
                   <td className="py-4 px-6 font-extrabold text-gray-900">
                     {formatMoney(p.amount)}
                   </td>
 
                   <td className="py-4 px-6 text-xs">
-                    {p.method === "credit_card" && (
+                    {p.method === 'credit_card' && (
                       <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-lg border border-blue-100">
                         💳 クレジットカード
                       </span>
                     )}
-                    {p.method === "line_pay" && (
+                    {p.method === 'line_pay' && (
                       <span className="bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-lg border border-emerald-100">
                         🟢 LINE Pay
                       </span>
                     )}
-                    {p.method === "cash" && (
+                    {p.method === 'cash' && (
                       <span className="bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-lg border border-amber-100">
                         💴 現金手渡し
                       </span>
@@ -405,17 +410,17 @@ export default function TeacherPaymentsView() {
                   </td>
 
                   <td className="py-4 px-6 text-xs">
-                    {p.status === "paid" && (
+                    {p.status === 'paid' && (
                       <span className="bg-green-100 text-[#2e7d32] font-bold px-2.5 py-1 rounded-full border border-green-200">
                         ✓ 支払済み
                       </span>
                     )}
-                    {p.status === "unpaid" && (
+                    {p.status === 'unpaid' && (
                       <span className="bg-red-100 text-red-700 font-bold px-2.5 py-1 rounded-full border border-red-200 animate-pulse">
                         ⚠️ 未払い
                       </span>
                     )}
-                    {p.status === "reminded" && (
+                    {p.status === 'reminded' && (
                       <span className="bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-full border border-amber-200">
                         💬 催促送信済み
                       </span>
@@ -423,7 +428,7 @@ export default function TeacherPaymentsView() {
                   </td>
 
                   <td className="py-4 px-6 text-right space-x-2">
-                    {p.status !== "paid" ? (
+                    {p.status !== 'paid' ? (
                       <>
                         <button
                           onClick={() => handleSendRemind(p.id, p.studentName)}

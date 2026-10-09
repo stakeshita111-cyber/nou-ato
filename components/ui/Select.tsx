@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from "react";
+import * as React from 'react';
 
 interface SelectContextValue {
   value?: string;
@@ -24,7 +24,7 @@ export function Select({ value, onValueChange, children }: SelectProps) {
 }
 
 export function SelectTrigger({
-  className = "",
+  className = '',
   children,
 }: {
   className?: string;
@@ -35,11 +35,7 @@ export function SelectTrigger({
 
 export function SelectValue({ placeholder }: { placeholder?: string }) {
   const context = React.useContext(SelectContext);
-  return (
-    <span className="block truncate text-sm">
-      {context.value || placeholder || ""}
-    </span>
-  );
+  return <span className="block truncate text-sm">{context.value || placeholder || ''}</span>;
 }
 
 interface SelectItemProps {
@@ -49,7 +45,7 @@ interface SelectItemProps {
 
 export function SelectContent({
   children,
-  className = "",
+  className = '',
 }: {
   children?: React.ReactNode;
   className?: string;
@@ -59,30 +55,30 @@ export function SelectContent({
   const items: Array<{ value: string; label: React.ReactNode }> = [];
 
   React.Children.forEach(children, (child) => {
-    if (React.isValidElement<SelectItemProps>(child) && (child.type as { displayName?: string })?.displayName === 'SelectItem') {
+    if (
+      React.isValidElement<SelectItemProps>(child) &&
+      (child.type as { displayName?: string })?.displayName === 'SelectItem'
+    ) {
       items.push({ value: child.props.value, label: child.props.children });
     }
   });
 
   return (
     <select
-      value={context.value || ""}
+      value={context.value || ''}
       onChange={(e) => context.onValueChange?.(e.target.value)}
       className={`w-full h-10 px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer ${className}`}
     >
       {items.map((item) => (
         <option key={item.value} value={item.value}>
-          {typeof item.label === "string" ? item.label : item.value}
+          {typeof item.label === 'string' ? item.label : item.value}
         </option>
       ))}
     </select>
   );
 }
 
-export function SelectItem({
-  value,
-  children,
-}: SelectItemProps) {
+export function SelectItem({ value, children }: SelectItemProps) {
   return null;
 }
-SelectItem.displayName = "SelectItem";
+SelectItem.displayName = 'SelectItem';

@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from "react";
+import * as React from 'react';
 
 export interface SliderProps {
   value?: number[];
@@ -12,7 +12,7 @@ export interface SliderProps {
 }
 
 export const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
-  ({ value = [0], onValueChange, min = 0, max = 100, step = 1, className = "" }, ref) => {
+  ({ value = [0], onValueChange, min = 0, max = 100, step = 1, className = '' }, ref) => {
     const val = value[0] ?? min;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,4 +36,4 @@ export const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
     );
   }
 );
-Slider.displayName = "Slider";
+Slider.displayName = 'Slider';

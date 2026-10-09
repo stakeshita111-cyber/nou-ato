@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { FarmBed } from "@/types/farm";
-import { uploadImageToStorage } from "@/lib/storage";
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { FarmBed } from '@/types/farm';
+import { uploadImageToStorage } from '@/lib/storage';
 
 interface BedCompletionModalProps {
   isOpen: boolean;
@@ -22,17 +22,17 @@ export default function BedCompletionModal({
   bed,
   onComplete,
 }: BedCompletionModalProps) {
-  const [totalHarvest, setTotalHarvest] = useState("");
-  const [completionNotes, setCompletionNotes] = useState("");
-  const [season, setSeason] = useState("2026年 春夏");
-  const [imageUrl, setImageUrl] = useState("");
+  const [totalHarvest, setTotalHarvest] = useState('');
+  const [completionNotes, setCompletionNotes] = useState('');
+  const [season, setSeason] = useState('2026年 春夏');
+  const [imageUrl, setImageUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 🌟 画像ファイルを最適サイズ（最大480px / 品質0.6）に自動リサイズ＆圧縮 🌟
   const processImageFile = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    if (!file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (readerEvent) => {
       const rawResult = readerEvent.target?.result as string;
@@ -50,13 +50,13 @@ export default function BedCompletionModal({
             h = maxDim;
           }
         }
-        const canvas = document.createElement("canvas");
+        const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const compressed = canvas.toDataURL("image/jpeg", 0.6);
+          const compressed = canvas.toDataURL('image/jpeg', 0.6);
           setImageUrl(compressed);
         } else {
           setImageUrl(rawResult);
@@ -68,19 +68,22 @@ export default function BedCompletionModal({
   }, []);
 
   // 🌟 クリップボード貼り付け (Ctrl+V / Paste) 共通ハンドラー 🌟
-  const handlePasteItems = useCallback((items?: DataTransferItemList | null) => {
-    if (!items) return false;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith("image/")) {
-        const file = items[i].getAsFile();
-        if (file) {
-          processImageFile(file);
-          return true;
+  const handlePasteItems = useCallback(
+    (items?: DataTransferItemList | null) => {
+      if (!items) return false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processImageFile(file);
+            return true;
+          }
         }
       }
-    }
-    return false;
-  }, [processImageFile]);
+      return false;
+    },
+    [processImageFile]
+  );
 
   // 🌟 モーダル表示中、ブラウザ全体のどこで Ctrl+V しても画像を確実にキャッチ 🌟
   useEffect(() => {
@@ -93,9 +96,9 @@ export default function BedCompletionModal({
       }
     };
 
-    window.addEventListener("paste", handleWindowPaste);
+    window.addEventListener('paste', handleWindowPaste);
     return () => {
-      window.removeEventListener("paste", handleWindowPaste);
+      window.removeEventListener('paste', handleWindowPaste);
     };
   }, [isOpen, handlePasteItems]);
 
@@ -109,10 +112,10 @@ export default function BedCompletionModal({
       const isBedChanged = prevBedIdRef.current !== bed.id;
 
       if (isNewlyOpened || isBedChanged) {
-        setTotalHarvest(bed.total_harvest || "");
-        setCompletionNotes(bed.completion_notes || "");
-        setSeason(bed.season || "2026年 春夏");
-        setImageUrl(bed.completion_image_url || "");
+        setTotalHarvest(bed.total_harvest || '');
+        setCompletionNotes(bed.completion_notes || '');
+        setSeason(bed.season || '2026年 春夏');
+        setImageUrl(bed.completion_image_url || '');
         prevBedIdRef.current = bed.id;
       }
     } else if (!isOpen) {
@@ -129,7 +132,7 @@ export default function BedCompletionModal({
       processImageFile(file);
     }
     // 同じファイルを再選択できるようにリセット
-    e.target.value = "";
+    e.target.value = '';
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -154,7 +157,7 @@ export default function BedCompletionModal({
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith("image/")) {
+    if (file && file.type.startsWith('image/')) {
       processImageFile(file);
     }
   };
@@ -163,10 +166,10 @@ export default function BedCompletionModal({
     e.preventDefault();
     setIsSubmitting(true);
     let finalImageUrl = imageUrl;
-    if (imageUrl && imageUrl.startsWith("data:")) {
-      finalImageUrl = await uploadImageToStorage(imageUrl, "beds");
+    if (imageUrl && imageUrl.startsWith('data:')) {
+      finalImageUrl = await uploadImageToStorage(imageUrl, 'beds');
       if (!finalImageUrl) {
-        alert("画像のアップロードに失敗しました。通信環境を確認して再度お試しください。");
+        alert('画像のアップロードに失敗しました。通信環境を確認して再度お試しください。');
         setIsSubmitting(false);
         return;
       }
@@ -182,7 +185,7 @@ export default function BedCompletionModal({
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
       onPaste={handlePaste}
     >
@@ -196,7 +199,9 @@ export default function BedCompletionModal({
             <span className="text-2xl">🏆</span>
             <div>
               <h3 className="font-black text-gray-900 text-base">
-                {bed.status === "rejected" ? "⚠️ 収穫完了報告の修正・再提出" : `畝 ${bed.bed_number} (${bed.crop_name || "作物"}) の収穫完了報告`}
+                {bed.status === 'rejected'
+                  ? '⚠️ 収穫完了報告の修正・再提出'
+                  : `畝 ${bed.bed_number} (${bed.crop_name || '作物'}) の収穫完了報告`}
               </h3>
               <p className="text-xs text-gray-500 font-bold">
                 収穫のまとめを記録して講師へ完了報告を送ります
@@ -214,9 +219,7 @@ export default function BedCompletionModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* シーズン選択 */}
           <div>
-            <label className="block text-xs font-black text-gray-700 mb-1">
-              🗓️ 栽培シーズン
-            </label>
+            <label className="block text-xs font-black text-gray-700 mb-1">🗓️ 栽培シーズン</label>
             <select
               value={season}
               onChange={(e) => setSeason(e.target.value)}
@@ -279,17 +282,17 @@ export default function BedCompletionModal({
             </div>
 
             {imageUrl ? (
-              <div 
+              <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`relative rounded-2xl overflow-hidden border mb-2 h-48 group transition ${
-                  isDragging ? "border-emerald-600 ring-4 ring-emerald-300" : "border-emerald-200"
+                  isDragging ? 'border-emerald-600 ring-4 ring-emerald-300' : 'border-emerald-200'
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageUrl} alt="収穫写真" className="w-full h-full object-cover" />
-                
+
                 {isDragging && (
                   <div className="absolute inset-0 bg-emerald-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-white font-black text-xs gap-1.5 z-10 animate-fade-in">
                     <span className="text-3xl">📥</span>
@@ -307,7 +310,7 @@ export default function BedCompletionModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setImageUrl("")}
+                    onClick={() => setImageUrl('')}
                     className="bg-red-600/90 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold shadow-md transition cursor-pointer active:scale-95"
                   >
                     ✕ 削除
@@ -315,19 +318,21 @@ export default function BedCompletionModal({
                 </div>
               </div>
             ) : (
-              <label 
+              <label
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center gap-2 transition cursor-pointer ${
-                  isDragging 
-                    ? "border-emerald-600 bg-emerald-100/90 scale-[1.02] ring-4 ring-emerald-300" 
-                    : "border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50"
+                  isDragging
+                    ? 'border-emerald-600 bg-emerald-100/90 scale-[1.02] ring-4 ring-emerald-300'
+                    : 'border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50'
                 }`}
               >
-                <span className="text-3xl">{isDragging ? "📥" : "📸"}</span>
+                <span className="text-3xl">{isDragging ? '📥' : '📸'}</span>
                 <span className="text-xs font-black text-emerald-900">
-                  {isDragging ? "ここに写真をドロップ！" : "タップして写真を選択、またはドラッグ＆ドロップ"}
+                  {isDragging
+                    ? 'ここに写真をドロップ！'
+                    : 'タップして写真を選択、またはドラッグ＆ドロップ'}
                 </span>
                 <span className="text-[11px] text-emerald-700 font-bold bg-white/80 px-2.5 py-0.5 rounded-full border border-emerald-200">
                   💡 画像をコピーして Ctrl+V で貼り付けもOK！
@@ -348,7 +353,11 @@ export default function BedCompletionModal({
               <span>完了報告前の重要なお知らせ：</span>
             </p>
             <p className="text-amber-900 pl-4 text-[10.5px] leading-relaxed">
-              完了報告を送信すると、<strong>講師が確認・承認するまでこの畝への新しい記録入力はできなくなります（過去の記録は閲覧可能）</strong>。<br />
+              完了報告を送信すると、
+              <strong>
+                講師が確認・承認するまでこの畝への新しい記録入力はできなくなります（過去の記録は閲覧可能）
+              </strong>
+              。<br />
               講師が承認すると完了した畝は過去ログとして保存され、新しい畝が準備されます。
             </p>
           </div>

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { Template } from "./TemplateCard";
+import React, { useState } from 'react';
+import { Template } from './TemplateCard';
 
 type TemplateCreateModalProps = {
   onClose: () => void;
@@ -10,19 +10,19 @@ type TemplateCreateModalProps = {
 
 export default function TemplateCreateModal({ onClose, onSave }: TemplateCreateModalProps) {
   const [newTpl, setNewTpl] = useState<Partial<Template>>({
-    title: "",
-    target_crop: "",
-    description: "",
-    tools_needed: "",
-    estimated_time: "30分",
+    title: '',
+    target_crop: '',
+    description: '',
+    tools_needed: '',
+    estimated_time: '30分',
     exp: 15,
     difficulty: 2,
-    memo: "",
+    memo: '',
   });
 
   const handleSubmit = () => {
     if (!newTpl.title?.trim()) {
-      alert("タイトルを入力してください。");
+      alert('タイトルを入力してください。');
       return;
     }
     onSave(newTpl);
@@ -44,12 +44,14 @@ export default function TemplateCreateModal({ onClose, onSave }: TemplateCreateM
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-xs text-gray-600 font-bold mb-1">テンプレート名 (必須)</label>
+            <label className="block text-xs text-gray-600 font-bold mb-1">
+              テンプレート名 (必須)
+            </label>
             <input
               type="text"
               className="w-full border border-gray-200 p-3 rounded-xl bg-gray-50 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20"
               placeholder="例: トマトのわき芽かき実習"
-              value={newTpl.title || ""}
+              value={newTpl.title || ''}
               onChange={(e) => setNewTpl({ ...newTpl, title: e.target.value })}
             />
           </div>
@@ -60,7 +62,7 @@ export default function TemplateCreateModal({ onClose, onSave }: TemplateCreateM
               type="text"
               className="w-full border border-gray-200 p-3 rounded-xl bg-gray-50 text-sm font-medium"
               placeholder="例: トマト"
-              value={newTpl.target_crop || ""}
+              value={newTpl.target_crop || ''}
               onChange={(e) => setNewTpl({ ...newTpl, target_crop: e.target.value })}
             />
           </div>
@@ -71,18 +73,20 @@ export default function TemplateCreateModal({ onClose, onSave }: TemplateCreateM
               type="text"
               className="w-full border border-gray-200 p-3 rounded-xl bg-gray-50 text-sm font-medium"
               placeholder="例: 剪定バサミ、アルコールスプレー"
-              value={newTpl.tools_needed || ""}
+              value={newTpl.tools_needed || ''}
               onChange={(e) => setNewTpl({ ...newTpl, tools_needed: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="block text-xs text-gray-600 font-bold mb-1">作業手順・チェックリスト</label>
+            <label className="block text-xs text-gray-600 font-bold mb-1">
+              作業手順・チェックリスト
+            </label>
             <textarea
               rows={4}
               className="w-full border border-gray-200 p-3 rounded-xl bg-gray-50 text-sm font-medium resize-none"
               placeholder="・第一花房の下のわき芽をすべて取る&#10;・ハサミを消毒する"
-              value={newTpl.description || ""}
+              value={newTpl.description || ''}
               onChange={(e) => setNewTpl({ ...newTpl, description: e.target.value })}
             />
           </div>

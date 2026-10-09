@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
-import { useFarmStore } from "@/store/useFarmStore";
-import Toast from "@/components/ui/Toast";
-import SlideSettingsModal, { SlideSettings } from "@/components/teacher/SlideSettingsModal";
-import { formatDate, formatHarvestAmount } from "@/lib/utils/formatHelper";
-import { sanitizePersonalNames } from "@/lib/rag/qaKnowledgeRetriever";
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useFarmStore } from '@/store/useFarmStore';
+import Toast from '@/components/ui/Toast';
+import SlideSettingsModal, { SlideSettings } from '@/components/teacher/SlideSettingsModal';
+import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
+import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
 
 interface JournalItem {
   id: string;
@@ -23,7 +23,7 @@ interface JournalItem {
 }
 
 export interface SlideItemRecord {
-  itemType: "record";
+  itemType: 'record';
   id: string;
   studentName: string;
   studentAvatar: string;
@@ -39,7 +39,7 @@ export interface SlideItemRecord {
 }
 
 export interface SlideItemDateCard {
-  itemType: "date_card";
+  itemType: 'date_card';
   id: string;
   dateKey: string;
   displayDate: string;
@@ -60,21 +60,21 @@ const extractDateInfo = (dateStrOrIso?: string) => {
   const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
 
   const y = validDate.getFullYear();
-  const m = String(validDate.getMonth() + 1).padStart(2, "0");
-  const d = String(validDate.getDate()).padStart(2, "0");
+  const m = String(validDate.getMonth() + 1).padStart(2, '0');
+  const d = String(validDate.getDate()).padStart(2, '0');
   const dateKey = `${y}-${m}-${d}`;
 
-  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
   const dayOfWeek = dayNames[validDate.getDay()];
   const displayDate = formatDate(validDate);
 
   const todayObj = new Date();
-  const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, "0")}-${String(todayObj.getDate()).padStart(2, "0")}`;
+  const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
   const isToday = dateKey === todayKey;
 
-  const timeStr = validDate.toLocaleTimeString("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
+  const timeStr = validDate.toLocaleTimeString('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
   });
 
   return {
@@ -87,7 +87,7 @@ const extractDateInfo = (dateStrOrIso?: string) => {
   };
 };
 
-import { isRegularRecord } from "@/lib/utils/journalHelper";
+import { isRegularRecord } from '@/lib/utils/journalHelper';
 export { isRegularRecord };
 
 export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournalsViewProps) {
@@ -100,12 +100,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [showIndexModal, setShowIndexModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
 
   // 🌟【100人規模対応】スマートフィルター State 🌟
-  const [filterTab, setFilterTab] = useState<"unreplied" | "records" | "all" | "ai_answered" | "approved">("unreplied");
-  const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filterTab, setFilterTab] = useState<
+    'unreplied' | 'records' | 'all' | 'ai_answered' | 'approved'
+  >('unreplied');
+  const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [approveOnReply, setApproveOnReply] = useState<{ [key: string]: boolean }>({});
 
   // 🌟【新機能】農園ナレッジ登録確認モーダル State 🌟
@@ -115,21 +117,21 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     replyText: string;
     isFromReplyAction: boolean;
   } | null>(null);
-  const [publicTitle, setPublicTitle] = useState("");
-  const [publicReply, setPublicReply] = useState("");
+  const [publicTitle, setPublicTitle] = useState('');
+  const [publicReply, setPublicReply] = useState('');
   const [isSavingKnowledge, setIsSavingKnowledge] = useState(false);
 
   // 🌟【新機能】スライド表示設定 State (各生徒直近3回分・ソート順・速度) 🌟
   const [slideSettings, setSlideSettings] = useState<SlideSettings>({
-    sortBy: "newest",
+    sortBy: 'newest',
     limitPerStudent: 3, // 各生徒 直近3回分 (デフォルト)
-    speed: "normal",
+    speed: 'normal',
   });
   const [showSlideSettingsModal, setShowSlideSettingsModal] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("nouato_slide_settings");
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nouato_slide_settings');
       if (saved) {
         try {
           setSlideSettings(JSON.parse(saved));
@@ -140,10 +142,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
   const handleSaveSlideSettings = (newSettings: SlideSettings) => {
     setSlideSettings(newSettings);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("nouato_slide_settings", JSON.stringify(newSettings));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nouato_slide_settings', JSON.stringify(newSettings));
     }
-    setToastMessage("⚙️ スライド表示設定を更新・適用しました！");
+    setToastMessage('⚙️ スライド表示設定を更新・適用しました！');
     setShowToast(true);
   };
 
@@ -151,8 +153,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const sliderRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<number>(0);
-  const slideModeRef = useRef<"forward" | "paused" | "reverse">("forward");
-  const [activeSlideStatus, setActiveSlideStatus] = useState<"forward" | "paused" | "reverse">("forward");
+  const slideModeRef = useRef<'forward' | 'paused' | 'reverse'>('forward');
+  const [activeSlideStatus, setActiveSlideStatus] = useState<'forward' | 'paused' | 'reverse'>(
+    'forward'
+  );
 
   const fetchJournals = async (isInitial: boolean = false) => {
     if (isInitial) {
@@ -160,14 +164,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     }
     try {
       // ログイン講師の現在選択中農園IDを取得
-      let farmId = activeFarmId || useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      let farmId =
+        activeFarmId ||
+        useFarmStore.getState().activeFarmId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
       if (!farmId) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           const { data: userData } = await supabase
-            .from("users")
-            .select("farm_id")
-            .eq("id", user.id)
+            .from('users')
+            .select('farm_id')
+            .eq('id', user.id)
             .maybeSingle();
           if (userData?.farm_id) farmId = userData.farm_id;
         }
@@ -177,31 +186,33 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       let myStudentIds: string[] = [];
       if (farmId) {
         const { data: farmStudents } = await supabase
-          .from("users")
-          .select("id")
-          .eq("farm_id", farmId)
-          .eq("role", "student");
+          .from('users')
+          .select('id')
+          .eq('farm_id', farmId)
+          .eq('role', 'student');
         if (farmStudents) {
           myStudentIds = farmStudents.map((s: any) => s.id);
         }
       }
 
-      let jDataQuery = supabase
-        .from("journals")
-        .select("*");
+      let jDataQuery = supabase.from('journals').select('*');
 
       if (farmId) {
         if (myStudentIds.length > 0) {
-          jDataQuery = jDataQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(",")})`);
+          jDataQuery = jDataQuery.or(
+            `farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(',')})`
+          );
         } else {
-          jDataQuery = jDataQuery.eq("farm_id", farmId);
+          jDataQuery = jDataQuery.eq('farm_id', farmId);
         }
       }
 
-      const { data: journalData, error: journalError } = await jDataQuery.order("created_at", { ascending: false });
+      const { data: journalData, error: journalError } = await jDataQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (journalError) {
-        console.warn("Journals fetch info:", journalError.message || journalError);
+        console.warn('Journals fetch info:', journalError.message || journalError);
         setJournals([]);
         return;
       }
@@ -211,19 +222,21 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         return;
       }
 
-      const studentIds = Array.from(new Set(journalData.map((j: any) => j.student_id).filter(Boolean)));
+      const studentIds = Array.from(
+        new Set(journalData.map((j: any) => j.student_id).filter(Boolean))
+      );
       const userMap: { [key: string]: string } = {};
 
       if (studentIds.length > 0) {
         const { data: usersData } = await supabase
-          .from("users")
-          .select("id, email, display_name")
-          .in("id", studentIds);
+          .from('users')
+          .select('id, email, display_name')
+          .in('id', studentIds);
 
         if (usersData) {
           usersData.forEach((u: any) => {
             if (u.id) {
-              userMap[u.id] = u.display_name || (u.email ? u.email.split("@")[0] : "受講生");
+              userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
             }
           });
         }
@@ -231,13 +244,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
       const filteredData = journalData.filter((j: any) => {
-        const content = (j.content || "").trim();
+        const content = (j.content || '').trim();
         if (!content) return false;
         if (
-          content.includes("【収穫完了報告】") ||
-          content.includes("【差し戻し通知】") ||
-          content.includes("を完了報告しました") ||
-          content === "（コメントなし）"
+          content.includes('【収穫完了報告】') ||
+          content.includes('【差し戻し通知】') ||
+          content.includes('を完了報告しました') ||
+          content === '（コメントなし）'
         ) {
           return false;
         }
@@ -245,21 +258,21 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       });
 
       const formatted: JournalItem[] = filteredData.map((j: any) => {
-        const name = userMap[j.student_id] || "受講生徒";
-        let cleanContent = j.content || "";
+        const name = userMap[j.student_id] || '受講生徒';
+        let cleanContent = j.content || '';
         let imgUrl = j.image_url || undefined;
         const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
         if (imgMatch) {
           imgUrl = imgMatch[1];
-          cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+          cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
         }
 
         const isPrivate =
           Boolean(j.is_private) ||
-          cleanContent.includes("【非公開相談】") ||
-          cleanContent.includes("【非公開】") ||
-          cleanContent.includes("非公開希望") ||
-          cleanContent.includes("完全個別相談");
+          cleanContent.includes('【非公開相談】') ||
+          cleanContent.includes('【非公開】') ||
+          cleanContent.includes('非公開希望') ||
+          cleanContent.includes('完全個別相談');
 
         return {
           id: j.id,
@@ -267,15 +280,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           studentName: name,
           studentAvatar: name.slice(0, 2).toUpperCase(),
           created_at: j.created_at
-            ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString("ja-JP", {
-                hour: "2-digit",
-                minute: "2-digit",
+            ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit',
               })}`
-            : "最近",
-          taskTitle: j.task_title || (isRegularRecord(cleanContent) ? "🌱 畝の観察記録" : "💡 気づきメモ・質問相談"),
+            : '最近',
+          taskTitle:
+            j.task_title ||
+            (isRegularRecord(cleanContent) ? '🌱 畝の観察記録' : '💡 気づきメモ・質問相談'),
           content: cleanContent,
           imageUrl: imgUrl,
-          reply: j.reply || "",
+          reply: j.reply || '',
           is_approved: j.is_approved || false,
           is_private: isPrivate,
         };
@@ -283,7 +298,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       setJournals(formatted);
     } catch (e) {
-      console.error("Journals error exception:", e);
+      console.error('Journals error exception:', e);
       setJournals([]);
     } finally {
       if (isInitial) {
@@ -302,49 +317,55 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     const shouldApprove = approveOnReply[id] || false;
 
     const { error } = await supabase
-      .from("journals")
+      .from('journals')
       .update({
         reply: text.trim(),
         ...(shouldApprove ? { is_approved: true } : {}),
       })
-      .eq("id", id);
+      .eq('id', id);
 
     if (error) {
-      setToastMessage("返信の保存に失敗しました: " + error.message);
+      setToastMessage('返信の保存に失敗しました: ' + error.message);
     } else {
       // 生徒宛ての個別通知レコードを insert
       try {
-        const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-        const effectiveFarmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+        const isUuid = (str?: string | null) =>
+          !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        const effectiveFarmId =
+          activeFarmId ||
+          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
         const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
-        const validStudentId = targetJournal?.student_id && isUuid(targetJournal.student_id) ? targetJournal.student_id : (targetJournal?.student_id || null);
+        const validStudentId =
+          targetJournal?.student_id && isUuid(targetJournal.student_id)
+            ? targetJournal.student_id
+            : targetJournal?.student_id || null;
 
         if (validStudentId) {
-          const { error: insErr } = await supabase.from("journals").insert([
+          const { error: insErr } = await supabase.from('journals').insert([
             {
-              role: "broadcast",
+              role: 'broadcast',
               student_id: validStudentId,
               farm_id: validFarmId,
-              text: "【返信】講師から相談への回答が届きました",
+              text: '【返信】講師から相談への回答が届きました',
               content: text.trim(),
-              reply: "講師からの返信",
+              reply: '講師からの返信',
               created_at: new Date().toISOString(),
             },
           ]);
           if (insErr) {
-            console.warn("Reply broadcast insert warn:", insErr);
+            console.warn('Reply broadcast insert warn:', insErr);
           }
         }
       } catch (e) {
-        console.warn("Reply broadcast insert exception:", e);
+        console.warn('Reply broadcast insert exception:', e);
       }
 
       // 送信後、BroadcastChannel 及び nouato_sync_event を送信
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("nouato_sync_event"));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
         try {
-          const bc = new BroadcastChannel("nouato_farm_sync_channel");
-          bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
           bc.close();
         } catch {}
       }
@@ -359,8 +380,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       setEditingReplyId(null);
       setToastMessage(
         shouldApprove
-          ? "💬 回答を送信し、★ AIナレッジとして承認保存しました！"
-          : "💬 生徒への回答メッセージを更新・保存しました！"
+          ? '💬 回答を送信し、★ AIナレッジとして承認保存しました！'
+          : '💬 生徒への回答メッセージを更新・保存しました！'
       );
     }
     setShowToast(true);
@@ -369,31 +390,36 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   // 返信の再編集モードを開く
   const handleStartEditReply = (journal: JournalItem) => {
     setEditingReplyId(journal.id);
-    setReplyInput({ ...replyInput, [journal.id]: journal.reply || "" });
+    setReplyInput({ ...replyInput, [journal.id]: journal.reply || '' });
   };
 
   // 一般化モーダルを開く処理 (返信時またはナレッジ承認ボタン押下時)
-  const openKnowledgeModal = (journal: JournalItem, replyText: string, isFromReplyAction: boolean) => {
+  const openKnowledgeModal = (
+    journal: JournalItem,
+    replyText: string,
+    isFromReplyAction: boolean
+  ) => {
     if (journal.is_private) {
-      setToastMessage("🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。");
+      setToastMessage('🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。');
       setShowToast(true);
       return;
     }
 
     // 生徒質問から個人情報・挨拶を除去＆一般化
-    const rawQuestion = journal.content || "";
+    const rawQuestion = journal.content || '';
     const cleanQuestion = sanitizePersonalNames(rawQuestion);
     // タイトルが未設定またはデフォルトの場合は質問本文の冒頭から一般的な質問タイトルを生成
-    let initialTitle = journal.taskTitle && journal.taskTitle !== "💡 気づきメモ・質問相談" ? journal.taskTitle : "";
+    let initialTitle =
+      journal.taskTitle && journal.taskTitle !== '💡 気づきメモ・質問相談' ? journal.taskTitle : '';
     if (!initialTitle) {
-      const firstLine = cleanQuestion.split("\n")[0] || "農園栽培・お手入れの質問";
-      initialTitle = firstLine.length > 30 ? firstLine.slice(0, 30) + "..." : firstLine;
+      const firstLine = cleanQuestion.split('\n')[0] || '農園栽培・お手入れの質問';
+      initialTitle = firstLine.length > 30 ? firstLine.slice(0, 30) + '...' : firstLine;
     }
     // 質問タイトルの個人名・呼びかけもクリーンアップ
     initialTitle = sanitizePersonalNames(initialTitle);
 
     // 講師返信から個人名呼びかけ・個別挨拶を一般化
-    const cleanReplyText = sanitizePersonalNames(replyText || journal.reply || "");
+    const cleanReplyText = sanitizePersonalNames(replyText || journal.reply || '');
 
     setKnowledgeModalTarget({ journal, replyText, isFromReplyAction });
     setPublicTitle(initialTitle);
@@ -408,49 +434,57 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
     setIsSavingKnowledge(true);
     try {
-      const finalReply = isFromReplyAction ? (replyText.trim() || publicReply.trim()) : (journal.reply || publicReply.trim());
+      const finalReply = isFromReplyAction
+        ? replyText.trim() || publicReply.trim()
+        : journal.reply || publicReply.trim();
       const { error } = await supabase
-        .from("journals")
+        .from('journals')
         .update({
           task_title: publicTitle.trim(),
           reply: finalReply,
           is_approved: true,
         })
-        .eq("id", journal.id);
+        .eq('id', journal.id);
 
       if (error) {
-        setToastMessage("ナレッジの登録・承認に失敗しました: " + error.message);
+        setToastMessage('ナレッジの登録・承認に失敗しました: ' + error.message);
       } else {
         // 返信アクション経由の場合は生徒宛て通知を挿入
         if (isFromReplyAction && replyText.trim()) {
           try {
-            const isUuid = (str?: string | null) => !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-            const effectiveFarmId = activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+            const isUuid = (str?: string | null) =>
+              !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+            const effectiveFarmId =
+              activeFarmId ||
+              (typeof window !== 'undefined'
+                ? localStorage.getItem('nouato_active_farm_id')
+                : null);
             const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
-            const validStudentId = journal.student_id && isUuid(journal.student_id) ? journal.student_id : null;
+            const validStudentId =
+              journal.student_id && isUuid(journal.student_id) ? journal.student_id : null;
 
             if (validStudentId) {
-              await supabase.from("journals").insert([
+              await supabase.from('journals').insert([
                 {
-                  role: "broadcast",
+                  role: 'broadcast',
                   student_id: validStudentId,
                   farm_id: validFarmId,
-                  text: "【返信】講師から相談への回答が届きました",
+                  text: '【返信】講師から相談への回答が届きました',
                   content: replyText.trim(),
-                  reply: "講師からの返信",
+                  reply: '講師からの返信',
                   created_at: new Date().toISOString(),
                 },
               ]);
             }
           } catch (e) {
-            console.warn("Broadcast insert warn:", e);
+            console.warn('Broadcast insert warn:', e);
           }
 
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("nouato_sync_event"));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('nouato_sync_event'));
             try {
-              const bc = new BroadcastChannel("nouato_farm_sync_channel");
-              bc.postMessage({ type: "BROADCAST_UPDATED", timestamp: Date.now() });
+              const bc = new BroadcastChannel('nouato_farm_sync_channel');
+              bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
               bc.close();
             } catch {}
           }
@@ -470,10 +504,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         );
         setShowKnowledgeModal(false);
         setEditingReplyId(null);
-        setToastMessage("💡 個人情報を確認・一般化し、農園FAQナレッジとして承認登録しました！✨");
+        setToastMessage('💡 個人情報を確認・一般化し、農園FAQナレッジとして承認登録しました！✨');
       }
     } catch (e: any) {
-      setToastMessage("エラーが発生しました: " + e.message);
+      setToastMessage('エラーが発生しました: ' + e.message);
     } finally {
       setIsSavingKnowledge(false);
       setShowToast(true);
@@ -486,28 +520,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     if (!targetJournal) return;
 
     if (targetJournal.is_private) {
-      setToastMessage("🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。");
+      setToastMessage('🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。');
       setShowToast(true);
       return;
     }
 
     if (!currentApproved) {
       // 未承認から承認へ変更する場合: 確認・一般化モーダルを表示
-      openKnowledgeModal(targetJournal, targetJournal.reply || "", false);
+      openKnowledgeModal(targetJournal, targetJournal.reply || '', false);
     } else {
       // 承認解除の場合
-      const { error } = await supabase
-        .from("journals")
-        .update({ is_approved: false })
-        .eq("id", id);
+      const { error } = await supabase.from('journals').update({ is_approved: false }).eq('id', id);
 
       if (error) {
-        setToastMessage("承認解除に失敗しました: " + error.message);
+        setToastMessage('承認解除に失敗しました: ' + error.message);
       } else {
-        setJournals(
-          journals.map((j) => (j.id === id ? { ...j, is_approved: false } : j))
-        );
-        setToastMessage("承認を取り消しました");
+        setJournals(journals.map((j) => (j.id === id ? { ...j, is_approved: false } : j)));
+        setToastMessage('承認を取り消しました');
       }
       setShowToast(true);
     }
@@ -516,28 +545,46 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   // 🌟 日誌・相談ログの削除 (不要データやテストデータの完全クリーンアップ) 🌟
   const handleDeleteJournal = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!window.confirm("この日記（相談ログ）を削除してもよろしいですか？\n削除するとAIナレッジの参照データからも完全に除外されます。")) {
+    if (
+      !window.confirm(
+        'この日記（相談ログ）を削除してもよろしいですか？\n削除するとAIナレッジの参照データからも完全に除外されます。'
+      )
+    ) {
       return;
     }
 
     try {
-      const { error } = await supabase.from("journals").delete().eq("id", id);
+      const { error } = await supabase.from('journals').delete().eq('id', id);
       if (error) {
-        setToastMessage("削除に失敗しました: " + error.message);
+        setToastMessage('削除に失敗しました: ' + error.message);
       } else {
         const nextList = journals.filter((j) => j.id !== id);
         setJournals(nextList);
-        setToastMessage("🗑️ 日記データを削除しました");
+        setToastMessage('🗑️ 日記データを削除しました');
       }
     } catch (err: any) {
-      setToastMessage("削除エラー: " + err.message);
+      setToastMessage('削除エラー: ' + err.message);
     }
     setShowToast(true);
   };
 
   // 🌟 緊急度・要注意キーワード判定 🌟
   const isUrgentJournal = (content: string) => {
-    const urgentKeywords = ["枯れ", "虫", "病", "腐", "黄", "異変", "倒れ", "食べられ", "斑点", "カビ", "元気がない", "しおれ", "害虫"];
+    const urgentKeywords = [
+      '枯れ',
+      '虫',
+      '病',
+      '腐',
+      '黄',
+      '異変',
+      '倒れ',
+      '食べられ',
+      '斑点',
+      'カビ',
+      '元気がない',
+      'しおれ',
+      '害虫',
+    ];
     return urgentKeywords.some((k) => content.includes(k));
   };
 
@@ -549,21 +596,21 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   // 🌟 フィルタリング適用後の日誌リスト 🌟
   const filteredJournals = journals.filter((j) => {
     // 1. タブフィルター
-    if (filterTab === "unreplied") {
+    if (filterTab === 'unreplied') {
       // 🌟 返信済み、および「ただの記録（観察・作業記録）」は要対応から除外 🌟
       if (j.reply && j.reply.trim().length > 0) return false;
       if (isRegularRecord(j.content)) return false;
-    } else if (filterTab === "records") {
+    } else if (filterTab === 'records') {
       // 🌟 生徒の日常の観察・作業記録のみを一覧表示 🌟
       if (!isRegularRecord(j.content)) return false;
-    } else if (filterTab === "ai_answered") {
+    } else if (filterTab === 'ai_answered') {
       if (!j.reply || j.reply.trim().length === 0) return false;
-    } else if (filterTab === "approved") {
+    } else if (filterTab === 'approved') {
       if (!j.is_approved) return false;
     }
 
     // 2. 生徒フィルター
-    if (selectedStudentFilter !== "all" && j.student_id !== selectedStudentFilter) {
+    if (selectedStudentFilter !== 'all' && j.student_id !== selectedStudentFilter) {
       return false;
     }
 
@@ -571,9 +618,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchContent = j.content.toLowerCase().includes(q);
-      const matchReply = (j.reply || "").toLowerCase().includes(q);
-      const matchStudent = (j.studentName || "").toLowerCase().includes(q);
-      const matchTitle = (j.taskTitle || "").toLowerCase().includes(q);
+      const matchReply = (j.reply || '').toLowerCase().includes(q);
+      const matchStudent = (j.studentName || '').toLowerCase().includes(q);
+      const matchTitle = (j.taskTitle || '').toLowerCase().includes(q);
       if (!matchContent && !matchReply && !matchStudent && !matchTitle) {
         return false;
       }
@@ -613,14 +660,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const fetchCropRecords = useCallback(async () => {
     try {
       // ログイン講師の現在選択中農園IDを取得
-      let farmId = activeFarmId || useFarmStore.getState().activeFarmId || (typeof window !== "undefined" ? localStorage.getItem("nouato_active_farm_id") : null);
+      let farmId =
+        activeFarmId ||
+        useFarmStore.getState().activeFarmId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
       if (!farmId) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           const { data: userData } = await supabase
-            .from("users")
-            .select("farm_id")
-            .eq("id", user.id)
+            .from('users')
+            .select('farm_id')
+            .eq('id', user.id)
             .maybeSingle();
           if (userData?.farm_id) farmId = userData.farm_id;
         }
@@ -630,10 +682,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       let myStudentIds: string[] = [];
       if (farmId) {
         const { data: farmStudents } = await supabase
-          .from("users")
-          .select("id")
-          .eq("farm_id", farmId)
-          .eq("role", "student");
+          .from('users')
+          .select('id')
+          .eq('farm_id', farmId)
+          .eq('role', 'student');
         if (farmStudents) {
           myStudentIds = farmStudents.map((s: any) => s.id);
         }
@@ -641,35 +693,39 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       // 1. crop_records から生徒の観察ノート・現場報告を取得（全件取得し、メモリ上で自農園・自生徒へ安全マッピング）
       const { data: recData, error: recError } = await supabase
-        .from("crop_records")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .from('crop_records')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (recError) {
-        console.warn("fetchCropRecords crop_records query error:", recError);
+        console.warn('fetchCropRecords crop_records query error:', recError);
       }
 
       // 2. journals から生徒の手入力日誌・相談メモを取得（自農園・自生徒に厳密制限）
-      let jQuery = supabase
-        .from("journals")
-        .select("*");
+      let jQuery = supabase.from('journals').select('*');
 
       if (farmId) {
         if (myStudentIds.length > 0) {
-          jQuery = jQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(",")})`);
+          jQuery = jQuery.or(`farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(',')})`);
         } else {
-          jQuery = jQuery.eq("farm_id", farmId);
+          jQuery = jQuery.eq('farm_id', farmId);
         }
       }
 
-      const { data: jData } = await jQuery.order("created_at", { ascending: false });
+      const { data: jData } = await jQuery.order('created_at', { ascending: false });
 
       // 3. 畝情報 (farm_beds) を取得して bed_id -> 生徒情報のマッピングを作成
       const { data: bedsData } = await supabase
-        .from("farm_beds")
-        .select("id, student_name, student_id, plot_id");
+        .from('farm_beds')
+        .select('id, student_name, student_id, plot_id');
 
-      const bedMap: { [id: string]: { student_name?: string | null; student_id?: string | null; plot_id?: string | null } } = {};
+      const bedMap: {
+        [id: string]: {
+          student_name?: string | null;
+          student_id?: string | null;
+          plot_id?: string | null;
+        };
+      } = {};
       if (bedsData) {
         bedsData.forEach((b: any) => {
           if (b.id) {
@@ -684,8 +740,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       // 4. 区画情報 (farm_plots) を取得
       const { data: plotsData } = await supabase
-        .from("farm_plots")
-        .select("id, code, student_id, farm_id");
+        .from('farm_plots')
+        .select('id, code, student_id, farm_id');
 
       const plotMap: { [id: string]: any } = {};
       const studentPlotMap: { [studentId: string]: { plotCode: string; farmId?: string } } = {};
@@ -706,7 +762,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         bedsData.forEach((b: any) => {
           if (b.student_id && b.plot_id && !studentPlotMap[b.student_id]) {
             const plotInfo = plotMap[b.plot_id];
-            const code = plotInfo?.code || b.plot_id.replace(/^plot_cell_/, "");
+            const code = plotInfo?.code || b.plot_id.replace(/^plot_cell_/, '');
             if (code) {
               studentPlotMap[b.student_id] = {
                 plotCode: code,
@@ -719,16 +775,16 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       // 5. ユーザー名 (users) の取得および他農園生徒の判定
       const { data: usersData } = await supabase
-        .from("users")
-        .select("id, display_name, email, farm_id, role");
+        .from('users')
+        .select('id, display_name, email, farm_id, role');
 
       const userMap: { [key: string]: string } = {};
       const otherFarmStudentIds = new Set<string>();
       if (usersData) {
         usersData.forEach((u: any) => {
           if (u.id) {
-            userMap[u.id] = u.display_name || (u.email ? u.email.split("@")[0] : "受講生");
-            if (farmId && u.farm_id && u.farm_id !== farmId && u.role === "student") {
+            userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
+            if (farmId && u.farm_id && u.farm_id !== farmId && u.role === 'student') {
               otherFarmStudentIds.add(u.id);
             }
           }
@@ -754,14 +810,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             r.student_name ||
             bedInfo?.student_name ||
             (resolvedStudentId && userMap[resolvedStudentId]) ||
-            "受講生";
+            '受講生';
 
-          let cleanNotes = r.notes || "観察記録を送信しました。";
+          let cleanNotes = r.notes || '観察記録を送信しました。';
           let imgUrl = r.photo_url || r.image_url || undefined;
           const imgMatch = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
           if (imgMatch) {
             imgUrl = imgMatch[1];
-            cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+            cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
           }
 
           const studentMapped = resolvedStudentId ? studentPlotMap[resolvedStudentId] : null;
@@ -769,24 +825,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           const derivedPlotCode =
             r.plot_code ||
             plotInfo?.code ||
-            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, "") : undefined) ||
+            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, '') : undefined) ||
             studentMapped?.plotCode;
 
           const derivedFarmId =
-            r.farm_id ||
-            plotInfo?.farm_id ||
-            studentMapped?.farmId ||
-            farmId ||
-            undefined;
+            r.farm_id || plotInfo?.farm_id || studentMapped?.farmId || farmId || undefined;
 
           allRecords.push({
-            itemType: "record",
+            itemType: 'record',
             id: r.id || `rec_${idx}`,
             studentName,
             studentAvatar: studentName.slice(0, 1),
-            title: Array.isArray(r.work_types) && r.work_types.length > 0
-              ? r.work_types.join(", ")
-              : (r.crop_name && r.crop_name !== "未確定" ? r.crop_name : "観察記録"),
+            title:
+              Array.isArray(r.work_types) && r.work_types.length > 0
+                ? r.work_types.join(', ')
+                : r.crop_name && r.crop_name !== '未確定'
+                  ? r.crop_name
+                  : '観察記録',
             content: cleanNotes,
             imageUrl: imgUrl,
             harvestAmount: formatHarvestAmount(r.harvest_amount) || undefined,
@@ -802,12 +857,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (jData && jData.length > 0) {
         jData
           .filter((j: any) => {
-            const c = (j.content || "").trim();
-            return c && 
-              !c.includes("【収穫完了報告】") && 
-              !c.includes("【差し戻し通知】") && 
-              !c.includes("を完了報告しました") && 
-              c !== "（コメントなし）";
+            const c = (j.content || '').trim();
+            return (
+              c &&
+              !c.includes('【収穫完了報告】') &&
+              !c.includes('【差し戻し通知】') &&
+              !c.includes('を完了報告しました') &&
+              c !== '（コメントなし）'
+            );
           })
           .forEach((j: any, idx: number) => {
             // 🌟 自農園に所属する生徒の記録のみに厳密制限 🌟
@@ -819,14 +876,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
             const rawDate = j.created_at;
             const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
-            const studentName = (j.student_id && userMap[j.student_id]) || "受講生";
+            const studentName = (j.student_id && userMap[j.student_id]) || '受講生';
 
-            let cleanContent = j.content || "";
+            let cleanContent = j.content || '';
             let imgUrl = j.image_url || j.photo_url || undefined;
             const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
             if (imgMatch) {
               imgUrl = imgMatch[1];
-              cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
+              cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
             }
 
             const studentMapped = j.student_id ? studentPlotMap[j.student_id] : null;
@@ -835,11 +892,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
             if (!allRecords.some((r) => r.content === cleanContent)) {
               allRecords.push({
-                itemType: "record",
+                itemType: 'record',
                 id: j.id || `j_${idx}`,
                 studentName,
                 studentAvatar: studentName.slice(0, 1),
-                title: j.task_title || "💡 質問・相談日誌",
+                title: j.task_title || '💡 質問・相談日誌',
                 content: cleanContent,
                 imageUrl: imgUrl,
                 dateStr: formatDate(rawDate),
@@ -878,29 +935,29 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       // 🌟【要件: ソート・並べ替えの適用】🌟
       const sortBy = slideSettings.sortBy;
       filteredByStudentRecords.sort((a, b) => {
-        if (sortBy === "oldest") {
+        if (sortBy === 'oldest') {
           return a.timestamp - b.timestamp;
         }
-        if (sortBy === "studentName") {
-          const nameCmp = a.studentName.localeCompare(b.studentName, "ja");
+        if (sortBy === 'studentName') {
+          const nameCmp = a.studentName.localeCompare(b.studentName, 'ja');
           if (nameCmp !== 0) return nameCmp;
           return b.timestamp - a.timestamp;
         }
-        if (sortBy === "hasImage") {
+        if (sortBy === 'hasImage') {
           const aImg = a.imageUrl ? 1 : 0;
           const bImg = b.imageUrl ? 1 : 0;
           if (bImg !== aImg) return bImg - aImg;
           return b.timestamp - a.timestamp;
         }
-        if (sortBy === "hasHarvest") {
+        if (sortBy === 'hasHarvest') {
           const aH = a.harvestAmount ? 1 : 0;
           const bH = b.harvestAmount ? 1 : 0;
           if (bH !== aH) return bH - aH;
           return b.timestamp - a.timestamp;
         }
-        if (sortBy === "isQuestion") {
-          const aQ = a.title.includes("相談") || a.title.includes("質問") ? 1 : 0;
-          const bQ = b.title.includes("相談") || b.title.includes("質問") ? 1 : 0;
+        if (sortBy === 'isQuestion') {
+          const aQ = a.title.includes('相談') || a.title.includes('質問') ? 1 : 0;
+          const bQ = b.title.includes('相談') || b.title.includes('質問') ? 1 : 0;
           if (bQ !== aQ) return bQ - aQ;
           return b.timestamp - a.timestamp;
         }
@@ -922,7 +979,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       setSlideColumns(filledCols as any);
     } catch (err) {
-      console.error("fetchCropRecords error:", err);
+      console.error('fetchCropRecords error:', err);
       setSlideColumns([]);
     }
   }, [slideSettings, activeFarmId]);
@@ -934,7 +991,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     // 🌟 1. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
     let bc: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel("nouato_farm_sync_channel");
+      bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = () => {
         fetchJournals(false);
         fetchCropRecords();
@@ -945,17 +1002,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       fetchJournals(false);
       fetchCropRecords();
     };
-    if (typeof window !== "undefined") {
-      window.addEventListener("nouato_sync_event", handleSync);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nouato_sync_event', handleSync);
       // タブに復帰した時のみ最新状態に再同期 (常時ポーリングを廃止して通信量を99%削減)
-      window.addEventListener("focus", handleSync);
+      window.addEventListener('focus', handleSync);
     }
 
     return () => {
       if (bc) bc.close();
-      if (typeof window !== "undefined") {
-        window.removeEventListener("nouato_sync_event", handleSync);
-        window.removeEventListener("focus", handleSync);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nouato_sync_event', handleSync);
+        window.removeEventListener('focus', handleSync);
       }
     };
   }, [fetchCropRecords, activeFarmId]);
@@ -976,19 +1033,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         const halfWidth = totalTrackWidth / 2;
 
         let baseSpeed = 0.65;
-        if (slideSettings.speed === "slow") baseSpeed = 0.35;
-        if (slideSettings.speed === "fast") baseSpeed = 1.1;
-        if (slideSettings.speed === "paused") baseSpeed = 0;
+        if (slideSettings.speed === 'slow') baseSpeed = 0.35;
+        if (slideSettings.speed === 'fast') baseSpeed = 1.1;
+        if (slideSettings.speed === 'paused') baseSpeed = 0;
 
         if (halfWidth > 50 && baseSpeed > 0) {
-          if (slideModeRef.current === "forward") {
+          if (slideModeRef.current === 'forward') {
             scrollPosRef.current += baseSpeed * delta;
             if (scrollPosRef.current >= halfWidth) {
               scrollPosRef.current -= halfWidth;
             }
-          } else if (slideModeRef.current === "reverse") {
+          } else if (slideModeRef.current === 'reverse') {
             // 逆方向スライド (左側にマウスがある時のみ)
-            scrollPosRef.current -= (baseSpeed * 1.5) * delta;
+            scrollPosRef.current -= baseSpeed * 1.5 * delta;
             if (scrollPosRef.current < 0) {
               scrollPosRef.current += halfWidth;
             }
@@ -1015,25 +1072,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
     // 左側28%エリアにカーソルがある場合は逆方向スライド
     if (mouseX < width * 0.28) {
-      if (slideModeRef.current !== "reverse") {
-        slideModeRef.current = "reverse";
-        setActiveSlideStatus("reverse");
+      if (slideModeRef.current !== 'reverse') {
+        slideModeRef.current = 'reverse';
+        setActiveSlideStatus('reverse');
       }
     } else {
       // それ以外の領域は一時停止
-      if (slideModeRef.current !== "paused") {
-        slideModeRef.current = "paused";
-        setActiveSlideStatus("paused");
+      if (slideModeRef.current !== 'paused') {
+        slideModeRef.current = 'paused';
+        setActiveSlideStatus('paused');
       }
     }
   };
 
   const handleSliderMouseLeave = () => {
-    slideModeRef.current = "forward";
-    setActiveSlideStatus("forward");
+    slideModeRef.current = 'forward';
+    setActiveSlideStatus('forward');
   };
-
-
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
@@ -1065,17 +1120,19 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         {/* 🔴 未返信（要対応） */}
         <button
           type="button"
-          onClick={() => setFilterTab("unreplied")}
+          onClick={() => setFilterTab('unreplied')}
           className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-            filterTab === "unreplied"
-              ? "bg-white text-red-700 shadow-xs border border-gray-200"
-              : "text-gray-600 hover:text-gray-900"
+            filterTab === 'unreplied'
+              ? 'bg-white text-red-700 shadow-xs border border-gray-200'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <span>🔴 要対応 (未返信)</span>
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-              unrepliedCount > 0 ? "bg-red-500 text-white animate-pulse" : "bg-gray-200 text-gray-600"
+              unrepliedCount > 0
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'bg-gray-200 text-gray-600'
             }`}
           >
             {unrepliedCount}
@@ -1085,11 +1142,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         {/* 🌱 観察・作業記録 */}
         <button
           type="button"
-          onClick={() => setFilterTab("records")}
+          onClick={() => setFilterTab('records')}
           className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-            filterTab === "records"
-              ? "bg-white text-blue-700 shadow-xs border border-gray-200"
-              : "text-gray-600 hover:text-gray-900"
+            filterTab === 'records'
+              ? 'bg-white text-blue-700 shadow-xs border border-gray-200'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <span>🌱 観察・作業記録</span>
@@ -1101,11 +1158,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         {/* 🟢 AI対応済み / 回答済み */}
         <button
           type="button"
-          onClick={() => setFilterTab("ai_answered")}
+          onClick={() => setFilterTab('ai_answered')}
           className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-            filterTab === "ai_answered"
-              ? "bg-white text-emerald-800 shadow-xs border border-gray-200"
-              : "text-gray-600 hover:text-gray-900"
+            filterTab === 'ai_answered'
+              ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <span>🟢 回答・対応済み</span>
@@ -1117,11 +1174,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         {/* 🌟 承認ナレッジ */}
         <button
           type="button"
-          onClick={() => setFilterTab("approved")}
+          onClick={() => setFilterTab('approved')}
           className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-            filterTab === "approved"
-              ? "bg-white text-amber-900 shadow-xs border border-gray-200"
-              : "text-gray-600 hover:text-gray-900"
+            filterTab === 'approved'
+              ? 'bg-white text-amber-900 shadow-xs border border-gray-200'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <span>🌟 AI承認ナレッジ</span>
@@ -1133,11 +1190,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         {/* 📜 すべて */}
         <button
           type="button"
-          onClick={() => setFilterTab("all")}
+          onClick={() => setFilterTab('all')}
           className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-            filterTab === "all"
-              ? "bg-white text-gray-900 shadow-xs border border-gray-200"
-              : "text-gray-600 hover:text-gray-900"
+            filterTab === 'all'
+              ? 'bg-white text-gray-900 shadow-xs border border-gray-200'
+              : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           <span>📜 すべて ({journals.length})</span>
@@ -1175,7 +1232,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => setSearchQuery('')}
               className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-1"
             >
               クリア
@@ -1190,23 +1247,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         /* 該当する日記が0件のときのスマート空状態 */
         <div className="app-bg-card rounded-3xl p-12 text-center border app-border space-y-3">
           <div className="w-12 h-12 app-accent-light rounded-2xl flex items-center justify-center mx-auto text-xl font-bold">
-            {filterTab === "unreplied" ? "🎉" : "📖"}
+            {filterTab === 'unreplied' ? '🎉' : '📖'}
           </div>
           <h3 className="font-bold text-gray-800 text-sm">
-            {filterTab === "unreplied"
-              ? "現在、未返信の日記・相談はありません！"
-              : filterTab === "records"
-              ? "まだ観察・作業記録はありません"
-              : filterTab === "approved"
-              ? "承認済みのAIナレッジはまだありません"
-              : "条件に一致する交換日記は見つかりませんでした"}
+            {filterTab === 'unreplied'
+              ? '現在、未返信の日記・相談はありません！'
+              : filterTab === 'records'
+                ? 'まだ観察・作業記録はありません'
+                : filterTab === 'approved'
+                  ? '承認済みのAIナレッジはまだありません'
+                  : '条件に一致する交換日記は見つかりませんでした'}
           </h3>
           <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            {filterTab === "unreplied"
-              ? "生徒からの質問にはすべて回答済みです。お疲れ様でした✨"
-              : filterTab === "records"
-              ? "生徒が畝の観察ノートや作業記録を投稿するとここに表示されます。"
-              : "上部のフィルター条件や検索キーワードを変更してお試しください。"}
+            {filterTab === 'unreplied'
+              ? '生徒からの質問にはすべて回答済みです。お疲れ様でした✨'
+              : filterTab === 'records'
+                ? '生徒が畝の観察ノートや作業記録を投稿するとここに表示されます。'
+                : '上部のフィルター条件や検索キーワードを変更してお試しください。'}
           </p>
         </div>
       ) : (
@@ -1218,8 +1275,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               disabled={currentPage === 0}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1 ${
                 currentPage === 0
-                  ? "opacity-30 cursor-not-allowed bg-gray-100 text-gray-400"
-                  : "app-accent-btn shadow-xs active:scale-95 cursor-pointer"
+                  ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-400'
+                  : 'app-accent-btn shadow-xs active:scale-95 cursor-pointer'
               }`}
             >
               <span>◀ 前の日記</span>
@@ -1235,7 +1292,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     key={idx}
                     onClick={() => setCurrentPage(idx)}
                     className={`w-2 h-2 rounded-full cursor-pointer transition ${
-                      idx === currentPage ? "app-accent-btn scale-125" : "bg-gray-200 hover:bg-gray-400"
+                      idx === currentPage
+                        ? 'app-accent-btn scale-125'
+                        : 'bg-gray-200 hover:bg-gray-400'
                     }`}
                   ></span>
                 ))}
@@ -1247,8 +1306,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               disabled={currentPage === totalPages - 1}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1 ${
                 currentPage === totalPages - 1
-                  ? "opacity-30 cursor-not-allowed bg-gray-100 text-gray-400"
-                  : "app-accent-btn shadow-xs active:scale-95 cursor-pointer"
+                  ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-400'
+                  : 'app-accent-btn shadow-xs active:scale-95 cursor-pointer'
               }`}
             >
               <span>次の日記 ▶</span>
@@ -1270,12 +1329,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                     </div>
                     <div>
                       <div className="flex items-center space-x-2 flex-wrap gap-1">
-                        <h3 className="font-extrabold text-gray-900 text-base">{currentJournal.studentName}</h3>
+                        <h3 className="font-extrabold text-gray-900 text-base">
+                          {currentJournal.studentName}
+                        </h3>
                         <span
                           className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
                             isRegularRecord(currentJournal.content)
-                              ? "bg-blue-100 text-blue-800 border border-blue-200"
-                              : "bg-gray-100 text-gray-700"
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-gray-100 text-gray-700'
                           }`}
                         >
                           {currentJournal.taskTitle}
@@ -1303,18 +1364,26 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleToggleApprove(currentJournal.id, currentJournal.is_approved)}
+                      onClick={() =>
+                        handleToggleApprove(currentJournal.id, currentJournal.is_approved)
+                      }
                       disabled={currentJournal.is_private}
-                      title={currentJournal.is_private ? "非公開相談のためナレッジ承認はできません" : undefined}
+                      title={
+                        currentJournal.is_private
+                          ? '非公開相談のためナレッジ承認はできません'
+                          : undefined
+                      }
                       className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition ${
                         currentJournal.is_private
-                          ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border border-gray-200"
+                          ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border border-gray-200'
                           : currentJournal.is_approved
-                          ? "bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer"
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer'
                       }`}
                     >
-                      <span>{currentJournal.is_approved ? "★ AIナレッジ承認済み" : "☆ AI知識として承認"}</span>
+                      <span>
+                        {currentJournal.is_approved ? '★ AIナレッジ承認済み' : '☆ AI知識として承認'}
+                      </span>
                     </button>
 
                     <button
@@ -1329,7 +1398,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
                 {/* 生徒の日誌・質問本文 */}
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-extrabold text-gray-500 block">📝 生徒からの提出・質問ノート:</span>
+                  <span className="text-[11px] font-extrabold text-gray-500 block">
+                    📝 生徒からの提出・質問ノート:
+                  </span>
                   <div className="text-sm text-gray-800 leading-relaxed bg-amber-50/40 p-5 rounded-2xl border border-amber-100 shadow-inner font-medium whitespace-pre-wrap">
                     {currentJournal.content}
                   </div>
@@ -1339,7 +1410,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         src={currentJournal.imageUrl}
                         alt="生徒添付写真"
                         className="w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition"
-                        onClick={() => window.open(currentJournal.imageUrl, "_blank")}
+                        onClick={() => window.open(currentJournal.imageUrl, '_blank')}
                       />
                       <div className="p-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-500 font-bold text-center">
                         📷 生徒の現場添付写真（クリックで拡大）
@@ -1377,7 +1448,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                       </p>
                       <div className="flex items-center justify-between pt-1 border-t border-emerald-100 text-[10px] text-gray-500">
                         <span>
-                          {currentJournal.is_approved ? "🌟 農園AIナレッジとして参照中" : "💡 未承認（通常返信）"}
+                          {currentJournal.is_approved
+                            ? '🌟 農園AIナレッジとして参照中'
+                            : '💡 未承認（通常返信）'}
                         </span>
                         <span className="font-semibold">✓ 返信完了</span>
                       </div>
@@ -1388,7 +1461,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                       <textarea
                         rows={3}
                         placeholder="回答や個別アドバイスを入力してください..."
-                        value={replyInput[currentJournal.id] || ""}
+                        value={replyInput[currentJournal.id] || ''}
                         onChange={(e) =>
                           setReplyInput({ ...replyInput, [currentJournal.id]: e.target.value })
                         }
@@ -1400,14 +1473,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         <label
                           className={`flex items-center space-x-2 text-xs font-bold px-3 py-1.5 rounded-xl border ${
                             currentJournal.is_private
-                              ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200"
-                              : "text-amber-900 bg-amber-50 border-amber-200 cursor-pointer"
+                              ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200'
+                              : 'text-amber-900 bg-amber-50 border-amber-200 cursor-pointer'
                           }`}
                         >
                           <input
                             type="checkbox"
                             disabled={currentJournal.is_private}
-                            checked={!currentJournal.is_private && (approveOnReply[currentJournal.id] || false)}
+                            checked={
+                              !currentJournal.is_private &&
+                              (approveOnReply[currentJournal.id] || false)
+                            }
                             onChange={(e) =>
                               setApproveOnReply({
                                 ...approveOnReply,
@@ -1418,8 +1494,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                           />
                           <span>
                             {currentJournal.is_private
-                              ? "🔒 完全個別相談（非公開）のためナレッジ登録不可"
-                              : "🌟 この回答を農園AIナレッジとしても登録（承認）する"}
+                              ? '🔒 完全個別相談（非公開）のためナレッジ登録不可'
+                              : '🌟 この回答を農園AIナレッジとしても登録（承認）する'}
                           </span>
                         </label>
 
@@ -1438,7 +1514,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                             onClick={() => handleSendReply(currentJournal.id)}
                             className="px-5 py-2.5 app-accent-btn font-bold text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer"
                           >
-                            {editingReplyId === currentJournal.id ? "回答を更新保存する" : "回答を送信する"}
+                            {editingReplyId === currentJournal.id
+                              ? '回答を更新保存する'
+                              : '回答を送信する'}
                           </button>
                         </div>
                       </div>
@@ -1470,38 +1548,38 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             >
               <span>⚙️ スライド設定</span>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">
-                {slideSettings.sortBy === "newest"
-                  ? "最新順"
-                  : slideSettings.sortBy === "studentName"
-                  ? "生徒順"
-                  : slideSettings.sortBy === "hasImage"
-                  ? "写真優先"
-                  : slideSettings.sortBy === "hasHarvest"
-                  ? "収穫優先"
-                  : slideSettings.sortBy === "isQuestion"
-                  ? "質問優先"
-                  : "古い順"}
-                {slideSettings.limitPerStudent > 0 ? ` (各生徒${slideSettings.limitPerStudent}件)` : " (全件)"}
+                {slideSettings.sortBy === 'newest'
+                  ? '最新順'
+                  : slideSettings.sortBy === 'studentName'
+                    ? '生徒順'
+                    : slideSettings.sortBy === 'hasImage'
+                      ? '写真優先'
+                      : slideSettings.sortBy === 'hasHarvest'
+                        ? '収穫優先'
+                        : slideSettings.sortBy === 'isQuestion'
+                          ? '質問優先'
+                          : '古い順'}
+                {slideSettings.limitPerStudent > 0
+                  ? ` (各生徒${slideSettings.limitPerStudent}件)`
+                  : ' (全件)'}
               </span>
             </button>
 
             <div className="hidden sm:flex items-center space-x-2 text-[11px] font-bold">
-              {activeSlideStatus === "reverse" && (
+              {activeSlideStatus === 'reverse' && (
                 <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
                   <span>◀◀</span>
                   <span>逆スライド中</span>
                 </span>
               )}
-              {activeSlideStatus === "paused" && (
+              {activeSlideStatus === 'paused' && (
                 <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
                   <span>⏸</span>
                   <span>一時停止中</span>
                 </span>
               )}
-              {activeSlideStatus === "forward" && (
-                <span className="text-gray-400 font-medium">
-                  💡 ホバーで停止 / 左端で逆再生
-                </span>
+              {activeSlideStatus === 'forward' && (
+                <span className="text-gray-400 font-medium">💡 ホバーで停止 / 左端で逆再生</span>
               )}
             </div>
           </div>
@@ -1525,8 +1603,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   const hasRealImage =
                     item.imageUrl &&
                     item.imageUrl.trim() &&
-                    item.imageUrl !== "undefined" &&
-                    !item.imageUrl.includes("undefined");
+                    item.imageUrl !== 'undefined' &&
+                    !item.imageUrl.includes('undefined');
 
                   return (
                     <div
@@ -1553,7 +1631,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                             alt="観察写真"
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = "none";
+                              (e.currentTarget as HTMLElement).style.display = 'none';
                             }}
                           />
                         </div>
@@ -1636,8 +1714,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   }}
                   className={`p-3 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
                     idx === currentPage
-                      ? "app-accent-light border-green-300 font-bold"
-                      : "bg-white hover:bg-gray-50 border-gray-200"
+                      ? 'app-accent-light border-green-300 font-bold'
+                      : 'bg-white hover:bg-gray-50 border-gray-200'
                   }`}
                 >
                   <div className="space-y-0.5 min-w-0 flex-1 mr-2">
@@ -1708,7 +1786,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               <div className="space-y-1.5">
                 <label className="font-bold text-gray-800 flex items-center justify-between">
                   <span>📌 公開用質問タイトル:</span>
-                  <span className="text-[10px] text-gray-400 font-normal">（一般化した短いタイトル）</span>
+                  <span className="text-[10px] text-gray-400 font-normal">
+                    （一般化した短いタイトル）
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -1721,7 +1801,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
               {/* 生徒の原文プレビュー (読み取り専用参照) */}
               <div className="space-y-1">
-                <span className="font-bold text-gray-500 text-[11px]">📝 生徒の質問原文 (参照):</span>
+                <span className="font-bold text-gray-500 text-[11px]">
+                  📝 生徒の質問原文 (参照):
+                </span>
                 <div className="p-2.5 bg-gray-100 rounded-xl text-gray-600 text-[11px] line-clamp-3">
                   {knowledgeModalTarget.journal.content}
                 </div>
@@ -1731,7 +1813,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               <div className="space-y-1.5">
                 <label className="font-bold text-gray-800 flex items-center justify-between">
                   <span>💬 公開用回答内容:</span>
-                  <span className="text-[10px] text-amber-800 font-semibold">✨ 個人名を自動で匿名化済み</span>
+                  <span className="text-[10px] text-amber-800 font-semibold">
+                    ✨ 個人名を自動で匿名化済み
+                  </span>
                 </label>
                 <textarea
                   rows={5}
@@ -1757,7 +1841,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 disabled={isSavingKnowledge || !publicTitle.trim() || !publicReply.trim()}
                 className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer flex items-center space-x-1.5"
               >
-                <span>{isSavingKnowledge ? "保存中..." : "★ ナレッジとして登録・承認"}</span>
+                <span>{isSavingKnowledge ? '保存中...' : '★ ナレッジとして登録・承認'}</span>
               </button>
             </div>
           </div>

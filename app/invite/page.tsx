@@ -1,30 +1,30 @@
-"use client";
+'use client';
 
-import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import type { Provider } from "@supabase/supabase-js";
-import Toast from "@/components/ui/Toast";
-import Link from "next/link";
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import type { Provider } from '@supabase/supabase-js';
+import Toast from '@/components/ui/Toast';
+import Link from 'next/link';
 
 function InviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const farmIdParam = searchParams.get("farm_id") || searchParams.get("code");
+  const farmIdParam = searchParams.get('farm_id') || searchParams.get('code');
 
   // 農園選択・情報
-  const [selectedFarmId, setSelectedFarmId] = useState<string>(farmIdParam || "");
-  const [farmName, setFarmName] = useState("たなか自然農園 (体験デモ)");
-  const [teacherName, setTeacherName] = useState("田中 太郎");
+  const [selectedFarmId, setSelectedFarmId] = useState<string>(farmIdParam || '');
+  const [farmName, setFarmName] = useState('たなか自然農園 (体験デモ)');
+  const [teacherName, setTeacherName] = useState('田中 太郎');
   const [isDemo, setIsDemo] = useState(!farmIdParam);
 
   // 入力フォームステート
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -35,17 +35,17 @@ function InviteContent() {
         if (farmIdParam) {
           // IDによる直検索
           let { data: farm, error: farmErr } = await supabase
-            .from("farms")
-            .select("id, name, owner_id, owner_name, invite_code")
-            .eq("id", farmIdParam)
+            .from('farms')
+            .select('id, name, owner_id, owner_name, invite_code')
+            .eq('id', farmIdParam)
             .single();
 
           if (farmErr || !farm) {
             // invite_code での検索を試行
             const { data: farmByCode, error: codeErr } = await supabase
-              .from("farms")
-              .select("id, name, owner_id, owner_name, invite_code")
-              .eq("invite_code", farmIdParam)
+              .from('farms')
+              .select('id, name, owner_id, owner_name, invite_code')
+              .eq('invite_code', farmIdParam)
               .single();
             if (!codeErr && farmByCode) {
               farm = farmByCode;
@@ -54,50 +54,50 @@ function InviteContent() {
           }
 
           if (!farmErr && farm) {
-            setFarmName(farm.name || "自然農園");
+            setFarmName(farm.name || '自然農園');
             setSelectedFarmId(farm.id);
             setIsDemo(false);
 
-            let teacherDisplayName = farm.owner_name || "";
+            let teacherDisplayName = farm.owner_name || '';
 
             // owner_id があれば users テーブルから表示名を取得
             if (!teacherDisplayName && farm.owner_id) {
               const { data: ownerUser } = await supabase
-                .from("users")
-                .select("display_name, email")
-                .eq("id", farm.owner_id)
+                .from('users')
+                .select('display_name, email')
+                .eq('id', farm.owner_id)
                 .single();
 
               if (ownerUser?.display_name) {
                 teacherDisplayName = ownerUser.display_name;
               } else if (ownerUser?.email) {
-                teacherDisplayName = ownerUser.email.split("@")[0];
+                teacherDisplayName = ownerUser.email.split('@')[0];
               }
             }
 
-            setTeacherName(teacherDisplayName || "講師");
+            setTeacherName(teacherDisplayName || '講師');
             return;
           }
         }
 
         // URLに農園ID指定がない、または該当なしの場合はデモ設定
-        setFarmName("たなか自然農園 (体験デモ)");
-        setTeacherName("田中 太郎");
+        setFarmName('たなか自然農園 (体験デモ)');
+        setTeacherName('田中 太郎');
         setIsDemo(true);
       } catch (err) {
-        console.error("fetchCurrentFarm error:", err);
+        console.error('fetchCurrentFarm error:', err);
       }
     };
 
     fetchCurrentFarm();
   }, [farmIdParam]);
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
 
   // 1. LINEで登録して参加
   const handleLineSignUp = async () => {
     if (isLineDisabled) {
-      setToastMessage("💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。");
+      setToastMessage('💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。');
       setShowToast(true);
       return;
     }
@@ -105,13 +105,13 @@ function InviteContent() {
     try {
       const origin = window.location.origin;
       if (selectedFarmId) {
-        localStorage.setItem("nouato_invite_farm_id", selectedFarmId);
+        localStorage.setItem('nouato_invite_farm_id', selectedFarmId);
         document.cookie = `nouato_invite_farm_id=${selectedFarmId}; path=/; max-age=3600`;
       }
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "custom:line" as unknown as Provider,
+        provider: 'custom:line' as unknown as Provider,
         options: {
-          scopes: "openid profile email",
+          scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student&farm_id=${encodeURIComponent(selectedFarmId)}`,
           queryParams: {
             farm_id: selectedFarmId,
@@ -120,13 +120,13 @@ function InviteContent() {
       });
 
       if (error) {
-        console.error("LINE signUp error:", error);
-        setToastMessage("💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。");
+        console.error('LINE signUp error:', error);
+        setToastMessage('💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。');
         setShowToast(true);
       }
     } catch (err: unknown) {
-      console.error("LINE signUp exception:", err);
-      setToastMessage("💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。");
+      console.error('LINE signUp exception:', err);
+      setToastMessage('💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。');
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -138,17 +138,17 @@ function InviteContent() {
     e.preventDefault();
 
     if (!name.trim()) {
-      setToastMessage("ユーザー名（お名前）を入力してください");
+      setToastMessage('ユーザー名（お名前）を入力してください');
       setShowToast(true);
       return;
     }
     if (!email.trim() || !password) {
-      setToastMessage("メールアドレスとパスワードを入力してください");
+      setToastMessage('メールアドレスとパスワードを入力してください');
       setShowToast(true);
       return;
     }
     if (password.length < 6) {
-      setToastMessage("パスワードは6文字以上で入力してください");
+      setToastMessage('パスワードは6文字以上で入力してください');
       setShowToast(true);
       return;
     }
@@ -156,7 +156,7 @@ function InviteContent() {
     setLoading(true);
 
     try {
-      const targetFarmId = selectedFarmId || farmIdParam || "";
+      const targetFarmId = selectedFarmId || farmIdParam || '';
 
       // 1. まずログインを試行
       const { data: signInData, error: loginError } = await supabase.auth.signInWithPassword({
@@ -174,8 +174,13 @@ function InviteContent() {
         });
 
         if (signUpError) {
-          if (signUpError.message.includes("already registered") || signUpError.message.includes("already exists")) {
-            setToastMessage("💡 このメールアドレスは既に登録されています。パスワードが正しいかご確認のうえログインいただくか、別のメールアドレスをご入力ください。");
+          if (
+            signUpError.message.includes('already registered') ||
+            signUpError.message.includes('already exists')
+          ) {
+            setToastMessage(
+              '💡 このメールアドレスは既に登録されています。パスワードが正しいかご確認のうえログインいただくか、別のメールアドレスをご入力ください。'
+            );
           } else {
             setToastMessage(`登録エラー: ${signUpError.message}`);
           }
@@ -190,31 +195,31 @@ function InviteContent() {
       if (userId) {
         // 表示名の更新
         if (name.trim()) {
-          await supabase.from("users").update({ display_name: name.trim() }).eq("id", userId);
+          await supabase.from('users').update({ display_name: name.trim() }).eq('id', userId);
         }
 
         // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を呼び出し)
-        if (targetFarmId && targetFarmId !== "tanaka_farm") {
-          const { error: joinErr } = await supabase.rpc("join_farm", { invite_code: targetFarmId });
+        if (targetFarmId && targetFarmId !== 'tanaka_farm') {
+          const { error: joinErr } = await supabase.rpc('join_farm', { invite_code: targetFarmId });
           if (joinErr) {
-            console.error("join_farm error:", joinErr);
+            console.error('join_farm error:', joinErr);
           }
         }
       }
 
       if (targetFarmId) {
-        localStorage.setItem("nouato_invite_farm_id", targetFarmId);
+        localStorage.setItem('nouato_invite_farm_id', targetFarmId);
       }
 
       setToastMessage(`🎉 「${farmName}」への参加登録が完了しました！`);
       setShowToast(true);
 
       setTimeout(() => {
-        router.push("/student");
+        router.push('/student');
       }, 900);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "";
-      setToastMessage("登録中にエラーが発生しました: " + message);
+      const message = err instanceof Error ? err.message : '';
+      setToastMessage('登録中にエラーが発生しました: ' + message);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -227,17 +232,22 @@ function InviteContent() {
 
       <div className="w-full max-w-[390px] bg-white rounded-3xl shadow-xl border border-gray-200/90 overflow-hidden animate-fade-in">
         {/* 動的農園招待バナー */}
-        <div className="relative h-48 w-full bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80')` }}>
+        <div
+          className="relative h-48 w-full bg-cover bg-center"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80')`,
+          }}
+        >
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent flex flex-col justify-end p-5 text-white">
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="bg-emerald-700/90 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                {isDemo ? "体験デモ農園" : "招待された農園"}
+                {isDemo ? '体験デモ農園' : '招待された農園'}
               </span>
             </div>
             <h2 className="text-xl font-black leading-snug drop-shadow-md">
               {farmName}へようこそ！
             </h2>
-            {teacherName && teacherName !== "講師" && teacherName !== "農園主" ? (
+            {teacherName && teacherName !== '講師' && teacherName !== '農園主' ? (
               <p className="text-[11px] text-gray-200 opacity-90 font-medium mt-0.5">
                 👨‍🌾 担当講師: {teacherName} 先生
               </p>
@@ -267,19 +277,27 @@ function InviteContent() {
               disabled={loading || isLineDisabled}
               className={`w-full py-3.5 font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm ${
                 isLineDisabled
-                  ? "bg-gray-300 text-gray-600 cursor-not-allowed opacity-80"
-                  : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-80'
+                  : 'bg-[#06C755] hover:bg-[#05b34c] text-white'
               }`}
             >
               <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
+                <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z" />
               </svg>
-              <span>{isLineDisabled ? "LINEで登録して参加 (準備中)" : loading ? "LINEへ接続中..." : "LINEで登録して参加"}</span>
+              <span>
+                {isLineDisabled
+                  ? 'LINEで登録して参加 (準備中)'
+                  : loading
+                    ? 'LINEへ接続中...'
+                    : 'LINEで登録して参加'}
+              </span>
             </button>
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-gray-200"></div>
-              <span className="flex-shrink mx-3 text-[10px] text-gray-400 font-bold">またはメールで登録</span>
+              <span className="flex-shrink mx-3 text-[10px] text-gray-400 font-bold">
+                またはメールで登録
+              </span>
               <div className="flex-grow border-t border-gray-200"></div>
             </div>
           </div>
@@ -287,9 +305,7 @@ function InviteContent() {
           {/* メールアドレスで登録フォーム */}
           <form onSubmit={handleEmailSignUp} className="space-y-3.5">
             <div>
-              <label className="block text-[11px] font-bold text-gray-600 mb-1">
-                ユーザー名
-              </label>
+              <label className="block text-[11px] font-bold text-gray-600 mb-1">ユーザー名</label>
               <input
                 type="text"
                 required
@@ -315,12 +331,10 @@ function InviteContent() {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-gray-600 mb-1">
-                パスワード
-              </label>
+              <label className="block text-[11px] font-bold text-gray-600 mb-1">パスワード</label>
               <div className="relative">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   required
                   minLength={6}
                   value={password}
@@ -332,9 +346,9 @@ function InviteContent() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 text-sm font-bold"
-                  title={showPassword ? "パスワードを非表示" : "パスワードを表示"}
+                  title={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
                 >
-                  {showPassword ? "🙈" : "👁️"}
+                  {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
             </div>
@@ -345,7 +359,7 @@ function InviteContent() {
               disabled={loading}
               className="w-full py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-bold rounded-full shadow-xs transition flex items-center justify-center space-x-1.5 text-xs mt-2"
             >
-              <span>{loading ? "登録中..." : "メールで登録 →"}</span>
+              <span>{loading ? '登録中...' : 'メールで登録 →'}</span>
             </button>
           </form>
 

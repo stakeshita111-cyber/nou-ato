@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
-import Toast from "@/components/ui/Toast";
+import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+import Toast from '@/components/ui/Toast';
 
 interface StudentOption {
   id: string;
@@ -30,15 +30,13 @@ export default function IndividualTaskAssignModal({
 }: IndividualTaskAssignModalProps) {
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [tasks, setTasks] = useState<TaskOption[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    targetStudent?.id || ""
-  );
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(targetStudent?.id || '');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCrop, setSelectedCrop] = useState("all");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCrop, setSelectedCrop] = useState('all');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
@@ -47,15 +45,15 @@ export default function IndividualTaskAssignModal({
       try {
         // 1. 生徒一覧の取得
         const { data: usersData } = await supabase
-          .from("users")
-          .select("id, display_name")
-          .eq("role", "student");
+          .from('users')
+          .select('id, display_name')
+          .eq('role', 'student');
 
         if (usersData && usersData.length > 0) {
           setStudents(
             usersData.map((u: any) => ({
               id: u.id,
-              name: u.display_name || "受講生",
+              name: u.display_name || '受講生',
             }))
           );
           if (!selectedStudentId) {
@@ -65,18 +63,18 @@ export default function IndividualTaskAssignModal({
 
         // 2. 公開中のタスク一覧の取得 (status = 'todo', deleted_at is null, is_template != true)
         const { data: tasksData } = await supabase
-          .from("tasks")
-          .select("id, title, target_crop, exp, description")
-          .eq("status", "todo")
-          .is("deleted_at", null)
-          .or("is_template.eq.false,is_template.is.null")
-          .order("created_at", { ascending: false });
+          .from('tasks')
+          .select('id, title, target_crop, exp, description')
+          .eq('status', 'todo')
+          .is('deleted_at', null)
+          .or('is_template.eq.false,is_template.is.null')
+          .order('created_at', { ascending: false });
 
         if (tasksData) {
           setTasks(tasksData);
         }
       } catch (err) {
-        console.error("Failed to load task assign options:", err);
+        console.error('Failed to load task assign options:', err);
       } finally {
         setFetching(false);
       }
@@ -93,14 +91,14 @@ export default function IndividualTaskAssignModal({
         cropSet.add(t.target_crop.trim());
       }
     });
-    return ["all", ...Array.from(cropSet)];
+    return ['all', ...Array.from(cropSet)];
   }, [tasks]);
 
   // フィルタリングされたタスク一覧
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       // 1. 作物絞り込み
-      if (selectedCrop !== "all" && task.target_crop !== selectedCrop) {
+      if (selectedCrop !== 'all' && task.target_crop !== selectedCrop) {
         return false;
       }
       // 2. キーワード部分一致（title, target_crop, description）
@@ -118,8 +116,7 @@ export default function IndividualTaskAssignModal({
   }, [tasks, selectedCrop, searchQuery]);
 
   const isAllFilteredSelected =
-    filteredTasks.length > 0 &&
-    filteredTasks.every((t) => selectedTaskIds.includes(t.id));
+    filteredTasks.length > 0 && filteredTasks.every((t) => selectedTaskIds.includes(t.id));
 
   const toggleSelectAllFiltered = () => {
     if (isAllFilteredSelected) {
@@ -133,21 +130,19 @@ export default function IndividualTaskAssignModal({
 
   const toggleTaskSelect = (taskId: string) => {
     setSelectedTaskIds((prev) =>
-      prev.includes(taskId)
-        ? prev.filter((id) => id !== taskId)
-        : [...prev, taskId]
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
     );
   };
 
   const handleAssign = async () => {
     if (!selectedStudentId) {
-      setToastMessage("割り当てる対象の受講生を選択してください");
+      setToastMessage('割り当てる対象の受講生を選択してください');
       setShowToast(true);
       return;
     }
 
     if (selectedTaskIds.length === 0) {
-      setToastMessage("割り当てるタスクを1つ以上選択してください");
+      setToastMessage('割り当てるタスクを1つ以上選択してください');
       setShowToast(true);
       return;
     }
@@ -162,18 +157,19 @@ export default function IndividualTaskAssignModal({
         target_crop: task.target_crop || null,
         description: task.description || null,
         exp: task.exp || 50,
-        status: "not_started",
+        status: 'not_started',
       }));
 
-      const { error } = await supabase.from("student_tasks").upsert(inserts);
+      const { error } = await supabase.from('student_tasks').upsert(inserts);
 
       if (error) {
         setToastMessage(`割り当てエラー: ${error.message}`);
         setShowToast(true);
       } else {
-        const studentName =
-          students.find((s) => s.id === selectedStudentId)?.name || "受講生";
-        setToastMessage(`🎉 ${studentName} さんに ${selectedTaskIds.length} 件のタスクを個別割り当てしました！`);
+        const studentName = students.find((s) => s.id === selectedStudentId)?.name || '受講生';
+        setToastMessage(
+          `🎉 ${studentName} さんに ${selectedTaskIds.length} 件のタスクを個別割り当てしました！`
+        );
         setShowToast(true);
 
         if (onAssigned) onAssigned();
@@ -182,7 +178,7 @@ export default function IndividualTaskAssignModal({
         }, 1200);
       }
     } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ""}`);
+      setToastMessage(`エラーが発生しました: ${err.message || ''}`);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -223,7 +219,9 @@ export default function IndividualTaskAssignModal({
             {targetStudent ? (
               <div className="bg-emerald-100/60 border border-emerald-300 text-emerald-900 px-4 py-2.5 rounded-xl font-black text-sm flex items-center justify-between">
                 <span>{targetStudent.name}</span>
-                <span className="text-xs bg-emerald-800 text-white px-2 py-0.5 rounded-full font-bold">選択中</span>
+                <span className="text-xs bg-emerald-800 text-white px-2 py-0.5 rounded-full font-bold">
+                  選択中
+                </span>
               </div>
             ) : (
               <select
@@ -252,7 +250,7 @@ export default function IndividualTaskAssignModal({
                   onClick={toggleSelectAllFiltered}
                   className="text-xs text-emerald-700 font-bold hover:underline"
                 >
-                  {isAllFilteredSelected ? "表示中を全解除" : "表示中をすべて選択"}
+                  {isAllFilteredSelected ? '表示中を全解除' : '表示中をすべて選択'}
                 </button>
               )}
             </div>
@@ -271,7 +269,7 @@ export default function IndividualTaskAssignModal({
                   {searchQuery && (
                     <button
                       type="button"
-                      onClick={() => setSearchQuery("")}
+                      onClick={() => setSearchQuery('')}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
                     >
                       ✕
@@ -288,11 +286,11 @@ export default function IndividualTaskAssignModal({
                         onClick={() => setSelectedCrop(crop)}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
                           selectedCrop === crop
-                            ? "bg-emerald-700 text-white shadow-xs"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? 'bg-emerald-700 text-white shadow-xs'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        {crop === "all" ? "すべて" : crop}
+                        {crop === 'all' ? 'すべて' : crop}
                       </button>
                     ))}
                   </div>
@@ -301,7 +299,9 @@ export default function IndividualTaskAssignModal({
             )}
 
             {fetching ? (
-              <div className="py-8 text-center text-xs text-gray-400 font-bold">タスクを読み込み中...</div>
+              <div className="py-8 text-center text-xs text-gray-400 font-bold">
+                タスクを読み込み中...
+              </div>
             ) : tasks.length === 0 ? (
               <div className="p-6 bg-gray-50 border rounded-2xl text-center text-xs text-gray-500 font-bold">
                 割り当て可能な公開中タスクがありません。看板ボードよりタスクを「配信中」に移動してください。
@@ -320,8 +320,8 @@ export default function IndividualTaskAssignModal({
                       onClick={() => toggleTaskSelect(task.id)}
                       className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-start space-x-3 ${
                         isChecked
-                          ? "bg-emerald-50/80 border-emerald-500 shadow-xs"
-                          : "bg-gray-50/70 border-gray-200 hover:bg-gray-100"
+                          ? 'bg-emerald-50/80 border-emerald-500 shadow-xs'
+                          : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100'
                       }`}
                     >
                       <input
@@ -332,9 +332,7 @@ export default function IndividualTaskAssignModal({
                       />
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-xs text-gray-900">
-                            {task.title}
-                          </h4>
+                          <h4 className="font-bold text-xs text-gray-900">{task.title}</h4>
                           {task.target_crop && (
                             <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
                               {task.target_crop}
@@ -370,7 +368,7 @@ export default function IndividualTaskAssignModal({
             disabled={loading || selectedTaskIds.length === 0}
             className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition"
           >
-            {loading ? "割り当て処理中..." : "選択した生徒に割り当てる"}
+            {loading ? '割り当て処理中...' : '選択した生徒に割り当てる'}
           </button>
         </div>
       </div>

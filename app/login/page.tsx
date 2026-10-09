@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import type { Provider } from "@supabase/supabase-js";
-import Toast from "@/components/ui/Toast";
-import Link from "next/link";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import type { Provider } from '@supabase/supabase-js';
+import Toast from '@/components/ui/Toast';
+import Link from 'next/link';
 
 export default function UnifiedLoginPage() {
   const router = useRouter();
 
   // フォームステート
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // トーストステート
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
   // メールアドレス ＋ パスワード ログイン (自動ロール判定付き)
@@ -25,7 +25,7 @@ export default function UnifiedLoginPage() {
     e.preventDefault();
 
     if (!email.trim() || !password) {
-      setToastMessage("メールアドレスとパスワードを入力してください");
+      setToastMessage('メールアドレスとパスワードを入力してください');
       setShowToast(true);
       return;
     }
@@ -49,23 +49,23 @@ export default function UnifiedLoginPage() {
       const userId = authData?.user?.id;
 
       // 2. 自動ロール判定 (users テーブルの role 参照)
-      let destination = "/student";
+      let destination = '/student';
       if (userId) {
         const { data: userData } = await supabase
-          .from("users")
-          .select("role, display_name")
-          .eq("id", userId)
+          .from('users')
+          .select('role, display_name')
+          .eq('id', userId)
           .maybeSingle();
 
-        if (userData?.role === "teacher") {
-          destination = "/teacher/dashboard";
-          setToastMessage(`🎉 講師「${userData.display_name || "先生"}」としてログインしました！`);
+        if (userData?.role === 'teacher') {
+          destination = '/teacher/dashboard';
+          setToastMessage(`🎉 講師「${userData.display_name || '先生'}」としてログインしました！`);
         } else {
-          destination = "/student";
-          setToastMessage(`🎉 受講生「${userData?.display_name || "様"}」としてログインしました！`);
+          destination = '/student';
+          setToastMessage(`🎉 受講生「${userData?.display_name || '様'}」としてログインしました！`);
         }
       } else {
-        setToastMessage("🎉 ログインしました！");
+        setToastMessage('🎉 ログインしました！');
       }
 
       setShowToast(true);
@@ -74,7 +74,7 @@ export default function UnifiedLoginPage() {
         window.location.href = destination;
       }, 800);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "";
+      const message = err instanceof Error ? err.message : '';
       setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
@@ -82,12 +82,14 @@ export default function UnifiedLoginPage() {
     }
   };
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === "false";
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
 
   // LINE サインイン処理
   const handleLineLogin = async () => {
     if (isLineDisabled) {
-      setToastMessage("💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。");
+      setToastMessage(
+        '💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。'
+      );
       setShowToast(true);
       return;
     }
@@ -95,21 +97,25 @@ export default function UnifiedLoginPage() {
     try {
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "custom:line" as unknown as Provider,
+        provider: 'custom:line' as unknown as Provider,
         options: {
-          scopes: "openid profile email",
+          scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback`,
         },
       });
 
       if (error) {
-        console.error("LINE login error:", error);
-        setToastMessage("💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。");
+        console.error('LINE login error:', error);
+        setToastMessage(
+          '💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。'
+        );
         setShowToast(true);
       }
     } catch (err: unknown) {
-      console.error("LINE login exception:", err);
-      setToastMessage("💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。");
+      console.error('LINE login exception:', err);
+      setToastMessage(
+        '💡 LINEログイン機能は現在準備中です。メールアドレスでログインしてください。'
+      );
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -135,18 +141,25 @@ export default function UnifiedLoginPage() {
             disabled={loading || isLineDisabled}
             className={`w-full py-3.5 font-bold rounded-2xl shadow-sm transition transform active:scale-[0.99] flex items-center justify-center space-x-2 text-sm ${
               isLineDisabled
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed opacity-80"
-                : "bg-[#06C755] hover:bg-[#05b34c] text-white"
+                ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-80'
+                : 'bg-[#06C755] hover:bg-[#05b34c] text-white'
             }`}
           >
             <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z"/>
+              <path d="M12 2C6.48 2 2 5.82 2 10.53c0 4.23 3.6 7.78 8.47 8.41.33.07.78.22.89.5.1.26.07.67.03.94-.06.4-.28 1.57-.31 1.91-.05.57.26.56.55.37.29-.19 4.67-2.75 6.37-4.71C20.61 15.65 22 13.27 22 10.53 22 5.82 17.52 2 12 2z" />
             </svg>
-            <span>{isLineDisabled ? "LINEでサインイン (準備中)" : loading ? "LINEへ接続中..." : "LINEでサインイン"}</span>
+            <span>
+              {isLineDisabled
+                ? 'LINEでサインイン (準備中)'
+                : loading
+                  ? 'LINEへ接続中...'
+                  : 'LINEでサインイン'}
+            </span>
           </button>
 
           <p className="text-[10px] text-gray-400 text-center leading-tight">
-            💡 LINEの仕様上、QRコード読み取り後に再度「ログイン」の確認画面が表示される場合があります。
+            💡
+            LINEの仕様上、QRコード読み取り後に再度「ログイン」の確認画面が表示される場合があります。
           </p>
 
           <div className="relative flex py-1 items-center">
@@ -170,8 +183,8 @@ export default function UnifiedLoginPage() {
             <button
               type="button"
               onClick={() => {
-                setEmail("test01@example.com");
-                setPassword("test01");
+                setEmail('test01@example.com');
+                setPassword('test01');
               }}
               className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group"
             >
@@ -183,8 +196,8 @@ export default function UnifiedLoginPage() {
             <button
               type="button"
               onClick={() => {
-                setEmail("test11@example.com");
-                setPassword("test11");
+                setEmail('test11@example.com');
+                setPassword('test11');
               }}
               className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group"
             >
@@ -199,9 +212,7 @@ export default function UnifiedLoginPage() {
         {/* 2. メールアドレス & パスワード フォーム */}
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1">
-              メールアドレス
-            </label>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">メールアドレス</label>
             <input
               type="email"
               required
@@ -213,12 +224,10 @@ export default function UnifiedLoginPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1">
-              パスワード
-            </label>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1">パスワード</label>
             <div className="relative">
               <input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -229,9 +238,9 @@ export default function UnifiedLoginPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 text-sm font-bold"
-                title={showPassword ? "パスワードを非表示" : "パスワードを表示"}
+                title={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
               >
-                {showPassword ? "🙈" : "👁️"}
+                {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
           </div>
@@ -241,7 +250,7 @@ export default function UnifiedLoginPage() {
             disabled={loading}
             className="w-full py-3.5 bg-[#16471a] hover:bg-[#123915] text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center space-x-2 text-sm mt-2"
           >
-            <span>{loading ? "ログイン処理中..." : "ログインする"}</span>
+            <span>{loading ? 'ログイン処理中...' : 'ログインする'}</span>
           </button>
         </form>
 
@@ -261,7 +270,10 @@ export default function UnifiedLoginPage() {
             </div>
             <div>
               <span className="text-gray-400 text-[11px]">農園運営者・講師の方: </span>
-              <Link href="/auth/signup/teacher" className="text-emerald-700 font-bold hover:underline">
+              <Link
+                href="/auth/signup/teacher"
+                className="text-emerald-700 font-bold hover:underline"
+              >
                 農園の新規開設・講師登録はこちら
               </Link>
             </div>

@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { FarmPlot, FarmBed, CropRecord, Farm, BedStatus } from "@/types/farm";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { FarmPlot, FarmBed, CropRecord, Farm, BedStatus } from '@/types/farm';
+import { supabase } from '@/lib/supabase';
 import {
   calculatePlotHeight,
   checkBoundingBoxOverlap,
@@ -13,7 +13,7 @@ import {
   CardBoundingBox,
   PlotUpsertPayload,
   BedUpsertPayload,
-} from "@/lib/farm/farmCalculations";
+} from '@/lib/farm/farmCalculations';
 import {
   StudentProfile,
   fetchFarmsDb,
@@ -29,7 +29,7 @@ import {
   updateCropRecordDb,
   deleteCropRecordDb,
   addFarmDb,
-} from "@/lib/farm/farmDb";
+} from '@/lib/farm/farmDb';
 
 export {
   calculatePlotHeight,
@@ -43,14 +43,14 @@ export {
 export type { CardBoundingBox, PlotUpsertPayload, BedUpsertPayload, StudentProfile };
 
 export const INITIAL_FARMS_LIST: Farm[] = [
-  { id: "farm_1", name: "第1農場 (メイン区画エリア)" },
-  { id: "farm_2", name: "第2農場 (体験・拡張エリア)" },
-  { id: "farm_3", name: "第3農場 (温室ハウスエリア)" },
+  { id: 'farm_1', name: '第1農場 (メイン区画エリア)' },
+  { id: 'farm_2', name: '第2農場 (体験・拡張エリア)' },
+  { id: 'farm_3', name: '第3農場 (温室ハウスエリア)' },
 ];
 
 export function useFarmManager() {
   const [farms, setFarms] = useState<Farm[]>(INITIAL_FARMS_LIST);
-  const [activeFarmId, setActiveFarmId] = useState<string>("farm_1");
+  const [activeFarmId, setActiveFarmId] = useState<string>('farm_1');
   const [plots, setPlots] = useState<FarmPlot[]>([]);
   const [records, setRecords] = useState<CropRecord[]>([]);
   const [supabaseStudents, setSupabaseStudents] = useState<StudentProfile[]>([]);
@@ -99,7 +99,11 @@ export function useFarmManager() {
       const currentUserId = authData?.user?.id;
 
       // 1. 農場一覧の取得 (DBを唯一の正とする)
-      const { farms: dbFarms, teacherFarmId, teacherDisplayName } = await fetchFarmsDb(currentUserId);
+      const {
+        farms: dbFarms,
+        teacherFarmId,
+        teacherDisplayName,
+      } = await fetchFarmsDb(currentUserId);
       let currentFarms = dbFarms;
       if (currentFarms.length === 0 && !currentUserId) {
         currentFarms = INITIAL_FARMS_LIST;
@@ -107,8 +111,8 @@ export function useFarmManager() {
       setFarms(currentFarms);
 
       let targetFarm: Farm | undefined;
-      if (typeof window !== "undefined") {
-        const savedFarmId = localStorage.getItem("nouato_active_farm_id");
+      if (typeof window !== 'undefined') {
+        const savedFarmId = localStorage.getItem('nouato_active_farm_id');
         if (savedFarmId) {
           targetFarm = currentFarms.find((f: any) => f.id === savedFarmId);
         }
@@ -120,17 +124,21 @@ export function useFarmManager() {
         targetFarm = currentFarms.find((f: any) => f.owner_id === currentUserId);
       }
 
-      const effectiveActiveId = targetFarm ? targetFarm.id : (currentFarms[0]?.id || "farm_1");
+      const effectiveActiveId = targetFarm ? targetFarm.id : currentFarms[0]?.id || 'farm_1';
       setActiveFarmId(effectiveActiveId);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("nouato_active_farm_id", effectiveActiveId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nouato_active_farm_id', effectiveActiveId);
         if (targetFarm?.name) {
-          localStorage.setItem("nouato_current_farm_name", targetFarm.name);
+          localStorage.setItem('nouato_current_farm_name', targetFarm.name);
         }
       }
 
       // 2. 生徒ユーザー一覧 (DBを唯一の正とする)
-      const { students, studentMap } = await fetchStudentsDb(effectiveActiveId, currentUserId, teacherDisplayName || undefined);
+      const { students, studentMap } = await fetchStudentsDb(
+        effectiveActiveId,
+        currentUserId,
+        teacherDisplayName || undefined
+      );
       setSupabaseStudents(students);
 
       // 3. 観察記録 (crop_records DB)
@@ -145,7 +153,7 @@ export function useFarmManager() {
         const seenStudentIds = new Set<string>();
         loadedBasePlots = dbPlots.map((dp: any) => {
           let sId = dp.student_id ? dp.student_id : undefined;
-          let sName = dp.student_name ? dp.student_name : (sId ? studentMap.get(sId) : undefined);
+          let sName = dp.student_name ? dp.student_name : sId ? studentMap.get(sId) : undefined;
 
           if (!sId && sName) {
             for (const [id, name] of studentMap.entries()) {
@@ -164,12 +172,13 @@ export function useFarmManager() {
           }
 
           let isVac = false;
-          if (dp.description === "vacant") {
+          if (dp.description === 'vacant') {
             isVac = true;
           } else if (dp.description) {
             try {
-              const meta = typeof dp.description === "string" ? JSON.parse(dp.description) : dp.description;
-              if (typeof meta?.is_vacant === "boolean") {
+              const meta =
+                typeof dp.description === 'string' ? JSON.parse(dp.description) : dp.description;
+              if (typeof meta?.is_vacant === 'boolean') {
                 isVac = meta.is_vacant;
               }
             } catch (e) {}
@@ -203,9 +212,13 @@ export function useFarmManager() {
         for (const dp of dbPlots) {
           if (dp.description) {
             try {
-              const meta = typeof dp.description === "string" ? JSON.parse(dp.description) : dp.description;
+              const meta =
+                typeof dp.description === 'string' ? JSON.parse(dp.description) : dp.description;
               if (meta?.grid_dimensions?.cols && meta?.grid_dimensions?.rows) {
-                if (!meta.grid_dimensions.farm_id || meta.grid_dimensions.farm_id === effectiveActiveId) {
+                if (
+                  !meta.grid_dimensions.farm_id ||
+                  meta.grid_dimensions.farm_id === effectiveActiveId
+                ) {
                   detectedCols = Number(meta.grid_dimensions.cols);
                   detectedRows = Number(meta.grid_dimensions.rows);
                   if (meta.grid_dimensions.unassigned_beds) {
@@ -215,14 +228,14 @@ export function useFarmManager() {
                 }
 
                 const farmMeta = meta.farm_meta || meta;
-                if (farmMeta.address && typeof window !== "undefined") {
-                  localStorage.setItem("nouato_farm_address", farmMeta.address);
+                if (farmMeta.address && typeof window !== 'undefined') {
+                  localStorage.setItem('nouato_farm_address', farmMeta.address);
                 }
                 const wLoc = farmMeta.weather_location || meta.weather_location;
-                if (wLoc?.name && wLoc?.lat && wLoc?.lon && typeof window !== "undefined") {
-                  localStorage.setItem("nouato_weather_city_name", wLoc.name);
-                  localStorage.setItem("nouato_weather_lat", String(wLoc.lat));
-                  localStorage.setItem("nouato_weather_lon", String(wLoc.lon));
+                if (wLoc?.name && wLoc?.lat && wLoc?.lon && typeof window !== 'undefined') {
+                  localStorage.setItem('nouato_weather_city_name', wLoc.name);
+                  localStorage.setItem('nouato_weather_lat', String(wLoc.lat));
+                  localStorage.setItem('nouato_weather_lon', String(wLoc.lon));
                 }
 
                 if (hasExplicitSavedDims) break;
@@ -251,14 +264,20 @@ export function useFarmManager() {
       gridRowsRef.current = detectedRows;
       unassignedBedsRef.current = detectedDefaultBeds;
 
-      const finalFixedPlots = buildFixedPlots(effectiveActiveId, loadedBasePlots, detectedCols, detectedRows, detectedDefaultBeds);
+      const finalFixedPlots = buildFixedPlots(
+        effectiveActiveId,
+        loadedBasePlots,
+        detectedCols,
+        detectedRows,
+        detectedDefaultBeds
+      );
 
       // journals からの未承認の収穫完了報告マップ
       const pendingApprovalMap = await fetchPendingJournalsDb();
 
       // 各区画に対して決定論的固定ベッドスロットを構築
       const plotsWithRecords = finalFixedPlots.map((plot) => {
-        const plotCode = plot.code || "C3";
+        const plotCode = plot.code || 'C3';
         const isPlotAssigned = !plot.is_vacant && (!!plot.student_id || !!plot.student_name);
 
         const plotArchivedBeds: FarmBed[] = [];
@@ -269,15 +288,15 @@ export function useFarmManager() {
           const isBelong = b.plot_id === plot.id || b.id?.startsWith(`plot_cell_${plotCode}_bed_`);
           if (!isBelong) return;
 
-          const isArchived = b.status === "archived" || b.id?.startsWith("archived_");
+          const isArchived = b.status === 'archived' || b.id?.startsWith('archived_');
           if (isArchived) {
             plotArchivedBeds.push({
               id: b.id,
               plot_id: plot.id,
               bed_number: parseInt(b.bed_number) || 1,
-              crop_name: b.crop_name || "過去の作物",
-              status: "archived",
-              season: b.season || "2026年 春夏",
+              crop_name: b.crop_name || '過去の作物',
+              status: 'archived',
+              season: b.season || '2026年 春夏',
               harvested_at: b.harvested_at,
               completion_notes: b.completion_notes,
               total_harvest: b.total_harvest,
@@ -293,7 +312,9 @@ export function useFarmManager() {
 
         rawActiveBeds.sort((a, b) => (parseInt(a.bed_number) || 0) - (parseInt(b.bed_number) || 0));
 
-        const defaultSlotCount = plot.beds?.length ? plot.beds.filter((b) => b.status !== "archived").length : detectedDefaultBeds;
+        const defaultSlotCount = plot.beds?.length
+          ? plot.beds.filter((b) => b.status !== 'archived').length
+          : detectedDefaultBeds;
         const activeCount = rawActiveBeds.length > 0 ? rawActiveBeds.length : defaultSlotCount;
         const bedList: FarmBed[] = [];
 
@@ -302,26 +323,46 @@ export function useFarmManager() {
           const bedId = dbB?.id || `plot_cell_${plotCode}_bed_${bedNum}`;
           const pendingData = pendingApprovalMap.get(`${plotCode}_${bedNum}`);
 
-          let status: BedStatus = "active";
-          if (dbB?.status === "completed_pending" || dbB?.status === "rejected") {
+          let status: BedStatus = 'active';
+          if (dbB?.status === 'completed_pending' || dbB?.status === 'rejected') {
             status = dbB.status;
           }
           if (pendingData) {
-            status = "completed_pending";
+            status = 'completed_pending';
           }
 
-          const total_harvest = pendingData?.total_harvest || ((status === "completed_pending" || status === "rejected") ? dbB?.total_harvest : undefined);
-          const completion_notes = pendingData?.completion_notes || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_notes : undefined);
-          const completion_image_url = pendingData?.completion_image_url || ((status === "completed_pending" || status === "rejected") ? dbB?.completion_image_url : undefined);
-          const season = dbB?.season || "2026年 秋冬";
+          const total_harvest =
+            pendingData?.total_harvest ||
+            (status === 'completed_pending' || status === 'rejected'
+              ? dbB?.total_harvest
+              : undefined);
+          const completion_notes =
+            pendingData?.completion_notes ||
+            (status === 'completed_pending' || status === 'rejected'
+              ? dbB?.completion_notes
+              : undefined);
+          const completion_image_url =
+            pendingData?.completion_image_url ||
+            (status === 'completed_pending' || status === 'rejected'
+              ? dbB?.completion_image_url
+              : undefined);
+          const season = dbB?.season || '2026年 秋冬';
 
           let latest: CropRecord | undefined = undefined;
           let extractedCrop: string | undefined = undefined;
 
           if (isPlotAssigned) {
             const bedAllRecs = formattedRecords
-              .filter((r) => (r.bed_id === bedId || (dbB?.id && r.bed_id === dbB.id)) && !r.bed_id?.startsWith("archived_"))
-              .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+              .filter(
+                (r) =>
+                  (r.bed_id === bedId || (dbB?.id && r.bed_id === dbB.id)) &&
+                  !r.bed_id?.startsWith('archived_')
+              )
+              .sort(
+                (a, b) =>
+                  new Date(b.created_at || b.date).getTime() -
+                  new Date(a.created_at || a.date).getTime()
+              );
 
             if (bedAllRecs.length > 0) {
               latest = bedAllRecs[0];
@@ -330,7 +371,12 @@ export function useFarmManager() {
                 if (tagMatch && tagMatch[1]?.trim()) {
                   extractedCrop = tagMatch[1].trim();
                   break;
-                } else if ((rec as any).crop_name && (rec as any).crop_name !== "トマト" && (rec as any).crop_name !== "未定 🌱" && (rec as any).crop_name !== "未確定 🌱") {
+                } else if (
+                  (rec as any).crop_name &&
+                  (rec as any).crop_name !== 'トマト' &&
+                  (rec as any).crop_name !== '未定 🌱' &&
+                  (rec as any).crop_name !== '未確定 🌱'
+                ) {
                   extractedCrop = (rec as any).crop_name;
                   break;
                 }
@@ -338,9 +384,13 @@ export function useFarmManager() {
             }
           }
 
-          let finalCropName = extractedCrop || dbB?.crop_name || "未確定 🌱";
-          if (finalCropName === "トマト" && !extractedCrop && (!dbB?.crop_name || dbB.crop_name === "トマト")) {
-            finalCropName = "未確定 🌱";
+          let finalCropName = extractedCrop || dbB?.crop_name || '未確定 🌱';
+          if (
+            finalCropName === 'トマト' &&
+            !extractedCrop &&
+            (!dbB?.crop_name || dbB.crop_name === 'トマト')
+          ) {
+            finalCropName = '未確定 🌱';
           }
 
           bedList.push({
@@ -368,31 +418,35 @@ export function useFarmManager() {
         };
       });
 
-      const isRecentlySaved = isSavingRef.current || (Date.now() - lastSaveTimeRef.current < 2500);
+      const isRecentlySaved = isSavingRef.current || Date.now() - lastSaveTimeRef.current < 2500;
       if (!isRecentlySaved || plotsRef.current.length === 0) {
         setPlots(plotsWithRecords);
         plotsRef.current = plotsWithRecords;
 
         // 保存状態スナップショットを初期化
-        let farmAddress = "";
+        let farmAddress = '';
         let weatherLocation: any = null;
-        if (typeof window !== "undefined") {
-          farmAddress = localStorage.getItem("nouato_farm_address") || "";
-          const wName = localStorage.getItem("nouato_weather_city_name");
-          const wLat = localStorage.getItem("nouato_weather_lat");
-          const wLon = localStorage.getItem("nouato_weather_lon");
+        if (typeof window !== 'undefined') {
+          farmAddress = localStorage.getItem('nouato_farm_address') || '';
+          const wName = localStorage.getItem('nouato_weather_city_name');
+          const wLat = localStorage.getItem('nouato_weather_lat');
+          const wLon = localStorage.getItem('nouato_weather_lon');
           if (wName && wLat && wLon) {
             weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
           }
         }
         const farmMeta = { address: farmAddress, weatherLocation };
-        const dims = { cols: detectedCols, rows: detectedRows, unassigned_beds: detectedDefaultBeds };
+        const dims = {
+          cols: detectedCols,
+          rows: detectedRows,
+          unassigned_beds: detectedDefaultBeds,
+        };
 
         const newPlotMap = new Map<string, string>();
         const newBedMap = new Map<string, string>();
 
         for (const plot of plotsWithRecords) {
-          if (!plot || plot.id.startsWith("plot_placeholder_")) continue;
+          if (!plot || plot.id.startsWith('plot_placeholder_')) continue;
           const pPayload = buildPlotUpsertPayload(plot, effectiveActiveId, dims, farmMeta);
           newPlotMap.set(pPayload.id, JSON.stringify(pPayload));
 
@@ -406,7 +460,7 @@ export function useFarmManager() {
         lastSavedBedsMapRef.current = newBedMap;
       }
     } catch (e) {
-      console.error("reloadAllFromSupabase error:", e);
+      console.error('reloadAllFromSupabase error:', e);
     } finally {
       setIsLoading(false);
     }
@@ -424,20 +478,21 @@ export function useFarmManager() {
 
     const currentCols = explicitDims?.cols ?? gridColsRef.current ?? gridCols ?? 6;
     const currentRows = explicitDims?.rows ?? gridRowsRef.current ?? gridRows ?? 8;
-    const currentBeds = explicitDims?.unassigned_beds ?? unassignedBedsRef.current ?? unassignedBedsCount ?? 7;
+    const currentBeds =
+      explicitDims?.unassigned_beds ?? unassignedBedsRef.current ?? unassignedBedsCount ?? 7;
 
     gridColsRef.current = currentCols;
     gridRowsRef.current = currentRows;
     unassignedBedsRef.current = currentBeds;
 
     try {
-      let farmAddress = "";
+      let farmAddress = '';
       let weatherLocation: any = null;
-      if (typeof window !== "undefined") {
-        farmAddress = localStorage.getItem("nouato_farm_address") || "";
-        const wName = localStorage.getItem("nouato_weather_city_name");
-        const wLat = localStorage.getItem("nouato_weather_lat");
-        const wLon = localStorage.getItem("nouato_weather_lon");
+      if (typeof window !== 'undefined') {
+        farmAddress = localStorage.getItem('nouato_farm_address') || '';
+        const wName = localStorage.getItem('nouato_weather_city_name');
+        const wLat = localStorage.getItem('nouato_weather_lat');
+        const wLon = localStorage.getItem('nouato_weather_lon');
         if (wName && wLat && wLon) {
           weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
         }
@@ -454,7 +509,7 @@ export function useFarmManager() {
         lastSavedBedsMapRef.current
       );
     } catch (err) {
-      console.warn("savePlotsGridIndicesToSupabase info:", err);
+      console.warn('savePlotsGridIndicesToSupabase info:', err);
     } finally {
       isSavingRef.current = false;
     }
@@ -465,7 +520,7 @@ export function useFarmManager() {
   const notifyBroadcast = useCallback(() => {
     if (broadcastRef.current) {
       try {
-        broadcastRef.current.postMessage({ type: "FARM_DATA_UPDATED", timestamp: Date.now() });
+        broadcastRef.current.postMessage({ type: 'FARM_DATA_UPDATED', timestamp: Date.now() });
       } catch (e) {
         console.error(e);
       }
@@ -475,8 +530,8 @@ export function useFarmManager() {
   useEffect(() => {
     reloadAllFromSupabase();
 
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      const channel = new BroadcastChannel("nouato_farm_sync_channel");
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      const channel = new BroadcastChannel('nouato_farm_sync_channel');
       broadcastRef.current = channel;
       channel.onmessage = () => {
         setTimeout(() => {
@@ -488,32 +543,32 @@ export function useFarmManager() {
     const uniqueChannelId = Math.random().toString(36).substring(2, 9);
     const channelName = `nouato_farm_manager_${Date.now()}_${uniqueChannelId}`;
     const shouldSkipSync = () => {
-      return isSavingRef.current || (Date.now() - lastSaveTimeRef.current < 2500);
+      return isSavingRef.current || Date.now() - lastSaveTimeRef.current < 2500;
     };
 
     let realtimeChannel: any = null;
     try {
       realtimeChannel = supabase
         .channel(channelName)
-        .on("postgres_changes", { event: "*", schema: "public", table: "crop_records" }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'crop_records' }, () => {
           if (!shouldSkipSync()) reloadAllFromSupabase();
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "farm_beds" }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_beds' }, () => {
           if (!shouldSkipSync()) reloadAllFromSupabase();
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "farm_plots" }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_plots' }, () => {
           if (!shouldSkipSync()) reloadAllFromSupabase();
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "journals" }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () => {
           if (!shouldSkipSync()) reloadAllFromSupabase();
         })
         .subscribe();
     } catch (realtimeErr) {
-      console.warn("Realtime subscription notice:", realtimeErr);
+      console.warn('Realtime subscription notice:', realtimeErr);
     }
 
     const handleCustomSync = () => reloadAllFromSupabase();
-    window.addEventListener("nouato_sync_event", handleCustomSync);
+    window.addEventListener('nouato_sync_event', handleCustomSync);
 
     const handleFarmChanged = (e: any) => {
       const newFarmId = e?.detail?.farmId;
@@ -522,10 +577,10 @@ export function useFarmManager() {
       }
       reloadAllFromSupabase();
     };
-    window.addEventListener("nouato_active_farm_changed", handleFarmChanged);
+    window.addEventListener('nouato_active_farm_changed', handleFarmChanged);
 
     const handleTabRevisit = () => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         return;
       }
       if (Date.now() - lastReloadTimeRef.current < 30000) {
@@ -534,8 +589,8 @@ export function useFarmManager() {
       reloadAllFromSupabase();
     };
 
-    window.addEventListener("focus", handleTabRevisit);
-    window.addEventListener("visibilitychange", handleTabRevisit);
+    window.addEventListener('focus', handleTabRevisit);
+    window.addEventListener('visibilitychange', handleTabRevisit);
 
     return () => {
       if (broadcastRef.current) {
@@ -548,14 +603,14 @@ export function useFarmManager() {
           supabase.removeChannel(realtimeChannel);
         } catch (e) {}
       }
-      window.removeEventListener("nouato_sync_event", handleCustomSync);
-      window.removeEventListener("nouato_active_farm_changed", handleFarmChanged);
-      window.removeEventListener("focus", handleTabRevisit);
-      window.removeEventListener("visibilitychange", handleTabRevisit);
+      window.removeEventListener('nouato_sync_event', handleCustomSync);
+      window.removeEventListener('nouato_active_farm_changed', handleFarmChanged);
+      window.removeEventListener('focus', handleTabRevisit);
+      window.removeEventListener('visibilitychange', handleTabRevisit);
     };
   }, [reloadAllFromSupabase]);
 
-  const currentFarmPlots = plots.filter((p) => (p.farm_id || "farm_1") === activeFarmId);
+  const currentFarmPlots = plots.filter((p) => (p.farm_id || 'farm_1') === activeFarmId);
 
   const snapToNonCollidingPosition = (
     plotId: string,
@@ -648,17 +703,17 @@ export function useFarmManager() {
     const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId);
     if (!targetPlot) return;
 
-    const plotCode = targetPlot.code || "C3";
-    const nextNum = (targetPlot.beds || []).filter(b => b.status !== "archived").length + 1;
+    const plotCode = targetPlot.code || 'C3';
+    const nextNum = (targetPlot.beds || []).filter((b) => b.status !== 'archived').length + 1;
     const newBedId = `plot_cell_${plotCode}_bed_${nextNum}`;
 
     const newBed: FarmBed = {
       id: newBedId,
       plot_id: targetPlot.id,
       bed_number: nextNum,
-      crop_name: "未確定 🌱",
-      status: "active",
-      season: "2026年 秋冬",
+      crop_name: '未確定 🌱',
+      status: 'active',
+      season: '2026年 秋冬',
       progress_percent: 0,
       is_updated: false,
       student_id: targetPlot.student_id,
@@ -682,20 +737,19 @@ export function useFarmManager() {
         id: newBedId,
         plot_id: targetPlot.id,
         bed_number: String(nextNum),
-        crop_name: "未確定 🌱",
-        status: "active",
-        season: "2026年 秋冬",
+        crop_name: '未確定 🌱',
+        status: 'active',
+        season: '2026年 秋冬',
         student_id: targetPlot.student_id || null,
         student_name: targetPlot.student_name || null,
         progress_percent: 0,
       });
     } catch (e) {
-      console.error("farm_beds addBedToPlot upsert error:", e);
-      if (typeof window !== "undefined") {
-        alert("畝の追加保存に失敗しました。通信環境を確認して再度お試しください。");
+      console.error('farm_beds addBedToPlot upsert error:', e);
+      if (typeof window !== 'undefined') {
+        alert('畝の追加保存に失敗しました。通信環境を確認して再度お試しください。');
       }
     }
-
 
     notifyBroadcast();
     return newBed;
@@ -707,11 +761,13 @@ export function useFarmManager() {
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId) {
         const remainingBeds = plot.beds.filter((b) => b.id !== bedId);
-        const activeBeds = remainingBeds.filter(b => b.status !== "archived").map((b, idx) => ({
-          ...b,
-          bed_number: idx + 1,
-        }));
-        const archivedBeds = remainingBeds.filter(b => b.status === "archived");
+        const activeBeds = remainingBeds
+          .filter((b) => b.status !== 'archived')
+          .map((b, idx) => ({
+            ...b,
+            bed_number: idx + 1,
+          }));
+        const archivedBeds = remainingBeds.filter((b) => b.status === 'archived');
         renumberedActiveBeds = activeBeds;
         return {
           ...plot,
@@ -725,7 +781,10 @@ export function useFarmManager() {
 
     await deleteBedDb(bedId);
     if (renumberedActiveBeds.length > 0) {
-      await reorderBedsInDb(plotId, renumberedActiveBeds.map(b => b.id));
+      await reorderBedsInDb(
+        plotId,
+        renumberedActiveBeds.map((b) => b.id)
+      );
     }
 
     notifyBroadcast();
@@ -761,8 +820,8 @@ export function useFarmManager() {
     }
 
     notifyBroadcast();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("nouato_sync_event"));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('nouato_sync_event'));
     }
   };
 
@@ -787,7 +846,7 @@ export function useFarmManager() {
           id: bedId,
           plot_id: plotId,
           bed_number: String(i),
-          dimensions: "2.0m × 0.7m (1.4㎡)",
+          dimensions: '2.0m × 0.7m (1.4㎡)',
         });
       }
     } else if (newBedCount < currentCount) {
@@ -798,9 +857,7 @@ export function useFarmManager() {
       }
     }
 
-    const nextPlots = plots.map((p) =>
-      p.id === plotId ? { ...p, beds: nextBeds } : p
-    );
+    const nextPlots = plots.map((p) => (p.id === plotId ? { ...p, beds: nextBeds } : p));
 
     setPlots(nextPlots);
     notifyBroadcast();
@@ -818,7 +875,7 @@ export function useFarmManager() {
             id: `plot_cell_${plot.code}_bed_${i}`,
             plot_id: plot.id,
             bed_number: i,
-            crop_name: "未確定 🌱",
+            crop_name: '未確定 🌱',
             is_updated: false,
           });
         }
@@ -835,8 +892,16 @@ export function useFarmManager() {
 
     try {
       for (const plot of nextPlots) {
-        if (!plot.is_vacant && !plot.student_id && !plot.student_name && !plot.id.startsWith("plot_placeholder_")) {
-          const { data: existingBeds } = await supabase.from("farm_beds").select("id").eq("plot_id", plot.id);
+        if (
+          !plot.is_vacant &&
+          !plot.student_id &&
+          !plot.student_name &&
+          !plot.id.startsWith('plot_placeholder_')
+        ) {
+          const { data: existingBeds } = await supabase
+            .from('farm_beds')
+            .select('id')
+            .eq('plot_id', plot.id);
           if (existingBeds) {
             for (const eb of existingBeds) {
               const bedNumMatch = eb.id.match(/_bed_(\d+)$/);
@@ -849,7 +914,7 @@ export function useFarmManager() {
         }
       }
     } catch (e) {
-      console.error("updateAllUnassignedBedsCount excess beds clean error:", e);
+      console.error('updateAllUnassignedBedsCount excess beds clean error:', e);
     }
   };
 
@@ -888,7 +953,7 @@ export function useFarmManager() {
     setPlots(nextPlots);
 
     try {
-      await supabase.from("farm_plots").insert({
+      await supabase.from('farm_plots').insert({
         id: plotId,
         name: `区画 ${codeStr}`,
         code: codeStr,
@@ -909,10 +974,12 @@ export function useFarmManager() {
   };
 
   const deletePlot = async (plotId: string) => {
-    const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId || p.name?.includes(plotId));
+    const targetPlot = plots.find(
+      (p) => p.id === plotId || p.code === plotId || p.name?.includes(plotId)
+    );
     if (!targetPlot) return;
 
-    if (!confirm(`「${targetPlot.name || "この区画"}」を本当に空き地にしますか？`)) return;
+    if (!confirm(`「${targetPlot.name || 'この区画'}」を本当に空き地にしますか？`)) return;
 
     const nextPlots = plots.map((p) => {
       if (p.id === targetPlot.id || p.code === targetPlot.code) {
@@ -939,7 +1006,9 @@ export function useFarmManager() {
 
     const oldPlot = currentList.find(
       (p) =>
-        (p.student_id === studentId || (p.student_name && (p.student_name.includes(studentName) || studentName.includes(p.student_name)))) &&
+        (p.student_id === studentId ||
+          (p.student_name &&
+            (p.student_name.includes(studentName) || studentName.includes(p.student_name)))) &&
         p.code !== targetCode &&
         p.id !== realPlotId
     );
@@ -952,9 +1021,14 @@ export function useFarmManager() {
 
       const migratedBedsForTarget: FarmBed[] = oldBeds.map((b, idx) => {
         const bedNum = b.bed_number || idx + 1;
-        const newBedId = b.status === "archived"
-          ? (b.id ? b.id.replace(new RegExp(`_${oldPlot.code}_`), `_${targetCode}_`).replace(new RegExp(`plot_cell_${oldPlot.code}`), `plot_cell_${targetCode}`) : `archived_bed_${targetCode}_${bedNum}_${Date.now()}`)
-          : `plot_cell_${targetCode}_bed_${bedNum}`;
+        const newBedId =
+          b.status === 'archived'
+            ? b.id
+              ? b.id
+                  .replace(new RegExp(`_${oldPlot.code}_`), `_${targetCode}_`)
+                  .replace(new RegExp(`plot_cell_${oldPlot.code}`), `plot_cell_${targetCode}`)
+              : `archived_bed_${targetCode}_${bedNum}_${Date.now()}`
+            : `plot_cell_${targetCode}_bed_${bedNum}`;
 
         return {
           ...b,
@@ -973,9 +1047,14 @@ export function useFarmManager() {
       if (oldTargetStudentId && oldTargetStudentName) {
         migratedBedsForOld = targetExistingBeds.map((b, idx) => {
           const bedNum = b.bed_number || idx + 1;
-          const newBedId = b.status === "archived"
-            ? (b.id ? b.id.replace(new RegExp(`_${targetCode}_`), `_${oldPlot.code}_`).replace(new RegExp(`plot_cell_${targetCode}`), `plot_cell_${oldPlot.code}`) : `archived_bed_${oldPlot.code}_${bedNum}_${Date.now()}`)
-            : `plot_cell_${oldPlot.code}_bed_${bedNum}`;
+          const newBedId =
+            b.status === 'archived'
+              ? b.id
+                ? b.id
+                    .replace(new RegExp(`_${targetCode}_`), `_${oldPlot.code}_`)
+                    .replace(new RegExp(`plot_cell_${targetCode}`), `plot_cell_${oldPlot.code}`)
+                : `archived_bed_${oldPlot.code}_${bedNum}_${Date.now()}`
+              : `plot_cell_${oldPlot.code}_bed_${bedNum}`;
           return {
             ...b,
             id: newBedId,
@@ -986,14 +1065,15 @@ export function useFarmManager() {
           };
         });
       } else {
-        const unassignedCount = targetExistingBeds.filter(b => b.status !== "archived").length || 6;
+        const unassignedCount =
+          targetExistingBeds.filter((b) => b.status !== 'archived').length || 6;
         migratedBedsForOld = Array.from({ length: unassignedCount }).map((_, idx) => ({
           id: `plot_cell_${oldPlot.code}_bed_${idx + 1}`,
           plot_id: oldPlot.id,
           bed_number: idx + 1,
-          crop_name: "未確定 🌱",
+          crop_name: '未確定 🌱',
           is_updated: false,
-          status: "active",
+          status: 'active',
         }));
       }
 
@@ -1013,7 +1093,9 @@ export function useFarmManager() {
             ...p,
             student_id: oldTargetStudentId || undefined,
             student_name: oldTargetStudentName || undefined,
-            name: oldTargetStudentName ? `区画 ${oldPlot.code} - ${oldTargetStudentName}` : `区画 ${oldPlot.code}`,
+            name: oldTargetStudentName
+              ? `区画 ${oldPlot.code} - ${oldTargetStudentName}`
+              : `区画 ${oldPlot.code}`,
             is_vacant: !oldTargetStudentId && Boolean(p.is_vacant),
             beds: migratedBedsForOld,
           };
@@ -1026,11 +1108,11 @@ export function useFarmManager() {
           const oldB = oldBeds[i];
           const newB = migratedBedsForTarget[i];
           if (oldB?.id && newB?.id && oldB.id !== newB.id) {
-            await supabase.from("crop_records").update({ bed_id: newB.id }).eq("bed_id", oldB.id);
+            await supabase.from('crop_records').update({ bed_id: newB.id }).eq('bed_id', oldB.id);
           }
         }
       } catch (err) {
-        console.warn("crop_records migration notice:", err);
+        console.warn('crop_records migration notice:', err);
       }
     } else {
       nextPlots = currentList.map((p) => {
@@ -1088,13 +1170,15 @@ export function useFarmManager() {
     await savePlotsGridIndicesToSupabase(nextPlots);
   };
 
-  const assignAllUnassignedStudents = async (unassignedStudents: { id: string; name: string }[]) => {
+  const assignAllUnassignedStudents = async (
+    unassignedStudents: { id: string; name: string }[]
+  ) => {
     if (!unassignedStudents || unassignedStudents.length === 0) return { count: 0 };
 
     const currentList = plotsRef.current.length > 0 ? [...plotsRef.current] : [...plots];
     const availablePlots = currentList
       .filter((p) => !p.is_vacant && !p.student_id && !p.student_name)
-      .sort((a, b) => (a.code || "").localeCompare(b.code || ""));
+      .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
 
     if (availablePlots.length === 0) {
       return { count: 0 };
@@ -1130,10 +1214,10 @@ export function useFarmManager() {
 
   const updatePlotStatus = async (
     plotId: string,
-    newStatus: "vacant" | "unassigned" | "assigned",
+    newStatus: 'vacant' | 'unassigned' | 'assigned',
     student?: { id: string; name: string }
   ) => {
-    if (newStatus === "assigned" && student) {
+    if (newStatus === 'assigned' && student) {
       await assignStudentToPlot(plotId, student.id, student.name);
       return;
     }
@@ -1144,7 +1228,7 @@ export function useFarmManager() {
 
     const nextPlots = plots.map((p) => {
       if (p.id === targetPlot.id || p.code === targetCode) {
-        if (newStatus === "vacant") {
+        if (newStatus === 'vacant') {
           return {
             ...p,
             is_vacant: true,
@@ -1179,24 +1263,27 @@ export function useFarmManager() {
     await savePlotsGridIndicesToSupabase(nextPlots);
   };
 
-  const addCropRecord = async (bedId: string, recordData: Omit<CropRecord, "id" | "created_at">) => {
+  const addCropRecord = async (
+    bedId: string,
+    recordData: Omit<CropRecord, 'id' | 'created_at'>
+  ) => {
     const newRecordId = `rec_${Date.now()}`;
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const newRecord: CropRecord = {
       ...recordData,
       id: newRecordId,
-      created_at: new Date().toLocaleString("ja-JP"),
+      created_at: new Date().toLocaleString('ja-JP'),
     };
 
     const nextRecords = [newRecord, ...records];
     setRecords(nextRecords);
 
     const imgToSave = recordData.image_url || recordData.photo_url;
-    const finalNotes =
-      (recordData.notes || "") + (imgToSave ? `\n[IMG:${imgToSave}]` : "");
+    const finalNotes = (recordData.notes || '') + (imgToSave ? `\n[IMG:${imgToSave}]` : '');
 
-    const extractedCropName = recordData.notes?.match(/【(.*?)】/)?.[1] || (recordData as any).crop_name || "未確定";
+    const extractedCropName =
+      recordData.notes?.match(/【(.*?)】/)?.[1] || (recordData as any).crop_name || '未確定';
     await insertCropRecordDb({
       id: newRecordId,
       bed_id: bedId,
@@ -1214,15 +1301,13 @@ export function useFarmManager() {
   };
 
   const updateCropRecord = async (recordId: string, updatedData: Partial<CropRecord>) => {
-    const nextRecords = records.map((r) =>
-      r.id === recordId ? { ...r, ...updatedData } : r
-    );
+    const nextRecords = records.map((r) => (r.id === recordId ? { ...r, ...updatedData } : r));
     setRecords(nextRecords);
 
     const imgToSave = updatedData.image_url || updatedData.photo_url;
-    let baseNotes = updatedData.notes || "";
-    baseNotes = baseNotes.replace(/\n?\[IMG:[\s\S]+?\]/, "").trim();
-    const finalNotes = baseNotes + (imgToSave ? `\n[IMG:${imgToSave}]` : "");
+    let baseNotes = updatedData.notes || '';
+    baseNotes = baseNotes.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
+    const finalNotes = baseNotes + (imgToSave ? `\n[IMG:${imgToSave}]` : '');
 
     await updateCropRecordDb(recordId, {
       notes: finalNotes,
@@ -1246,7 +1331,7 @@ export function useFarmManager() {
 
   const updateBedCrop = async (bedId: string, cropName: string) => {
     const nextPlots = plots.map((plot) => {
-      const isTarget = (plot.beds || []).some(b => b.id === bedId || b.id?.endsWith(`_${bedId}`));
+      const isTarget = (plot.beds || []).some((b) => b.id === bedId || b.id?.endsWith(`_${bedId}`));
       if (isTarget) {
         return {
           ...plot,
@@ -1263,12 +1348,9 @@ export function useFarmManager() {
     setPlots(nextPlots);
 
     try {
-      await supabase
-        .from("farm_beds")
-        .update({ crop_name: cropName })
-        .eq("id", bedId);
+      await supabase.from('farm_beds').update({ crop_name: cropName }).eq('id', bedId);
     } catch (e) {
-      console.error("updateBedCrop error:", e);
+      console.error('updateBedCrop error:', e);
     }
     notifyBroadcast();
   };
@@ -1283,11 +1365,11 @@ export function useFarmManager() {
       season?: string;
     }
   ) => {
-    const todayStr = new Date().toLocaleDateString("ja-JP");
-    let targetCropName = "未確定 🌱";
-    let targetStudentName = "受講生徒";
+    const todayStr = new Date().toLocaleDateString('ja-JP');
+    let targetCropName = '未確定 🌱';
+    let targetStudentName = '受講生徒';
     let targetStudentId: string | null = null;
-    let targetPlotCode = "C3";
+    let targetPlotCode = 'C3';
     let targetBedNum = 1;
 
     const nextPlots = plots.map((plot) => {
@@ -1298,27 +1380,28 @@ export function useFarmManager() {
         (plotId && plot.code && plotId.includes(plot.code));
 
       if (isMatchPlot) {
-        targetPlotCode = plot.code || "C3";
-        targetStudentName = plot.student_name || "受講生徒";
+        targetPlotCode = plot.code || 'C3';
+        targetStudentName = plot.student_name || '受講生徒';
         targetStudentId = plot.student_id || null;
 
         const nextBeds = (plot.beds || []).map((bed) => {
-          const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
-          const isMatchBed = bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId);
+          const numFromId = Number(bedId?.split('_').pop()) || bed.bed_number;
+          const isMatchBed =
+            bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId);
 
           if (isMatchBed) {
-            targetCropName = bed.crop_name || "未確定 🌱";
+            targetCropName = bed.crop_name || '未確定 🌱';
             targetBedNum = bed.bed_number;
             if (bed.student_id) targetStudentId = bed.student_id;
             if (bed.student_name) targetStudentName = bed.student_name;
             return {
               ...bed,
-              status: "completed_pending" as const,
+              status: 'completed_pending' as const,
               harvested_at: todayStr,
               total_harvest: details.totalHarvest,
               completion_notes: details.completionNotes,
               completion_image_url: details.imageUrl,
-              season: details.season || bed.season || "2026年 春夏",
+              season: details.season || bed.season || '2026年 春夏',
             };
           }
           return bed;
@@ -1331,39 +1414,43 @@ export function useFarmManager() {
     setPlots(nextPlots);
 
     try {
-      const validStudentId = (targetStudentId && /^[0-9a-fA-F-]{36}$/.test(targetStudentId)) ? targetStudentId : null;
-      const validFarmId = (activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId)) ? activeFarmId : null;
-      const hasHttpImg = details.imageUrl && details.imageUrl.startsWith("http");
-      const baseContent = `【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum} (${targetCropName}) の収穫が完了しました！\n収穫量: ${details.totalHarvest || "未記載"}\n振り返り: ${details.completionNotes || "順調に収穫できました"}`;
-      const journalContent = (details.imageUrl && !hasHttpImg)
-        ? `${baseContent}\n[IMG:${details.imageUrl}]`
-        : baseContent;
+      const validStudentId =
+        targetStudentId && /^[0-9a-fA-F-]{36}$/.test(targetStudentId) ? targetStudentId : null;
+      const validFarmId =
+        activeFarmId && /^[0-9a-fA-F-]{36}$/.test(activeFarmId) ? activeFarmId : null;
+      const hasHttpImg = details.imageUrl && details.imageUrl.startsWith('http');
+      const baseContent = `【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum} (${targetCropName}) の収穫が完了しました！\n収穫量: ${details.totalHarvest || '未記載'}\n振り返り: ${details.completionNotes || '順調に収穫できました'}`;
+      const journalContent =
+        details.imageUrl && !hasHttpImg ? `${baseContent}\n[IMG:${details.imageUrl}]` : baseContent;
 
-      await supabase.from("journals").insert([
+      await supabase.from('journals').insert([
         {
           student_id: validStudentId,
           farm_id: validFarmId,
           content: journalContent,
           image_url: details.imageUrl || null,
-          role: "student",
+          role: 'student',
           is_approved: false,
         },
       ]);
     } catch (e) {
-      console.warn("journals completion insert notice:", e);
+      console.warn('journals completion insert notice:', e);
     }
 
     const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNum}`;
     try {
-      await supabase.from("farm_beds").update({
-        status: "completed_pending",
-        harvested_at: todayStr,
-        total_harvest: details.totalHarvest || null,
-        completion_notes: details.completionNotes || null,
-        completion_image_url: details.imageUrl || null,
-      }).eq("id", exactBedId);
+      await supabase
+        .from('farm_beds')
+        .update({
+          status: 'completed_pending',
+          harvested_at: todayStr,
+          total_harvest: details.totalHarvest || null,
+          completion_notes: details.completionNotes || null,
+          completion_image_url: details.imageUrl || null,
+        })
+        .eq('id', exactBedId);
     } catch (e) {
-      console.warn("farm_beds status update notice:", e);
+      console.warn('farm_beds status update notice:', e);
     }
 
     await savePlotsGridIndicesToSupabase(nextPlots);
@@ -1377,35 +1464,39 @@ export function useFarmManager() {
   const approveAndAddNewBed = async (
     plotId: string,
     bedId: string,
-    newCropName: string = "未確定 🌱",
-    newSeason: string = "2026年 秋冬"
+    newCropName: string = '未確定 🌱',
+    newSeason: string = '2026年 秋冬'
   ) => {
     let targetBedNumber = 1;
-    let targetPlotCode = "C3";
-    let oldCropName = "野菜";
-    let oldHarvest = "";
-    let oldNotes = "";
-    let oldImg = "";
-    let oldSeason = "2026年 春夏";
-    const todayStr = new Date().toLocaleDateString("ja-JP");
+    let targetPlotCode = 'C3';
+    let oldCropName = '野菜';
+    let oldHarvest = '';
+    let oldNotes = '';
+    let oldImg = '';
+    let oldSeason = '2026年 春夏';
+    const todayStr = new Date().toLocaleDateString('ja-JP');
 
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId || plot.code === plotId) {
         targetPlotCode = plot.code;
         const updatedBeds = (plot.beds || []).map((bed) => {
-          const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
-          if (bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId)) {
+          const numFromId = Number(bedId?.split('_').pop()) || bed.bed_number;
+          if (
+            bed.id === bedId ||
+            bed.bed_number === numFromId ||
+            bed.bed_number === Number(bedId)
+          ) {
             targetBedNumber = bed.bed_number;
-            oldCropName = bed.crop_name || "野菜";
-            oldHarvest = bed.total_harvest || "";
-            oldNotes = bed.completion_notes || "";
-            oldImg = bed.completion_image_url || "";
-            oldSeason = bed.season || "2026年 春夏";
+            oldCropName = bed.crop_name || '野菜';
+            oldHarvest = bed.total_harvest || '';
+            oldNotes = bed.completion_notes || '';
+            oldImg = bed.completion_image_url || '';
+            oldSeason = bed.season || '2026年 春夏';
 
             return {
               ...bed,
-              crop_name: "未確定 🌱",
-              status: "active" as const,
+              crop_name: '未確定 🌱',
+              status: 'active' as const,
               season: newSeason,
               progress_percent: 0,
               is_updated: false,
@@ -1426,10 +1517,10 @@ export function useFarmManager() {
 
     try {
       const { data: pendingJournals } = await supabase
-        .from("journals")
-        .select("*")
-        .like("content", `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`)
-        .order("created_at", { ascending: false })
+        .from('journals')
+        .select('*')
+        .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`)
+        .order('created_at', { ascending: false })
         .limit(1);
 
       if (pendingJournals && pendingJournals.length > 0) {
@@ -1439,16 +1530,20 @@ export function useFarmManager() {
         const notesMatch = pj.content?.match(/振り返り:\s*([^\n]+)/);
 
         if (cropMatch && cropMatch[1]?.trim()) oldCropName = cropMatch[1].trim();
-        if (harvestMatch && harvestMatch[1]?.trim() && harvestMatch[1].trim() !== "未記載") {
+        if (harvestMatch && harvestMatch[1]?.trim() && harvestMatch[1].trim() !== '未記載') {
           oldHarvest = harvestMatch[1].trim();
         }
-        if (notesMatch && notesMatch[1]?.trim() && notesMatch[1].trim() !== "順調に収穫できました") {
+        if (
+          notesMatch &&
+          notesMatch[1]?.trim() &&
+          notesMatch[1].trim() !== '順調に収穫できました'
+        ) {
           oldNotes = notesMatch[1].trim();
         }
         if (pj.image_url) oldImg = pj.image_url;
       }
     } catch (e) {
-      console.warn("fetch latest completion journal notice:", e);
+      console.warn('fetch latest completion journal notice:', e);
     }
 
     const archiveId = `archived_bed_${targetPlotCode}_${targetBedNumber}_${Date.now()}`;
@@ -1457,7 +1552,7 @@ export function useFarmManager() {
       plot_id: plotId,
       bed_number: targetBedNumber,
       crop_name: oldCropName,
-      status: "archived",
+      status: 'archived',
       season: oldSeason,
       harvested_at: todayStr,
       total_harvest: oldHarvest || undefined,
@@ -1485,7 +1580,7 @@ export function useFarmManager() {
         plot_id: plotId,
         bed_number: String(targetBedNumber),
         crop_name: oldCropName,
-        status: "archived",
+        status: 'archived',
         season: oldSeason,
         harvested_at: todayStr,
         total_harvest: oldHarvest || null,
@@ -1496,54 +1591,67 @@ export function useFarmManager() {
 
       const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`;
       await supabase
-        .from("crop_records")
+        .from('crop_records')
         .update({ bed_id: archiveId })
-        .or(`bed_id.eq.${exactBedId},bed_id.eq.${bedId},bed_id.like.%${targetPlotCode}_bed_${targetBedNumber}`);
+        .or(
+          `bed_id.eq.${exactBedId},bed_id.eq.${bedId},bed_id.like.%${targetPlotCode}_bed_${targetBedNumber}`
+        );
     } catch (e) {
-      console.warn("archive bed insert notice:", e);
+      console.warn('archive bed insert notice:', e);
     }
 
     const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`;
     try {
-      await supabase.from("farm_beds").update({
-        crop_name: "未確定 🌱",
-        status: "active",
-        season: newSeason,
-        progress_percent: 0,
-        harvested_at: null,
-        completion_notes: null,
-        total_harvest: null,
-        completion_image_url: null,
-      }).or(`id.eq.${exactBedId},id.eq.${bedId}`);
+      await supabase
+        .from('farm_beds')
+        .update({
+          crop_name: '未確定 🌱',
+          status: 'active',
+          season: newSeason,
+          progress_percent: 0,
+          harvested_at: null,
+          completion_notes: null,
+          total_harvest: null,
+          completion_image_url: null,
+        })
+        .or(`id.eq.${exactBedId},id.eq.${bedId}`);
     } catch (e) {
-      console.warn("farm_beds reset update error:", e);
+      console.warn('farm_beds reset update error:', e);
     }
 
     try {
       await supabase
-        .from("journals")
+        .from('journals')
         .update({ is_approved: true })
-        .like("content", `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
+        .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
     } catch (e) {}
 
     await savePlotsGridIndicesToSupabase(finalPlots);
     notifyBroadcast();
   };
 
-  const rejectBedCompletion = async (plotId: string, bedId: string, rejectReason: string = "内容の再確認をお願いします") => {
-    let targetPlotCode = "C3";
+  const rejectBedCompletion = async (
+    plotId: string,
+    bedId: string,
+    rejectReason: string = '内容の再確認をお願いします'
+  ) => {
+    let targetPlotCode = 'C3';
     let targetBedNum = 1;
 
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId || plot.code === plotId) {
         targetPlotCode = plot.code;
         const nextBeds = (plot.beds || []).map((bed) => {
-          const numFromId = Number(bedId?.split("_").pop()) || bed.bed_number;
-          if (bed.id === bedId || bed.bed_number === numFromId || bed.bed_number === Number(bedId)) {
+          const numFromId = Number(bedId?.split('_').pop()) || bed.bed_number;
+          if (
+            bed.id === bedId ||
+            bed.bed_number === numFromId ||
+            bed.bed_number === Number(bedId)
+          ) {
             targetBedNum = bed.bed_number;
             return {
               ...bed,
-              status: "rejected" as const,
+              status: 'rejected' as const,
               reject_reason: rejectReason,
               completion_notes: rejectReason,
             };
@@ -1559,19 +1667,22 @@ export function useFarmManager() {
 
     const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNum}`;
     try {
-      await supabase.from("farm_beds").update({
-        status: "rejected",
-        completion_notes: rejectReason,
-      }).eq("id", exactBedId);
+      await supabase
+        .from('farm_beds')
+        .update({
+          status: 'rejected',
+          completion_notes: rejectReason,
+        })
+        .eq('id', exactBedId);
     } catch (e) {
-      console.warn("farm_beds reject update error:", e);
+      console.warn('farm_beds reject update error:', e);
     }
 
     try {
       await supabase
-        .from("journals")
+        .from('journals')
         .update({ is_approved: true })
-        .like("content", `%【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum}%`);
+        .like('content', `%【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum}%`);
     } catch (e) {}
 
     await savePlotsGridIndicesToSupabase(nextPlots);
@@ -1585,7 +1696,7 @@ export function useFarmManager() {
           if (bed.id === bedId) {
             return {
               ...bed,
-              status: "active" as const,
+              status: 'active' as const,
             };
           }
           return bed;
@@ -1600,7 +1711,11 @@ export function useFarmManager() {
     notifyBroadcast();
   };
 
-  const addNewBedForPlot = async (plotId: string, cropName: string = "新しい作物", season: string = "2026年 秋冬") => {
+  const addNewBedForPlot = async (
+    plotId: string,
+    cropName: string = '新しい作物',
+    season: string = '2026年 秋冬'
+  ) => {
     const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId);
     if (!targetPlot) return;
 
@@ -1614,7 +1729,7 @@ export function useFarmManager() {
       plot_id: targetPlot.id,
       bed_number: nextBedNumber,
       crop_name: cropName,
-      status: "active",
+      status: 'active',
       season: season,
       progress_percent: 0,
       is_updated: false,
@@ -1650,7 +1765,10 @@ export function useFarmManager() {
     unassignedBedsCount,
     setUnassignedBedsCount,
     addFarm: async (name: string) => {
-      const generatedId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `farm_${Date.now()}`;
+      const generatedId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `farm_${Date.now()}`;
       const newFarm: Farm = {
         id: generatedId,
         name,
@@ -1663,7 +1781,7 @@ export function useFarmManager() {
         const { data: authData } = await supabase.auth.getUser();
         await addFarmDb(newFarm.id, newFarm.name, authData?.user?.id);
       } catch (e) {
-        console.error("addFarm error:", e);
+        console.error('addFarm error:', e);
       }
 
       notifyBroadcast();

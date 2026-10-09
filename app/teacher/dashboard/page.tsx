@@ -1,65 +1,65 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { useFarmManager } from "@/hooks/useFarmManager";
-import { supabase } from "@/lib/supabase";
-import Toast from "@/components/ui/Toast";
-import TeacherSidebar from "@/components/teacher/TeacherSidebar";
-import TeacherHeader from "@/components/teacher/TeacherHeader";
-import { SproutLoader } from "@/components/SproutLoader";
-import { useFarmStore } from "@/store/useFarmStore";
+import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+import { useFarmManager } from '@/hooks/useFarmManager';
+import { supabase } from '@/lib/supabase';
+import Toast from '@/components/ui/Toast';
+import TeacherSidebar from '@/components/teacher/TeacherSidebar';
+import TeacherHeader from '@/components/teacher/TeacherHeader';
+import { SproutLoader } from '@/components/SproutLoader';
+import { useFarmStore } from '@/store/useFarmStore';
 
 // 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
 // これにより、初回アクセス時の React 19 Hydration クラッシュやモバイル端末での初期化エラーを 100% 防止します
-const TeacherOverviewView = dynamic(
-  () => import("@/components/teacher/TeacherOverviewView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherTaskBoardView = dynamic(
-  () => import("@/components/teacher/TeacherTaskBoardView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherFarmCanvasView = dynamic(
-  () => import("@/components/teacher/TeacherFarmCanvasView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherStudentsView = dynamic(
-  () => import("@/components/teacher/TeacherStudentsView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherJournalsView = dynamic(
-  () => import("@/components/teacher/TeacherJournalsView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherTemplatesView = dynamic(
-  () => import("@/components/teacher/TeacherTemplatesView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherPaymentsView = dynamic(
-  () => import("@/components/teacher/TeacherPaymentsView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherEventsView = dynamic(
-  () => import("@/components/teacher/TeacherEventsView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
-const TeacherSettingsView = dynamic(
-  () => import("@/components/teacher/TeacherSettingsView"),
-  { ssr: false, loading: () => <SproutLoader /> }
-);
+const TeacherOverviewView = dynamic(() => import('@/components/teacher/TeacherOverviewView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherTaskBoardView = dynamic(() => import('@/components/teacher/TeacherTaskBoardView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherFarmCanvasView = dynamic(() => import('@/components/teacher/TeacherFarmCanvasView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherStudentsView = dynamic(() => import('@/components/teacher/TeacherStudentsView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherJournalsView = dynamic(() => import('@/components/teacher/TeacherJournalsView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherTemplatesView = dynamic(() => import('@/components/teacher/TeacherTemplatesView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherPaymentsView = dynamic(() => import('@/components/teacher/TeacherPaymentsView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherEventsView = dynamic(() => import('@/components/teacher/TeacherEventsView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
+const TeacherSettingsView = dynamic(() => import('@/components/teacher/TeacherSettingsView'), {
+  ssr: false,
+  loading: () => <SproutLoader />,
+});
 
 const VALID_TEACHER_MENUS = [
-  "dashboard",
-  "farm",
-  "tasks",
-  "templates",
-  "journals",
-  "events",
-  "payments",
-  "settings",
-  "students",
+  'dashboard',
+  'farm',
+  'tasks',
+  'templates',
+  'journals',
+  'events',
+  'payments',
+  'settings',
+  'students',
 ];
 
 export default function TeacherDashboardPage() {
@@ -71,24 +71,24 @@ export default function TeacherDashboardPage() {
   let pendingApprovalCount = 0;
   (plots || []).forEach((p) => {
     (p?.beds || []).forEach((b) => {
-      if (b?.status === "completed_pending") {
+      if (b?.status === 'completed_pending') {
         pendingApprovalCount++;
       }
     });
   });
 
   // 🌟 Hydration Mismatch 防止: 初期値は常に "dashboard"、マウント後にストレージから安全に復元 🌟
-  const [activeMenu, setActiveMenu] = useState<string>("dashboard");
+  const [activeMenu, setActiveMenu] = useState<string>('dashboard');
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const tabParam = urlParams.get("tab");
+      const tabParam = urlParams.get('tab');
       if (tabParam && VALID_TEACHER_MENUS.includes(tabParam)) {
         setActiveMenu(tabParam);
         return;
       }
-      const savedMenu = sessionStorage.getItem("nouato_teacher_active_menu");
+      const savedMenu = sessionStorage.getItem('nouato_teacher_active_menu');
       if (savedMenu && VALID_TEACHER_MENUS.includes(savedMenu)) {
         setActiveMenu(savedMenu);
       }
@@ -97,23 +97,23 @@ export default function TeacherDashboardPage() {
 
   const handleMenuChange = (menu: string) => {
     setActiveMenu(menu);
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       try {
-        sessionStorage.setItem("nouato_teacher_active_menu", menu);
+        sessionStorage.setItem('nouato_teacher_active_menu', menu);
         const url = new URL(window.location.href);
-        url.searchParams.set("tab", menu);
-        window.history.replaceState(null, "", url.toString());
+        url.searchParams.set('tab', menu);
+        window.history.replaceState(null, '', url.toString());
       } catch (e) {
-        console.error("Storage error:", e);
+        console.error('Storage error:', e);
       }
     }
   };
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [showTaskFormImmediate, setShowTaskFormImmediate] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [targetPlotCode, setTargetPlotCode] = useState<string | undefined>(undefined);
   const [targetFarmId, setTargetFarmId] = useState<string | undefined>(undefined);
@@ -122,7 +122,7 @@ export default function TeacherDashboardPage() {
   const handleNavigateToFarm = (plotCode?: string, farmId?: string) => {
     setTargetPlotCode(plotCode);
     setTargetFarmId(farmId);
-    handleMenuChange("farm");
+    handleMenuChange('farm');
   };
 
   // 講師ロール（role === 'teacher'）権限の厳格チェック
@@ -132,25 +132,27 @@ export default function TeacherDashboardPage() {
       const minDisplayTime = 750; // 🌱 芽が出るアニメーションを心地よく見せる最低保証時間 (0.75秒)
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
         if (!user) {
-          router.push("/login");
+          router.push('/login');
           return;
         }
 
         const { data: userData } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
           .maybeSingle();
 
-        if (userData?.role !== "teacher") {
-          setToastMessage("🚫 講師専用画面です。生徒アカウントではアクセスできません。");
+        if (userData?.role !== 'teacher') {
+          setToastMessage('🚫 講師専用画面です。生徒アカウントではアクセスできません。');
           setShowToast(true);
           setIsAuthorized(false);
           setTimeout(() => {
-            router.push("/student");
+            router.push('/student');
           }, 1200);
           return;
         }
@@ -164,12 +166,12 @@ export default function TeacherDashboardPage() {
         setIsAuthorized(true);
         fetchTeacherFarms();
       } catch (err) {
-        console.error("Auth role check error:", err);
-        setToastMessage("🚫 認証エラーが発生しました。生徒ダッシュボードへ移動します。");
+        console.error('Auth role check error:', err);
+        setToastMessage('🚫 認証エラーが発生しました。生徒ダッシュボードへ移動します。');
         setShowToast(true);
         setIsAuthorized(false);
         setTimeout(() => {
-          router.push("/student");
+          router.push('/student');
         }, 1200);
       }
     };
@@ -178,7 +180,7 @@ export default function TeacherDashboardPage() {
   }, [router, fetchTeacherFarms]);
 
   const handleAddNewTask = () => {
-    handleMenuChange("tasks");
+    handleMenuChange('tasks');
     setShowTaskFormImmediate(true);
   };
 
@@ -219,47 +221,45 @@ export default function TeacherDashboardPage() {
         {/* トップヘッダー */}
         <TeacherHeader
           title={
-            activeMenu === "dashboard"
-              ? "ダッシュボード"
-              : activeMenu === "students"
-              ? "生徒一覧"
-              : activeMenu === "farm"
-              ? "畑管理"
-              : activeMenu === "tasks"
-              ? "タスク管理"
-              : activeMenu === "templates"
-              ? "教材・タスクテンプレート"
-              : activeMenu === "journals"
-              ? "相談・日記確認"
-              : activeMenu === "events"
-              ? "カレンダー"
-              : activeMenu === "payments"
-              ? "収支シミュレーション"
-              : "画面設定"
+            activeMenu === 'dashboard'
+              ? 'ダッシュボード'
+              : activeMenu === 'students'
+                ? '生徒一覧'
+                : activeMenu === 'farm'
+                  ? '畑管理'
+                  : activeMenu === 'tasks'
+                    ? 'タスク管理'
+                    : activeMenu === 'templates'
+                      ? '教材・タスクテンプレート'
+                      : activeMenu === 'journals'
+                        ? '相談・日記確認'
+                        : activeMenu === 'events'
+                          ? 'カレンダー'
+                          : activeMenu === 'payments'
+                            ? '収支シミュレーション'
+                            : '画面設定'
           }
-          onSearch={activeMenu === "tasks" ? setSearchQuery : undefined}
+          onSearch={activeMenu === 'tasks' ? setSearchQuery : undefined}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
         {/* ページコンテンツ */}
         <main className="p-4 sm:p-8 max-w-7xl w-full mx-auto flex-1 overflow-y-auto">
-          {activeMenu === "dashboard" && (
+          {activeMenu === 'dashboard' && (
             <TeacherOverviewView
               key={`overview_${activeFarmId}`}
               onAddNewTaskClick={handleAddNewTask}
-              onNavigateToStudents={() => handleMenuChange("students")}
-              onNavigateToJournals={() => handleMenuChange("journals")}
+              onNavigateToStudents={() => handleMenuChange('students')}
+              onNavigateToJournals={() => handleMenuChange('journals')}
               onNavigateToFarm={() => handleNavigateToFarm()}
-              onNavigateToTasks={() => handleMenuChange("tasks")}
-              onNavigateToEvents={() => handleMenuChange("events")}
+              onNavigateToTasks={() => handleMenuChange('tasks')}
+              onNavigateToEvents={() => handleMenuChange('events')}
             />
           )}
 
-          {activeMenu === "students" && (
-            <TeacherStudentsView key={`students_${activeFarmId}`} />
-          )}
+          {activeMenu === 'students' && <TeacherStudentsView key={`students_${activeFarmId}`} />}
 
-          {activeMenu === "farm" && (
+          {activeMenu === 'farm' && (
             <TeacherFarmCanvasView
               key={`canvas_${activeFarmId}`}
               initialPlotCode={targetPlotCode}
@@ -268,7 +268,7 @@ export default function TeacherDashboardPage() {
             />
           )}
 
-          {activeMenu === "tasks" && (
+          {activeMenu === 'tasks' && (
             <TeacherTaskBoardView
               key={`tasks_${activeFarmId}`}
               searchQuery={searchQuery}
@@ -276,17 +276,20 @@ export default function TeacherDashboardPage() {
             />
           )}
 
-          {activeMenu === "templates" && <TeacherTemplatesView key={`templates_${activeFarmId}`} />}
+          {activeMenu === 'templates' && <TeacherTemplatesView key={`templates_${activeFarmId}`} />}
 
-          {activeMenu === "journals" && (
-            <TeacherJournalsView key={`journals_${activeFarmId}`} onNavigateToFarm={handleNavigateToFarm} />
+          {activeMenu === 'journals' && (
+            <TeacherJournalsView
+              key={`journals_${activeFarmId}`}
+              onNavigateToFarm={handleNavigateToFarm}
+            />
           )}
 
-          {activeMenu === "payments" && <TeacherPaymentsView key={`payments_${activeFarmId}`} />}
+          {activeMenu === 'payments' && <TeacherPaymentsView key={`payments_${activeFarmId}`} />}
 
-          {activeMenu === "events" && <TeacherEventsView key={`events_${activeFarmId}`} />}
+          {activeMenu === 'events' && <TeacherEventsView key={`events_${activeFarmId}`} />}
 
-          {activeMenu === "settings" && <TeacherSettingsView key={`settings_${activeFarmId}`} />}
+          {activeMenu === 'settings' && <TeacherSettingsView key={`settings_${activeFarmId}`} />}
         </main>
       </div>
     </div>

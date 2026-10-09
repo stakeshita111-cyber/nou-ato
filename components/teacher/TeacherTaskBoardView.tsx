@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   DndContext,
   closestCorners,
@@ -9,46 +9,46 @@ import {
   useSensors,
   PointerSensor,
   KeyboardSensor,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { useKanbanBoard } from "@/hooks/useKanbanBoard";
-import BoardColumn from "@/components/board/BoardColumn";
-import TaskCard from "@/components/board/TaskCard";
-import TaskForm from "@/components/board/TaskForm";
-import TaskEditModal from "@/components/board/TaskEditModal";
-import TaskTemplateModal from "@/components/board/TaskTemplateModal";
-import TrashModal from "@/components/board/TrashModal";
-import PageHeader from "@/components/ui/PageHeader";
-import { ColumnType, Task } from "@/types/task";
-import { TaskTemplate } from "@/lib/taskTemplates";
-import { SproutLoader } from "@/components/SproutLoader";
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { useKanbanBoard } from '@/hooks/useKanbanBoard';
+import BoardColumn from '@/components/board/BoardColumn';
+import TaskCard from '@/components/board/TaskCard';
+import TaskForm from '@/components/board/TaskForm';
+import TaskEditModal from '@/components/board/TaskEditModal';
+import TaskTemplateModal from '@/components/board/TaskTemplateModal';
+import TrashModal from '@/components/board/TrashModal';
+import PageHeader from '@/components/ui/PageHeader';
+import { ColumnType, Task } from '@/types/task';
+import { TaskTemplate } from '@/lib/taskTemplates';
+import { SproutLoader } from '@/components/SproutLoader';
 
-import IndividualTaskAssignModal from "@/components/teacher/IndividualTaskAssignModal";
+import IndividualTaskAssignModal from '@/components/teacher/IndividualTaskAssignModal';
 
 const COLUMNS: ColumnType[] = [
   {
-    id: "pool",
-    title: "教材準備",
-    subtitle: "作成中・準備中の教材を置いておく場所です",
-    dotColor: "bg-[#965c49]",
-    badgeBg: "bg-[#f5e3db]",
-    badgeText: "text-[#803d27]",
+    id: 'pool',
+    title: '教材準備',
+    subtitle: '作成中・準備中の教材を置いておく場所です',
+    dotColor: 'bg-[#965c49]',
+    badgeBg: 'bg-[#f5e3db]',
+    badgeText: 'text-[#803d27]',
   },
   {
-    id: "prep",
-    title: "準備完了",
-    subtitle: "公開準備が整った学習資料です",
-    dotColor: "bg-[#185e9e]",
-    badgeBg: "bg-[#dbebf8]",
-    badgeText: "text-[#185e9e]",
+    id: 'prep',
+    title: '準備完了',
+    subtitle: '公開準備が整った学習資料です',
+    dotColor: 'bg-[#185e9e]',
+    badgeBg: 'bg-[#dbebf8]',
+    badgeText: 'text-[#185e9e]',
   },
   {
-    id: "todo",
-    title: "生徒へ公開中",
-    subtitle: "生徒のアプリ画面に配信中の課題です",
-    dotColor: "bg-[#1d5c23]",
-    badgeBg: "bg-[#dcf2de]",
-    badgeText: "text-[#1d5c23]",
+    id: 'todo',
+    title: '生徒へ公開中',
+    subtitle: '生徒のアプリ画面に配信中の課題です',
+    dotColor: 'bg-[#1d5c23]',
+    badgeBg: 'bg-[#dcf2de]',
+    badgeText: 'text-[#1d5c23]',
   },
 ];
 
@@ -57,7 +57,10 @@ interface TeacherTaskBoardViewProps {
   initialShowForm?: boolean;
 }
 
-export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm = false }: TeacherTaskBoardViewProps) {
+export default function TeacherTaskBoardView({
+  searchQuery = '',
+  initialShowForm = false,
+}: TeacherTaskBoardViewProps) {
   const {
     isLoading,
     tasks,
@@ -163,7 +166,7 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
             onClick={() => setShowQuickForm(!showQuickForm)}
             className="px-4 py-2 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition"
           >
-            {showQuickForm ? "フォームを閉じる" : "＋ タスクを追加"}
+            {showQuickForm ? 'フォームを閉じる' : '＋ タスクを追加'}
           </button>
 
           <button
@@ -212,7 +215,9 @@ export default function TeacherTaskBoardView({ searchQuery = "", initialShowForm
           ))}
         </div>
 
-        <DragOverlay dropAnimation={{ duration: 200, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
+        <DragOverlay
+          dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}
+        >
           {activeTask ? (
             <div className="rotate-2 shadow-2xl scale-105 opacity-90 pointer-events-none">
               <TaskCard task={activeTask} onDelete={() => {}} />

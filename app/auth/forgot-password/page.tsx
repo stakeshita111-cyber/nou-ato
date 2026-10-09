@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import Toast from "@/components/ui/Toast";
+import { useState } from 'react';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+import Toast from '@/components/ui/Toast';
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
-      setToastMessage("メールアドレスを入力してください");
+      setToastMessage('メールアドレスを入力してください');
       setShowToast(true);
       return;
     }
@@ -33,11 +33,11 @@ export default function ForgotPasswordPage() {
         setShowToast(true);
       } else {
         setSubmitted(true);
-        setToastMessage("✉️ パスワード再設定メールを送信しました！");
+        setToastMessage('✉️ パスワード再設定メールを送信しました！');
         setShowToast(true);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "";
+      const message = err instanceof Error ? err.message : '';
       setToastMessage(`エラーが発生しました: ${message}`);
       setShowToast(true);
     } finally {
@@ -63,7 +63,8 @@ export default function ForgotPasswordPage() {
             <div className="space-y-1.5">
               <h2 className="text-sm font-bold text-gray-800">メールを送信しました</h2>
               <p className="text-xs text-gray-500 leading-relaxed">
-                <strong>{email}</strong> 宛てにパスワード再設定用の案内メールをお送りしました。<br />
+                <strong>{email}</strong> 宛てにパスワード再設定用の案内メールをお送りしました。
+                <br />
                 メール内のリンクを開いて、新しいパスワードを設定してください。
               </p>
             </div>
@@ -79,7 +80,9 @@ export default function ForgotPasswordPage() {
         ) : (
           <>
             <p className="text-xs text-gray-500 leading-relaxed text-center">
-              登録したメールアドレスを入力してください。<br />パスワード再設定用のリンクをお送りします。
+              登録したメールアドレスを入力してください。
+              <br />
+              パスワード再設定用のリンクをお送りします。
             </p>
 
             <form onSubmit={handleResetRequest} className="space-y-4">
@@ -102,7 +105,7 @@ export default function ForgotPasswordPage() {
                 disabled={loading}
                 className="w-full py-3.5 bg-[#16471a] hover:bg-[#123915] text-white font-bold rounded-2xl shadow-md transition flex items-center justify-center space-x-2 text-sm cursor-pointer disabled:opacity-50"
               >
-                <span>{loading ? "送信中..." : "再設定リンクを送信する"}</span>
+                <span>{loading ? '送信中...' : '再設定リンクを送信する'}</span>
               </button>
             </form>
 

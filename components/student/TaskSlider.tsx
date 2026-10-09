@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import Badge from "@/components/ui/Badge";
+import { useState, useRef, useEffect } from 'react';
+import Badge from '@/components/ui/Badge';
 
 interface TaskSliderProps {
   tasks: any[];
@@ -23,8 +23,8 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
 
   // スタック切り替えアニメーション用ステート
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
-  const [animType, setAnimType] = useState<"next" | "prev" | null>(null);
-  const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(null);
+  const [animType, setAnimType] = useState<'next' | 'prev' | null>(null);
+  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
 
   const animTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -37,15 +37,15 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   }, []);
 
   // 未完了タスクと完了済みタスクの分離
-  const activeTasks = tasks.filter((t) => t.status !== "completed");
-  const completedTasks = tasks.filter((t) => t.status === "completed");
+  const activeTasks = tasks.filter((t) => t.status !== 'completed');
+  const completedTasks = tasks.filter((t) => t.status === 'completed');
 
   const validIndex = activeTasks.length === 0 ? 0 : currentIndex % activeTasks.length;
 
-  const triggerNext = (direction: "left" | "right" = "left") => {
+  const triggerNext = (direction: 'left' | 'right' = 'left') => {
     if (activeTasks.length <= 1 || isAnimating) return;
     setIsAnimating(true);
-    setAnimType("next");
+    setAnimType('next');
     setExitDirection(direction);
 
     if (animTimeoutRef.current) {
@@ -61,10 +61,10 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
     }, 350);
   };
 
-  const triggerPrev = (direction: "left" | "right" = "right") => {
+  const triggerPrev = (direction: 'left' | 'right' = 'right') => {
     if (activeTasks.length <= 1 || isAnimating) return;
     setIsAnimating(true);
-    setAnimType("prev");
+    setAnimType('prev');
     setExitDirection(direction);
 
     if (animTimeoutRef.current) {
@@ -114,9 +114,9 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
 
     if (isQuickFlick || isNormalSwipe) {
       if (dragOffset < 0) {
-        triggerNext("left");
+        triggerNext('left');
       } else {
-        triggerPrev("right");
+        triggerPrev('right');
       }
     } else {
       setDragOffset(0);
@@ -142,7 +142,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   let card3Index = -1;
 
   if (n >= 2) {
-    if (animType === "prev") {
+    if (animType === 'prev') {
       card2Index = (validIndex - 1 + n) % n;
     } else {
       card2Index = (validIndex + 1) % n;
@@ -151,7 +151,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   }
 
   if (n >= 3) {
-    if (animType === "prev") {
+    if (animType === 'prev') {
       card3Index = validIndex;
     } else {
       card3Index = (validIndex + 2) % n;
@@ -165,25 +165,25 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   // 最前面カードのスタイル
   const getTopCardStyle = () => {
     if (isAnimating) {
-      const xPercent = exitDirection === "left" ? "-120%" : "120%";
-      const rotateDeg = exitDirection === "left" ? -15 : 15;
+      const xPercent = exitDirection === 'left' ? '-120%' : '120%';
+      const rotateDeg = exitDirection === 'left' ? -15 : 15;
       return {
         transform: `translateX(${xPercent}) rotate(${rotateDeg}deg)`,
         opacity: 0,
-        transition: "transform 0.35s ease-out, opacity 0.35s ease-out",
+        transition: 'transform 0.35s ease-out, opacity 0.35s ease-out',
       };
     }
     if (isDragging) {
       return {
         transform: `translateX(${dragOffset}px) rotate(${dragOffset * 0.05}deg)`,
         opacity: 1,
-        transition: "none",
+        transition: 'none',
       };
     }
     return {
-      transform: "translateX(0px) rotate(0deg)",
+      transform: 'translateX(0px) rotate(0deg)',
       opacity: 1,
-      transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+      transition: 'transform 0.2s ease-out, opacity 0.2s ease-out',
     };
   };
 
@@ -191,9 +191,9 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   const getCard2Style = () => {
     if (isAnimating) {
       return {
-        transform: "scale(1) translateY(0px)",
+        transform: 'scale(1) translateY(0px)',
         opacity: 1,
-        transition: "transform 0.35s ease-out, opacity 0.35s ease-out",
+        transition: 'transform 0.35s ease-out, opacity 0.35s ease-out',
       };
     }
     if (isDragging) {
@@ -202,13 +202,13 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
       return {
         transform: `scale(${scale}) translateY(${translateY}px)`,
         opacity: 0.95,
-        transition: "none",
+        transition: 'none',
       };
     }
     return {
-      transform: "scale(0.95) translateY(10px)",
+      transform: 'scale(0.95) translateY(10px)',
       opacity: 0.9,
-      transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+      transition: 'transform 0.2s ease-out, opacity 0.2s ease-out',
     };
   };
 
@@ -216,24 +216,24 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   const getCard3Style = () => {
     if (isAnimating) {
       return {
-        transform: "scale(0.95) translateY(10px)",
+        transform: 'scale(0.95) translateY(10px)',
         opacity: 0.9,
-        transition: "transform 0.35s ease-out, opacity 0.35s ease-out",
+        transition: 'transform 0.35s ease-out, opacity 0.35s ease-out',
       };
     }
     if (isDragging) {
-      const scale = 0.90 + 0.05 * dragProgress;
+      const scale = 0.9 + 0.05 * dragProgress;
       const translateY = 20 - 10 * dragProgress;
       return {
         transform: `scale(${scale}) translateY(${translateY}px)`,
         opacity: 0.8,
-        transition: "none",
+        transition: 'none',
       };
     }
     return {
-      transform: "scale(0.90) translateY(20px)",
+      transform: 'scale(0.90) translateY(20px)',
       opacity: 0.7,
-      transition: "transform 0.2s ease-out, opacity 0.2s ease-out",
+      transition: 'transform 0.2s ease-out, opacity 0.2s ease-out',
     };
   };
 
@@ -242,14 +242,16 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
       {/* 完了済み切り替えボタン */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-bold text-gray-700">
-          {showCompletedList ? `完了済みタスク (${completedTasks.length})` : `進行中のタスク (${activeTasks.length})`}
+          {showCompletedList
+            ? `完了済みタスク (${completedTasks.length})`
+            : `進行中のタスク (${activeTasks.length})`}
         </span>
         {completedTasks.length > 0 && (
           <button
             onClick={() => setShowCompletedList(!showCompletedList)}
             className="text-xs font-bold text-[#1d5c23] hover:underline cursor-pointer"
           >
-            {showCompletedList ? "未完了タスクに戻る" : `完了済みを表示 (${completedTasks.length})`}
+            {showCompletedList ? '未完了タスクに戻る' : `完了済みを表示 (${completedTasks.length})`}
           </button>
         )}
       </div>
@@ -259,7 +261,9 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
           <div className="bg-green-50/80 p-8 rounded-3xl border border-green-200 text-center space-y-2">
             <span className="text-2xl">🎉</span>
             <h4 className="font-black text-gray-900 text-sm">すべてのタスクを完了しました！</h4>
-            <p className="text-xs text-gray-500">お疲れ様でした。講師からのフィードバックをお待ちください。</p>
+            <p className="text-xs text-gray-500">
+              お疲れ様でした。講師からのフィードバックをお待ちください。
+            </p>
           </div>
         ) : (
           <div className="relative pb-6">
@@ -267,7 +271,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
             {activeTasks.length > 1 && (
               <>
                 <button
-                  onClick={() => triggerPrev("right")}
+                  onClick={() => triggerPrev('right')}
                   disabled={isAnimating}
                   className="absolute -left-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
                   aria-label="前のタスク"
@@ -275,7 +279,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                   ‹
                 </button>
                 <button
-                  onClick={() => triggerNext("left")}
+                  onClick={() => triggerNext('left')}
                   disabled={isAnimating}
                   className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
                   aria-label="次のタスク"
@@ -300,7 +304,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                     key={card3Task.id || card3Index}
                     style={{
                       ...getCard3Style(),
-                      transformOrigin: "top center",
+                      transformOrigin: 'top center',
                     }}
                     className="absolute inset-0 z-0 pointer-events-none bg-white p-6 rounded-3xl shadow-xs border border-gray-200 border-l-4 border-l-[#1d5c23]/40 space-y-4"
                   >
@@ -309,16 +313,18 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                         {card3Index + 1} / {activeTasks.length}
                       </span>
                       <Badge type="crop">
-                        {card3Task.tasks?.target_crop || card3Task.target_crop || "春野菜"}
+                        {card3Task.tasks?.target_crop || card3Task.target_crop || '春野菜'}
                       </Badge>
                     </div>
 
                     <div className="space-y-1">
                       <h3 className="text-xl font-black text-gray-900 leading-snug">
-                        {card3Task.tasks?.title || card3Task.title || "タスク"}
+                        {card3Task.tasks?.title || card3Task.title || 'タスク'}
                       </h3>
                       <p className="text-xs text-gray-500 line-clamp-2">
-                        {card3Task.tasks?.description || card3Task.description || "しっかり観察して作業を進めましょう。"}
+                        {card3Task.tasks?.description ||
+                          card3Task.description ||
+                          'しっかり観察して作業を進めましょう。'}
                       </p>
                     </div>
                   </div>
@@ -330,7 +336,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                     key={card2Task.id || card2Index}
                     style={{
                       ...getCard2Style(),
-                      transformOrigin: "top center",
+                      transformOrigin: 'top center',
                     }}
                     className="absolute inset-0 z-10 pointer-events-none bg-white p-6 rounded-3xl shadow-sm border border-gray-200 border-l-4 border-l-[#1d5c23]/60 space-y-4"
                   >
@@ -339,16 +345,18 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                         {card2Index + 1} / {activeTasks.length}
                       </span>
                       <Badge type="crop">
-                        {card2Task.tasks?.target_crop || card2Task.target_crop || "春野菜"}
+                        {card2Task.tasks?.target_crop || card2Task.target_crop || '春野菜'}
                       </Badge>
                     </div>
 
                     <div className="space-y-1">
                       <h3 className="text-xl font-black text-gray-900 leading-snug">
-                        {card2Task.tasks?.title || card2Task.title || "タスク"}
+                        {card2Task.tasks?.title || card2Task.title || 'タスク'}
                       </h3>
                       <p className="text-xs text-gray-500 line-clamp-2">
-                        {card2Task.tasks?.description || card2Task.description || "しっかり観察して作業を進めましょう。"}
+                        {card2Task.tasks?.description ||
+                          card2Task.description ||
+                          'しっかり観察して作業を進めましょう。'}
                       </p>
                     </div>
                   </div>
@@ -360,7 +368,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                     key={topTask.id || validIndex}
                     style={{
                       ...getTopCardStyle(),
-                      transformOrigin: "bottom center",
+                      transformOrigin: 'bottom center',
                     }}
                     className="relative z-20 bg-white p-6 rounded-3xl shadow-md border border-green-100 border-l-4 border-l-[#1d5c23] space-y-4"
                   >
@@ -369,16 +377,18 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                         {validIndex + 1} / {activeTasks.length}
                       </span>
                       <Badge type="crop">
-                        {topTask.tasks?.target_crop || topTask.target_crop || "春野菜"}
+                        {topTask.tasks?.target_crop || topTask.target_crop || '春野菜'}
                       </Badge>
                     </div>
 
                     <div className="space-y-1">
                       <h3 className="text-xl font-black text-gray-900 leading-snug">
-                        {topTask.tasks?.title || topTask.title || "タスク"}
+                        {topTask.tasks?.title || topTask.title || 'タスク'}
                       </h3>
                       <p className="text-xs text-gray-500 line-clamp-2">
-                        {topTask.tasks?.description || topTask.description || "しっかり観察して作業を進めましょう。"}
+                        {topTask.tasks?.description ||
+                          topTask.description ||
+                          'しっかり観察して作業を進めましょう。'}
                       </p>
                     </div>
 
@@ -389,9 +399,24 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                         onClick={() => onSelect(topTask)}
                         className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
                         </svg>
                         <span>📖 詳細・手順を確認して作業する</span>
                       </button>
@@ -406,15 +431,20 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
         /* 完了済みタスク一覧 */
         <div className="space-y-3">
           {completedTasks.map((ct) => (
-            <div key={ct.id} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+            <div
+              key={ct.id}
+              className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs space-y-3"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded">
                     ✓ 完了済み
                   </span>
-                  <h4 className="font-bold text-gray-900 text-sm mt-1">{ct.tasks?.title || ct.title}</h4>
+                  <h4 className="font-bold text-gray-900 text-sm mt-1">
+                    {ct.tasks?.title || ct.title}
+                  </h4>
                 </div>
-                <Badge type="crop">{ct.tasks?.target_crop || ct.target_crop || "完了作業"}</Badge>
+                <Badge type="crop">{ct.tasks?.target_crop || ct.target_crop || '完了作業'}</Badge>
               </div>
 
               {/* 完了タスク用操作ボタン */}

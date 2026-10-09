@@ -1,6 +1,6 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { supabase } from "@/lib/supabase";
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { supabase } from '@/lib/supabase';
 
 export interface FarmItem {
   id: string;
@@ -24,24 +24,26 @@ export const useFarmStore = create<FarmStoreState>()(
   persist(
     (set, get) => ({
       farms: [],
-      activeFarmId: "",
-      activeFarmName: "",
+      activeFarmId: '',
+      activeFarmName: '',
       isLoading: true,
 
       setFarms: (farms) => set({ farms }),
 
       setActiveFarmId: (farmId: string) => {
         const farm = get().farms.find((f) => f.id === farmId);
-        const farmName = farm?.name || "農園";
+        const farmName = farm?.name || '農園';
         set({ activeFarmId: farmId, activeFarmName: farmName });
 
-        if (typeof window !== "undefined") {
+        if (typeof window !== 'undefined') {
           try {
-            localStorage.setItem("nouato_active_farm_id", farmId);
-            localStorage.setItem("nouato_current_farm_name", farmName);
-            window.dispatchEvent(new CustomEvent("nouato_active_farm_changed", { detail: { farmId, farmName } }));
-            const bc = new BroadcastChannel("nouato_farm_sync_channel");
-            bc.postMessage({ type: "FARM_SWITCHED", farmId, farmName });
+            localStorage.setItem('nouato_active_farm_id', farmId);
+            localStorage.setItem('nouato_current_farm_name', farmName);
+            window.dispatchEvent(
+              new CustomEvent('nouato_active_farm_changed', { detail: { farmId, farmName } })
+            );
+            const bc = new BroadcastChannel('nouato_farm_sync_channel');
+            bc.postMessage({ type: 'FARM_SWITCHED', farmId, farmName });
             bc.close();
           } catch (e) {}
         }
@@ -56,9 +58,9 @@ export const useFarmStore = create<FarmStoreState>()(
 
           if (currentUserId) {
             const { data: uData } = await supabase
-              .from("users")
-              .select("farm_id")
-              .eq("id", currentUserId)
+              .from('users')
+              .select('farm_id')
+              .eq('id', currentUserId)
               .maybeSingle();
 
             if (uData?.farm_id) {
@@ -66,16 +68,16 @@ export const useFarmStore = create<FarmStoreState>()(
             }
           }
 
-          let farmsQuery = supabase.from("farms").select("*");
+          let farmsQuery = supabase.from('farms').select('*');
           if (currentUserId) {
             if (teacherFarmId) {
               farmsQuery = farmsQuery.or(`owner_id.eq.${currentUserId},id.eq.${teacherFarmId}`);
             } else {
-              farmsQuery = farmsQuery.eq("owner_id", currentUserId);
+              farmsQuery = farmsQuery.eq('owner_id', currentUserId);
             }
           }
 
-          const { data: dbFarms } = await farmsQuery.order("created_at", { ascending: true });
+          const { data: dbFarms } = await farmsQuery.order('created_at', { ascending: true });
           const farmList: FarmItem[] = dbFarms && dbFarms.length > 0 ? dbFarms : [];
 
           // 保持中の activeFarmId が有効かチェック
@@ -89,21 +91,21 @@ export const useFarmStore = create<FarmStoreState>()(
 
           set({
             farms: farmList,
-            activeFarmId: targetFarmId || (farmList[0]?.id || ""),
-            activeFarmName: targetFarm?.name || farmList[0]?.name || "農園",
+            activeFarmId: targetFarmId || farmList[0]?.id || '',
+            activeFarmName: targetFarm?.name || farmList[0]?.name || '農園',
             isLoading: false,
           });
 
           if (targetFarm) {
             try {
-              localStorage.setItem("nouato_active_farm_id", targetFarm.id);
-              localStorage.setItem("nouato_current_farm_name", targetFarm.name);
+              localStorage.setItem('nouato_active_farm_id', targetFarm.id);
+              localStorage.setItem('nouato_current_farm_name', targetFarm.name);
             } catch (e) {}
           }
 
           return farmList;
         } catch (err) {
-          console.error("fetchTeacherFarms error:", err);
+          console.error('fetchTeacherFarms error:', err);
           set({ isLoading: false });
           return [];
         }
@@ -116,7 +118,10 @@ export const useFarmStore = create<FarmStoreState>()(
         try {
           const { data: authData } = await supabase.auth.getUser();
           const currentUserId = authData?.user?.id;
-          const newId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `farm_${Date.now()}`;
+          const newId =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `farm_${Date.now()}`;
 
           const payload: any = {
             id: newId,
@@ -127,9 +132,9 @@ export const useFarmStore = create<FarmStoreState>()(
             payload.owner_id = currentUserId;
           }
 
-          const { data, error } = await supabase.from("farms").insert([payload]).select().single();
+          const { data, error } = await supabase.from('farms').insert([payload]).select().single();
           if (error) {
-            console.error("createNewFarm insert error:", error);
+            console.error('createNewFarm insert error:', error);
             return null;
           }
 
@@ -141,26 +146,34 @@ export const useFarmStore = create<FarmStoreState>()(
             activeFarmName: createdItem.name,
           });
 
-          if (typeof window !== "undefined") {
+          if (typeof window !== 'undefined') {
             try {
-              localStorage.setItem("nouato_active_farm_id", createdItem.id);
-              localStorage.setItem("nouato_current_farm_name", createdItem.name);
-              window.dispatchEvent(new CustomEvent("nouato_active_farm_changed", { detail: { farmId: createdItem.id, farmName: createdItem.name } }));
-              const bc = new BroadcastChannel("nouato_farm_sync_channel");
-              bc.postMessage({ type: "FARM_SWITCHED", farmId: createdItem.id, farmName: createdItem.name });
+              localStorage.setItem('nouato_active_farm_id', createdItem.id);
+              localStorage.setItem('nouato_current_farm_name', createdItem.name);
+              window.dispatchEvent(
+                new CustomEvent('nouato_active_farm_changed', {
+                  detail: { farmId: createdItem.id, farmName: createdItem.name },
+                })
+              );
+              const bc = new BroadcastChannel('nouato_farm_sync_channel');
+              bc.postMessage({
+                type: 'FARM_SWITCHED',
+                farmId: createdItem.id,
+                farmName: createdItem.name,
+              });
               bc.close();
             } catch (e) {}
           }
 
           return createdItem;
         } catch (err) {
-          console.error("createNewFarm error:", err);
+          console.error('createNewFarm error:', err);
           return null;
         }
       },
     }),
     {
-      name: "nouato_farm_store",
+      name: 'nouato_farm_store',
       partialize: (state) => ({
         activeFarmId: state.activeFarmId,
         activeFarmName: state.activeFarmName,
