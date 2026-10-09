@@ -145,9 +145,10 @@ CREATE TRIGGER on_auth_user_created
 
 -- ------------------------------------------------------------------------------
 -- 4. 仮想ビュー (VIEW): farm_beds_with_students
---    （farm_beds.student_name を参照せず、users.display_name とリアルタイム結合）
+--    （farm_beds.student_name を参照せず、users.display_name とリアルタイム結合。security_invoker = true を適用してRLSバイパスを防止）
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW public.farm_beds_with_students AS
+CREATE OR REPLACE VIEW public.farm_beds_with_students
+WITH (security_invoker = true) AS
 SELECT 
     b.id,
     b.plot_id,
