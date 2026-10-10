@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { GrowthStage, WorkType, CropRecord, FarmBed } from '@/types/farm';
 import Toast from '@/components/ui/Toast';
@@ -11,6 +11,11 @@ import { SproutLoader } from '@/components/SproutLoader';
 import { supabase } from '@/lib/supabase';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
 import { uploadImageToStorage } from '@/lib/storage';
+import {
+  parseCrops,
+  formatBedCropLabel,
+  isRecordMatchingCrop,
+} from '@/lib/farm/companionCropsHelper';
 
 interface StudentFarmRecordViewProps {
   studentId?: string;
@@ -105,6 +110,9 @@ export default function StudentFarmRecordView({
     ? null
     : activeBeds.find((b) => b.id === selectedBedId) || null;
 
+  // 🌟 #2: 混植畝における作物品種フィルタータブ ('all' または個別品種名) 🌟
+  const [selectedCropFilter, setSelectedCropFilter] = useState<string>('all');
+
   // 全体共有記録の抽出
   const sharedRecords = records.filter(
     (r) =>
@@ -112,6 +120,42 @@ export default function StudentFarmRecordView({
       (!r.plot_id || r.plot_id === myPlot?.id)
   );
   const sharedRecordsCount = sharedRecords.length;
+
+  // 🌟 案B: タイムラインへの自動スムーズスクロール用 Ref & ハンドラー 🌟
+  const timelineSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToTimeline = useCallback(() => {
+    setTimeout(() => {
+      if (timelineSectionRef.current) {
+        timelineSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 60);
+  }, []);
+
+  const handleSelectBed = useCallback(
+    (bedId: string) => {
+      setSelectedCropFilter('all');
+      setSelectedBedId((prev) => {
+        const next = prev === bedId ? null : bedId;
+        if (next !== null) {
+          scrollToTimeline();
+        }
+        return next;
+      });
+    },
+    [scrollToTimeline]
+  );
+
+  const handleSelectShared = useCallback(() => {
+    setSelectedCropFilter('all');
+    setSelectedBedId((prev) => {
+      const next = prev === 'shared' ? null : 'shared';
+      if (next !== null) {
+        scrollToTimeline();
+      }
+      return next;
+    });
+  }, [scrollToTimeline]);
 
   const [showInputModal, setShowInputModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<CropRecord | null>(null);
@@ -281,10 +325,17 @@ export default function StudentFarmRecordView({
       }
 
       if (editingRecord) {
+        const targetBedId = isTargetShared
+          ? null
+          : selectedBedId && selectedBedId !== 'shared'
+            ? selectedBedId
+            : currentBed?.id || null;
         updateCropRecord(editingRecord.id, {
+          bed_id: targetBedId,
+          plot_id: myPlot?.id || null,
           crop_name: finalCrop,
           growth_stage: selectedStage,
-          height_cm: Number(heightCm),
+          height_cm: isTargetShared ? undefined : Number(heightCm),
           work_types: selectedWorks,
           notes: taggedNotes,
           harvest_amount: harvestAmount.trim() || undefined,
@@ -366,13 +417,17 @@ export default function StudentFarmRecordView({
   // 🌟 編集モーダルを開く 🌟
   const handleOpenEditModal = (rec: CropRecord) => {
     setEditingRecord(rec);
+    const initialBedId = rec.bed_id ? rec.bed_id : 'shared';
+    setSelectedBedId(initialBedId);
     setSelectedStage((rec.growth_stage as GrowthStage) || '果実肥大');
     setHeightCm(rec.height_cm || 75);
     setSelectedWorks(rec.work_types || ['水やり']);
     const tagCrop = rec.notes?.match(/【(.*?)】/)?.[1] || '';
+    const matchingBed = activeBeds.find((b) => b.id === rec.bed_id);
+    const defaultBedCrop =
+      matchingBed?.crop_name && matchingBed.crop_name !== '未確定 🌱' ? matchingBed.crop_name : '';
     setCustomCropName(
-      tagCrop ||
-        (currentBed?.crop_name && currentBed.crop_name !== '未確定 🌱' ? currentBed.crop_name : '')
+      tagCrop || rec.crop_name || defaultBedCrop || (initialBedId === 'shared' ? '全体共通' : '')
     );
     setNotes(
       (rec.notes || '')
@@ -590,6 +645,23 @@ export default function StudentFarmRecordView({
     return [...observationItems, ...replyItems].sort((a, b) => b.timestamp - a.timestamp);
   })();
 
+  // 🌟 #2: 混植畝の登録品種一覧とタブ絞り込み 🌟
+  const currentBedCrops = parseCrops(currentBed?.crop_name);
+
+  const filteredTimelineItems = synthesizedTimelineItems.filter((item) => {
+    if (selectedCropFilter === 'all') return true;
+    if (item.type === 'observation') {
+      return isRecordMatchingCrop(item.record.crop_name, item.record.notes, selectedCropFilter);
+    }
+    if (item.type === 'teacher_reply') {
+      return (
+        (item.originalQuestion && item.originalQuestion.includes(selectedCropFilter)) ||
+        (item.replyContent && item.replyContent.includes(selectedCropFilter))
+      );
+    }
+    return true;
+  });
+
   if (isLoading || plots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[380px] py-16 animate-fade-in">
@@ -640,7 +712,7 @@ export default function StudentFarmRecordView({
         />
       )}
 
-      {/* 🌟 2. 担当区画内の畝(ベッド)一覧 (縦位置・余白を調整し画面内に収まりやすく改善) 🌟 */}
+      {/* 🌟 2. 担当区画内の畝(ベッド)一覧 (案B: 全体共有の明確化 & タップ時自動スクロール) 🌟 */}
       <div className="bg-white p-3.5 sm:p-5 rounded-3xl border border-gray-200 shadow-xs space-y-2.5">
         <div className="flex flex-wrap items-center justify-between border-b pb-2 gap-2">
           <div className="flex items-center gap-2">
@@ -653,26 +725,6 @@ export default function StudentFarmRecordView({
           </div>
 
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* 🌐 全体共有ボタン */}
-            <button
-              type="button"
-              onClick={() => setSelectedBedId(isSharedSelected ? null : 'shared')}
-              className={`px-2.5 py-1 rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer shadow-2xs border ${
-                isSharedSelected
-                  ? 'bg-emerald-700 text-white border-emerald-800 ring-2 ring-emerald-400'
-                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
-              }`}
-            >
-              <span>🌐 全体共有</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  isSharedSelected ? 'bg-white text-emerald-900' : 'bg-emerald-800 text-white'
-                }`}
-              >
-                {sharedRecordsCount}
-              </span>
-            </button>
-
             {/* 📦 過去の作物を見るボタン */}
             <button
               type="button"
@@ -687,13 +739,52 @@ export default function StudentFarmRecordView({
 
             <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
               {isSharedSelected
-                ? '全体共有 選択中'
+                ? '🌐 全体共有 選択中'
                 : currentBed
                   ? `畝 ${currentBed.bed_number} 選択中`
-                  : '畝をタップして記録を表示'}
+                  : 'タップして記録を表示'}
             </span>
           </div>
         </div>
+
+        {/* 🌐 全体共有（区画全体・共通作業）切り替えバー (案B: 最上部に常設し見落としを防止) */}
+        <button
+          type="button"
+          onClick={handleSelectShared}
+          className={`w-full p-2.5 rounded-2xl border-2 transition font-black text-xs flex items-center justify-between cursor-pointer ${
+            isSharedSelected
+              ? 'bg-emerald-700 text-white border-emerald-800 ring-4 ring-amber-400 shadow-md scale-[1.01]'
+              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border-emerald-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base shrink-0">🌐</span>
+            <div className="text-left">
+              <span className="block font-black text-xs leading-tight">
+                全体共有（区画全体 / 共通作業）
+              </span>
+              <span
+                className={`text-[10px] font-bold leading-tight ${
+                  isSharedSelected ? 'text-emerald-100' : 'text-emerald-800'
+                }`}
+              >
+                資材受取・道具整備・共通タスクの記録
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                isSharedSelected ? 'bg-white text-emerald-900' : 'bg-emerald-800 text-white'
+              }`}
+            >
+              全 {sharedRecordsCount} 件
+            </span>
+            {isSharedSelected && (
+              <span className="text-amber-300 text-xs font-black">✓ 表示中</span>
+            )}
+          </div>
+        </button>
 
         {activeBeds.length === 0 ? (
           <div className="py-8 text-center space-y-2">
@@ -736,7 +827,7 @@ export default function StudentFarmRecordView({
                 <button
                   key={bed.id || `bed_${bed.bed_number}`}
                   type="button"
-                  onClick={() => setSelectedBedId(selectedBedId === bed.id ? null : bed.id)}
+                  onClick={() => handleSelectBed(bed.id)}
                   className={`relative py-2 px-2.5 rounded-2xl border-2 transition font-black text-xs text-center flex flex-col items-center justify-center space-y-0.5 overflow-hidden cursor-pointer ${colorClasses} ${
                     isSelected
                       ? 'ring-4 ring-amber-400 border-amber-400 scale-105 shadow-md z-10'
@@ -751,9 +842,12 @@ export default function StudentFarmRecordView({
                     </div>
                   )}
 
-                  <span className="text-xs font-black leading-tight">畝 {bed.bed_number}</span>
-                  <span className="text-[10.5px] opacity-80 font-bold max-w-[70px] truncate leading-tight">
-                    {bed.crop_name || '未設定'}
+                  <span className="text-xs font-black leading-tight flex items-center gap-1">
+                    <span>畝 {bed.bed_number}</span>
+                    {isSelected && <span className="text-amber-400 text-[10px]">✓</span>}
+                  </span>
+                  <span className="text-[10.5px] opacity-80 font-bold max-w-[85px] truncate leading-tight">
+                    {formatBedCropLabel(bed.crop_name)}
                   </span>
                 </button>
               );
@@ -803,10 +897,16 @@ export default function StudentFarmRecordView({
       )}
 
       {currentBed || isSharedSelected ? (
-        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-gray-200 shadow-xs space-y-4 animate-fade-in">
+        <div
+          ref={timelineSectionRef}
+          className="bg-white p-4 sm:p-5 rounded-3xl border-2 border-emerald-500/50 shadow-xs space-y-4 animate-fade-in scroll-mt-3"
+        >
           <div className="flex flex-wrap items-center justify-between border-b pb-3 gap-2">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] bg-emerald-700 text-white font-black px-2 py-0.5 rounded-md shadow-2xs">
+                  👇 現在表示中
+                </span>
                 <h3 className="font-black text-gray-900 text-sm sm:text-base">
                   {isSharedSelected
                     ? '🌐 全体共有・共通作業の記録'
@@ -868,6 +968,14 @@ export default function StudentFarmRecordView({
                     setEditingRecord(null);
                     setNotes('');
                     setHarvestAmount('');
+                    if (isSharedSelected) {
+                      setCustomCropName('全体共通');
+                    } else if (currentBed) {
+                      const crops = parseCrops(currentBed.crop_name);
+                      setCustomCropName(crops.length === 1 ? crops[0] : '');
+                    } else {
+                      setCustomCropName('');
+                    }
                     setShowInputModal(true);
                   }}
                   className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-xs rounded-xl shadow-xs transition transform active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer"
@@ -920,9 +1028,50 @@ export default function StudentFarmRecordView({
             </div>
           )}
 
-          {synthesizedTimelineItems.length === 0 ? (
+          {/* 🌟 #2: 混植畝の場合の品種別フィルタータブ 🌟 */}
+          {currentBed && currentBedCrops.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] text-gray-500 font-bold shrink-0">品種で絞り込み:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedCropFilter('all')}
+                className={`px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shrink-0 ${
+                  selectedCropFilter === 'all'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                すべて ({currentBedRecords.length})
+              </button>
+              {currentBedCrops.map((crop) => {
+                const count = currentBedRecords.filter((r) =>
+                  isRecordMatchingCrop(r.crop_name, r.notes, crop)
+                ).length;
+                return (
+                  <button
+                    key={crop}
+                    type="button"
+                    onClick={() => setSelectedCropFilter(crop)}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shrink-0 ${
+                      selectedCropFilter === crop
+                        ? 'bg-emerald-700 text-white shadow-2xs'
+                        : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
+                    }`}
+                  >
+                    {crop} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {filteredTimelineItems.length === 0 ? (
             <div className="py-12 text-center text-gray-400 font-bold text-sm space-y-3">
-              <p>この畝にはまだ記録が登録されていません。</p>
+              <p>
+                {selectedCropFilter === 'all'
+                  ? 'この畝にはまだ記録が登録されていません。'
+                  : `「${selectedCropFilter}」に関する記録はまだ登録されていません。`}
+              </p>
               {currentBed?.status !== 'completed_pending' && (
                 <button
                   onClick={() => {
@@ -937,7 +1086,7 @@ export default function StudentFarmRecordView({
             </div>
           ) : (
             <div className="relative border-l-2 border-emerald-200 ml-4 pl-6 space-y-6 my-2">
-              {synthesizedTimelineItems.map((item) => {
+              {filteredTimelineItems.map((item) => {
                 if (item.type === 'teacher_reply') {
                   return (
                     <div key={item.id} className="relative group">
@@ -1090,7 +1239,7 @@ export default function StudentFarmRecordView({
           <div className="pt-1 flex justify-center gap-2">
             <button
               type="button"
-              onClick={() => setSelectedBedId('shared')}
+              onClick={handleSelectShared}
               className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl transition cursor-pointer shadow-2xs"
             >
               🌐 全体共有の記録を見る ({sharedRecordsCount}件)
@@ -1126,8 +1275,20 @@ export default function StudentFarmRecordView({
                 <label className="block text-gray-700 mb-1">対象の畝(ベッド) *</label>
                 <select
                   value={selectedBedId || 'shared'}
-                  onChange={(e) => setSelectedBedId(e.target.value)}
-                  disabled={!!editingRecord}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setSelectedBedId(newId);
+                    if (newId === 'shared') {
+                      if (!customCropName || customCropName === '未確定 🌱') {
+                        setCustomCropName('全体共通');
+                      }
+                    } else {
+                      const b = activeBeds.find((item) => item.id === newId);
+                      if (b?.crop_name && b.crop_name !== '未確定 🌱') {
+                        setCustomCropName(b.crop_name);
+                      }
+                    }
+                  }}
                   className="w-full p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-sm cursor-pointer"
                 >
                   <option value="shared">🌐 全体共有（区画全体 / 共通作業）</option>
@@ -1144,13 +1305,58 @@ export default function StudentFarmRecordView({
                 <label className="block text-gray-700 mb-1">
                   栽培中の作物品種 (自由入力・変更可)
                 </label>
-                <input
-                  type="text"
-                  placeholder="例: 桃太郎トマト、メークイン、中玉トマト"
-                  value={customCropName}
-                  onChange={(e) => setCustomCropName(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-sm"
-                />
+                {/* 🌟 #3: 登録済みの品種がある場合はワンタップ選択チップを表示 🌟 */}
+                {(() => {
+                  const modalTargetBed =
+                    selectedBedId !== 'shared'
+                      ? activeBeds.find((item) => item.id === selectedBedId)
+                      : null;
+                  const modalTargetCrops = parseCrops(modalTargetBed?.crop_name);
+
+                  return (
+                    <>
+                      {modalTargetCrops.length > 0 && (
+                        <div className="mb-2 p-2.5 bg-emerald-50/80 rounded-xl border border-emerald-200 space-y-1.5">
+                          <span className="text-[11px] font-black text-emerald-900 block">
+                            🌱 この畝の品種からワンタップ選択:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {modalTargetCrops.map((crop) => (
+                              <button
+                                key={crop}
+                                type="button"
+                                onClick={() => setCustomCropName(crop)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1 ${
+                                  customCropName === crop
+                                    ? 'bg-emerald-700 text-white shadow-xs ring-2 ring-emerald-500'
+                                    : 'bg-white text-emerald-900 hover:bg-emerald-100 border border-emerald-300'
+                                }`}
+                              >
+                                <span>{customCropName === crop ? '✓' : '＋'}</span>
+                                <span>{crop}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <input
+                        type="text"
+                        placeholder={
+                          modalTargetCrops.length > 0
+                            ? '上のボタンから選ぶか、新しい品種を自由入力'
+                            : '例: きゅうり、ミニトマト、中玉トマト'
+                        }
+                        value={customCropName}
+                        onChange={(e) => setCustomCropName(e.target.value)}
+                        className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 font-bold text-sm"
+                      />
+                      <p className="text-[10px] text-gray-400 font-medium mt-1">
+                        💡
+                        複数の野菜を一緒に育てる（混植）場合は、「きゅうり、ミニトマト」のようにカンマで区切って入力すると同じ畝にまとめて登録できます。
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
 
               <div>

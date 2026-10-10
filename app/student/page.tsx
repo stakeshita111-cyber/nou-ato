@@ -445,7 +445,7 @@ export default function StudentPage() {
 
       {/* メインコンテンツ */}
       <main
-        className={`w-full max-w-md ${activeTab === 'talk' ? 'p-2 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden' : 'p-4 space-y-5 flex-1 pb-28'}`}
+        className={`w-full max-w-md ${activeTab === 'talk' ? 'p-0 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden' : 'p-4 space-y-5 flex-1 pb-28'}`}
       >
         {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
         {activeTab === 'myfarm' && (

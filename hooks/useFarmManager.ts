@@ -1318,6 +1318,9 @@ export function useFarmManager() {
     const finalNotes = baseNotes + (imgToSave ? `\n[IMG:${imgToSave}]` : '');
 
     await updateCropRecordDb(recordId, {
+      bed_id: updatedData.bed_id !== undefined ? updatedData.bed_id : undefined,
+      plot_id: updatedData.plot_id !== undefined ? updatedData.plot_id : undefined,
+      crop_name: updatedData.crop_name,
       notes: finalNotes,
       height_cm: updatedData.height_cm,
       growth_stage: updatedData.growth_stage,

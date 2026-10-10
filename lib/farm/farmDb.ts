@@ -312,6 +312,9 @@ export async function insertCropRecordDb(record: {
 export async function updateCropRecordDb(
   recordId: string,
   payload: {
+    bed_id?: string | null;
+    plot_id?: string | null;
+    crop_name?: string;
     notes?: string;
     height_cm?: number;
     growth_stage?: string;
