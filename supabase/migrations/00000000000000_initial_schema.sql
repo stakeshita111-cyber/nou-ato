@@ -41,8 +41,15 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- farms.owner_id 外部キー追加
-ALTER TABLE public.farms
-    ADD CONSTRAINT fk_farms_owner FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_farms_owner'
+    ) THEN
+        ALTER TABLE public.farms
+            ADD CONSTRAINT fk_farms_owner FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- 1.3 畑区画テーブル (farm_plots)
 CREATE TABLE IF NOT EXISTS public.farm_plots (
@@ -183,7 +190,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 
 -- 1.10 イベント講習会テーブル (events)
 CREATE TABLE IF NOT EXISTS public.events (
-    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    id TEXT NOT NULL DEFAULT gen_random_uuid()::text,
     title TEXT NOT NULL,
     date TEXT NOT NULL,
     date_display TEXT,
@@ -202,7 +209,7 @@ CREATE TABLE IF NOT EXISTS public.events (
 -- 1.11 講習会予約テーブル (reservations)
 CREATE TABLE IF NOT EXISTS public.reservations (
     id UUID NOT NULL DEFAULT gen_random_uuid(),
-    event_id UUID REFERENCES public.events(id) ON DELETE CASCADE,
+    event_id TEXT REFERENCES public.events(id) ON DELETE CASCADE,
     student_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT reservations_pkey PRIMARY KEY (id)
@@ -236,37 +243,59 @@ ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reservations ENABLE ROW LEVEL SECURITY;
 
 -- 開発・本番共通 RLS ポリシー設定 (authenticated / anon への適切なアクセス権)
+DROP POLICY IF EXISTS "Allow full access for authenticated users on farms" ON public.farms;
 CREATE POLICY "Allow full access for authenticated users on farms" ON public.farms FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on farms" ON public.farms;
 CREATE POLICY "Allow read access for anon on farms" ON public.farms FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on users" ON public.users;
 CREATE POLICY "Allow full access for authenticated users on users" ON public.users FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on users" ON public.users;
 CREATE POLICY "Allow read access for anon on users" ON public.users FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on farm_plots" ON public.farm_plots;
 CREATE POLICY "Allow full access for authenticated users on farm_plots" ON public.farm_plots FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on farm_plots" ON public.farm_plots;
 CREATE POLICY "Allow read access for anon on farm_plots" ON public.farm_plots FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on farm_beds" ON public.farm_beds;
 CREATE POLICY "Allow full access for authenticated users on farm_beds" ON public.farm_beds FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on farm_beds" ON public.farm_beds;
 CREATE POLICY "Allow read access for anon on farm_beds" ON public.farm_beds FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on crop_records" ON public.crop_records;
 CREATE POLICY "Allow full access for authenticated users on crop_records" ON public.crop_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on crop_records" ON public.crop_records;
 CREATE POLICY "Allow read access for anon on crop_records" ON public.crop_records FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on tasks" ON public.tasks;
 CREATE POLICY "Allow full access for authenticated users on tasks" ON public.tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on tasks" ON public.tasks;
 CREATE POLICY "Allow read access for anon on tasks" ON public.tasks FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on student_tasks" ON public.student_tasks;
 CREATE POLICY "Allow full access for authenticated users on student_tasks" ON public.student_tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on student_tasks" ON public.student_tasks;
 CREATE POLICY "Allow read access for anon on student_tasks" ON public.student_tasks FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on journals" ON public.journals;
 CREATE POLICY "Allow full access for authenticated users on journals" ON public.journals FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on journals" ON public.journals;
 CREATE POLICY "Allow read access for anon on journals" ON public.journals FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on payments" ON public.payments;
 CREATE POLICY "Allow full access for authenticated users on payments" ON public.payments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on payments" ON public.payments;
 CREATE POLICY "Allow read access for anon on payments" ON public.payments FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on events" ON public.events;
 CREATE POLICY "Allow full access for authenticated users on events" ON public.events FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on events" ON public.events;
 CREATE POLICY "Allow read access for anon on events" ON public.events FOR SELECT TO anon USING (true);
 
+DROP POLICY IF EXISTS "Allow full access for authenticated users on reservations" ON public.reservations;
 CREATE POLICY "Allow full access for authenticated users on reservations" ON public.reservations FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read access for anon on reservations" ON public.reservations;
 CREATE POLICY "Allow read access for anon on reservations" ON public.reservations FOR SELECT TO anon USING (true);
 
 -- ------------------------------------------------------------------------------
