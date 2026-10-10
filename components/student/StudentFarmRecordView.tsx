@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { GrowthStage, WorkType, CropRecord, FarmBed } from '@/types/farm';
 import Toast from '@/components/ui/Toast';
-import TaskSlider from '@/components/student/TaskSlider';
+import TaskSlider, { TaskSliderItem } from '@/components/student/TaskSlider';
 import BedCompletionModal from '@/components/farm/BedCompletionModal';
 import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
 import { SproutLoader } from '@/components/SproutLoader';
@@ -15,8 +15,8 @@ import { uploadImageToStorage } from '@/lib/storage';
 interface StudentFarmRecordViewProps {
   studentId?: string;
   studentName?: string;
-  tasks?: Record<string, unknown>[];
-  onSelectTask?: (task: Record<string, unknown>) => void;
+  tasks?: TaskSliderItem[];
+  onSelectTask?: (task: TaskSliderItem) => void;
   onCompleteTask?: (id: string) => void;
   onUncompleteTask?: (id: string) => void;
   newJournal?: string;
@@ -353,7 +353,7 @@ export default function StudentFarmRecordView({
   };
 
   // 生徒の日誌・返信データ (journals) の取得とリアルタイム同期
-  const [studentJournals, setStudentJournals] = useState<any[]>([]);
+  const [studentJournals, setStudentJournals] = useState<Array<Record<string, unknown>>>([]);
 
   const fetchStudentJournals = useCallback(async () => {
     const targetStudentId = studentId || myPlot?.student_id;

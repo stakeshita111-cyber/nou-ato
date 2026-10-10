@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Badge from '@/components/ui/Badge';
 
 export interface TaskSliderItem {
-  id: string;
+  id?: string;
   task_id?: string;
   title?: string;
   target_crop?: string;
@@ -27,7 +27,7 @@ interface TaskSliderProps {
   onUncomplete?: (id: string) => void;
 }
 
-export default function TaskSlider({ tasks, onSelect }: TaskSliderProps) {
+export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletedList, setShowCompletedList] = useState(false);
 
@@ -473,10 +473,10 @@ export default function TaskSlider({ tasks, onSelect }: TaskSliderProps) {
                   <span>👁 詳細を見る</span>
                 </button>
 
-                {onUncomplete && (
+                {onUncomplete && ct.id && (
                   <button
                     onClick={() => {
-                      onUncomplete(ct.id);
+                      if (ct.id) onUncomplete(ct.id);
                       setShowCompletedList(false);
                     }}
                     className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs rounded-lg transition flex items-center space-x-1 cursor-pointer"

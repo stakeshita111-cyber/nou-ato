@@ -15,11 +15,13 @@ export interface SkillBoardTaskItem {
   id: string;
   status?: string;
   title?: string;
+  description?: string | null;
   badge_name?: string | null;
   badge_icon?: string | null;
   tasks?: {
     id?: string;
     title?: string;
+    description?: string | null;
     badge_name?: string | null;
     badge_icon?: string | null;
     [key: string]: unknown;
