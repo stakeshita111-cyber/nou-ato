@@ -47,16 +47,14 @@ AIおよび開発者は、単に「コードを書いた」「画面モックが
    テストファイル内でTypeScriptの擬似関数を自作して自己満足するテストを禁止する。必ず実装された実コンポーネント、実APIハンドラー、またはDBマイグレーションに対するテストを書くこと。
 4. **型安全性の徹底（新規 `any` の物理禁止）:**  
    `any` による一時的な型エラー回避を禁止する。コミット時フック（lint-staged）およびCIにより、ステージングされた変更ファイル内の `any` はエラーとして物理ブロックされる。
-5. **機械的品質・セキュリティ検証（7重ガードレール）のオールグリーン:**  
+5. **機械的品質・セキュリティ検証（統合ガードレール）のオールグリーン:**  
    完了報告前に必ず自律的に `npm run verify` を実行し、全項目がエラー0件であることを確認すること。
    - `npm run check:clean`（仮コード・秘密情報ゼロ）
-   - `npm run check:schema`（DBスキーマ・TypeScript型整合性）
-   - `npm run check:db`（DB/RLSセキュリティ: 全許可ポリシー禁止・View RLS貫通防止・search_path厳格化）
-   - `npm run check:arch`（アーキテクチャ境界: 秘密環境変数クライアント漏洩防止・localStorage SSOT依存禁止・API Route認証ガード）
-   - `npx tsc --noEmit`（型チェック 0 エラー）
+   - `npm run check:db`（DBスキーマ・RLSセキュリティ・型整合性統合検証）
+   - `npx tsc --noEmit`（TypeScript 型チェック 0 エラー）
    - `npm test`（Vitest テスト全件パス）
    - `npm run format:check`（Prettier 整形チェック）
-   - `npm run lint`（ESLint エラー 0 件）
+   - `npm run lint`（ESLint ASTアーキテクチャ境界 & any 物理禁止）
 
 ### 曖昧な要件への対応プロトコル（推測実装の禁止）
 
@@ -78,15 +76,13 @@ Supabase のテーブルや列の追加・変更は必ず `supabase/migrations/`
 ## 6. 検証・ビルド・開発コマンド一覧
 
 - **依存関係取得:** `npm install`
-- **一括品質・セキュリティ検証（7重ガードレール）:** `npm run verify`
+- **一括品質・セキュリティ検証:** `npm run verify`
 - **仮コード・秘密情報検証:** `npm run check:clean`
-- **DBスキーマ・型整合性検証:** `npm run check:schema`
-- **DBセキュリティ・RLS検証:** `npm run check:db`
-- **アーキテクチャ境界・API認証検証:** `npm run check:arch`
+- **DBスキーマ・RLS統合検証:** `npm run check:db`
 - **型チェック（単体）:** `npm run typecheck`
 - **テスト実行:** `npm test`
 - **コード自動整形:** `npm run format`
 - **コード整形検証:** `npm run format:check`
-- **Lintエラーチェック:** `npm run lint`
+- **Lintエラーチェック (AST境界含む):** `npm run lint`
 - **本番ビルド検証:** `npm run build`
 - **開発サーバー起動:** `npm run dev`

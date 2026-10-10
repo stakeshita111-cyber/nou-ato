@@ -1,4 +1,4 @@
 npm run check:clean
-npm run check:schema
+npm run check:db
 npm run typecheck
 npx lint-staged
