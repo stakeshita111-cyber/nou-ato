@@ -142,15 +142,15 @@ npx supabase db push
 
 ---
 
-#### B. Storage バケット (`journals`) の作成と公開設定
+#### B. Storage バケット (`crop-photos`) の作成と公開設定
 
-日誌投稿時の写真アップロードに必要な `journals` ストレージバケットを作成します。
+日誌・観察記録投稿時の写真アップロードに必要な `crop-photos` ストレージバケットを作成します。
 
 ##### 手順:
 
 1. Supabase Dashboard の左メニューから **Storage** を選択します。
 2. **New bucket** ボタンをクリックし、以下の設定でバケットを作成します：
-   - **Bucket name**: `journals`
+   - **Bucket name**: `crop-photos`
    - **Public bucket**: **ON** (有効化: 投稿された画像URLの公開アクセスのため)
 3. バケット作成後、認証済みユーザーが画像をアップロードできるように RLS ポリシー（Policies）を設定します：
    - **SELECT**: `Public` (全員読み取り可能)

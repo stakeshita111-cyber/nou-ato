@@ -5,9 +5,10 @@ import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import {
   getTicketState,
-  consumeTicket,
+  parseTicketStatus,
   DEFAULT_DAILY_TICKETS,
   TicketPlanType,
+  TicketState,
   addQuestionStock,
   clearQuestionStock,
   formatStockText,
@@ -117,48 +118,35 @@ export default function StudentTalkView({
   const [searchKeyword, setSearchKeyword] = useState('');
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
-  // AI相談チケット State
-  const [ticketState, setTicketState] = useState(() =>
-    getTicketState(studentId || 'default', customDailyLimit, planType)
-  );
+  // AI相談チケット State（残数・上限は DB が正。取得前は仮表示）
+  const [ticketState, setTicketState] = useState(() => getTicketState(customDailyLimit, planType));
 
-  useEffect(() => {
-    const current = getTicketState(studentId || 'default', customDailyLimit, planType);
-    setTicketState(current);
-  }, [studentId, customDailyLimit, planType]);
-
-  // リアルタイム・クロス cellophane チケット残数同期
-  useEffect(() => {
-    const updateState = () => {
-      const current = getTicketState(studentId || 'default', customDailyLimit, planType);
-      setTicketState(current);
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('nouato_tickets_updated', updateState);
-      window.addEventListener('nouato_sync_event', updateState);
-      window.addEventListener('storage', updateState);
+  // 最新の残数を DB から取得する。失敗時は null を返し、残数を偽って表示しない。
+  const refreshTicketState = useCallback(async (): Promise<TicketState | null> => {
+    if (planType !== 'limited') {
+      const fixed = getTicketState(customDailyLimit, planType);
+      setTicketState(fixed);
+      return fixed;
     }
+    const { data, error } = await supabase.rpc('get_ai_ticket_status');
+    if (error) return null;
+    const parsed = parseTicketStatus(data);
+    if (parsed) setTicketState(parsed);
+    return parsed;
+  }, [customDailyLimit, planType]);
 
-    let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel('nouato_farm_sync_channel');
-      bc.onmessage = (event) => {
-        if (event.data?.type === 'TICKETS_UPDATED') {
-          updateState();
-        }
-      };
-    } catch {}
+  useEffect(() => {
+    void refreshTicketState();
+  }, [studentId, refreshTicketState]);
 
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('nouato_tickets_updated', updateState);
-        window.removeEventListener('nouato_sync_event', updateState);
-        window.removeEventListener('storage', updateState);
-      }
-      if (bc) bc.close();
+  // 講師が付与した直後などに反映するため、画面が前面に戻ったとき再取得
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshTicketState();
     };
-  }, [studentId, customDailyLimit, planType]);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshTicketState]);
 
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
   const loadChatHistory = useCallback(async () => {
@@ -434,7 +422,13 @@ export default function StudentTalkView({
     const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     const userMsgId = 'user_' + Date.now();
 
-    const currentTicket = getTicketState(studentId || 'default', customDailyLimit, planType);
+    // 残数は DB が正。取得できない場合は送信せず失敗を表示（残数を偽らない）
+    const currentTicket = await refreshTicketState();
+    if (!currentTicket) {
+      setToastMessage('チケット残数を確認できませんでした。通信状況を確認して再度お試しください');
+      setShowToast(true);
+      return;
+    }
     const hasTicket = currentTicket.isUnlimited || currentTicket.count > 0;
     const isMemoOnly = !hasTicket;
 
@@ -468,17 +462,6 @@ export default function StudentTalkView({
       return;
     }
 
-    if (currentTicket.isUnlimited) {
-      setToastMessage('🌟 AIに相談しました（相談し放題プラン）');
-      setShowToast(true);
-    } else if (hasTicket) {
-      const consumed = consumeTicket(studentId || 'default', customDailyLimit, planType);
-      setTicketState(consumed);
-      clearQuestionStock(studentId || 'default');
-      setToastMessage('🎟️ チケットを使って相談しました（本日残り' + consumed.count + '回）');
-      setShowToast(true);
-    }
-
     try {
       const res = await fetch('/api/chat/rag', {
         method: 'POST',
@@ -492,15 +475,16 @@ export default function StudentTalkView({
 
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}));
-        setToastMessage(data.detail || '本日のAI相談上限（1日3回）に達しました');
+        setToastMessage(data.detail || '本日のAI相談チケットの上限に達しました');
         setShowToast(true);
         const limitMsg: MessageItem = {
           id: 'bot_limit_' + Date.now(),
           sender: 'teacher',
-          text: '【しるべぇ】本日のAI相談チケット（1日3回）上限に達しました🙇 ご入力内容は質問メモとして大切にお預かりしましたので、次回来園時に講師にご相談くださいね🌱',
+          text: '【しるべぇ】本日のAI相談チケットの上限に達しました🙇 ご入力内容は質問メモとして大切にお預かりしましたので、次回来園時に講師にご相談くださいね🌱',
           timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, limitMsg]);
+        void refreshTicketState();
         return;
       }
 
@@ -516,6 +500,22 @@ export default function StudentTalkView({
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+      clearQuestionStock(studentId || 'default');
+
+      // 成功後に最新の残数を DB から再取得して表示
+      const latest = await refreshTicketState();
+      if (data.saved === false) {
+        setToastMessage(
+          '⚠️ 回答は表示しましたが、相談履歴の保存に失敗しました。講師には届いていません'
+        );
+      } else if (currentTicket.isUnlimited) {
+        setToastMessage('🌟 AIに相談しました（相談し放題プラン）');
+      } else {
+        setToastMessage(
+          '🎟️ チケットを使って相談しました' + (latest ? `（本日残り${latest.count}回）` : '')
+        );
+      }
+      setShowToast(true);
     } catch (err) {
       console.error('Chat sending error:', err);
       const fallbackMsg: MessageItem = {

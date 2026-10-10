@@ -28,12 +28,15 @@ describe('Kanban board checklist badge mapping logic', () => {
       },
     ];
 
-    const mappedTasks = rawDataFromDb.map((t: any) => {
-      const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
+    const mappedTasks = rawDataFromDb.map((t) => {
+      const cl =
+        t.checklist && typeof t.checklist === 'object'
+          ? (t.checklist as Record<string, unknown>)
+          : {};
       return {
         ...t,
-        badge_name: t.badge_name || cl.badge_name || null,
-        badge_icon: t.badge_icon || cl.badge_icon || null,
+        badge_name: t.badge_name || (cl.badge_name as string | undefined) || null,
+        badge_icon: t.badge_icon || (cl.badge_icon as string | undefined) || null,
       };
     });
 
@@ -44,7 +47,7 @@ describe('Kanban board checklist badge mapping logic', () => {
   });
 
   it('prepares update payload for Supabase without top-level badge columns, storing badge in checklist JSON', () => {
-    const existingTask: { id: string; title: string; checklist: Record<string, any> } = {
+    const existingTask: { id: string; title: string; checklist: Record<string, unknown> } = {
       id: 'task-100',
       title: 'キュウリの収穫',
       checklist: {
@@ -64,7 +67,7 @@ describe('Kanban board checklist badge mapping logic', () => {
       existingTask.checklist && typeof existingTask.checklist === 'object'
         ? existingTask.checklist
         : {};
-    const updatedChecklist: Record<string, any> = {
+    const updatedChecklist: Record<string, unknown> = {
       ...existingChecklist,
       badge_name: updatedTaskInput.badge_name || null,
       badge_icon: updatedTaskInput.badge_icon || null,

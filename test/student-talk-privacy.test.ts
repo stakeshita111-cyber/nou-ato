@@ -1,10 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { formatQuestionTopic, prepareMessageForSend } from '@/lib/utils/journalHelper';
 
-export function processChatHistory(targetList: any[]) {
+interface ChatHistoryItem {
+  id?: string;
+  content?: string;
+  task_title?: string;
+  reply?: string;
+  role?: string;
+  text?: string;
+  sender?: 'student' | 'teacher';
+}
+
+export function processChatHistory(targetList: ChatHistoryItem[]) {
   const formatted: { id: string; sender: 'student' | 'teacher'; text: string }[] = [];
 
-  (targetList || []).forEach((j: any) => {
+  (targetList || []).forEach((j) => {
     const c = (j.content || '').trim();
 
     if (

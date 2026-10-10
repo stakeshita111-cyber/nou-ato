@@ -148,7 +148,9 @@ describe('Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const eqMock = vi.fn();
       eqMock.mockReturnValue({ eq: eqMock, not: notMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-      const fromMock = vi.spyOn(supabase, 'from').mockReturnValue({ select: selectMock } as any);
+      const fromMock = vi
+        .spyOn(supabase, 'from')
+        .mockReturnValue({ select: selectMock } as unknown as ReturnType<typeof supabase.from>);
 
       const result = await searchSimilarKnowledge('トマト 追肥');
 
@@ -189,7 +191,9 @@ describe('Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const eqMock = vi.fn();
       eqMock.mockReturnValue({ eq: eqMock, not: notMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-      const fromMock = vi.spyOn(supabase, 'from').mockReturnValue({ select: selectMock } as any);
+      const fromMock = vi
+        .spyOn(supabase, 'from')
+        .mockReturnValue({ select: selectMock } as unknown as ReturnType<typeof supabase.from>);
 
       // 1. content のみに含まれるキーワード（「カボチャ」）で検索してもヒットしないこと
       const pumpkinResult = await searchSimilarKnowledge('カボチャ 相談');
@@ -226,7 +230,9 @@ describe('Knowledge Retriever & Quality Logic Tests (コード品質・プライ
       const eqMock = vi.fn();
       eqMock.mockReturnValue({ eq: eqMock, not: notMock });
       const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-      const fromMock = vi.spyOn(supabase, 'from').mockReturnValue({ select: selectMock } as any);
+      const fromMock = vi
+        .spyOn(supabase, 'from')
+        .mockReturnValue({ select: selectMock } as unknown as ReturnType<typeof supabase.from>);
 
       // ユーザーがトマトについて質問した際、replyにトマトが含まれないため除外されること
       const tomatoResult = await searchSimilarKnowledge('トマト 防虫ネット');

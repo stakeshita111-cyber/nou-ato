@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/types/supabase';
 
 export interface FarmItem {
   id: string;
@@ -123,7 +124,7 @@ export const useFarmStore = create<FarmStoreState>()(
               ? crypto.randomUUID()
               : `farm_${Date.now()}`;
 
-          const payload: any = {
+          const payload: Database['public']['Tables']['farms']['Insert'] = {
             id: newId,
             name: cleanName,
             created_at: new Date().toISOString(),

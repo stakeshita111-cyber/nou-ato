@@ -37,5 +37,5 @@ if (typeof globalThis.WebSocket === 'undefined') {
     }
   }
 
-  globalThis.WebSocket = MockWebSocket as any;
+  globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
 }

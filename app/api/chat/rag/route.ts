@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { generateRagAnswer, ChatHistoryItem, ReferencedQA } from '@/lib/rag/qaKnowledgeRetriever';
-import { getJstDateString } from '@/lib/ticketManager';
 import { createClient } from '@/utils/supabase/server';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
@@ -47,38 +46,10 @@ export async function POST(request: Request) {
       sessionUser.email?.split('@')[0] ||
       studentName;
 
-    const todayJst = getJstDateString();
-
     // 2. 多層防御②: サーバー側回数制限 (1日3回 + 講師付与チケット分)
+    //    上限算出と加算は DB 関数が auth.uid() を使い、1文でアトミックに行う。
     if (!isMemoOnly) {
-      // 本日の追加付与チケット数を取得
-      let grantedCount = 0;
-      try {
-        const ticketQuery = supabase
-          .from('ai_tickets')
-          .select('granted_count')
-          .eq('student_id', studentId)
-          .eq('date', todayJst);
-        const ticketResult =
-          typeof ticketQuery?.maybeSingle === 'function'
-            ? await ticketQuery.maybeSingle()
-            : typeof ticketQuery?.single === 'function'
-              ? await ticketQuery.single()
-              : null;
-        if (ticketResult?.data && typeof ticketResult.data.granted_count === 'number') {
-          grantedCount = ticketResult.data.granted_count;
-        }
-      } catch (e) {
-        logger.warn('Failed to query ai_tickets granted_count:', 'api/chat/rag', undefined, e);
-      }
-
-      const effectiveLimit = 3 + grantedCount;
-
-      const { data: allowed, error: rpcErr } = await supabase.rpc('check_and_increment_ai_usage', {
-        p_user_id: studentId,
-        p_date: todayJst,
-        p_limit: effectiveLimit,
-      });
+      const { data: allowed, error: rpcErr } = await supabase.rpc('check_and_increment_ai_usage');
 
       if (rpcErr) {
         logger.error(
@@ -92,9 +63,9 @@ export async function POST(request: Request) {
         );
       }
 
-      if (allowed === false) {
+      if (allowed !== true) {
         return ApiResponse.tooManyRequests(
-          `本日のAI相談チケット（1日${effectiveLimit}回）上限に達しました`
+          '本日のAI相談チケットの上限に達しました（1日3回＋講師からの追加付与分）'
         );
       }
     }
@@ -133,6 +104,7 @@ export async function POST(request: Request) {
 
     // 4. Supabase の journals テーブルに対話履歴・質問メモを保存 (is_privateフラグ & is_approved: false)
     const isPrivate = message.startsWith('【非公開相談】');
+    let saved = true;
     try {
       const { error: insertErr } = await supabase.from('journals').insert([
         {
@@ -148,15 +120,18 @@ export async function POST(request: Request) {
       ]);
 
       if (insertErr) {
+        saved = false;
         logger.error('journals insert error:', 'api/chat/rag', undefined, insertErr);
       }
     } catch (dbErr) {
+      saved = false;
       logger.warn('journals insert exception:', 'api/chat/rag', undefined, dbErr);
     }
 
     return ApiResponse.success({
       reply,
       referencedQa,
+      saved,
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {

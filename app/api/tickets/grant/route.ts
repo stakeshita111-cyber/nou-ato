@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
-import { supabase as clientSupabase } from '@/lib/supabase';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 
@@ -40,12 +39,7 @@ export async function POST(request: Request) {
 
     const { studentId, amount } = parseResult.data;
 
-    let supabase = clientSupabase;
-    try {
-      supabase = await createClient();
-    } catch {
-      supabase = clientSupabase;
-    }
+    const supabase = await createClient();
 
     // 1. 認証チェック（未ログインは 401）
     const {
@@ -57,7 +51,7 @@ export async function POST(request: Request) {
       return ApiResponse.unauthorized('チケットの付与にはログインが必要です');
     }
 
-    // 2. 講師権限チェック（teacher でなければ 403）
+    // 2. 講師権限チェック（農園に所属する teacher でなければ 403）
     const userQuery = supabase.from('users').select('role, farm_id').eq('id', sessionUser.id);
     const userResult =
       typeof userQuery.maybeSingle === 'function'
@@ -65,26 +59,26 @@ export async function POST(request: Request) {
         : await userQuery.single();
     const dbUser = userResult?.data;
 
-    if (!dbUser || dbUser.role !== 'teacher') {
-      return ApiResponse.forbidden('チケットの追加付与権限は講師のみに付与されています');
+    if (!dbUser || dbUser.role !== 'teacher' || !dbUser.farm_id) {
+      return ApiResponse.forbidden(
+        'チケットの追加付与権限は農園に所属する講師のみに付与されています'
+      );
     }
 
     // 3. 同一農園チェック（他農園の受講生には付与不可）
-    if (dbUser.farm_id) {
-      const studentQuery = supabase.from('users').select('farm_id, role').eq('id', studentId);
-      const studentResult =
-        typeof studentQuery.maybeSingle === 'function'
-          ? await studentQuery.maybeSingle()
-          : await studentQuery.single();
-      const targetStudent = studentResult?.data;
+    const studentQuery = supabase.from('users').select('farm_id, role').eq('id', studentId);
+    const studentResult =
+      typeof studentQuery.maybeSingle === 'function'
+        ? await studentQuery.maybeSingle()
+        : await studentQuery.single();
+    const targetStudent = studentResult?.data;
 
-      if (!targetStudent) {
-        return ApiResponse.notFound('対象の受講生が見つかりません');
-      }
+    if (!targetStudent) {
+      return ApiResponse.notFound('対象の受講生が見つかりません');
+    }
 
-      if (targetStudent.farm_id !== dbUser.farm_id) {
-        return ApiResponse.forbidden('他農園の受講生にチケットを付与することはできません');
-      }
+    if (targetStudent.farm_id !== dbUser.farm_id) {
+      return ApiResponse.forbidden('他農園の受講生にチケットを付与することはできません');
     }
 
     // 4. Postgres 関数 `grant_ai_tickets` をアトミックに呼び出し

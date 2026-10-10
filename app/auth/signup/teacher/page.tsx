@@ -100,7 +100,7 @@ export default function TeacherSignUpPage() {
         return;
       }
 
-      const createdFarmId = (rpcResult as any)?.farm_id;
+      const createdFarmId = (rpcResult as { farm_id?: string } | null)?.farm_id;
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('nouato_owner_name', teacherName.trim());

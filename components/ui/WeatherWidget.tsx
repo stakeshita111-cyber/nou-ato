@@ -3,6 +3,35 @@
 import { useEffect, useState, useRef } from 'react';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/types/supabase';
+
+interface LeafletMapInstance {
+  remove: () => void;
+  setView: (center: [number, number], zoom: number) => LeafletMapInstance;
+  on: (event: string, fn: () => void) => void;
+  getCenter: () => { lat: number; lng: number };
+}
+
+interface LeafletGlobal {
+  map: (element: HTMLElement, options?: Record<string, unknown>) => LeafletMapInstance;
+  tileLayer: (
+    url: string,
+    options?: Record<string, unknown>
+  ) => { addTo: (map: LeafletMapInstance) => void };
+}
+
+interface UserWeatherFields {
+  weather_location_name?: string | null;
+  weather_lat?: number | string | null;
+  weather_lon?: number | string | null;
+}
+
+interface GeocodingResultItem {
+  name: string;
+  admin1?: string;
+  latitude: number;
+  longitude: number;
+}
 
 export type SprayingStatus = 'good' | 'warning' | 'danger';
 export type IrrigationStatus = 'skip' | 'normal' | 'heavy';
@@ -151,7 +180,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   const [isSearching, setIsSearching] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const leafletMapRef = useRef<any>(null);
+  const leafletMapRef = useRef<LeafletMapInstance | null>(null);
 
   const [weather, setWeather] = useState<WeatherData>({
     municipalityName: '千葉県千葉市',
@@ -513,10 +542,11 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             .eq('id', user.id)
             .maybeSingle();
 
-          if (profile && (profile as any).weather_location_name) {
-            currentName = (profile as any).weather_location_name;
-            currentLat = Number((profile as any).weather_lat);
-            currentLon = Number((profile as any).weather_lon);
+          const weatherProfile = profile as unknown as UserWeatherFields | null;
+          if (weatherProfile && weatherProfile.weather_location_name) {
+            currentName = weatherProfile.weather_location_name;
+            currentLat = Number(weatherProfile.weather_lat);
+            currentLon = Number(weatherProfile.weather_lon);
             foundFromDb = true;
           }
         }
@@ -576,13 +606,13 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
       const targetPlot = plotData && plotData.length > 0 ? plotData[0] : null;
       if (targetPlot) {
-        let existingMeta: any = {};
+        let existingMeta: Record<string, unknown> = {};
         if (targetPlot.description) {
           try {
             existingMeta =
               typeof targetPlot.description === 'string'
-                ? JSON.parse(targetPlot.description)
-                : targetPlot.description;
+                ? (JSON.parse(targetPlot.description) as Record<string, unknown>)
+                : (targetPlot.description as Record<string, unknown>);
           } catch {}
         }
         const updatedMeta = {
@@ -593,7 +623,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             lon: longitude,
           },
           farm_meta: {
-            ...(existingMeta.farm_meta || {}),
+            ...((existingMeta.farm_meta as Record<string, unknown> | undefined) || {}),
             weather_location: {
               name: cityName,
               lat: latitude,
@@ -619,7 +649,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
             weather_location_name: cityName,
             weather_lat: latitude,
             weather_lon: longitude,
-          } as any)
+          } as unknown as Database['public']['Tables']['users']['Update'])
           .eq('id', user.id);
       }
     } catch (e) {
@@ -652,7 +682,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   };
 
   const initCenterPinMap = () => {
-    const L = (window as any).L;
+    const L = (window as unknown as { L?: LeafletGlobal }).L;
     if (!L || !mapContainerRef.current) return;
 
     if (leafletMapRef.current) {
@@ -669,7 +699,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
     leafletMapRef.current = map;
 
-    let timer: any;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     map.on('moveend', () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
@@ -688,7 +718,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
   useEffect(() => {
     if (isLocationModalOpen && mapContainerRef.current) {
-      if (!(window as any).L) {
+      if (!(window as unknown as { L?: LeafletGlobal }).L) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -722,7 +752,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
       if (res.ok) {
         const data = await res.json();
         if (data.results && data.results.length > 0) {
-          const formatted = data.results.map((item: any) => ({
+          const formatted = (data.results as GeocodingResultItem[]).map((item) => ({
             name: `${item.admin1 || ''} ${item.name}`.trim(),
             lat: Math.round(item.latitude * 10000) / 10000,
             lon: Math.round(item.longitude * 10000) / 10000,

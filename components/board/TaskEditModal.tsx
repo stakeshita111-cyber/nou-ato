@@ -110,9 +110,10 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
 
       setToastMessage('📋 テンプレートに追加しました！');
       setShowToast(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save as template:', err);
-      setToastMessage(`❌ テンプレートの追加に失敗しました: ${err?.message || '不明なエラー'}`);
+      const msg = err instanceof Error ? err.message : '不明なエラー';
+      setToastMessage(`❌ テンプレートの追加に失敗しました: ${msg}`);
       setShowToast(true);
     } finally {
       setIsSavingTemplate(false);

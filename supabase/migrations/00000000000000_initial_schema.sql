@@ -242,61 +242,8 @@ ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reservations ENABLE ROW LEVEL SECURITY;
 
--- 開発・本番共通 RLS ポリシー設定 (authenticated / anon への適切なアクセス権)
-DROP POLICY IF EXISTS "Allow full access for authenticated users on farms" ON public.farms;
-CREATE POLICY "Allow full access for authenticated users on farms" ON public.farms FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on farms" ON public.farms;
-CREATE POLICY "Allow read access for anon on farms" ON public.farms FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on users" ON public.users;
-CREATE POLICY "Allow full access for authenticated users on users" ON public.users FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on users" ON public.users;
-CREATE POLICY "Allow read access for anon on users" ON public.users FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on farm_plots" ON public.farm_plots;
-CREATE POLICY "Allow full access for authenticated users on farm_plots" ON public.farm_plots FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on farm_plots" ON public.farm_plots;
-CREATE POLICY "Allow read access for anon on farm_plots" ON public.farm_plots FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on farm_beds" ON public.farm_beds;
-CREATE POLICY "Allow full access for authenticated users on farm_beds" ON public.farm_beds FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on farm_beds" ON public.farm_beds;
-CREATE POLICY "Allow read access for anon on farm_beds" ON public.farm_beds FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on crop_records" ON public.crop_records;
-CREATE POLICY "Allow full access for authenticated users on crop_records" ON public.crop_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on crop_records" ON public.crop_records;
-CREATE POLICY "Allow read access for anon on crop_records" ON public.crop_records FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on tasks" ON public.tasks;
-CREATE POLICY "Allow full access for authenticated users on tasks" ON public.tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on tasks" ON public.tasks;
-CREATE POLICY "Allow read access for anon on tasks" ON public.tasks FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on student_tasks" ON public.student_tasks;
-CREATE POLICY "Allow full access for authenticated users on student_tasks" ON public.student_tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on student_tasks" ON public.student_tasks;
-CREATE POLICY "Allow read access for anon on student_tasks" ON public.student_tasks FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on journals" ON public.journals;
-CREATE POLICY "Allow full access for authenticated users on journals" ON public.journals FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on journals" ON public.journals;
-CREATE POLICY "Allow read access for anon on journals" ON public.journals FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on payments" ON public.payments;
-CREATE POLICY "Allow full access for authenticated users on payments" ON public.payments FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on payments" ON public.payments;
-CREATE POLICY "Allow read access for anon on payments" ON public.payments FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on events" ON public.events;
-CREATE POLICY "Allow full access for authenticated users on events" ON public.events FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on events" ON public.events;
-CREATE POLICY "Allow read access for anon on events" ON public.events FOR SELECT TO anon USING (true);
-
-DROP POLICY IF EXISTS "Allow full access for authenticated users on reservations" ON public.reservations;
-CREATE POLICY "Allow full access for authenticated users on reservations" ON public.reservations FOR ALL TO authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow read access for anon on reservations" ON public.reservations;
-CREATE POLICY "Allow read access for anon on reservations" ON public.reservations FOR SELECT TO anon USING (true);
+-- RLS ポリシーは後続のマイグレーション（20261010020000_purge_legacy_rls_and_harden_security.sql 等）で
+-- 厳格なマルチテナント分離ポリシーとして定義・適用されます。
 
 -- ------------------------------------------------------------------------------
 -- 4. 仮想ビュー (VIEW): farm_beds_with_students

@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { VEGETABLE_TASK_TEMPLATES, TaskTemplate } from '@/lib/taskTemplates';
+import {
+  VEGETABLE_TASK_TEMPLATES,
+  TaskTemplate,
+  TaskCategory,
+  TaskSeason,
+  TaskPhase,
+} from '@/lib/taskTemplates';
 import { supabase } from '@/lib/supabase';
 
 interface TaskTemplateModalProps {
@@ -28,15 +34,18 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
           .is('deleted_at', null);
 
         if (dbTemplates && dbTemplates.length > 0) {
-          customTemplates = dbTemplates.map((t: any) => {
-            const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
+          customTemplates = dbTemplates.map((t) => {
+            const cl =
+              t.checklist && typeof t.checklist === 'object'
+                ? (t.checklist as Record<string, unknown>)
+                : {};
             return {
               id: t.id,
               title: t.title,
-              category: t.category || '共通',
+              category: (t.category as TaskCategory) || '共通',
               target_crop: t.target_crop || '共通',
-              phase: cl.phase || '育成管理',
-              season: cl.season || '通年',
+              phase: typeof cl.phase === 'string' ? (cl.phase as TaskPhase) : '育成・管理',
+              season: typeof cl.season === 'string' ? (cl.season as TaskSeason) : '通年',
               estimated_time: t.estimated_time || '30分',
               tools_needed: t.tools_needed || '軍手',
               description: t.description || '',
@@ -44,8 +53,8 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
               exp: t.exp || 50,
               difficulty: t.difficulty || 1,
               require_photo: Boolean(t.require_photo),
-              badge_name: cl.badge_name || '栽培マスター',
-              badge_icon: cl.badge_icon || '🌿',
+              badge_name: typeof cl.badge_name === 'string' ? cl.badge_name : '栽培マスター',
+              badge_icon: typeof cl.badge_icon === 'string' ? cl.badge_icon : '🌿',
             };
           });
         }

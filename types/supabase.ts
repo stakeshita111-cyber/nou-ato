@@ -635,12 +635,12 @@ export interface Database {
         Returns: Json;
       };
       check_and_increment_ai_usage: {
-        Args: {
-          p_user_id: string;
-          p_date: string;
-          p_limit?: number;
-        };
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      get_ai_ticket_status: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
       };
       publish_task_to_all_students: {
         Args: {

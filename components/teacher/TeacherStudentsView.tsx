@@ -11,9 +11,8 @@ import QRCodeModal from '@/components/ui/QRCodeModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
 import { formatDate } from '@/lib/utils/formatHelper';
-import { grantTicket } from '@/lib/ticketManager';
 
-interface StudentData {
+export interface StudentData {
   id: string;
   name: string;
   avatar: string;
@@ -491,38 +490,31 @@ export default function TeacherStudentsView() {
   // 🎟️ 講師から特定受講生へ追加チケットを付与する処理
   const handleGrantTicket = async (student: StudentData) => {
     try {
-      // 1. サーバーAPIのエンドポイント POST /api/tickets/grant を呼出
-      await fetch('/api/tickets/grant', {
+      // サーバーAPI POST /api/tickets/grant（講師・同一農園チェック済み、DB の ai_tickets に永続化）
+      const res = await fetch('/api/tickets/grant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: student.id, amount: 1 }),
       });
 
-      // 2. クライアント側のチケットストレージも即時アトミック加算
-      const updated = grantTicket(student.id, 1);
+      if (!res.ok) {
+        const errBody: { detail?: string; message?: string } | null = await res
+          .json()
+          .catch(() => null);
+        setToastMessage(
+          `チケットを付与できませんでした: ${errBody?.detail || errBody?.message || `HTTP ${res.status}`}`
+        );
+        setShowToast(true);
+        return;
+      }
 
       setToastMessage(
-        `🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日残: ${updated.count}枚）`
+        `🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日分・受講生は再読込なしで利用可能）`
       );
       setShowToast(true);
-
-      // 3. リアルタイム同期イベントを発行
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('nouato_sync_event'));
-        try {
-          const bc = new BroadcastChannel('nouato_farm_sync_channel');
-          bc.postMessage({
-            type: 'TICKETS_UPDATED',
-            userId: student.id,
-            updated,
-            timestamp: Date.now(),
-          });
-          bc.close();
-        } catch {}
-      }
     } catch (err) {
       console.error('handleGrantTicket error:', err);
-      setToastMessage('チケット付与中にエラーが発生しました');
+      setToastMessage('チケット付与中に通信エラーが発生しました');
       setShowToast(true);
     }
   };
@@ -535,30 +527,7 @@ export default function TeacherStudentsView() {
     setSendingBroadcast(true);
     try {
       const nowStr = new Date().toISOString();
-      const broadcastObj = {
-        id: `bc_${Date.now()}`,
-        title: broadcastTitle.trim(),
-        content: broadcastBody.trim(),
-        sender: `講師 (${effectiveFarmName || '当農園'})`,
-        created_at: nowStr,
-      };
-
-      // 1. LocalStorageに一括配信リストをアペンド (農園IDスコープ)
-      const bcKey = effectiveFarmId
-        ? `nouato_broadcast_announcements_${effectiveFarmId}`
-        : 'nouato_broadcast_announcements';
-      const existingStr = localStorage.getItem(bcKey);
-      let list = [];
-      if (existingStr) {
-        try {
-          list = JSON.parse(existingStr);
-        } catch {}
-      }
-      list.unshift(broadcastObj);
-      localStorage.setItem(bcKey, JSON.stringify(list));
-      localStorage.setItem('nouato_broadcast_announcements', JSON.stringify(list));
-
-      // 2. Supabase の journals テーブルにも講師配信として保存 (全体向け + 各登録生徒個別宛て)
+      // Supabase の journals テーブルに講師配信として保存 (全体向け + 各登録生徒個別宛て)
       try {
         const isUuid = (str: string) =>
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);

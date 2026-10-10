@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { EventItem } from '@/types/event';
+import type { Database } from '@/types/supabase';
+import type { EventItem, Attendee } from '@/types/event';
 
 const INITIAL_EVENTS: EventItem[] = [
   {
@@ -68,7 +69,9 @@ export function useEvents(farmId?: string) {
       const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
 
       if (data && data.length > 0) {
-        const formatted: EventItem[] = data.map((d: any) => ({
+        const formatted: EventItem[] = (
+          data as Database['public']['Tables']['events']['Row'][]
+        ).map((d) => ({
           id: d.id,
           title: d.title,
           date: d.date,
@@ -78,9 +81,9 @@ export function useEvents(farmId?: string) {
           capacity: d.capacity || 10,
           reservedCount: d.reserved_count || 0,
           fee: d.fee || '無料',
-          category: d.category || 'harvest',
+          category: (d.category as EventItem['category']) || 'harvest',
           description: d.description || '',
-          attendees: d.attendees || [],
+          attendees: Array.isArray(d.attendees) ? (d.attendees as unknown as Attendee[]) : [],
         }));
         setEvents(formatted);
         try {

@@ -1,9 +1,13 @@
 'use client';
 
+import type { StudentData } from '@/components/teacher/TeacherStudentsView';
+
+export type StudentPreviewData = StudentData;
+
 interface StudentPreviewModalProps {
-  student: any;
+  student: StudentPreviewData;
   onClose: () => void;
-  onDeleteStudent?: (student: any) => void;
+  onDeleteStudent?: (student: StudentPreviewData) => void;
 }
 
 export default function StudentPreviewModal({

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useFarmManager } from '@/hooks/useFarmManager';
-import { FarmBed, FarmPlot } from '@/types/farm';
+import { FarmBed, FarmPlot, CropRecord } from '@/types/farm';
 import Toast from '@/components/ui/Toast';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
 import BedApprovalNotificationBanner from '@/components/teacher/BedApprovalNotificationBanner';
@@ -18,6 +18,20 @@ interface UnassignedStudent {
   initials: string;
   grade: string;
   colorBg: string;
+}
+
+interface BedTimelineRecord {
+  id?: string;
+  date?: string;
+  notes?: string;
+  content?: string;
+  photo_url?: string | null;
+  image_url?: string | null;
+  growth_stage?: string | null;
+  height_cm?: number | null;
+  work_types?: string[];
+  harvest_amount?: string | number | null;
+  created_at?: string | null;
 }
 
 interface TeacherFarmCanvasViewProps {
@@ -76,7 +90,7 @@ export default function TeacherFarmCanvasView({
   const [selectedBedForRecords, setSelectedBedForRecords] = useState<FarmBed | null>(null);
   const [approvalModalPlot, setApprovalModalPlot] = useState<FarmPlot | null>(null);
   const [approvalModalBed, setApprovalModalBed] = useState<FarmBed | null>(null);
-  const [bedRecords, setBedRecords] = useState<any[]>([]);
+  const [bedRecords, setBedRecords] = useState<BedTimelineRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
 
   const fetchBedRecords = async (
@@ -84,7 +98,7 @@ export default function TeacherFarmCanvasView({
     bedNumber: number,
     bedId?: string,
     studentName?: string,
-    latestRec?: any,
+    latestRec?: BedTimelineRecord | CropRecord | null,
     cropName?: string
   ) => {
     setIsLoadingRecords(true);
@@ -107,14 +121,16 @@ export default function TeacherFarmCanvasView({
         .select('*')
         .order('created_at', { ascending: false });
 
-      const combined: any[] = [];
+      const combined: BedTimelineRecord[] = [];
 
       if (cData && cData.length > 0) {
-        cData.forEach((r: any) => {
+        cData.forEach((r) => {
           // bed_id の完全一致を最優先
           const isBedIdMatch = bedId && r.bed_id === bedId;
+          const rRecord = r as Record<string, unknown>;
+          const rPlotCode = (rRecord.plot_code as string | undefined) || '';
           const matchCodeAndBed =
-            r.plot_code === plotCode &&
+            rPlotCode === plotCode &&
             (r.bed_id?.includes(`bed_${bedNumber}`) || r.bed_id?.endsWith(`_${bedNumber}`));
 
           if (isBedIdMatch || matchCodeAndBed) {
@@ -126,11 +142,11 @@ export default function TeacherFarmCanvasView({
                   ? formatDate(r.created_at)
                   : '記録日',
               notes: r.notes || '観察記録',
-              photo_url: r.photo_url || r.image_url,
+              photo_url: (rRecord.photo_url as string | undefined) || r.image_url,
               growth_stage: r.growth_stage || '作業記録',
               height_cm: r.height_cm,
-              harvest_amount: r.harvest_amount,
-              work_types: r.work_types,
+              harvest_amount: r.harvest_amount != null ? String(r.harvest_amount) : undefined,
+              work_types: Array.isArray(r.work_types) ? (r.work_types as string[]) : undefined,
               created_at: r.created_at,
             });
           }
@@ -138,7 +154,7 @@ export default function TeacherFarmCanvasView({
       }
 
       if (jData && jData.length > 0) {
-        jData.forEach((j: any) => {
+        jData.forEach((j) => {
           const content = j.content || '';
           if (
             content &&
@@ -148,11 +164,15 @@ export default function TeacherFarmCanvasView({
             const hasBedHint =
               content.includes(`畝 ${bedNumber}`) || content.includes(`畝#${bedNumber}`);
             if (hasBedHint) {
+              const jRecord = j as Record<string, unknown>;
               combined.push({
                 id: j.id,
                 date: j.created_at ? formatDate(j.created_at) : '最近',
                 notes: content,
-                photo_url: j.image_url || j.photo_url,
+                photo_url:
+                  (j.image_url as string | null) ||
+                  (jRecord.photo_url as string | null) ||
+                  undefined,
                 growth_stage: j.task_title || '💡 質問・相談日誌',
                 created_at: j.created_at,
               });
@@ -779,7 +799,7 @@ export default function TeacherFarmCanvasView({
         '✨ 農園設定（農園名・代表者氏名・メールアドレス・住所）を確定保存しました！'
       );
       setShowToast(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('handleSaveFarmSettings error:', err);
     }
   };

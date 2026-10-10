@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { User } from '@supabase/supabase-js';
 import { uploadImageToStorage } from '../lib/storage';
 import { supabase } from '../lib/supabase';
 
@@ -41,14 +42,14 @@ describe('uploadImageToStorage', () => {
     });
 
     vi.mocked(supabase.auth.getUser).mockResolvedValue({
-      data: { user: { id: 'user123' } as any },
+      data: { user: { id: 'user123' } as unknown as User },
       error: null,
     });
 
     vi.mocked(supabase.storage.from).mockReturnValue({
       upload: mockUpload,
       getPublicUrl: mockGetPublicUrl,
-    } as any);
+    } as unknown as ReturnType<typeof supabase.storage.from>);
 
     // 有効な Base64 文字列 ("SGVsbG8=" = "Hello")
     const base64Image = 'data:image/jpeg;base64,SGVsbG8=';
@@ -64,14 +65,14 @@ describe('uploadImageToStorage', () => {
     const mockUpload = vi.fn().mockResolvedValue({ error: { message: 'Storage quota exceeded' } });
 
     vi.mocked(supabase.auth.getUser).mockResolvedValue({
-      data: { user: { id: 'user123' } as any },
+      data: { user: { id: 'user123' } as unknown as User },
       error: null,
     });
 
     vi.mocked(supabase.storage.from).mockReturnValue({
       upload: mockUpload,
       getPublicUrl: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof supabase.storage.from>);
 
     const base64Image = 'data:image/jpeg;base64,SGVsbG8=';
     const result = await uploadImageToStorage(base64Image, 'tasks');
