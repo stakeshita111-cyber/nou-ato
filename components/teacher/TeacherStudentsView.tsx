@@ -12,6 +12,11 @@ import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
 import { formatDate } from '@/lib/utils/formatHelper';
 
+type UserRow = Database['public']['Tables']['users']['Row'];
+type TaskRow = Database['public']['Tables']['tasks']['Row'];
+type StudentTaskRow = Database['public']['Tables']['student_tasks']['Row'];
+type JournalRow = Database['public']['Tables']['journals']['Row'];
+
 export interface StudentData {
   id: string;
   name: string;
@@ -201,7 +206,7 @@ export default function TeacherStudentsView() {
         }
 
         // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
-        let publicTasks: Record<string, unknown>[] = [];
+        let publicTasks: TaskRow[] = [];
         try {
           let pTasksQuery = supabase
             .from('tasks')
@@ -213,14 +218,17 @@ export default function TeacherStudentsView() {
           }
           const { data: ptData } = await pTasksQuery.order('created_at', { ascending: true });
           if (ptData && ptData.length > 0) {
-            publicTasks = ptData as Record<string, unknown>[];
+            publicTasks = ptData;
           }
         } catch (err) {
           console.warn('fetchStudents public tasks lookup:', err);
         }
 
         // Supabase の student_tasks 取得 (実在するカラムのみクエリしエラーを防止)
-        let studentTasksRaw: Record<string, unknown>[] = [];
+        let studentTasksRaw: Pick<
+          StudentTaskRow,
+          'id' | 'student_id' | 'status' | 'base_task_id' | 'title'
+        >[] = [];
         try {
           const { data: stData, error: stErr } = await supabase
             .from('student_tasks')
@@ -228,7 +236,7 @@ export default function TeacherStudentsView() {
           if (stErr) {
             console.warn('fetchStudents student_tasks query notice:', stErr);
           } else if (stData) {
-            studentTasksRaw = stData as Record<string, unknown>[];
+            studentTasksRaw = stData;
           }
         } catch (err) {
           console.warn('fetchStudents student_tasks lookup:', err);
@@ -286,109 +294,108 @@ export default function TeacherStudentsView() {
           ];
 
           // 同一受講生(多対1)のカード重複防止と名寄せグループ化
-          const uniqueUsers: Record<string, unknown>[] = [];
+          const uniqueUsers: UserRow[] = [];
           const seenNames = new Set<string>();
-          usersData.forEach((u: Record<string, unknown>) => {
-            const normName = String(u.display_name || u.name || '').replace(/\s+/g, '');
+          (usersData as UserRow[]).forEach((u) => {
+            const normName = (u.display_name || u.email || '').replace(/\s+/g, '');
             if (!seenNames.has(normName) && normName.length > 0) {
               seenNames.add(normName);
               uniqueUsers.push(u);
             }
           });
 
-          const formatted: StudentData[] = uniqueUsers.map(
-            (u: Record<string, unknown>, idx: number) => {
-              const studentName = String(u.display_name || u.name || `受講生 ${idx + 1}`);
-              const uId = String(u.id || '');
-              const plotName = String(
-                plotMap[uId] ||
-                  plotMap[studentName] ||
-                  u.plot ||
-                  u.plot_name ||
-                  u.assigned_plot ||
-                  '未割り当て'
-              );
+          const formatted: StudentData[] = uniqueUsers.map((u, idx: number) => {
+            const studentName =
+              u.display_name || (u.email ? u.email.split('@')[0] : `受講生 ${idx + 1}`);
+            const uId = u.id;
+            const plotName = String(plotMap[uId] || plotMap[studentName] || '未割り当て');
 
-              // 生徒画面 (useStudentDashboard) と完全に一致する教材タスク一覧を構築
-              const baseTasks =
-                publicTasks.length > 0
-                  ? publicTasks
-                  : (MASTER_TASKS as unknown as Record<string, unknown>[]);
+            // 生徒画面 (useStudentDashboard) と完全に一致する教材タスク一覧を構築
+            const baseTasks: Array<{
+              id: string;
+              title: string;
+              description?: string | null;
+              target_crop?: string | null;
+              exp?: number | null;
+            }> = publicTasks.length > 0 ? publicTasks : MASTER_TASKS;
 
-              // Supabase DB (student_tasks) レコードの集約
-              const userStRows = studentTasksRaw.filter(
-                (st: Record<string, unknown>) => st.student_id === uId
-              );
-              let completedTasks = 0;
-              let uncompletedTaskObj: Record<string, unknown> | null = null;
+            // Supabase DB (student_tasks) レコードの集約
+            const userStRows = studentTasksRaw.filter((st) => st.student_id === uId);
+            let completedTasks = 0;
+            let uncompletedTaskObj: {
+              id: string;
+              title: string;
+              description?: string | null;
+              target_crop?: string | null;
+              exp?: number | null;
+            } | null = null;
 
-              baseTasks.forEach((taskObj) => {
-                const taskId = String(taskObj.id || '');
+            baseTasks.forEach((taskObj) => {
+              const taskId = taskObj.id;
 
-                // ① Supabase DB (student_tasks) の status === "completed" を ID で厳密照合
-                const isStDone = userStRows.some((st: Record<string, unknown>) => {
-                  if (st.status !== 'completed') return false;
-                  const baseId = String(st.base_task_id || st.task_id || st.id || '');
-                  return baseId === taskId;
-                });
+              // ① Supabase DB (student_tasks) の status === "completed" を ID で厳密照合
+              const isStDone = userStRows.some((st) => {
+                if (st.status !== 'completed') return false;
+                const baseId = st.base_task_id || st.id;
+                return baseId === taskId;
+              });
 
-                if (isStDone) {
+              if (isStDone) {
+                completedTasks++;
+              } else if (!uncompletedTaskObj) {
+                uncompletedTaskObj = taskObj;
+              }
+            });
+
+            // 生徒個別追加タスク (base_task_id なしで student_tasks に直接登録されたもの) で完了しているものも加算
+            userStRows.forEach((st) => {
+              if (st.status === 'completed' && !st.base_task_id) {
+                const alreadyCounted = baseTasks.some((bt) => bt.id === st.id);
+                if (!alreadyCounted) {
                   completedTasks++;
-                } else if (!uncompletedTaskObj) {
-                  uncompletedTaskObj = taskObj;
                 }
-              });
+              }
+            });
 
-              // 生徒個別追加タスク (base_task_id なしで student_tasks に直接登録されたもの) で完了しているものも加算
-              userStRows.forEach((st: Record<string, unknown>) => {
-                if (st.status === 'completed' && !st.base_task_id) {
-                  const alreadyCounted = baseTasks.some((bt) => String(bt.id) === String(st.id));
-                  if (!alreadyCounted) {
-                    completedTasks++;
-                  }
+            // 出題全数: baseTasks の件数（完了数が多い場合は完了数以上）
+            const totalTasks = Math.max(baseTasks.length, completedTasks);
+
+            // 進捗率 (%) 算定
+            const calcProgress =
+              totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
+
+            let stepText = '受講開始';
+            if (calcProgress >= 100 && totalTasks > 0) stepText = '全課題完了 🏆';
+            else if (calcProgress >= 60) stepText = '応用作業中 🌱';
+            else if (calcProgress >= 20 || completedTasks > 0) stepText = '基礎作業中 🌿';
+
+            const activeTaskRaw = uncompletedTaskObj || baseTasks[0] || null;
+            const activeTask = activeTaskRaw
+              ? {
+                  title: activeTaskRaw.title || '',
+                  description: activeTaskRaw.description || '',
+                  target_crop: activeTaskRaw.target_crop || '',
+                  exp: activeTaskRaw.exp ?? 50,
                 }
-              });
+              : null;
 
-              // 出題全数: baseTasks の件数（完了数が多い場合は完了数以上）
-              const totalTasks = Math.max(baseTasks.length, completedTasks);
-
-              // 進捗率 (%) 算定
-              const calcProgress =
-                totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
-
-              let stepText = '受講開始';
-              if (calcProgress >= 100 && totalTasks > 0) stepText = '全課題完了 🏆';
-              else if (calcProgress >= 60) stepText = '応用作業中 🌱';
-              else if (calcProgress >= 20 || completedTasks > 0) stepText = '基礎作業中 🌿';
-
-              const activeTaskRaw = uncompletedTaskObj || baseTasks[0] || null;
-              const activeTask = activeTaskRaw
-                ? {
-                    title: String(activeTaskRaw.title || ''),
-                    description: String(activeTaskRaw.description || ''),
-                    target_crop: String(activeTaskRaw.target_crop || ''),
-                    exp: Number(activeTaskRaw.exp || 50),
-                  }
-                : null;
-
-              return {
-                id: uId,
-                name: studentName,
-                avatar: studentName.slice(0, 2),
-                avatarBg: colors[idx % colors.length],
-                plot: plotName,
-                step: stepText,
-                progress: calcProgress,
-                completedCount: completedTasks,
-                totalTaskCount: totalTasks,
-                unreadCount: 0,
-                lastReport: u.created_at ? formatDate(String(u.created_at)) : '最近',
-                hasOverdue: false,
-                activeTask,
-                lastJournal: lastJournalMap[uId] || null,
-              };
-            }
-          );
+            return {
+              id: uId,
+              name: studentName,
+              avatar: studentName.slice(0, 2),
+              avatarBg: colors[idx % colors.length],
+              plot: plotName,
+              step: stepText,
+              progress: calcProgress,
+              completedCount: completedTasks,
+              totalTaskCount: totalTasks,
+              unreadCount: 0,
+              lastReport: u.created_at ? formatDate(String(u.created_at)) : '最近',
+              hasOverdue: false,
+              activeTask,
+              lastJournal: lastJournalMap[uId] || null,
+            };
+          });
           setStudents(formatted);
           return;
         }
@@ -692,7 +699,7 @@ export default function TeacherStudentsView() {
         const seen = new Set<string>();
         const list: BroadcastRecordItem[] = [];
 
-        data.forEach((item: Record<string, unknown>) => {
+        (data as JournalRow[]).forEach((item) => {
           const key = `${item.text}_${item.content}_${item.created_at}_${item.student_id}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -702,14 +709,14 @@ export default function TeacherStudentsView() {
               targetName = matchedStudent ? `${matchedStudent.name} さん（個別）` : '個別配信';
             }
             list.push({
-              id: String(item.id),
-              role: String(item.role || 'broadcast'),
-              student_id: item.student_id ? String(item.student_id) : null,
-              farm_id: item.farm_id ? String(item.farm_id) : null,
-              text: item.text ? String(item.text) : '',
-              content: item.content ? String(item.content) : '',
-              reply: item.reply ? String(item.reply) : '',
-              created_at: String(item.created_at || ''),
+              id: item.id,
+              role: item.role || 'broadcast',
+              student_id: item.student_id ? item.student_id : null,
+              farm_id: item.farm_id ? item.farm_id : null,
+              text: item.text ? item.text : '',
+              content: item.content ? item.content : '',
+              reply: item.reply ? item.reply : '',
+              created_at: item.created_at || '',
               targetName,
             });
           }
