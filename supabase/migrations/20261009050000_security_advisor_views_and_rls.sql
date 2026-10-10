@@ -283,7 +283,10 @@ CREATE POLICY "tasks_modify_policy" ON public.tasks
 -- events: 全員閲覧、講師のみ作成・更新・削除
 DROP POLICY IF EXISTS "events_select_policy" ON public.events;
 CREATE POLICY "events_select_policy" ON public.events
-    FOR SELECT USING (true);
+    FOR SELECT USING (
+        auth.role() = 'authenticated'
+        AND (farm_id IS NULL OR farm_id = public.current_user_farm_id() OR public.current_user_role() = 'teacher')
+    );
 
 DROP POLICY IF EXISTS "events_modify_policy" ON public.events;
 CREATE POLICY "events_modify_policy" ON public.events

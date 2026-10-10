@@ -249,7 +249,7 @@ ALTER TABLE public.reservations ENABLE ROW LEVEL SECURITY;
 -- 4. 仮想ビュー (VIEW): farm_beds_with_students
 --    (型キャストなしで b.student_id = u.id 結合)
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW public.farm_beds_with_students AS
+CREATE OR REPLACE VIEW public.farm_beds_with_students WITH (security_invoker = true) AS
 SELECT
     b.id,
     b.plot_id,

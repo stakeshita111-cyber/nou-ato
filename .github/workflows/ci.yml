@@ -32,6 +32,12 @@ jobs:
       - name: Run Schema & Type Integrity Gate
         run: npm run check:schema
 
+      - name: Run Database Security Gate
+        run: npm run check:db
+
+      - name: Run Architecture & Boundary Gate
+        run: npm run check:arch
+
       - name: Strict Any Check on Changed Files (PR Only)
         if: github.event_name == 'pull_request'
         run: |

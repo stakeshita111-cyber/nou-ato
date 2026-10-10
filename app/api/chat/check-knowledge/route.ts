@@ -6,6 +6,7 @@ import {
 } from '@/lib/rag/qaKnowledgeRetriever';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
+import { createClient } from '@/utils/supabase/server';
 
 interface KnowledgeMatch {
   id: string;
@@ -49,7 +50,23 @@ const PRESET_FAQS = [
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const supabase = await createClient();
+    const {
+      data: { user: sessionUser },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !sessionUser) {
+      logger.warn(
+        'Unauthorized call to /api/chat/check-knowledge',
+        'api/chat/check-knowledge',
+        undefined,
+        authErr
+      );
+      return ApiResponse.unauthorized('ナレッジ照会機能の利用にはログインが必要です');
+    }
+
+    const body = await request.json().catch(() => ({}));
     const { question } = body;
     if (!question || typeof question !== 'string' || !question.trim()) {
       return ApiResponse.success({ matches: [] });

@@ -3,5 +3,6 @@
     "eslint --rule \"@typescript-eslint/no-explicit-any: error\"",
     "prettier --write"
   ],
+  "supabase/migrations/*.sql": ["node scripts/check-database-security.mjs"],
   "*.{json,css,md}": ["prettier --write"]
 }

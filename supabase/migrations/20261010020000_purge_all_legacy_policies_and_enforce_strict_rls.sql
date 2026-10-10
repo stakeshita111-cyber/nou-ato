@@ -285,7 +285,10 @@ CREATE POLICY "ai_tickets_select_policy" ON public.ai_tickets
 
 -- 【events】
 CREATE POLICY "events_select_policy" ON public.events
-    FOR SELECT USING (true);
+    FOR SELECT USING (
+        auth.role() = 'authenticated'
+        AND (farm_id IS NULL OR farm_id = public.current_user_farm_id() OR public.current_user_role() = 'teacher')
+    );
 
 CREATE POLICY "events_modify_policy" ON public.events
     FOR ALL USING (public.current_user_role() = 'teacher');
