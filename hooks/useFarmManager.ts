@@ -25,6 +25,8 @@ import {
   fetchPendingJournalsDb,
   savePlotsAndBedsToDb,
   reorderBedsInDb,
+  addFarmBedInDb,
+  deleteFarmBedInDb,
   insertBedDb,
   deleteBedDb,
   insertCropRecordDb,
@@ -195,10 +197,10 @@ export function useFarmManager() {
       }
 
       // セルアドレス (code) 絶対位置マップ構築
-      let detectedCols = 6;
-      let detectedRows = 8;
+      let detectedCols = targetFarm?.grid_cols || 6;
+      let detectedRows = targetFarm?.grid_rows || 8;
       let detectedDefaultBeds = 7;
-      let hasExplicitSavedDims = false;
+      let hasExplicitSavedDims = !!(targetFarm?.grid_cols && targetFarm?.grid_rows);
 
       if (dbPlots && dbPlots.length > 0) {
         for (const dp of dbPlots) {
@@ -211,12 +213,14 @@ export function useFarmManager() {
                   !meta.grid_dimensions.farm_id ||
                   meta.grid_dimensions.farm_id === effectiveActiveId
                 ) {
-                  detectedCols = Number(meta.grid_dimensions.cols);
-                  detectedRows = Number(meta.grid_dimensions.rows);
+                  if (!hasExplicitSavedDims) {
+                    detectedCols = Number(meta.grid_dimensions.cols);
+                    detectedRows = Number(meta.grid_dimensions.rows);
+                    hasExplicitSavedDims = true;
+                  }
                   if (meta.grid_dimensions.unassigned_beds) {
                     detectedDefaultBeds = Number(meta.grid_dimensions.unassigned_beds);
                   }
-                  hasExplicitSavedDims = true;
                 }
 
                 const farmMeta = meta.farm_meta || meta;
@@ -700,61 +704,60 @@ export function useFarmManager() {
     const targetPlot = plots.find((p) => p.id === plotId || p.code === plotId);
     if (!targetPlot) return;
 
-    const plotCode = targetPlot.code || 'C3';
     const nextNum = (targetPlot.beds || []).filter((b) => b.status !== 'archived').length + 1;
-    const newBedId = `plot_cell_${plotCode}_bed_${nextNum}`;
-
-    const newBed: FarmBed = {
-      id: newBedId,
-      plot_id: targetPlot.id,
-      bed_number: nextNum,
-      crop_name: '未確定 🌱',
-      status: 'active',
-      season: '2026年 秋冬',
-      progress_percent: 0,
-      is_updated: false,
-      student_id: targetPlot.student_id,
-      student_name: targetPlot.student_name,
-    };
-
-    const nextPlots = plots.map((plot) => {
-      if (plot.id === targetPlot.id || plot.code === targetPlot.code) {
-        return {
-          ...plot,
-          beds: [...plot.beds, newBed],
-        };
-      }
-      return plot;
-    });
-
-    setPlots(nextPlots);
 
     try {
-      await insertBedDb({
-        id: newBedId,
+      const dbBed = await addFarmBedInDb(targetPlot.id, '未確定 🌱', '2026年 秋冬');
+      const resolvedBedId = (dbBed?.id as string) || `bed_${Date.now()}`;
+      const resolvedBedNum = Number(dbBed?.bed_number) || nextNum;
+
+      const newBed: FarmBed = {
+        id: resolvedBedId,
         plot_id: targetPlot.id,
-        bed_number: String(nextNum),
+        bed_number: resolvedBedNum,
         crop_name: '未確定 🌱',
         status: 'active',
         season: '2026年 秋冬',
-        student_id: targetPlot.student_id || null,
-        student_name: targetPlot.student_name || null,
         progress_percent: 0,
+        is_updated: false,
+        student_id: targetPlot.student_id,
+        student_name: targetPlot.student_name,
+      };
+
+      const nextPlots = plots.map((plot) => {
+        if (plot.id === targetPlot.id || plot.code === targetPlot.code) {
+          return {
+            ...plot,
+            beds: [...plot.beds, newBed],
+          };
+        }
+        return plot;
       });
+
+      setPlots(nextPlots);
+      notifyBroadcast();
+      return newBed;
     } catch (e) {
-      console.error('farm_beds addBedToPlot upsert error:', e);
+      console.error('farm_beds addBedToPlot error:', e);
       if (typeof window !== 'undefined') {
         alert('畝の追加保存に失敗しました。通信環境を確認して再度お試しください。');
       }
+      return null;
     }
-
-    notifyBroadcast();
-    return newBed;
   };
 
   // 畝(ベッド)の完全削除
   const deleteBedFromPlot = async (plotId: string, bedId: string) => {
-    let renumberedActiveBeds: FarmBed[] = [];
+    try {
+      const ok = await deleteFarmBedInDb(plotId, bedId);
+      if (!ok) {
+        await deleteBedDb(bedId);
+      }
+    } catch (e) {
+      console.error('deleteBedFromPlot error:', e);
+      await deleteBedDb(bedId);
+    }
+
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId) {
         const remainingBeds = plot.beds.filter((b) => b.id !== bedId);
@@ -765,7 +768,6 @@ export function useFarmManager() {
             bed_number: idx + 1,
           }));
         const archivedBeds = remainingBeds.filter((b) => b.status === 'archived');
-        renumberedActiveBeds = activeBeds;
         return {
           ...plot,
           beds: [...activeBeds, ...archivedBeds],
@@ -775,15 +777,6 @@ export function useFarmManager() {
     });
 
     setPlots(nextPlots);
-
-    await deleteBedDb(bedId);
-    if (renumberedActiveBeds.length > 0) {
-      await reorderBedsInDb(
-        plotId,
-        renumberedActiveBeds.map((b) => b.id)
-      );
-    }
-
     notifyBroadcast();
   };
 

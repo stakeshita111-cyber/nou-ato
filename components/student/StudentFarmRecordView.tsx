@@ -381,17 +381,21 @@ export default function StudentFarmRecordView({
             },
           ]);
           if (jErr) {
-            console.warn('journals insert warning:', jErr);
+            console.error('journals insert error:', jErr);
+            setToastMessage(
+              `⚠️ 記録は作成されましたが、日誌への自動連携に失敗しました: ${jErr.message}`
+            );
+          } else {
+            setToastMessage(
+              isTargetShared
+                ? '🎉 共通の作業として記録を登録しました！'
+                : `🎉 畝 ${currentBed!.bed_number} (${finalCrop}) に新しい記録を登録しました！`
+            );
           }
         } catch (e) {
           console.error('journals insert error:', e);
+          setToastMessage('⚠️ 記録は作成されましたが、日誌の連携中に通信エラーが発生しました');
         }
-
-        setToastMessage(
-          isTargetShared
-            ? '🎉 共通の作業として記録を登録しました！'
-            : `🎉 畝 ${currentBed!.bed_number} (${finalCrop}) に新しい記録を登録しました！`
-        );
       }
 
       if (typeof window !== 'undefined') {
@@ -407,6 +411,9 @@ export default function StudentFarmRecordView({
       setShowToast(true);
     } catch (err) {
       console.error('handleSubmitRecord error:', err);
+      const msg = err instanceof Error ? err.message : '保存に失敗しました';
+      setToastMessage(`❌ 記録の登録に失敗しました: ${msg}`);
+      setShowToast(true);
     } finally {
       setIsSubmittingRecord(false);
     }

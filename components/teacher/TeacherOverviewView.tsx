@@ -185,10 +185,14 @@ export default function TeacherOverviewView({
     void load();
   }, [farmId, fetchCounts]);
 
-  const effectiveInviteCode = inviteCode || farmId;
-  const inviteUrl = `${origin}/invite?code=${effectiveInviteCode}`;
+  const inviteUrl = inviteCode ? `${origin}/invite?code=${inviteCode}` : '';
 
   const handleCopyInviteLink = () => {
+    if (!inviteUrl) {
+      setToastMessage('招待コードを読み込み中です。少々お待ちください');
+      setShowToast(true);
+      return;
+    }
     navigator.clipboard.writeText(inviteUrl);
     setToastMessage('LINE招待リンクをコピーしました！');
     setShowToast(true);

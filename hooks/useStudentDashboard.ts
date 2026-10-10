@@ -44,17 +44,6 @@ export function useStudentDashboard() {
       const startTime = Date.now();
       const minDisplayTime = isInitial ? 600 : 0; // 初回ロード時のみ芽が出るアニメーションを心地よく見せる
       try {
-        // 0. 一括配信 (broadcasts) を LocalStorage & DB からロード
-        const savedBcStr =
-          typeof window !== 'undefined'
-            ? localStorage.getItem('nouato_broadcast_announcements')
-            : null;
-        if (savedBcStr) {
-          try {
-            JSON.parse(savedBcStr);
-          } catch {}
-        }
-
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
@@ -72,8 +61,6 @@ export function useStudentDashboard() {
             (authUser.email ? authUser.email.split('@')[0] : '');
 
           const displayName = oauthName || '受講生';
-          const storedFarmId =
-            typeof window !== 'undefined' ? localStorage.getItem('nouato_invite_farm_id') : null;
 
           const { data: userData } = await supabase
             .from('users')
@@ -89,7 +76,7 @@ export function useStudentDashboard() {
             };
             setUser(studentUserObj);
             // 🌟 退会済み（deleted_at あり）または農園未所属の場合を検知 🌟
-            if (userData.deleted_at || (!userData.farm_id && !storedFarmId)) {
+            if (userData.deleted_at || !userData.farm_id) {
               setIsDeactivated(true);
             }
           } else {
@@ -97,12 +84,10 @@ export function useStudentDashboard() {
               id: authUser.id,
               name: displayName,
               email: authUser.email,
-              farm_id: storedFarmId,
+              farm_id: null,
             };
             setUser(studentUserObj);
-            if (!storedFarmId) {
-              setIsDeactivated(true);
-            }
+            setIsDeactivated(true);
           }
         }
 
@@ -115,9 +100,7 @@ export function useStudentDashboard() {
         }
 
         const currentStudentId = studentUserObj?.id || null;
-        const studentFarmId =
-          studentUserObj?.farm_id ||
-          (typeof window !== 'undefined' ? localStorage.getItem('nouato_invite_farm_id') : null);
+        const studentFarmId = studentUserObj?.farm_id || null;
 
         if (!currentStudentId) {
           setMyBeds([]);
@@ -339,123 +322,37 @@ export function useStudentDashboard() {
 
         setJournals(jData);
 
-        // 全体お知らせ ＆ 生徒宛てお知らせ (broadcasts) を Supabase DB ＆ LocalStorage から確実・網羅的に取得
-        let bcData: Record<string, unknown>[] = [];
+        // 全体お知らせ ＆ 生徒宛てお知らせ (broadcasts) を Supabase DB (announcements) から確実・網羅的に取得
+        const uniqueBroadcasts: BroadcastItem[] = [];
         try {
-          const isUuid = (str?: string | null) =>
-            !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-
-          // 1. 対象範囲のOR条件を構築:
-          //    - ログイン生徒自身宛て (student_id.eq.currentStudentId)
-          // 配信の取得:
-          // 1. 本人宛て (student_id = currentStudentId) または 全体宛て (student_id IS NULL)
-          // 2. 自農園宛て (farm_id = studentFarmId) または 全農園宛て (farm_id IS NULL)
-          let query = supabase
-            .from('journals')
+          const { data: annData, error: annError } = await supabase
+            .from('announcements')
             .select('*')
-            .in('role', ['broadcast', 'announcement']);
+            .order('created_at', { ascending: false })
+            .limit(30);
 
-          if (currentStudentId && isUuid(currentStudentId)) {
-            query = query.or(`student_id.is.null,student_id.eq.${currentStudentId}`);
-          } else {
-            query = query.is('student_id', null);
+          if (annError) {
+            console.warn('useStudentDashboard announcements error:', annError);
           }
 
-          if (studentFarmId && isUuid(studentFarmId)) {
-            query = query.or(`farm_id.is.null,farm_id.eq.${studentFarmId}`);
-          }
-
-          const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
-
-          if (error) {
-            console.warn('useStudentDashboard bcQuery error:', error);
-          }
-
-          if (data && data.length > 0) {
-            // 防御的フィルタ: 他受講生の個別配信や他農園の配信を確実に物理除外
-            bcData = (data as Record<string, unknown>[]).filter((j) => {
-              const targetStudentId = j.student_id ? String(j.student_id) : null;
-              if (targetStudentId !== null && targetStudentId !== currentStudentId) {
-                return false;
-              }
-              if (studentFarmId && j.farm_id && String(j.farm_id) !== studentFarmId) {
-                return false;
-              }
-              return true;
+          if (annData && annData.length > 0) {
+            annData.forEach((a) => {
+              const rawTitle = a.title || '講師からのお知らせ';
+              const cleanTitle =
+                rawTitle.replace('📢 【全体お知らせ】', '').replace('📢', '').trim() ||
+                '講師からのお知らせ';
+              uniqueBroadcasts.push({
+                id: a.id,
+                title: cleanTitle,
+                content: a.body,
+                sender: '講師',
+                created_at: a.created_at,
+              });
             });
           }
         } catch (e) {
-          console.warn('useStudentDashboard bcQuery exception:', e);
+          console.warn('useStudentDashboard announcements exception:', e);
         }
-
-        // LocalStorage からのアナウンスキャッシュ取得 (自農園キーのみ。他者混入防止のため共通キーフォールバックは廃止)
-        const bcFarmKey = studentFarmId ? `nouato_broadcast_announcements_${studentFarmId}` : null;
-        const savedBcAnnouncementsStr =
-          typeof window !== 'undefined' && bcFarmKey ? localStorage.getItem(bcFarmKey) : null;
-        let localBcArr: BroadcastItem[] = [];
-        if (savedBcAnnouncementsStr) {
-          try {
-            localBcArr = JSON.parse(savedBcAnnouncementsStr);
-          } catch {}
-        }
-
-        const combinedBroadcasts: BroadcastItem[] = [];
-
-        // DB データを変換してアペンド
-        if (bcData && bcData.length > 0) {
-          bcData.forEach((j: Record<string, unknown>) => {
-            const rawTitle = String(j.text || j.content || '講師からのお知らせ');
-            const cleanTitle =
-              rawTitle.replace('📢 【全体お知らせ】', '').replace('📢', '').trim() ||
-              '講師からのお知らせ';
-            const bodyContent = String(j.content || j.text || '');
-            const senderName = String(j.reply || '講師');
-            combinedBroadcasts.push({
-              id: String(j.id || ''),
-              title: cleanTitle,
-              content: bodyContent,
-              sender: senderName.startsWith('講師配信:')
-                ? senderName.replace('講師配信:', '').trim()
-                : senderName,
-              created_at: j.created_at ? String(j.created_at) : undefined,
-            });
-          });
-        }
-
-        // LocalStorage キャッシュをアペンド
-        if (localBcArr && localBcArr.length > 0) {
-          localBcArr.forEach((item: BroadcastItem) => {
-            combinedBroadcasts.push({
-              id: item.id || `local_${item.created_at}`,
-              title:
-                item.title?.replace('📢 【全体お知らせ】', '')?.replace('📢', '')?.trim() ||
-                '講師からのお知らせ',
-              content: item.content || '',
-              sender: item.sender || '講師',
-              created_at: item.created_at || new Date().toISOString(),
-            });
-          });
-        }
-
-        // 重複除去 (title + content サマリー)
-        const seenBcKeys = new Set<string>();
-        const uniqueBroadcasts: BroadcastItem[] = [];
-
-        combinedBroadcasts.forEach((bc) => {
-          const contentSnippet = (bc.content || '').slice(0, 30).trim();
-          const bcKey = `${bc.title}_${contentSnippet}`;
-          if (!seenBcKeys.has(bcKey)) {
-            seenBcKeys.add(bcKey);
-            uniqueBroadcasts.push(bc);
-          }
-        });
-
-        // 作成日時 (created_at) 降順ソート
-        uniqueBroadcasts.sort((a, b) => {
-          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return timeB - timeA;
-        });
 
         setBroadcasts(uniqueBroadcasts);
       } catch (e) {

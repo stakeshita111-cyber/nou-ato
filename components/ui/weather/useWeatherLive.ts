@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
 import type {
   HourlyPoint,
   DailyPoint,
@@ -74,7 +73,7 @@ export function fetchMunicipalityNameFromCoords(
     });
 }
 
-export function saveLocationToDBAndStorage(
+export async function saveLocationToDBAndStorage(
   cityName: string,
   latitude: number,
   longitude: number
@@ -85,67 +84,31 @@ export function saveLocationToDBAndStorage(
     localStorage.setItem('nouato_weather_lon', longitude.toString());
   }
 
-  return (async () => {
-    try {
-      // 1. farm_plots の起点プロット（A1 または先頭プロット）の description に位置情報を永続保存
-      const { data: plotData } = await supabase
-        .from('farm_plots')
-        .select('id, code, description, name, student_id')
-        .or('code.eq.A1,id.eq.plot_cell_A1')
-        .limit(1);
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const targetPlot = plotData && plotData.length > 0 ? plotData[0] : null;
-      if (targetPlot) {
-        let existingMeta: Record<string, unknown> = {};
-        if (targetPlot.description) {
-          try {
-            existingMeta =
-              typeof targetPlot.description === 'string'
-                ? (JSON.parse(targetPlot.description) as Record<string, unknown>)
-                : (targetPlot.description as Record<string, unknown>);
-          } catch {}
-        }
-        const updatedMeta = {
-          ...existingMeta,
-          weather_location: {
-            name: cityName,
-            lat: latitude,
-            lon: longitude,
-          },
-          farm_meta: {
-            ...((existingMeta.farm_meta as Record<string, unknown> | undefined) || {}),
-            weather_location: {
-              name: cityName,
-              lat: latitude,
-              lon: longitude,
-            },
-          },
-        };
+    const { data: uData } = await supabase
+      .from('users')
+      .select('farm_id')
+      .eq('id', user.id)
+      .maybeSingle();
 
-        await supabase
-          .from('farm_plots')
-          .update({ description: JSON.stringify(updatedMeta) })
-          .eq('id', targetPlot.id);
-      }
-
-      // 2. users テーブルへの更新（カラムが存在する場合の互換性保持）
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('users')
-          .update({
-            weather_location_name: cityName,
-            weather_lat: latitude,
-            weather_lon: longitude,
-          } as unknown as Database['public']['Tables']['users']['Update'])
-          .eq('id', user.id);
-      }
-    } catch (e) {
-      console.log('Supabase location save sync notice:', e);
+    if (uData?.farm_id) {
+      await supabase
+        .from('farms')
+        .update({
+          address: cityName,
+          latitude: latitude,
+          longitude: longitude,
+        })
+        .eq('id', uData.farm_id);
     }
-  })();
+  } catch (e) {
+    console.warn('Supabase farms location save sync notice:', e);
+  }
 }
 
 export function useWeatherLive() {
@@ -452,46 +415,35 @@ export function useWeatherLive() {
     let currentLon = 140.1065;
 
     try {
-      // 1. farm_plots の起点プロット description から位置情報を復元
-      const { data: plotData } = await supabase
-        .from('farm_plots')
-        .select('description')
-        .or('code.eq.A1,id.eq.plot_cell_A1')
-        .limit(1);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (plotData && plotData.length > 0 && plotData[0].description) {
-        try {
-          const meta =
-            typeof plotData[0].description === 'string'
-              ? (JSON.parse(plotData[0].description) as Record<string, unknown>)
-              : (plotData[0].description as Record<string, unknown>);
+      if (user) {
+        const { data: uData } = await supabase
+          .from('users')
+          .select('farm_id')
+          .eq('id', user.id)
+          .maybeSingle();
 
-          const loc = (meta.weather_location ||
-            (meta.farm_meta as Record<string, unknown> | undefined)?.weather_location) as
-            { name?: string; lat?: number; lon?: number } | undefined;
+        if (uData?.farm_id) {
+          const { data: farmData } = await supabase
+            .from('farms')
+            .select('address, latitude, longitude')
+            .eq('id', uData.farm_id)
+            .maybeSingle();
 
-          if (loc) {
-            if (loc.name) currentName = loc.name;
-            if (typeof loc.lat === 'number') currentLat = loc.lat;
-            if (typeof loc.lon === 'number') currentLon = loc.lon;
-          }
-        } catch {}
-      } else {
-        // 2. LocalStorage の互換フォールバック
-        if (typeof window !== 'undefined') {
-          const savedName = localStorage.getItem('nouato_weather_city_name');
-          const savedLat = localStorage.getItem('nouato_weather_lat');
-          const savedLon = localStorage.getItem('nouato_weather_lon');
-
-          if (savedName) currentName = savedName;
-          if (savedLat && savedLon) {
-            currentLat = parseFloat(savedLat);
-            currentLon = parseFloat(savedLon);
+          if (farmData) {
+            if (farmData.address) currentName = farmData.address;
+            if (farmData.latitude !== null && farmData.latitude !== undefined) {
+              currentLat = Number(farmData.latitude);
+            }
+            if (farmData.longitude !== null && farmData.longitude !== undefined) {
+              currentLon = Number(farmData.longitude);
+            }
           }
         }
-      }
-    } catch {
-      if (typeof window !== 'undefined') {
+      } else if (typeof window !== 'undefined') {
         const savedName = localStorage.getItem('nouato_weather_city_name');
         const savedLat = localStorage.getItem('nouato_weather_lat');
         const savedLon = localStorage.getItem('nouato_weather_lon');
@@ -502,6 +454,8 @@ export function useWeatherLive() {
           currentLon = parseFloat(savedLon);
         }
       }
+    } catch (err) {
+      console.warn('loadSavedLocation from farms notice:', err);
     }
 
     setMunicipalityName(currentName);

@@ -49,6 +49,11 @@ export interface Database {
           owner_id: string | null;
           show_student_talk_tab: boolean | null;
           invite_code?: string | null;
+          grid_cols: number;
+          grid_rows: number;
+          address: string | null;
+          latitude: number | null;
+          longitude: number | null;
           preset_faqs?:
             | Array<{ id: string; chipLabel: string; question: string; answer: string }>
             | Json
@@ -63,6 +68,11 @@ export interface Database {
           owner_id?: string | null;
           show_student_talk_tab?: boolean | null;
           invite_code?: string | null;
+          grid_cols?: number;
+          grid_rows?: number;
+          address?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
           preset_faqs?:
             | Array<{ id: string; chipLabel: string; question: string; answer: string }>
             | Json
@@ -76,6 +86,12 @@ export interface Database {
           deleted_at?: string | null;
           owner_id?: string | null;
           show_student_talk_tab?: boolean | null;
+          invite_code?: string | null;
+          grid_cols?: number;
+          grid_rows?: number;
+          address?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
           preset_faqs?:
             | Array<{ id: string; chipLabel: string; question: string; answer: string }>
             | Json
@@ -599,6 +615,66 @@ export interface Database {
         };
         Relationships: [];
       };
+      ai_usage_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          usage_date: string;
+          status: 'reserved' | 'committed' | 'released';
+          reserved_at: string;
+          finalized_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          usage_date: string;
+          status: 'reserved' | 'committed' | 'released';
+          reserved_at?: string;
+          finalized_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          usage_date?: string;
+          status?: 'reserved' | 'committed' | 'released';
+          reserved_at?: string;
+          finalized_at?: string | null;
+        };
+        Relationships: [];
+      };
+      announcements: {
+        Row: {
+          id: string;
+          farm_id: string;
+          author_id: string | null;
+          target_student_id: string | null;
+          title: string | null;
+          body: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          farm_id: string;
+          author_id?: string | null;
+          target_student_id?: string | null;
+          title?: string | null;
+          body: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          farm_id?: string;
+          author_id?: string | null;
+          target_student_id?: string | null;
+          title?: string | null;
+          body?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       farm_beds_with_students: {
@@ -627,6 +703,33 @@ export interface Database {
       };
     };
     Functions: {
+      search_knowledge_candidates: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          reply: string;
+          created_at: string;
+        }[];
+      };
+      list_farm_member_names: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          display_name: string;
+        }[];
+      };
+      reserve_ai_usage: {
+        Args: Record<PropertyKey, never>;
+        Returns: string | null;
+      };
+      finalize_ai_usage: {
+        Args: {
+          p_id: string;
+          p_commit: boolean;
+        };
+        Returns: void;
+      };
       grant_ai_tickets: {
         Args: {
           p_student_id: string;
@@ -654,6 +757,21 @@ export interface Database {
           p_bed_ids: string[];
         };
         Returns: void;
+      };
+      add_farm_bed: {
+        Args: {
+          p_plot_id: string;
+          p_crop_name?: string;
+          p_season?: string;
+        };
+        Returns: Json;
+      };
+      delete_farm_bed: {
+        Args: {
+          p_plot_id: string;
+          p_bed_id: string;
+        };
+        Returns: Json;
       };
       reorder_farm_beds: {
         Args: {

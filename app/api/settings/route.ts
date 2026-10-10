@@ -194,25 +194,31 @@ export async function POST(request: Request) {
       updateFields.preset_faqs = presetFaqs;
     }
 
-    if (ownedFarms && ownedFarms.length > 0) {
+    let targetFarmId = userData.farm_id;
+
+    if (!targetFarmId) {
+      // 農園レコードが未登録の場合は register_teacher RPC 経由で安全に作成
+      const { data: regData, error: regErr } = await supabase.rpc('register_teacher', {
+        farm_name: 'マイ農園',
+      });
+      if (regErr) {
+        logger.error(
+          'register_teacher RPC failed in /api/settings',
+          'api/settings',
+          undefined,
+          regErr
+        );
+        return ApiResponse.internalError('農園の初期作成に失敗しました: ' + regErr.message);
+      }
+      const parsedReg = regData as { farm_id?: string } | null;
+      targetFarmId = parsedReg?.farm_id || null;
+    }
+
+    if (targetFarmId) {
+      await supabase.from('farms').update(updateFields).eq('id', targetFarmId);
+    } else if (ownedFarms && ownedFarms.length > 0) {
       const farmIds = ownedFarms.map((f) => f.id);
       await supabase.from('farms').update(updateFields).in('id', farmIds);
-    } else {
-      // 農園レコードが未登録の場合は新規作成/upsert
-      const newFarmId = userData?.farm_id || crypto.randomUUID();
-      await supabase.from('farms').upsert([
-        {
-          id: newFarmId,
-          name: 'マイ農園',
-          owner_id: user.id,
-          show_student_talk_tab: showStudentTalkTab !== undefined ? showStudentTalkTab : true,
-          preset_faqs: presetFaqs !== undefined ? presetFaqs : DEFAULT_PRESET_FAQS,
-          updated_at: new Date().toISOString(),
-        },
-      ]);
-      if (!userData?.farm_id) {
-        await supabase.from('users').update({ farm_id: newFarmId }).eq('id', user.id);
-      }
     }
 
     const settings: ServerSettings = {

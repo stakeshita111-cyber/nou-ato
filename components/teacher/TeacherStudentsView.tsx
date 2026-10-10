@@ -15,7 +15,6 @@ import { formatDate } from '@/lib/utils/formatHelper';
 type UserRow = Database['public']['Tables']['users']['Row'];
 type TaskRow = Database['public']['Tables']['tasks']['Row'];
 type StudentTaskRow = Database['public']['Tables']['student_tasks']['Row'];
-type JournalRow = Database['public']['Tables']['journals']['Row'];
 
 export interface StudentData {
   id: string;
@@ -480,10 +479,14 @@ export default function TeacherStudentsView() {
     };
   }, [fetchStudents]);
 
-  const effectiveInviteCode = inviteCode || effectiveFarmId;
-  const inviteUrl = `${origin}/invite?code=${effectiveInviteCode}`;
+  const inviteUrl = inviteCode ? `${origin}/invite?code=${inviteCode}` : '';
 
   const handleCopyInviteUrl = async () => {
+    if (!inviteUrl) {
+      setToastMessage('招待コードを読み込み中です。少々お待ちください');
+      setShowToast(true);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setToastMessage('📋 招待URLをクリップボードにコピーしました！受講生へ共有してください');
@@ -526,77 +529,45 @@ export default function TeacherStudentsView() {
     }
   };
 
-  // 📢 受講生全員へのメッセージ・お知らせ一括配信処理
+  // 📢 受講生全員へのメッセージ・お知らせ一括配信処理 (announcements テーブル)
   const handleSendBroadcastAll = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
 
     setSendingBroadcast(true);
     try {
-      const nowStr = new Date().toISOString();
-      // Supabase の journals テーブルに講師配信として保存 (全体向け + 各登録生徒個別宛て)
-      try {
-        const isUuid = (str: string) =>
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-        const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+      const isUuid = (str: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
 
-        const journalInserts: Array<Database['public']['Tables']['journals']['Insert']> = [
-          {
-            role: 'broadcast',
-            student_id: null,
-            farm_id: validFarmId,
-            text: broadcastTitle.trim(),
-            content: broadcastBody.trim(),
-            reply: `講師配信: ${effectiveFarmName || '当農園'}`,
-            created_at: nowStr,
-          },
-        ];
-
-        // 農園未特定環境・デモ環境でも全受講生に確実に届くよう、farm_id: null の全体配信レコードも併せて追加
-        if (validFarmId) {
-          journalInserts.push({
-            role: 'broadcast',
-            student_id: null,
-            farm_id: null,
-            text: broadcastTitle.trim(),
-            content: broadcastBody.trim(),
-            reply: `講師配信: ${effectiveFarmName || '当農園'}`,
-            created_at: nowStr,
-          });
-        }
-
-        // 登録中の全生徒ID宛てにも個別レコードを作成（UUID形式のもののみ安全に追加）
-        if (students && students.length > 0) {
-          students.forEach((s) => {
-            if (s.id && isUuid(s.id)) {
-              journalInserts.push({
-                role: 'broadcast',
-                student_id: s.id,
-                farm_id: validFarmId,
-                text: broadcastTitle.trim(),
-                content: broadcastBody.trim(),
-                reply: `講師配信: ${effectiveFarmName || '当農園'}`,
-                created_at: nowStr,
-              });
-            }
-          });
-        }
-
-        const { error: insErr } = await supabase.from('journals').insert(journalInserts);
-        if (insErr) {
-          console.error('Supabase broadcast insert error:', insErr);
-          setToastMessage(`一括配信に失敗しました: ${insErr.message}`);
-          setShowToast(true);
-          return;
-        }
-      } catch (err) {
-        console.error('Supabase broadcast insert exception:', err);
-        setToastMessage('一括配信中にエラーが発生しました');
+      if (!validFarmId) {
+        setToastMessage('所属農園を特定できませんでした');
         setShowToast(true);
         return;
       }
 
-      // 3. 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { error: insErr } = await supabase.from('announcements').insert([
+        {
+          farm_id: validFarmId,
+          author_id: user?.id || null,
+          target_student_id: null,
+          title: broadcastTitle.trim(),
+          body: broadcastBody.trim(),
+        },
+      ]);
+
+      if (insErr) {
+        console.error('Supabase announcements insert error:', insErr);
+        setToastMessage(`一括配信に失敗しました: ${insErr.message}`);
+        setShowToast(true);
+        return;
+      }
+
+      // 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('nouato_sync_event'));
         try {
@@ -620,32 +591,39 @@ export default function TeacherStudentsView() {
     }
   };
 
-  // 💬 受講生への個別メッセージ配信処理 (Create)
+  // 💬 受講生への個別メッセージ配信処理 (announcements テーブル)
   const handleSendIndividual = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!individualStudent || !individualTitle.trim() || !individualBody.trim()) return;
 
     setSendingIndividual(true);
     try {
-      const nowStr = new Date().toISOString();
       const isUuid = (str: string) =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
 
-      const { error: insErr } = await supabase.from('journals').insert([
+      if (!validFarmId) {
+        setToastMessage('所属農園を特定できませんでした');
+        setShowToast(true);
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { error: insErr } = await supabase.from('announcements').insert([
         {
-          role: 'broadcast',
-          student_id: individualStudent.id,
           farm_id: validFarmId,
-          text: individualTitle.trim(),
-          content: individualBody.trim(),
-          reply: `講師個別連絡: ${effectiveFarmName || '当農園'}`,
-          created_at: nowStr,
+          author_id: user?.id || null,
+          target_student_id: individualStudent.id,
+          title: individualTitle.trim(),
+          body: individualBody.trim(),
         },
       ]);
 
       if (insErr) {
-        console.error('Individual broadcast insert error:', insErr);
+        console.error('Individual announcements insert error:', insErr);
         setToastMessage(`個別配信に失敗しました: ${insErr.message}`);
         setShowToast(true);
         return;
@@ -676,7 +654,7 @@ export default function TeacherStudentsView() {
     }
   };
 
-  // 📋 配信履歴の一覧取得 (Read - CRUD)
+  // 📋 配信履歴の一覧取得 (Read - announcements テーブル)
   const fetchBroadcastHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
@@ -684,42 +662,34 @@ export default function TeacherStudentsView() {
         !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
       let query = supabase
-        .from('journals')
+        .from('announcements')
         .select('*')
-        .in('role', ['broadcast', 'announcement'])
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (effectiveFarmId && isUuid(effectiveFarmId)) {
-        query = query.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
+        query = query.eq('farm_id', effectiveFarmId);
       }
 
       const { data, error } = await query;
       if (data) {
-        const seen = new Set<string>();
-        const list: BroadcastRecordItem[] = [];
-
-        (data as JournalRow[]).forEach((item) => {
-          const key = `${item.text}_${item.content}_${item.created_at}_${item.student_id}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            let targetName = '受講生全員';
-            if (item.student_id) {
-              const matchedStudent = students.find((s) => s.id === item.student_id);
-              targetName = matchedStudent ? `${matchedStudent.name} さん（個別）` : '個別配信';
-            }
-            list.push({
-              id: item.id,
-              role: item.role || 'broadcast',
-              student_id: item.student_id ? item.student_id : null,
-              farm_id: item.farm_id ? item.farm_id : null,
-              text: item.text ? item.text : '',
-              content: item.content ? item.content : '',
-              reply: item.reply ? item.reply : '',
-              created_at: item.created_at || '',
-              targetName,
-            });
+        const list: BroadcastRecordItem[] = data.map((item) => {
+          let targetName = '受講生全員';
+          if (item.target_student_id) {
+            const matchedStudent = students.find((s) => s.id === item.target_student_id);
+            targetName = matchedStudent ? `${matchedStudent.name} さん（個別）` : '個別配信';
           }
+          return {
+            id: item.id,
+            role: item.target_student_id ? 'individual' : 'broadcast',
+            student_id: item.target_student_id,
+            farm_id: item.farm_id,
+            text: item.title || '',
+            content: item.body,
+            reply: null,
+            created_at: item.created_at || '',
+            targetName,
+          };
         });
         setBroadcastHistory(list);
       }
@@ -733,12 +703,12 @@ export default function TeacherStudentsView() {
     }
   }, [effectiveFarmId, students]);
 
-  // 🗑️ 配信履歴の削除処理 (Delete - CRUD)
+  // 🗑️ 配信履歴の削除処理 (Delete - announcements テーブル)
   const handleDeleteBroadcast = useCallback(async (broadcastId: string) => {
     if (!confirm('この配信を削除してもよろしいですか？受講生の通知一覧からも削除されます。'))
       return;
     try {
-      const { error } = await supabase.from('journals').delete().eq('id', broadcastId);
+      const { error } = await supabase.from('announcements').delete().eq('id', broadcastId);
       if (error) {
         setToastMessage(`削除に失敗しました: ${error.message}`);
         setShowToast(true);
@@ -757,8 +727,8 @@ export default function TeacherStudentsView() {
           bc.close();
         } catch {}
       }
-    } catch (err) {
-      console.error('handleDeleteBroadcast error:', err);
+    } catch (e) {
+      console.error('handleDeleteBroadcast error:', e);
       setToastMessage('削除中にエラーが発生しました');
       setShowToast(true);
     }

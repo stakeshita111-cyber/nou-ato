@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 
 /**
@@ -34,12 +35,9 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const nextRaw = searchParams.get('next');
   const safeNext = sanitizeNextUrl(nextRaw, '/student');
-  const cookieHeader = request.headers.get('cookie') || '';
-  const cookieFarmId = cookieHeader
-    .split(';')
-    .find((c) => c.trim().startsWith('nouato_invite_farm_id='))
-    ?.split('=')[1];
-  const farmIdParam = searchParams.get('farm_id') || cookieFarmId || '';
+  const cookieStore = await cookies();
+  const cookieInviteCode = cookieStore.get('nouato_invite_code')?.value || '';
+  const inviteCodeParam = searchParams.get('invite') || cookieInviteCode;
   const errorCode = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
@@ -86,22 +84,29 @@ export async function GET(request: Request) {
             targetNext = '/teacher/dashboard';
           }
 
-          // 2. 表示名の安全な更新
-          if (lineName && lineName !== existingUser?.display_name) {
+          // 2. 表示名の安全な設定 (既存の表示名がない場合のみ初期設定し、手動変更を上書きしない)
+          if (!existingUser?.display_name && lineName) {
             await supabase.from('users').update({ display_name: lineName }).eq('id', user.id);
           }
 
-          // 3. 農園紐づけ (join_farm RPC を使用して安全に更新)
-          if (userRole !== 'teacher' && farmIdParam) {
+          // 3. 農園紐づけ (未所属受講生のみ join_farm RPC を使用して招待コードで安全に参加)
+          if (userRole !== 'teacher' && inviteCodeParam && !existingUser?.farm_id) {
             const { error: joinErr } = await supabase.rpc('join_farm', {
-              invite_code: farmIdParam,
+              invite_code: inviteCodeParam.trim(),
             });
+
+            // 招待Cookieをクリーンアップ
+            try {
+              cookieStore.delete('nouato_invite_code');
+            } catch {}
+
             if (joinErr) {
               console.error('join_farm error in OAuth callback:', joinErr);
+              targetNext = `/invite?error=invalid_invite`;
             }
           }
         } catch (callbackErr) {
-          console.error('Failed to process LINE user setup in callback:', callbackErr);
+          console.error('Failed to process user setup in callback:', callbackErr);
         }
       }
 

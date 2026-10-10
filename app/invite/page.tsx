@@ -10,7 +10,7 @@ import Link from 'next/link';
 function InviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteCodeParam = searchParams.get('code') || searchParams.get('farm_id');
+  const inviteCodeParam = searchParams.get('code');
 
   // 農園選択・情報
   const [inviteCode, setInviteCode] = useState<string>(inviteCodeParam || '');
@@ -61,7 +61,7 @@ function InviteContent() {
     fetchCurrentFarm();
   }, [inviteCodeParam]);
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED !== 'true';
 
   // 1. LINEで登録して参加
   const handleLineSignUp = async () => {

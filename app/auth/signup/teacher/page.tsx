@@ -127,7 +127,7 @@ export default function TeacherSignUpPage() {
     }
   };
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED !== 'true';
 
   // LINE で登録
   const handleLineSignUp = async () => {

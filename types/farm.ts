@@ -71,4 +71,9 @@ export type Farm = {
   name: string;
   owner_id?: string | null;
   created_at?: string;
+  grid_cols?: number | null;
+  grid_rows?: number | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };

@@ -238,32 +238,84 @@ export async function savePlotsAndBedsToDb(
       }
     }
   }
+
+  // 3. farms テーブルへのメタデータ直接永続化
+  const isUuid = (str: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  if (activeFarmId && isUuid(activeFarmId)) {
+    try {
+      const updateData: Database['public']['Tables']['farms']['Update'] = {
+        grid_cols: dims.cols,
+        grid_rows: dims.rows,
+      };
+      if (farmMeta.address) updateData.address = farmMeta.address;
+      const wLoc = farmMeta.weatherLocation as { lat?: number; lon?: number } | null | undefined;
+      if (wLoc?.lat !== undefined && wLoc?.lat !== null) {
+        updateData.latitude = Number(wLoc.lat);
+      }
+      if (wLoc?.lon !== undefined && wLoc?.lon !== null) {
+        updateData.longitude = Number(wLoc.lon);
+      }
+      await supabase.from('farms').update(updateData).eq('id', activeFarmId);
+    } catch (e) {
+      console.warn('farms metadata update notice:', e);
+    }
+  }
 }
 
 export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {
   if (!plotId || !orderedBedIds || orderedBedIds.length === 0) return;
 
   try {
-    const rpcCaller = supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>
-    ) => Promise<{ error: Error | null }>;
-    const { error } = await rpcCaller('reorder_beds', {
+    const { error } = await supabase.rpc('reorder_beds', {
       p_plot_id: plotId,
       p_bed_ids: orderedBedIds,
     });
 
     if (error) {
-      // Fallback: row-by-row update if RPC function is not available
-      for (let i = 0; i < orderedBedIds.length; i++) {
-        await supabase
-          .from('farm_beds')
-          .update({ bed_number: String(i + 1) })
-          .eq('id', orderedBedIds[i]);
-      }
+      console.error('reorderBedsInDb RPC error:', error.message);
     }
   } catch (err) {
     console.warn('reorderBedsInDb error:', err);
+  }
+}
+
+export async function addFarmBedInDb(
+  plotId: string,
+  cropName = '未確定 🌱',
+  season = '2026年 秋冬'
+) {
+  try {
+    const { data, error } = await supabase.rpc('add_farm_bed', {
+      p_plot_id: plotId,
+      p_crop_name: cropName,
+      p_season: season,
+    });
+    if (error) {
+      console.error('addFarmBedInDb error:', error.message);
+      return null;
+    }
+    return data as Record<string, unknown>;
+  } catch (err) {
+    console.error('addFarmBedInDb exception:', err);
+    return null;
+  }
+}
+
+export async function deleteFarmBedInDb(plotId: string, bedId: string) {
+  try {
+    const { error } = await supabase.rpc('delete_farm_bed', {
+      p_plot_id: plotId,
+      p_bed_id: bedId,
+    });
+    if (error) {
+      console.error('deleteFarmBedInDb error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('deleteFarmBedInDb exception:', e);
+    return false;
   }
 }
 

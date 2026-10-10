@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 
 export interface ReferencedQA {
@@ -5,6 +7,12 @@ export interface ReferencedQA {
   question: string;
   answer: string;
   similarityScore?: number;
+}
+
+export interface RagAnswerResult {
+  reply: string;
+  referencedQa: ReferencedQA[];
+  status: 'ok' | 'degraded';
 }
 
 // 主な作物品種リスト (作物不一致の誤ヒットを防止)
@@ -107,10 +115,26 @@ export const STOP_WORDS = [
 
 /**
  * DBから受講生の表示名（display_name）リストを動的取得
+ * 自農園のメンバー一覧をRPCから取得し、生徒権限でも確実にPIIマスキングが可能
  */
-export async function fetchStudentDisplayNames(): Promise<string[]> {
+export async function fetchStudentDisplayNames(
+  client?: SupabaseClient<Database>
+): Promise<string[]> {
+  const db = client || supabase;
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db.rpc('list_farm_member_names');
+    if (!error && data && data.length > 0) {
+      return data
+        .map((u) => u.display_name?.trim())
+        .filter((name): name is string => Boolean(name && name.length >= 2));
+    }
+  } catch (e) {
+    console.warn('list_farm_member_names RPC notice:', e);
+  }
+
+  // フォールバック: users テーブルからの直接取得
+  try {
+    const { data, error } = await db
       .from('users')
       .select('display_name')
       .not('display_name', 'is', null)
@@ -258,20 +282,54 @@ export function extractTopicFromReply(reply: string): string {
  * 🌟 生徒の生相談文(content)の参照を完全廃止し、サニタイズされたreply(回答・トピック)のみから照合 🌟
  * 🌟 非公開相談(is_private = true)はDB層で厳密に除外 🌟
  */
-export async function searchSimilarKnowledge(userQuestion: string): Promise<ReferencedQA[]> {
+export async function searchSimilarKnowledge(
+  userQuestion: string,
+  client?: SupabaseClient<Database>
+): Promise<ReferencedQA[]> {
+  const db = client || supabase;
   try {
-    const { data: dbData, error } = await supabase
-      .from('journals')
-      .select('id, reply, is_approved, is_private, student_id')
-      .eq('is_approved', true)
-      .eq('is_private', false)
-      .not('reply', 'is', null)
-      .neq('reply', '')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    let candidateReplies: { id: string; reply: string; is_approved?: boolean | null }[] = [];
 
-    if (error || !dbData || dbData.length === 0) {
-      return [];
+    // 1. セキュアな RPC による候補検索 (同農園・承認済・非公開除外)
+    try {
+      const { data: rpcData, error: rpcErr } = await db.rpc('search_knowledge_candidates', {
+        p_limit: 50,
+      });
+      if (!rpcErr && rpcData && rpcData.length > 0) {
+        candidateReplies = rpcData.map((r) => ({
+          id: r.id,
+          reply: r.reply,
+          is_approved: true,
+        }));
+      } else if (rpcErr) {
+        console.warn('search_knowledge_candidates notice:', rpcErr.message);
+      }
+    } catch (rpcEx) {
+      console.warn('search_knowledge_candidates exception:', rpcEx);
+    }
+
+    // 2. フォールバック: journals テーブルからの直接取得
+    if (candidateReplies.length === 0) {
+      const { data: dbData, error } = await db
+        .from('journals')
+        .select('id, reply, is_approved, is_private, student_id')
+        .eq('is_approved', true)
+        .eq('is_private', false)
+        .not('reply', 'is', null)
+        .neq('reply', '')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error || !dbData || dbData.length === 0) {
+        return [];
+      }
+      candidateReplies = dbData
+        .filter((d): d is typeof d & { reply: string } => Boolean(d.reply))
+        .map((d) => ({
+          id: d.id,
+          reply: d.reply,
+          is_approved: d.is_approved,
+        }));
     }
 
     const pastQa: (ReferencedQA & { id?: string })[] = [];
@@ -301,7 +359,7 @@ export async function searchSimilarKnowledge(userQuestion: string): Promise<Refe
       }
     });
 
-    dbData.forEach((item) => {
+    candidateReplies.forEach((item) => {
       if (!item.reply) return;
 
       const itemReply = item.reply.toLowerCase();
@@ -358,19 +416,21 @@ export async function searchSimilarKnowledge(userQuestion: string): Promise<Refe
 export async function getAnswerWithRag(
   userQuestion: string,
   studentName: string = '受講生',
-  recentHistoryText: string = ''
-): Promise<{ reply: string; referencedQa: ReferencedQA[] }> {
+  recentHistoryText: string = '',
+  client?: SupabaseClient<Database>
+): Promise<RagAnswerResult> {
   // 🌟「大量質問テスト」トリガーの即時ルールベース返信 🌟
   if (userQuestion.includes('大量質問テスト')) {
     return {
       reply:
         '【AI相棒（しるべぇ）よりお知らせ】🌱\n\n現在、たくさんの受講生のみなさまからご質問・ご相談をいただいており、本日のAI自動対話枠が上限（混雑状態）に達しております🙇\n\nご入力いただいたメッセージは交換日記として大切にお預かりしておりますので、講師からの直接の回答をお待ちいただくか、お時間を空けて再度お試しくださいね✨\n\n美味しい野菜づくりを応援しています🧑‍🌾',
       referencedQa: [],
+      status: 'degraded',
     };
   }
 
   // 🌟 DBから受講生表示名リストを取得 & Gemini送信前サニタイズパイプライン 🌟
-  const studentDisplayNames = await fetchStudentDisplayNames();
+  const studentDisplayNames = await fetchStudentDisplayNames(client);
   const allStudentNames = Array.from(
     new Set([...studentDisplayNames, studentName].filter(Boolean))
   );
@@ -379,7 +439,7 @@ export async function getAnswerWithRag(
   const cleanRecentHistoryText = sanitizePiiText(recentHistoryText, allStudentNames);
 
   // 1. 類似ナレッジを検索 (重み1.2倍を優先)
-  const referencedQa = await searchSimilarKnowledge(cleanUserQuestion);
+  const referencedQa = await searchSimilarKnowledge(cleanUserQuestion, client);
 
   // 2. Gemini API 呼び出し
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -387,6 +447,7 @@ export async function getAnswerWithRag(
     return {
       reply: 'メッセージを受け付けました！次回来園時に講師より詳しく回答いたしますね🌱',
       referencedQa,
+      status: 'degraded',
     };
   }
 
@@ -438,14 +499,14 @@ ${knowledgeSection}`;
       : `受講生の新しい相談メッセージ: 「${cleanUserQuestion}」`;
 
     const preferredModel = process.env.GEMINI_MODEL;
-    const modelsToTry = [
-      preferredModel,
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-    ].filter(Boolean) as string[];
-
-    const uniqueModels = Array.from(new Set(modelsToTry));
+    const baseModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+    const modelsToTry = preferredModel
+      ? [
+          preferredModel,
+          preferredModel === 'gemini-1.5-flash' ? 'gemini-2.0-flash' : 'gemini-1.5-flash',
+        ]
+      : baseModels;
+    const uniqueModels = Array.from(new Set(modelsToTry)).slice(0, 2);
 
     for (const modelName of uniqueModels) {
       try {
@@ -493,7 +554,7 @@ ${knowledgeSection}`;
               .trim() || parts[0]?.text?.trim();
 
           if (generatedText) {
-            return { reply: generatedText, referencedQa };
+            return { reply: generatedText, referencedQa, status: 'ok' };
           }
         }
       } catch (apiErr) {
@@ -508,6 +569,7 @@ ${knowledgeSection}`;
     reply:
       '【AI相棒（しるべぇ）よりお知らせ】🌱\n\n現在、たくさんの受講生のみなさまからご質問・ご相談をいただいており、本日のAI自動対話枠が上限（混雑状態）に達しております🙇\n\nご入力いただいたメッセージは交換日記として大切にお預かりしておりますので、講師からの直接の回答をお待ちいただくか、お時間を空けて再度お試しくださいね✨\n\n美味しい野菜づくりを応援しています🧑‍🌾',
     referencedQa,
+    status: 'degraded',
   };
 }
 
@@ -519,10 +581,11 @@ export interface ChatHistoryItem {
 export async function generateRagAnswer(
   userQuestion: string,
   studentName: string = '受講生',
-  history: ChatHistoryItem[] = []
-): Promise<{ reply: string; referencedQa: ReferencedQA[] }> {
+  history: ChatHistoryItem[] = [],
+  client?: SupabaseClient<Database>
+): Promise<RagAnswerResult> {
   const historyText = history
     .map((h) => `${h.sender === 'student' ? '受講生' : 'しるべぇ(AI)'}: ${h.text}`)
     .join('\n');
-  return getAnswerWithRag(userQuestion, studentName, historyText);
+  return getAnswerWithRag(userQuestion, studentName, historyText, client);
 }

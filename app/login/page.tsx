@@ -40,7 +40,18 @@ export default function UnifiedLoginPage() {
       });
 
       if (authError) {
-        setToastMessage(`ログイン失敗: ${authError.message}`);
+        let localizedMessage = 'メールアドレスまたはパスワードが正しくありません';
+        if (authError.message.includes('Invalid login credentials')) {
+          localizedMessage = 'メールアドレスまたはパスワードが正しくありません';
+        } else if (authError.message.includes('Email not confirmed')) {
+          localizedMessage = 'メールアドレスの確認が完了していません。受信トレイをご確認ください';
+        } else if (authError.message.includes('Too many requests')) {
+          localizedMessage =
+            'ログイン試行回数が上限に達しました。しばらく時間をおいてから再度お試しください';
+        } else {
+          localizedMessage = `ログインに失敗しました (${authError.message})`;
+        }
+        setToastMessage(`❌ ${localizedMessage}`);
         setShowToast(true);
         setLoading(false);
         return;

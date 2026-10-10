@@ -12,6 +12,7 @@ const chatRequestBodySchema = z.object({
     .max(1000, 'メッセージは1000文字以内で入力してください'),
   studentName: z.string().optional(),
   isMemoOnly: z.boolean().optional(),
+  isPrivate: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -46,14 +47,14 @@ export async function POST(request: Request) {
       sessionUser.email?.split('@')[0] ||
       studentName;
 
-    // 2. 多層防御②: サーバー側回数制限 (1日3回 + 講師付与チケット分)
-    //    上限算出と加算は DB 関数が auth.uid() を使い、1文でアトミックに行う。
+    // 2. 多層防御②: 2フェーズ台帳によるアトミックな予約 (1日3回 + 講師付与チケット分)
+    let reservationId: string | null = null;
     if (!isMemoOnly) {
-      const { data: allowed, error: rpcErr } = await supabase.rpc('check_and_increment_ai_usage');
+      const { data: resId, error: rpcErr } = await supabase.rpc('reserve_ai_usage');
 
       if (rpcErr) {
         logger.error(
-          'check_and_increment_ai_usage RPC failure in /api/chat/rag:',
+          'reserve_ai_usage RPC failure in /api/chat/rag:',
           'api/chat/rag',
           undefined,
           rpcErr
@@ -63,11 +64,12 @@ export async function POST(request: Request) {
         );
       }
 
-      if (allowed !== true) {
+      if (!resId) {
         return ApiResponse.tooManyRequests(
           '本日のAI相談チケットの上限に達しました（1日3回＋講師からの追加付与分）'
         );
       }
+      reservationId = resId;
     }
 
     // 3. 多層防御③: 会話履歴をブラウザ信頼せず、サーバー側でDB(journals)から最新履歴を取得・構築
@@ -93,24 +95,50 @@ export async function POST(request: Request) {
 
     let reply = '';
     let referencedQa: ReferencedQA[] = [];
+    let isDegraded = false;
 
     if (isMemoOnly) {
       reply = `📝【質問メモをお預かりしました】🌱\n\n本日のAI相談チケット（1日3回）を使い切ったため、AIによる即時回答はお休みとなります。\nご相談内容は農園ノートに記録しましたので、次回の来園時に講師より詳しくアドバイスいたしますね！\n\n※チケットは毎晩日本時間0:00に復活します✨`;
     } else {
-      const ragRes = await generateRagAnswer(message, effectiveStudentName, history);
-      reply = ragRes.reply;
-      referencedQa = ragRes.referencedQa;
+      try {
+        const ragRes = await generateRagAnswer(message, effectiveStudentName, history, supabase);
+        reply = ragRes.reply;
+        referencedQa = ragRes.referencedQa;
+        isDegraded = ragRes.status === 'degraded';
+      } catch (genErr) {
+        logger.error(
+          'generateRagAnswer exception in /api/chat/rag:',
+          'api/chat/rag',
+          undefined,
+          genErr
+        );
+        reply =
+          '【AI相棒（しるべぇ）よりお知らせ】🌱\n\n現在、システムが混雑しております。ご相談内容は質問メモとして保存いたしましたので、講師からの回答をお待ちください。';
+        isDegraded = true;
+      } finally {
+        // AI生成成功時のみチケット確定、失敗・フォールバック時はチケット解放
+        if (reservationId) {
+          const shouldCommit = !isDegraded;
+          await supabase.rpc('finalize_ai_usage', {
+            p_id: reservationId,
+            p_commit: shouldCommit,
+          });
+        }
+      }
     }
 
-    // 4. Supabase の journals テーブルに対話履歴・質問メモを保存 (is_privateフラグ & is_approved: false)
-    const isPrivate = message.startsWith('【非公開相談】');
+    // 4. Supabase の journals テーブルに対話履歴・質問メモを保存
+    //    フォールバック(degraded)時は reply を null (質問メモ) として保存し、ナレッジ汚染を物理防止
+    const isPrivate = parseResult.data.isPrivate === true || message.startsWith('【非公開相談】');
+    const journalReply = isMemoOnly || isDegraded ? null : reply;
     let saved = true;
+
     try {
       const { error: insertErr } = await supabase.from('journals').insert([
         {
           student_id: studentId,
           content: message,
-          reply: isMemoOnly ? null : reply,
+          reply: journalReply,
           role: 'student',
           is_private: isPrivate,
           is_approved: false, // 承認不可制約により is_private が true の場合は承認不可を保障
@@ -132,6 +160,7 @@ export async function POST(request: Request) {
       reply,
       referencedQa,
       saved,
+      status: isDegraded ? 'degraded' : 'ok',
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
