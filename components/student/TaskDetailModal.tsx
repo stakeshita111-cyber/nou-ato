@@ -3,10 +3,61 @@
 import React, { useState, useEffect } from 'react';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { uploadImageToStorage } from '@/lib/storage';
-import { TaskSliderItem } from './TaskSlider';
+import { WorkType } from '@/types/farm';
+
+export interface TaskModalItem {
+  id?: string;
+  task_id?: string;
+  title?: string;
+  target_crop?: string;
+  category?: string;
+  phase?: string;
+  difficulty?: number;
+  description?: string;
+  tips?: string;
+  status?: string;
+  estimated_minutes?: number;
+  reward_points?: number;
+  badges?: string[];
+  season?: string;
+  exp?: number;
+  timing?: string;
+  variety?: string;
+  estimated_time?: string;
+  tools_needed?: string[];
+  memo?: string;
+  badge_name?: string;
+  badge_icon?: string;
+  require_photo?: boolean;
+  source?: string;
+  tasks?: {
+    id?: string;
+    title?: string;
+    target_crop?: string;
+    category?: string;
+    phase?: string;
+    difficulty?: number;
+    description?: string;
+    tips?: string;
+    estimated_minutes?: number;
+    reward_points?: number;
+    badges?: string[];
+    season?: string;
+    exp?: number;
+    timing?: string;
+    variety?: string;
+    estimated_time?: string;
+    tools_needed?: string[];
+    memo?: string;
+    badge_name?: string;
+    badge_icon?: string;
+    require_photo?: boolean;
+    source?: string;
+  };
+}
 
 interface TaskDetailModalProps {
-  task: TaskSliderItem;
+  task: TaskModalItem;
   studentId?: string;
   studentName?: string;
   onClose: () => void;
@@ -44,15 +95,12 @@ export default function TaskDetailModal({
     );
 
   // タスクの対象作物に合致する畝を検索 (共通または見つからない場合は 'shared')
+  const targetCrop = task?.tasks?.target_crop || task?.target_crop;
   const matchedBed =
-    task &&
-    (task.tasks?.target_crop || task.target_crop) &&
-    (task.tasks?.target_crop || task.target_crop) !== '共通'
+    task && targetCrop && targetCrop !== '共通'
       ? myBeds.find(
           (b) =>
-            b.crop_name &&
-            (b.crop_name.includes(task.tasks?.target_crop || task.target_crop) ||
-              (task.tasks?.target_crop || task.target_crop).includes(b.crop_name))
+            b.crop_name && (b.crop_name.includes(targetCrop) || targetCrop.includes(b.crop_name))
         )
       : null;
 
@@ -186,15 +234,20 @@ export default function TaskDetailModal({
       crop_name: targetBed
         ? targetBed.crop_name || t.target_crop || '未確定'
         : t.target_crop || '全体共有',
-      work_types: [t.title],
-      notes: reportMemo.trim() || `${t.title}の作業を完了しました。`,
+      work_types: [t.title || '手入れ'] as WorkType[],
+      notes: reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
       harvest_amount: finalPhotoUrl ? '📷 現場写真あり' : undefined,
       image_url: finalPhotoUrl || undefined,
       photo_url: finalPhotoUrl || undefined,
     });
 
     if (onComplete) {
-      onComplete(task.id, selectedBedId, finalPhotoUrl || undefined, reportMemo);
+      onComplete(
+        task.id || task.task_id || '',
+        selectedBedId,
+        finalPhotoUrl || undefined,
+        reportMemo
+      );
     }
     onClose();
   };

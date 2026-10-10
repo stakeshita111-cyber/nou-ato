@@ -33,8 +33,20 @@ interface MatchedKnowledgeItem {
   matchedKeywords: string[];
 }
 
+export interface JournalItem {
+  id?: string;
+  role?: string;
+  content?: string;
+  text?: string;
+  reply?: string;
+  created_at?: string;
+  date?: string;
+  student_id?: string;
+  task_title?: string;
+}
+
 interface StudentTalkViewProps {
-  journals?: Record<string, unknown>[];
+  journals?: JournalItem[];
   studentName?: string;
   studentId?: string;
   customDailyLimit?: number;
@@ -148,7 +160,7 @@ export default function StudentTalkView({
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
   const loadChatHistory = useCallback(async () => {
     try {
-      let targetList: Record<string, unknown>[] = [];
+      let targetList: JournalItem[] = [];
 
       if (studentId) {
         const { data: dbJournals } = await supabase
@@ -158,11 +170,11 @@ export default function StudentTalkView({
           .order('created_at', { ascending: true });
 
         // 自分のデータのみを使用（0件なら0件のまま。他人の会話には絶対にフォールバックしない）
-        targetList = (dbJournals || []) as unknown as Record<string, unknown>[];
+        targetList = (dbJournals || []) as unknown as JournalItem[];
       } else if (journals && journals.length > 0) {
         // studentId 未設定の場合でも、他人のデータ混入を防止
         targetList = journals.filter(
-          (j: Record<string, unknown>) => !j.student_id || j.student_id === 'student_default'
+          (j: JournalItem) => !j.student_id || j.student_id === 'student_default'
         );
       }
 
@@ -178,7 +190,7 @@ export default function StudentTalkView({
         timestamp: '現在',
       });
 
-      (targetList || []).forEach((j: Record<string, unknown>) => {
+      (targetList || []).forEach((j: JournalItem) => {
         const c = String(j.content || '').trim();
 
         if (

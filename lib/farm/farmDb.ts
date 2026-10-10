@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/supabase';
-import { FarmPlot, CropRecord, Farm } from '@/types/farm';
+import { FarmPlot, CropRecord, Farm, GrowthStage, WorkType } from '@/types/farm';
 import {
   buildPlotUpsertPayload,
   buildBedUpsertPayloadsForPlot,
@@ -108,11 +108,11 @@ export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
       bed_id: r.bed_id,
       plot_id: r.plot_id,
       date: r.date || new Date(r.created_at).toLocaleDateString('ja-JP'),
-      growth_stage: r.growth_stage || '観察記録',
-      height_cm: r.height_cm,
-      work_types: Array.isArray(r.work_types) ? r.work_types : ['手入れ'],
+      growth_stage: ((r.growth_stage as GrowthStage) || '観察記録') as GrowthStage,
+      height_cm: r.height_cm ?? undefined,
+      work_types: (Array.isArray(r.work_types) ? r.work_types : ['手入れ']) as WorkType[],
       notes: cleanNotes,
-      harvest_amount: r.harvest_amount,
+      harvest_amount: r.harvest_amount ?? undefined,
       image_url: imgUrl,
       photo_url: imgUrl,
       created_at: r.created_at,
