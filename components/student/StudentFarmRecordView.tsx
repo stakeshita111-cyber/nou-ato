@@ -490,9 +490,9 @@ export default function StudentFarmRecordView({
         if (!seenReplyTexts.has(replyText)) {
           seenReplyTexts.add(replyText);
           const dateObj = j.updated_at
-            ? new Date(j.updated_at)
+            ? new Date(String(j.updated_at))
             : j.created_at
-              ? new Date(j.created_at)
+              ? new Date(String(j.created_at))
               : new Date();
           const timeStr = dateObj.toLocaleTimeString('ja-JP', {
             hour: '2-digit',
@@ -515,7 +515,7 @@ export default function StudentFarmRecordView({
         const bContent = String(j.content || '').trim();
         if (bContent && !seenReplyTexts.has(bContent)) {
           seenReplyTexts.add(bContent);
-          const dateObj = j.created_at ? new Date(j.created_at) : new Date();
+          const dateObj = j.created_at ? new Date(String(j.created_at)) : new Date();
           const timeStr = dateObj.toLocaleTimeString('ja-JP', {
             hour: '2-digit',
             minute: '2-digit',
