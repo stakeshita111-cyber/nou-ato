@@ -19,6 +19,7 @@ export type Task = {
   difficulty?: number | null; // 難易度(1〜5)
   badge_name?: string | null; // 🏆 達成時獲得バッジ名 (例: "芽かきマスター")
   badge_icon?: string | null; // 🏆 獲得バッジアイコン (例: "✂️")
+  checklist?: Record<string, unknown> | null; // チェックリスト・バッジメタデータ (jsonb)
 
   // UI装飾用拡張プロパティ（オプション）
   tags?: string[]; // タグ配列 (例: ["解説資料", "下書き"])

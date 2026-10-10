@@ -311,19 +311,8 @@ export default function TeacherStudentsView() {
               const userStRows = studentTasksRaw.filter(
                 (st: Record<string, unknown>) => st.student_id === uId
               );
-              // 日誌 (journals) による完了タイトルの集約
-              const userJournalTitles =
-                journalCompletedTitlesMap[uId] ||
-                journalCompletedTitlesMap[studentName] ||
-                new Set<string>();
-
               let completedTasks = 0;
               let uncompletedTaskObj: Record<string, unknown> | null = null;
-
-              const cleanStr = (s: string) =>
-                (s || '')
-                  .replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, '')
-                  .trim();
 
               baseTasks.forEach((taskObj) => {
                 const taskId = String(taskObj.id || '');
@@ -609,10 +598,16 @@ export default function TeacherStudentsView() {
 
         const { error: insErr } = await supabase.from('journals').insert(journalInserts);
         if (insErr) {
-          console.warn('Supabase broadcast insert warn:', insErr);
+          console.error('Supabase broadcast insert error:', insErr);
+          setToastMessage(`一括配信に失敗しました: ${insErr.message}`);
+          setShowToast(true);
+          return;
         }
       } catch (err) {
-        console.warn('Supabase broadcast insert exception:', err);
+        console.error('Supabase broadcast insert exception:', err);
+        setToastMessage('一括配信中にエラーが発生しました');
+        setShowToast(true);
+        return;
       }
 
       // 3. 配信完了時に BroadcastChannel およびリアルタイム同期イベント（nouato_sync_event）を発行
@@ -664,7 +659,10 @@ export default function TeacherStudentsView() {
       ]);
 
       if (insErr) {
-        console.warn('Individual broadcast insert warn:', insErr);
+        console.error('Individual broadcast insert error:', insErr);
+        setToastMessage(`個別配信に失敗しました: ${insErr.message}`);
+        setShowToast(true);
+        return;
       }
 
       // 配信完了時に同期イベントを発行

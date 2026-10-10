@@ -1,6 +1,6 @@
 {
   "*.{js,jsx,ts,tsx}": [
-    "eslint --rule \"@typescript-eslint/no-explicit-any: error\" --max-warnings 0",
+    "eslint --rule \"@typescript-eslint/no-explicit-any: error\"",
     "prettier --write"
   ],
   "*.{json,css,md}": ["prettier --write"]

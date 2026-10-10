@@ -49,42 +49,53 @@ export async function POST(request: Request) {
 
     const todayJst = getJstDateString();
 
-    // 2. 多層防御②: サーバー側回数制限 (1日3回制限)
+    // 2. 多層防御②: サーバー側回数制限 (1日3回 + 講師付与チケット分)
     if (!isMemoOnly) {
+      // 本日の追加付与チケット数を取得
+      let grantedCount = 0;
+      try {
+        const ticketQuery = supabase
+          .from('ai_tickets')
+          .select('granted_count')
+          .eq('student_id', studentId)
+          .eq('date', todayJst);
+        const ticketResult =
+          typeof ticketQuery?.maybeSingle === 'function'
+            ? await ticketQuery.maybeSingle()
+            : typeof ticketQuery?.single === 'function'
+              ? await ticketQuery.single()
+              : null;
+        if (ticketResult?.data && typeof ticketResult.data.granted_count === 'number') {
+          grantedCount = ticketResult.data.granted_count;
+        }
+      } catch (e) {
+        logger.warn('Failed to query ai_tickets granted_count:', 'api/chat/rag', undefined, e);
+      }
+
+      const effectiveLimit = 3 + grantedCount;
+
       const { data: allowed, error: rpcErr } = await supabase.rpc('check_and_increment_ai_usage', {
         p_user_id: studentId,
         p_date: todayJst,
-        p_limit: 3,
+        p_limit: effectiveLimit,
       });
 
       if (rpcErr) {
-        logger.warn(
-          'check_and_increment_ai_usage RPC error, falling back to table query',
+        logger.error(
+          'check_and_increment_ai_usage RPC failure in /api/chat/rag:',
           'api/chat/rag',
           undefined,
           rpcErr
         );
-        // フォールバック: テーブルから直接判定＆更新
-        const { data: usageData } = await supabase
-          .from('ai_usage')
-          .select('count')
-          .eq('user_id', studentId)
-          .eq('date', todayJst)
-          .single();
+        return ApiResponse.serviceUnavailable(
+          'サーバーの利用制限チェックに失敗しました。時間をおいて再試行してください'
+        );
+      }
 
-        const currentCount = usageData?.count ?? 0;
-        if (currentCount >= 3) {
-          return ApiResponse.tooManyRequests('本日のAI相談チケット（1日3回）上限に達しました');
-        }
-
-        await supabase.from('ai_usage').upsert({
-          user_id: studentId,
-          date: todayJst,
-          count: currentCount + 1,
-          updated_at: new Date().toISOString(),
-        });
-      } else if (allowed === false) {
-        return ApiResponse.tooManyRequests('本日のAI相談チケット（1日3回）上限に達しました');
+      if (allowed === false) {
+        return ApiResponse.tooManyRequests(
+          `本日のAI相談チケット（1日${effectiveLimit}回）上限に達しました`
+        );
       }
     }
 

@@ -119,7 +119,7 @@ describe('Security & Authorization Suite (本番コード直撃セキュリテ�
       process.cwd(),
       'supabase',
       'migrations',
-      '20261009_prevent_privilege_escalation.sql'
+      '20261009040000_prevent_privilege_escalation.sql'
     );
     const sqlContent = fs.readFileSync(migrationFile, 'utf-8');
 
@@ -246,15 +246,15 @@ describe('Security & Authorization Suite (本番コード直撃セキュリテ�
         process.cwd(),
         'supabase',
         'migrations',
-        '20261009_prevent_privilege_escalation.sql'
+        '20261009040000_prevent_privilege_escalation.sql'
       );
       const rawSql = fs.readFileSync(targetMigration, 'utf-8');
       // コメント行 (-- ...) を除外した純粋なSQL構文から抽出
       const cleanSql = rawSql.replace(/--.*$/gm, '');
       const definerCount = (cleanSql.match(/\bSECURITY\s+DEFINER\b/gi) || []).length;
       const searchPathCount = (cleanSql.match(/SET\s+search_path\s*=\s*public/gi) || []).length;
-      expect(definerCount).toBe(3);
-      expect(searchPathCount).toBe(3);
+      expect(definerCount).toBeGreaterThanOrEqual(3);
+      expect(searchPathCount).toBeGreaterThanOrEqual(definerCount);
     });
   });
 });

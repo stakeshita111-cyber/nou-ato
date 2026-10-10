@@ -99,4 +99,11 @@ export class ApiResponse {
   static internalError(detail = 'サーバー内部エラーが発生しました'): NextResponse<ProblemDetails> {
     return this.problem(500, 'Internal Server Error', detail);
   }
+
+  /**
+   * 503 Service Unavailable
+   */
+  static serviceUnavailable(detail = 'サービスは現在利用できません'): NextResponse<ProblemDetails> {
+    return this.problem(503, 'Service Unavailable', detail);
+  }
 }

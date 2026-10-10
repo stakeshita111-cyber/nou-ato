@@ -51,7 +51,7 @@ export default function IndividualTaskAssignModal({
 
         if (usersData && usersData.length > 0) {
           setStudents(
-            usersData.map((u: any) => ({
+            (usersData as Array<{ id: string; display_name: string | null }>).map((u) => ({
               id: u.id,
               name: u.display_name || '受講生',
             }))
@@ -160,7 +160,10 @@ export default function IndividualTaskAssignModal({
         status: 'not_started',
       }));
 
-      const { error } = await supabase.from('student_tasks').upsert(inserts);
+      const { error } = await supabase.from('student_tasks').upsert(inserts, {
+        onConflict: 'student_id,base_task_id',
+        ignoreDuplicates: true,
+      });
 
       if (error) {
         setToastMessage(`割り当てエラー: ${error.message}`);
@@ -177,8 +180,9 @@ export default function IndividualTaskAssignModal({
           onClose();
         }, 1200);
       }
-    } catch (err: any) {
-      setToastMessage(`エラーが発生しました: ${err.message || ''}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setToastMessage(`エラーが発生しました: ${msg}`);
       setShowToast(true);
     } finally {
       setLoading(false);

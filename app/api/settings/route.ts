@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/utils/supabase/server';
@@ -10,6 +11,14 @@ interface ServerSettings {
 const DEFAULT_SETTINGS: ServerSettings = {
   showStudentTalkTab: true,
 };
+
+const settingsRequestBodySchema = z
+  .object({
+    showStudentTalkTab: z.boolean({
+      message: 'showStudentTalkTab は真偽値である必要があります',
+    }),
+  })
+  .passthrough();
 
 export async function GET(request?: Request) {
   try {
@@ -102,78 +111,81 @@ export async function GET(request?: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Partial<ServerSettings>;
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    const rawBody = await request.json().catch(() => null);
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
       return ApiResponse.badRequest('リクエストボディが不正です');
     }
+
+    const parseResult = settingsRequestBodySchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
+      return ApiResponse.badRequest(issue?.message || 'リクエストボディが不正です');
+    }
+
+    const { showStudentTalkTab, ...extraSettings } = parseResult.data;
 
     const supabase = await createClient();
     const {
       data: { user },
+      error: authErr,
     } = await supabase.auth.getUser();
 
-    const showStudentTalkTab = body.showStudentTalkTab !== false;
+    if (authErr || !user) {
+      return ApiResponse.unauthorized('設定の変更にはログインが必要です');
+    }
 
-    if (user) {
-      // ログイン中講師が所有/所属する農園を取得・更新
-      const { data: userData } = await supabase
-        .from('users')
-        .select('farm_id, role')
-        .eq('id', user.id)
-        .maybeSingle();
+    // ログイン中ユーザーが teacher ロールであることを検証
+    const { data: userData } = await supabase
+      .from('users')
+      .select('farm_id, role')
+      .eq('id', user.id)
+      .maybeSingle();
 
-      const { data: ownedFarms } = await supabase
+    if (!userData || userData.role !== 'teacher') {
+      return ApiResponse.forbidden('設定の変更権限は講師のみに付与されています');
+    }
+
+    // ログイン中講師が所有/所属する農園を取得・更新
+    const { data: ownedFarms } = await supabase
+      .from('farms')
+      .select('id')
+      .or(`owner_id.eq.${user.id}${userData?.farm_id ? `,id.eq.${userData.farm_id}` : ''}`);
+
+    if (ownedFarms && ownedFarms.length > 0) {
+      const farmIds = ownedFarms.map((f) => f.id);
+      await supabase
         .from('farms')
-        .select('id')
-        .or(`owner_id.eq.${user.id}${userData?.farm_id ? `,id.eq.${userData.farm_id}` : ''}`);
-
-      if (ownedFarms && ownedFarms.length > 0) {
-        const farmIds = ownedFarms.map((f) => f.id);
-        await supabase
-          .from('farms')
-          .update({
-            show_student_talk_tab: showStudentTalkTab,
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', farmIds);
-      } else {
-        // 農園レコードが未登録の場合は新規作成/upsert
-        const newFarmId = userData?.farm_id || crypto.randomUUID();
-        await supabase.from('farms').upsert([
-          {
-            id: newFarmId,
-            name: 'マイ農園',
-            owner_id: user.id,
-            show_student_talk_tab: showStudentTalkTab,
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-        if (!userData?.farm_id) {
-          await supabase.from('users').update({ farm_id: newFarmId }).eq('id', user.id);
-        }
-      }
+        .update({
+          show_student_talk_tab: showStudentTalkTab,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', farmIds);
     } else {
-      // 未ログイン状態でも全体デフォルト設定として1件目の農園があれば更新を試みる
-      const { data: firstFarm } = await supabase.from('farms').select('id').limit(1).maybeSingle();
-      if (firstFarm) {
-        await supabase
-          .from('farms')
-          .update({
-            show_student_talk_tab: showStudentTalkTab,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', firstFarm.id);
+      // 農園レコードが未登録の場合は新規作成/upsert
+      const newFarmId = userData?.farm_id || crypto.randomUUID();
+      await supabase.from('farms').upsert([
+        {
+          id: newFarmId,
+          name: 'マイ農園',
+          owner_id: user.id,
+          show_student_talk_tab: showStudentTalkTab,
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+      if (!userData?.farm_id) {
+        await supabase.from('users').update({ farm_id: newFarmId }).eq('id', user.id);
       }
     }
 
     const settings: ServerSettings = {
       ...DEFAULT_SETTINGS,
-      ...body,
+      ...extraSettings,
       showStudentTalkTab,
     };
 
     logger.info('Updated global server settings', 'api/settings', {
       showStudentTalkTab,
+      userId: user.id,
     });
 
     return ApiResponse.success({

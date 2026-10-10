@@ -2,14 +2,38 @@
 -- NOU-ATO (のうあと) サインアップ権限昇格の防止 & Postgres関数（register_teacher/join_farm）化
 -- Migration: 20261009_prevent_privilege_escalation.sql
 -- 目的:
---  1. handle_new_auth_user トリガーの修正: raw_user_meta_data の role / farm_id を無視し、
+--  1. current_user_role() / current_user_farm_id() ヘルパー関数作成（RLS再帰防止）
+--  2. handle_new_auth_user トリガーの修正: raw_user_meta_data の role / farm_id を無視し、
 --     常に role = 'student', farm_id = NULL で安全に初期ユーザーを作成。
---  2. farms テーブルに invite_code カラム追加（既存レコードにもユニークコードを採番）。
---  3. 講師登録用 SECURITY DEFINER 関数: register_teacher(farm_name text)
---  4. 農園参加用 SECURITY DEFINER 関数: join_farm(invite_code text)
---  5. public.users の RLS および UPDATE トリガーを設定し、
+--  3. farms テーブルに invite_code カラム追加。
+--  4. 講師登録用 SECURITY DEFINER 関数: register_teacher(farm_name text)
+--  5. 農園参加用 SECURITY DEFINER 関数: join_farm(invite_code text)
+--  6. public.users の RLS および UPDATE トリガーを設定し、
 --     クライアント（authenticated / anon）からの role / farm_id の直接変更を禁止。
 -- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 0. RLS再帰防止用 SECURITY DEFINER ヘルパー関数
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT role FROM public.users WHERE id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.current_user_farm_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT farm_id FROM public.users WHERE id = auth.uid();
+$$;
 
 -- ------------------------------------------------------------------------------
 -- 1. handle_new_auth_user トリガー関数の更新 (常に role='student', farm_id=NULL)
@@ -74,7 +98,7 @@ ALTER TABLE public.farms ADD COLUMN IF NOT EXISTS invite_code text UNIQUE;
 
 -- 既存の農園で invite_code が NULL の場合は、ランダムな招待コードを生成して設定
 UPDATE public.farms
-SET invite_code = encode(gen_random_bytes(6), 'hex')
+SET invite_code = encode(extensions.gen_random_bytes(6), 'hex')
 WHERE invite_code IS NULL;
 
 -- ------------------------------------------------------------------------------
@@ -84,7 +108,7 @@ CREATE OR REPLACE FUNCTION public.register_teacher(farm_name text)
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
     target_user_id uuid;
@@ -102,7 +126,7 @@ BEGIN
         RAISE EXCEPTION 'Farm name is required';
     END IF;
 
-    new_invite_code := encode(gen_random_bytes(6), 'hex');
+    new_invite_code := encode(extensions.gen_random_bytes(6), 'hex');
     new_farm_id := gen_random_uuid();
 
     -- 新しい農園を作成
@@ -136,6 +160,8 @@ SET search_path = public
 AS $$
 DECLARE
     target_user_id uuid;
+    caller_role text;
+    caller_farm_id uuid;
     found_farm_id uuid;
     found_farm_name text;
     clean_code text;
@@ -145,16 +171,28 @@ BEGIN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
 
+    -- 呼び出し元ユーザーの状態を確認（受講生で、かつ未所属のみ許可）
+    SELECT role, farm_id INTO caller_role, caller_farm_id
+    FROM public.users
+    WHERE id = target_user_id;
+
+    IF caller_role != 'student' THEN
+        RAISE EXCEPTION 'Only students can join a farm';
+    END IF;
+
+    IF caller_farm_id IS NOT NULL THEN
+        RAISE EXCEPTION 'Already joined a farm';
+    END IF;
+
     clean_code := trim(invite_code);
     IF clean_code IS NULL OR clean_code = '' THEN
         RAISE EXCEPTION 'Invite code is required';
     END IF;
 
-    -- invite_code または id::text（UUID）で農園を検証
+    -- セキュリティ強化: invite_code のみで農園を検証（農園UUIDでの参加は禁止）
     SELECT id, name INTO found_farm_id, found_farm_name
     FROM public.farms
     WHERE public.farms.invite_code = clean_code
-       OR public.farms.id::text = clean_code
     LIMIT 1;
 
     IF found_farm_id IS NULL THEN
@@ -181,13 +219,21 @@ $$;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
+DROP POLICY IF EXISTS "Users can update own basic profile" ON public.users;
+DROP POLICY IF EXISTS "Allow full access for authenticated users on users" ON public.users;
+DROP POLICY IF EXISTS "Allow read access for anon on users" ON public.users;
+
+-- 閲覧ポリシー: 本人のみ、または同農園の講師のみ閲覧可能（再帰防止に current_user_role / current_user_farm_id を使用）
 CREATE POLICY "Users can view own profile" ON public.users
     FOR SELECT USING (
         auth.uid() = id
-        OR (SELECT role FROM public.users WHERE id = auth.uid()) = 'teacher'
+        OR (
+            public.current_user_role() = 'teacher'
+            AND farm_id = public.current_user_farm_id()
+        )
     );
 
-DROP POLICY IF EXISTS "Users can update own basic profile" ON public.users;
+-- 更新ポリシー: 本人のみ表示名などを更新可能（作成・削除は不可）
 CREATE POLICY "Users can update own basic profile" ON public.users
     FOR UPDATE USING (auth.uid() = id);
 

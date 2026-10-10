@@ -52,12 +52,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       const { data: tasksData } = await tasksQuery.order('created_at', { ascending: false });
       if (tasksData) {
-        const mappedTasks: Task[] = tasksData.map((t: any) => {
+        const mappedTasks: Task[] = (tasksData as unknown as Task[]).map((t) => {
           const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
           return {
             ...t,
-            badge_name: t.badge_name || cl.badge_name || null,
-            badge_icon: t.badge_icon || cl.badge_icon || null,
+            badge_name: t.badge_name || (cl.badge_name as string) || null,
+            badge_icon: t.badge_icon || (cl.badge_icon as string) || null,
           };
         });
         setTasks(mappedTasks);
@@ -72,12 +72,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       const { data: trashData } = await trashQuery.order('deleted_at', { ascending: false });
       if (trashData) {
-        const mappedTrash: Task[] = trashData.map((t: any) => {
+        const mappedTrash: Task[] = (trashData as unknown as Task[]).map((t) => {
           const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
           return {
             ...t,
-            badge_name: t.badge_name || cl.badge_name || null,
-            badge_icon: t.badge_icon || cl.badge_icon || null,
+            badge_name: t.badge_name || (cl.badge_name as string) || null,
+            badge_icon: t.badge_icon || (cl.badge_icon as string) || null,
           };
         });
         setTrashTasks(mappedTrash);
@@ -125,10 +125,10 @@ export function useKanbanBoard(columns: ColumnType[]) {
         const bc = new BroadcastChannel('nouato_farm_sync_channel');
         bc.postMessage({ type: 'TASKS_UPDATED', timestamp: Date.now() });
         bc.close();
-      } catch (e) {}
+      } catch {}
       try {
         localStorage.setItem('nouato_sync_event', Date.now().toString());
-      } catch (e) {}
+      } catch {}
     }
   };
 
@@ -136,7 +136,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const publishTaskToStudents = async (taskId: string, targetFarmId?: string | null) => {
     try {
       // 1. Supabase Postgres RPC 関数を呼び出し
-      const { error: rpcErr } = await (supabase.rpc as any)('publish_task_to_all_students', {
+      const { error: rpcErr } = await supabase.rpc('publish_task_to_all_students', {
         p_task_id: taskId,
       });
       if (rpcErr) {
@@ -182,7 +182,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
     }
   };
 
-  // タスクの追加（Create: 作成された Task を返却）
+  // タスクの追加（Create: 実DBへ保存し、作成された Task を返却）
   const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
     let effectiveFarmId = farmId;
     if (!effectiveFarmId && typeof window !== 'undefined') {
@@ -190,32 +190,16 @@ export function useKanbanBoard(columns: ColumnType[]) {
     }
 
     if (!userId || !effectiveFarmId) {
-      // 一時IDでフロント用オブジェクトを生成
-      const tempTask: Task = {
-        id: `temp_${Date.now()}`,
-        title,
-        status: options?.status || 'pool',
-        category: options?.category || 'work',
-        description: options?.description || null,
-        tools_needed: options?.tools_needed || null,
-        reference_links: options?.reference_links || null,
-        memo: options?.memo || null,
-        target_crop: options?.target_crop || null,
-        require_photo: options?.require_photo || false,
-        exp: options?.exp || 10,
-        difficulty: options?.difficulty || 1,
-        estimated_time: options?.estimated_time || null,
-        badge_name: options?.badge_name || null,
-        badge_icon: options?.badge_icon || null,
-      };
-      setTasks((prev) => [tempTask, ...prev]);
-      return tempTask;
+      console.warn('addTask: ユーザーIDまたは農園IDが未特定のためタスクを作成できません');
+      return null;
     }
 
     try {
       const existingChecklist =
-        (options as any)?.checklist && typeof (options as any)?.checklist === 'object'
-          ? (options as any).checklist
+        options?.checklist &&
+        typeof options.checklist === 'object' &&
+        !Array.isArray(options.checklist)
+          ? (options.checklist as Record<string, unknown>)
           : {};
       const newTaskChecklist = {
         ...existingChecklist,
@@ -244,21 +228,14 @@ export function useKanbanBoard(columns: ColumnType[]) {
       const { data, error } = await supabase.from('tasks').insert([newTaskData]).select().single();
 
       if (error) {
-        console.warn('タスクDB追加警告:', error.message);
-        const tempTask: Task = {
-          id: `temp_${Date.now()}`,
-          ...newTaskData,
-          badge_name: options?.badge_name || null,
-          badge_icon: options?.badge_icon || null,
-        };
-        setTasks((prev) => [tempTask, ...prev]);
-        return tempTask;
+        console.error('タスクDB追加エラー:', error.message);
+        return null;
       }
 
       if (data) {
         const cl =
           data.checklist && typeof data.checklist === 'object' && !Array.isArray(data.checklist)
-            ? (data.checklist as Record<string, any>)
+            ? (data.checklist as Record<string, unknown>)
             : {};
         const createdTask = {
           ...data,
@@ -299,8 +276,10 @@ export function useKanbanBoard(columns: ColumnType[]) {
     try {
       const existingTask = tasks.find((t) => t.id === updatedTask.id);
       const existingChecklist =
-        (existingTask as any)?.checklist && typeof (existingTask as any)?.checklist === 'object'
-          ? (existingTask as any).checklist
+        existingTask?.checklist &&
+        typeof existingTask.checklist === 'object' &&
+        !Array.isArray(existingTask.checklist)
+          ? (existingTask.checklist as Record<string, unknown>)
           : {};
       const updatedChecklist = {
         ...existingChecklist,
@@ -443,8 +422,6 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
     const currentTask = tasks.find((t) => t.id === taskId);
     if (!currentTask) return;
-
-    const previousTasks = [...tasks];
 
     setTasks((prevTasks) => {
       const oldIndex = prevTasks.findIndex((t) => t.id === taskId);

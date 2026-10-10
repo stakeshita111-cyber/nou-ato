@@ -1,114 +1,113 @@
+import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
 import { supabase as clientSupabase } from '@/lib/supabase';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 
-interface GrantTicketRequestBody {
-  studentId?: string;
-  amount?: number;
-}
+const grantTicketRequestBodySchema = z.object({
+  studentId: z
+    .string()
+    .min(1, '受講生ID (studentId) は必須です')
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, {
+      message: '有効な文字列のIDを指定してください',
+    }),
+  amount: z
+    .number({ message: '付与枚数 (amount) は1以上の数値を指定してください' })
+    .int('付与枚数 (amount) は1以上の数値を指定してください')
+    .positive('付与枚数 (amount) は1以上の数値を指定してください')
+    .default(1),
+});
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as GrantTicketRequestBody;
-    const { studentId, amount = 1 } = body;
+    const rawBody = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+      return ApiResponse.badRequest('リクエスト内容が正しくありません');
+    }
 
-    if (!studentId || typeof studentId !== 'string' || !studentId.trim()) {
+    if (!rawBody.studentId || typeof rawBody.studentId !== 'string' || !rawBody.studentId.trim()) {
       return ApiResponse.badRequest('受講生ID (studentId) は必須です', [
         { name: 'studentId', reason: '有効な文字列のIDを指定してください' },
       ]);
     }
 
-    if (typeof amount !== 'number' || amount <= 0) {
-      return ApiResponse.badRequest('付与枚数 (amount) は1以上の数値を指定してください', [
-        { name: 'amount', reason: '1以上の数値を指定してください' },
-      ]);
+    const parseResult = grantTicketRequestBodySchema.safeParse(rawBody);
+
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
+      return ApiResponse.badRequest(issue?.message || 'リクエスト内容が正しくありません');
     }
+
+    const { studentId, amount } = parseResult.data;
 
     let supabase = clientSupabase;
     try {
       supabase = await createClient();
     } catch {
-      // Vitest テスト環境や cookies() 非アクティブ環境ではクライアントインスタンスにフォールバック
       supabase = clientSupabase;
     }
 
-    // ログイン中のユーザー情報を確認
-    try {
-      const {
-        data: { user: sessionUser },
-      } = await supabase.auth.getUser();
+    // 1. 認証チェック（未ログインは 401）
+    const {
+      data: { user: sessionUser },
+      error: authErr,
+    } = await supabase.auth.getUser();
 
-      if (sessionUser) {
-        // ユーザーのロールを確認（teacher ロールであることを検証）
-        const { data: dbUser } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', sessionUser.id)
-          .single();
-
-        if (dbUser && dbUser.role !== 'teacher') {
-          return ApiResponse.forbidden('チケットの追加付与権限は講師のみに付与されています');
-        }
-      }
-    } catch (authErr) {
-      logger.warn(
-        'Auth session check in /api/tickets/grant:',
-        'api/tickets/grant',
-        undefined,
-        authErr
-      );
+    if (authErr || !sessionUser) {
+      return ApiResponse.unauthorized('チケットの付与にはログインが必要です');
     }
 
-    // Postgres 関数 `grant_ai_tickets` をアトミックに呼び出し
+    // 2. 講師権限チェック（teacher でなければ 403）
+    const userQuery = supabase.from('users').select('role, farm_id').eq('id', sessionUser.id);
+    const userResult =
+      typeof userQuery.maybeSingle === 'function'
+        ? await userQuery.maybeSingle()
+        : await userQuery.single();
+    const dbUser = userResult?.data;
+
+    if (!dbUser || dbUser.role !== 'teacher') {
+      return ApiResponse.forbidden('チケットの追加付与権限は講師のみに付与されています');
+    }
+
+    // 3. 同一農園チェック（他農園の受講生には付与不可）
+    if (dbUser.farm_id) {
+      const studentQuery = supabase.from('users').select('farm_id, role').eq('id', studentId);
+      const studentResult =
+        typeof studentQuery.maybeSingle === 'function'
+          ? await studentQuery.maybeSingle()
+          : await studentQuery.single();
+      const targetStudent = studentResult?.data;
+
+      if (!targetStudent) {
+        return ApiResponse.notFound('対象の受講生が見つかりません');
+      }
+
+      if (targetStudent.farm_id !== dbUser.farm_id) {
+        return ApiResponse.forbidden('他農園の受講生にチケットを付与することはできません');
+      }
+    }
+
+    // 4. Postgres 関数 `grant_ai_tickets` をアトミックに呼び出し
+    const { data: rpcData, error: rpcError } = await supabase.rpc('grant_ai_tickets', {
+      p_student_id: studentId,
+      p_count: amount,
+    });
+
+    if (rpcError) {
+      logger.error('RPC grant_ai_tickets failure:', 'api/tickets/grant', undefined, rpcError);
+      return ApiResponse.internalError('チケット付与処理に失敗しました: ' + rpcError.message);
+    }
+
     let newCount = 3 + amount;
-    let rpcError = null;
-
-    try {
-      const { data: rpcData, error } = await (supabase.rpc as any)('grant_ai_tickets', {
-        p_student_id: studentId,
-        p_count: amount,
-      });
-
-      if (error) {
-        rpcError = error;
-        logger.warn('RPC grant_ai_tickets notice/fallback:', 'api/tickets/grant', undefined, error);
-      } else if (
+    if (typeof rpcData === 'object' && rpcData !== null) {
+      if (
         Array.isArray(rpcData) &&
         rpcData.length > 0 &&
-        typeof (rpcData[0] as any)?.count === 'number'
+        typeof (rpcData[0] as Record<string, unknown>)?.count === 'number'
       ) {
-        newCount = (rpcData[0] as any).count;
-      }
-    } catch (err) {
-      rpcError = err;
-      logger.warn('RPC grant_ai_tickets exception:', 'api/tickets/grant', undefined, err);
-    }
-
-    // DB テーブル `ai_tickets` への直接 UPSERT 補完（RPC未登録環境用バックアップ）
-    if (rpcError) {
-      try {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const { data: existing } = await supabase
-          .from('ai_tickets')
-          .select('count, granted_count')
-          .eq('student_id', studentId)
-          .eq('date', todayStr)
-          .single();
-
-        const currentCount = existing?.count ?? 3;
-        const currentGranted = existing?.granted_count ?? 0;
-        newCount = currentCount + amount;
-
-        await supabase.from('ai_tickets').upsert({
-          student_id: studentId,
-          date: todayStr,
-          count: newCount,
-          granted_count: currentGranted + amount,
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch (dbErr) {
-        logger.warn('ai_tickets direct upsert exception:', 'api/tickets/grant', undefined, dbErr);
+        newCount = (rpcData[0] as Record<string, unknown>).count as number;
+      } else if (typeof (rpcData as Record<string, unknown>).count === 'number') {
+        newCount = (rpcData as Record<string, unknown>).count as number;
       }
     }
 
