@@ -233,4 +233,18 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
     expect(recIdArg).toBe('rec-1');
     expect(payloadArg.bed_id).toBe('bed-2');
   });
+
+  it('畝の作物品種名がきゅうりの場合、過去記録に他品種があっても見出しは設定品種のみとなりボタンと完全一致すること', async () => {
+    render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
+
+    const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
+    await act(async () => {
+      fireEvent.click(bed1Btn);
+    });
+
+    // 選択ボタンが「畝 1 きゅうり」であり、見出しも「📅 畝 1 (きゅうり) の記録」と完全一致すること
+    expect(screen.getByText('📅 畝 1 (きゅうり) の記録')).toBeDefined();
+    // キャベツなどの過去の無関係な品種名は見出しに混入しないこと
+    expect(screen.queryByText(/きゃべつ/)).toBeNull();
+  });
 });

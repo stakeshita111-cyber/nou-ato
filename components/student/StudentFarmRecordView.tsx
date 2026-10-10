@@ -666,8 +666,8 @@ export default function StudentFarmRecordView({
     return [...observationItems, ...replyItems].sort((a, b) => b.timestamp - a.timestamp);
   })();
 
-  // 🌟 #2: 混植畝の登録品種一覧: 畝名および過去の記録からすべての品種を漏れなく収集 🌟
-  const currentBedCrops = getBedAllCrops(currentBed?.crop_name, currentBedRecords);
+  // 🌟 現在の畝に設定されている栽培品種一覧 (過去の別作物のログを現在の作物名として誤認・混入させない) 🌟
+  const currentBedCrops = parseCrops(currentBed?.crop_name);
 
   const filteredTimelineItems = synthesizedTimelineItems.filter((item) => {
     if (selectedCropFilter === 'all') return true;

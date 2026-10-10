@@ -598,131 +598,14 @@ export default function StudentTalkView({
     <div className="flex flex-col h-full flex-1 min-h-0 bg-white overflow-hidden relative">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* 🌟 2. 検索バー 🌟 */}
-      {showSearch && (
-        <div className="bg-emerald-50/90 border-b border-emerald-200 p-2.5 space-y-2 shrink-0 animate-fade-in shadow-2xs">
-          <div className="flex items-center justify-between">
-            <div className="flex space-x-1 bg-emerald-100/80 p-0.5 rounded-xl text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setSearchMode('jump')}
-                className={
-                  'px-2.5 py-1 rounded-lg transition cursor-pointer ' +
-                  (searchMode === 'jump'
-                    ? 'bg-white text-emerald-900 shadow-2xs'
-                    : 'text-emerald-700 hover:text-emerald-900')
-                }
-              >
-                🔀 キーワード検索
-              </button>
-              <button
-                type="button"
-                onClick={() => setSearchMode('list')}
-                className={
-                  'px-2.5 py-1 rounded-lg transition cursor-pointer ' +
-                  (searchMode === 'list'
-                    ? 'bg-white text-emerald-900 shadow-2xs'
-                    : 'text-emerald-700 hover:text-emerald-900')
-                }
-              >
-                📜 過去の質問一覧 ({studentQuestionsList.length})
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowSearch(false);
-                setSearchKeyword('');
-              }}
-              className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-0.5 cursor-pointer"
-            >
-              ✕ 閉じる
-            </button>
-          </div>
-
-          {searchMode === 'jump' ? (
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder="探したい言葉を入力 (例: トマト, 水やり, ハダニ)..."
-                autoFocus
-                className="flex-1 px-3 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 font-medium placeholder-gray-400"
-              />
-
-              {matchedMessageIds.length > 0 ? (
-                <div className="flex items-center space-x-1 shrink-0">
-                  <span className="text-[11px] font-black text-emerald-900 bg-white px-2 py-1 rounded-lg border border-emerald-200 shadow-2xs">
-                    {currentMatchIndex + 1} / {matchedMessageIds.length} 件
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handlePrevMatch}
-                    className="p-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
-                  >
-                    ◀
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextMatch}
-                    className="p-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-lg text-xs font-bold transition cursor-pointer"
-                  >
-                    ▶
-                  </button>
-                </div>
-              ) : searchKeyword.trim() ? (
-                <span className="text-[11px] text-gray-500 font-bold shrink-0">一致なし</span>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-[11px] text-emerald-800 font-medium">
-              💡 過去に送信した質問一覧です。タップするとその会話へジャンプします。
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* 🌟 3. メインチャットエリア 🌟 */}
-      {showSearch && searchMode === 'list' ? (
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-emerald-50/30 animate-fade-in">
-          {studentQuestionsList.length === 0 ? (
-            <div className="p-8 text-center text-xs text-gray-400">まだ質問履歴はありません。</div>
-          ) : (
-            studentQuestionsList.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => {
-                  setShowSearch(false);
-                  setTimeout(() => jumpToMessage(item.id), 100);
-                }}
-                className="bg-white p-3.5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 cursor-pointer transition group text-left"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-black text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded-md">
-                    質問 #{item.number}
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-medium">{item.timestamp}</span>
-                </div>
-                <p className="text-xs text-gray-900 font-extrabold group-hover:text-emerald-800 line-clamp-2 leading-snug">
-                  {item.question}
-                </p>
-                {item.replyText && (
-                  <p className="text-[11px] text-gray-500 font-normal line-clamp-1 mt-1 border-t border-gray-100 pt-1">
-                    💬 {item.replyText}
-                  </p>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      ) : (
+      {/* 🌟 2. メインチャットエリア (常に表示 ＆ 右下に虫眼鏡ボタン常駐) 🌟 */}
+      <div className="flex-1 min-h-0 relative flex flex-col">
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#fcfbf9]">
           {messages.map((msg) => {
             const isMe = msg.sender === 'student';
             const isTargetMatch =
-              searchKeyword.trim() && matchedMessageIds[currentMatchIndex] === msg.id;
+              (searchKeyword.trim() && matchedMessageIds[currentMatchIndex] === msg.id) ||
+              highlightedMessageId === msg.id;
 
             return (
               <div
@@ -795,7 +678,7 @@ export default function StudentTalkView({
                       </div>
                     )}
 
-                    {/* 📚 参照した過去の講師Q&Aナレッジ (AI新規生成時のみ表示し、ルールベース直答時は重複防止) */}
+                    {/* 📚 参照した過去の講師Q&Aナレッジ */}
                     {!isMe &&
                       !msg.isKnowledgeHit &&
                       msg.referencedQa &&
@@ -847,6 +730,178 @@ export default function StudentTalkView({
           )}
 
           <div ref={messagesEndRef} />
+        </div>
+
+        {/* 🌟 チャット画面の右下に配置された虫眼鏡ボタン 🌟 */}
+        <button
+          type="button"
+          onClick={() => setShowSearch(true)}
+          className="absolute bottom-3 right-3 z-20 w-11 h-11 rounded-full bg-white hover:bg-emerald-50 text-[#1c4d21] border border-emerald-300 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center transition-all cursor-pointer group"
+          title="会話履歴・過去の質問を検索"
+        >
+          <span className="text-lg group-hover:scale-110 transition-transform">🔍</span>
+        </button>
+      </div>
+
+      {/* 🌟 3. 検索 ＆ 過去の質問一覧モーダル窓 (虫眼鏡ボタン押下で開く) 🌟 */}
+      {showSearch && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center p-3.5 bg-black/50 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm max-h-[85%] flex flex-col shadow-2xl border border-gray-200 overflow-hidden animate-scale-up text-left">
+            {/* モーダルヘッダー */}
+            <div className="px-4 py-3 bg-[#1c4d21] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm">🔍</span>
+                <h4 className="font-extrabold text-xs sm:text-sm tracking-wide">
+                  会話履歴 ＆ 質問検索
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSearch(false);
+                  setSearchKeyword('');
+                }}
+                className="text-white/80 hover:text-white p-1 rounded-full text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* モード切り替えタブ */}
+            <div className="p-2 bg-emerald-50/80 border-b border-emerald-100 flex items-center space-x-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSearchMode('jump')}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer text-center ${
+                  searchMode === 'jump'
+                    ? 'bg-white text-[#1c4d21] shadow-2xs'
+                    : 'text-emerald-700 hover:text-[#1c4d21]'
+                }`}
+              >
+                🔀 キーワード検索
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchMode('list')}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer text-center ${
+                  searchMode === 'list'
+                    ? 'bg-white text-[#1c4d21] shadow-2xs'
+                    : 'text-emerald-700 hover:text-[#1c4d21]'
+                }`}
+              >
+                📜 過去の質問 ({studentQuestionsList.length})
+              </button>
+            </div>
+
+            {/* モーダルコンテンツ */}
+            {searchMode === 'jump' ? (
+              <div className="flex-1 flex flex-col min-h-0 p-3 space-y-2.5">
+                <div className="flex items-center space-x-2 shrink-0">
+                  <input
+                    type="text"
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                    placeholder="探したい言葉を入力 (例: トマト, 水やり)..."
+                    autoFocus
+                    className="flex-1 px-3 py-2 bg-gray-50 focus:bg-white border border-emerald-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#1c4d21] font-medium placeholder-gray-400"
+                  />
+                  {searchKeyword.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchKeyword('')}
+                      className="text-xs text-gray-400 hover:text-gray-600 px-1 font-bold cursor-pointer shrink-0"
+                    >
+                      クリア
+                    </button>
+                  )}
+                </div>
+
+                {/* 検索結果リスト */}
+                <div className="flex-1 overflow-y-auto space-y-2 min-h-0 pr-0.5">
+                  {searchKeyword.trim() ? (
+                    matchedMessagesList.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-gray-400 font-medium">
+                        一致するメッセージはありませんでした
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-[11px] font-bold text-emerald-900 px-1 flex items-center justify-between">
+                          <span>一致: {matchedMessagesList.length} 件</span>
+                          <span className="text-[10px] text-gray-400">タップして移動</span>
+                        </div>
+                        {matchedMessagesList.map((msg) => (
+                          <div
+                            key={msg.id}
+                            onClick={() => {
+                              setShowSearch(false);
+                              setTimeout(() => jumpToMessage(msg.id), 120);
+                            }}
+                            className="p-3 bg-emerald-50/50 hover:bg-emerald-100/70 rounded-2xl border border-emerald-100 transition cursor-pointer group text-left shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-extrabold text-[#1c4d21] bg-white px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                                {msg.sender === 'student' ? '👤 あなたの質問' : '🧑‍🌾 農家のしるべぇ'}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-medium">
+                                {msg.timestamp}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-800 line-clamp-2 leading-relaxed">
+                              {renderHighlightedText(msg.text, searchKeyword)}
+                            </p>
+                          </div>
+                        ))}
+                      </>
+                    )
+                  ) : (
+                    <div className="py-8 text-center text-xs text-gray-400 space-y-1">
+                      <span className="text-2xl block">🔍</span>
+                      <p className="font-medium">探したいキーワードを入力してください</p>
+                      <p className="text-[11px] text-gray-400">
+                        過去のやり取りから該当メッセージを検索できます
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0 bg-gray-50/40">
+                {studentQuestionsList.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-gray-400 font-medium">
+                    まだ質問履歴はありません
+                  </div>
+                ) : (
+                  studentQuestionsList.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        setShowSearch(false);
+                        setTimeout(() => jumpToMessage(item.id), 120);
+                      }}
+                      className="bg-white p-3 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 cursor-pointer transition group text-left"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-black text-[#1c4d21] bg-emerald-100 px-2 py-0.5 rounded-md">
+                          質問 #{item.number}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-medium">
+                          {item.timestamp}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-900 font-extrabold group-hover:text-emerald-800 line-clamp-2 leading-snug">
+                        {item.question}
+                      </p>
+                      {item.replyText && (
+                        <p className="text-[11px] text-gray-500 font-normal line-clamp-1 mt-1 border-t border-gray-100 pt-1">
+                          💬 {item.replyText}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
