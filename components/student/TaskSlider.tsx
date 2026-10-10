@@ -215,7 +215,7 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
     }
     if (isDragging) {
       const scale = 0.95 + 0.05 * dragProgress;
-      const translateY = 10 - 10 * dragProgress;
+      const translateY = 6 - 6 * dragProgress;
       return {
         transform: `scale(${scale}) translateY(${translateY}px)`,
         opacity: 0.95,
@@ -223,7 +223,7 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
       };
     }
     return {
-      transform: 'scale(0.95) translateY(10px)',
+      transform: 'scale(0.95) translateY(6px)',
       opacity: 0.9,
       transition: 'transform 0.2s ease-out, opacity 0.2s ease-out',
     };
@@ -233,14 +233,14 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
   const getCard3Style = () => {
     if (isAnimating) {
       return {
-        transform: 'scale(0.95) translateY(10px)',
+        transform: 'scale(0.95) translateY(6px)',
         opacity: 0.9,
         transition: 'transform 0.35s ease-out, opacity 0.35s ease-out',
       };
     }
     if (isDragging) {
       const scale = 0.9 + 0.05 * dragProgress;
-      const translateY = 20 - 10 * dragProgress;
+      const translateY = 12 - 6 * dragProgress;
       return {
         transform: `scale(${scale}) translateY(${translateY}px)`,
         opacity: 0.8,
@@ -248,14 +248,14 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
       };
     }
     return {
-      transform: 'scale(0.90) translateY(20px)',
+      transform: 'scale(0.90) translateY(12px)',
       opacity: 0.7,
       transition: 'transform 0.2s ease-out, opacity 0.2s ease-out',
     };
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* 完了済み切り替えボタン */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-bold text-gray-700">
@@ -275,22 +275,22 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
 
       {!showCompletedList ? (
         activeTasks.length === 0 ? (
-          <div className="bg-green-50/80 p-8 rounded-3xl border border-green-200 text-center space-y-2">
-            <span className="text-2xl">🎉</span>
-            <h4 className="font-black text-gray-900 text-sm">すべてのタスクを完了しました！</h4>
-            <p className="text-xs text-gray-500">
+          <div className="bg-green-50/80 p-6 rounded-3xl border border-green-200 text-center space-y-1.5">
+            <span className="text-xl">🎉</span>
+            <h4 className="font-black text-gray-900 text-xs">すべてのタスクを完了しました！</h4>
+            <p className="text-[11px] text-gray-500">
               お疲れ様でした。講師からのフィードバックをお待ちください。
             </p>
           </div>
         ) : (
-          <div className="relative pb-6">
+          <div className="relative pb-2">
             {/* 左右ナビゲーションアローボタン */}
             {activeTasks.length > 1 && (
               <>
                 <button
                   onClick={() => triggerPrev('right')}
                   disabled={isAnimating}
-                  className="absolute -left-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                  className="absolute -left-2 top-1/2 -translate-y-1/2 z-30 w-7 h-7 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50 text-xs"
                   aria-label="前のタスク"
                 >
                   ‹
@@ -298,7 +298,7 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
                 <button
                   onClick={() => triggerNext('left')}
                   disabled={isAnimating}
-                  className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                  className="absolute -right-2 top-1/2 -translate-y-1/2 z-30 w-7 h-7 rounded-full bg-white shadow-md border border-gray-200 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-50 transition cursor-pointer disabled:opacity-50 text-xs"
                   aria-label="次のタスク"
                 >
                   ›
@@ -307,13 +307,13 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
             )}
 
             {/* カードスタック（デッキ風）領域 */}
-            <div className="overflow-hidden py-1 px-0.5 relative">
+            <div className="overflow-hidden py-0.5 px-0.5 relative">
               <div
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
-                className="relative min-h-[190px] touch-pan-y select-none"
+                className="relative min-h-[135px] touch-pan-y select-none"
               >
                 {/* 3枚目カード（最背面） */}
                 {card3Task && (
@@ -323,22 +323,22 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
                       ...getCard3Style(),
                       transformOrigin: 'top center',
                     }}
-                    className="absolute inset-0 z-0 pointer-events-none bg-white p-6 rounded-3xl shadow-xs border border-gray-200 border-l-4 border-l-[#1d5c23]/40 space-y-4"
+                    className="absolute inset-0 z-0 pointer-events-none bg-white p-3.5 sm:p-4 rounded-3xl shadow-2xs border border-gray-200 border-l-4 border-l-[#1d5c23]/40 space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-gray-400">
+                      <span className="text-[10px] font-bold text-gray-400">
                         {card3Index + 1} / {activeTasks.length}
                       </span>
                       <Badge type="crop">
-                        {card3Task.tasks?.target_crop || card3Task.target_crop || '春野菜'}
+                        {card3Task.tasks?.target_crop || card3Task.target_crop || '共通'}
                       </Badge>
                     </div>
 
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-black text-gray-900 leading-snug">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-black text-gray-900 leading-snug truncate">
                         {card3Task.tasks?.title || card3Task.title || 'タスク'}
                       </h3>
-                      <p className="text-xs text-gray-500 line-clamp-2">
+                      <p className="text-[11px] text-gray-500 line-clamp-1">
                         {card3Task.tasks?.description ||
                           card3Task.description ||
                           'しっかり観察して作業を進めましょう。'}
@@ -355,22 +355,22 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
                       ...getCard2Style(),
                       transformOrigin: 'top center',
                     }}
-                    className="absolute inset-0 z-10 pointer-events-none bg-white p-6 rounded-3xl shadow-sm border border-gray-200 border-l-4 border-l-[#1d5c23]/60 space-y-4"
+                    className="absolute inset-0 z-10 pointer-events-none bg-white p-3.5 sm:p-4 rounded-3xl shadow-xs border border-gray-200 border-l-4 border-l-[#1d5c23]/60 space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-gray-400">
+                      <span className="text-[10px] font-bold text-gray-400">
                         {card2Index + 1} / {activeTasks.length}
                       </span>
                       <Badge type="crop">
-                        {card2Task.tasks?.target_crop || card2Task.target_crop || '春野菜'}
+                        {card2Task.tasks?.target_crop || card2Task.target_crop || '共通'}
                       </Badge>
                     </div>
 
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-black text-gray-900 leading-snug">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-black text-gray-900 leading-snug truncate">
                         {card2Task.tasks?.title || card2Task.title || 'タスク'}
                       </h3>
-                      <p className="text-xs text-gray-500 line-clamp-2">
+                      <p className="text-[11px] text-gray-500 line-clamp-1">
                         {card2Task.tasks?.description ||
                           card2Task.description ||
                           'しっかり観察して作業を進めましょう。'}
@@ -387,22 +387,22 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
                       ...getTopCardStyle(),
                       transformOrigin: 'bottom center',
                     }}
-                    className="relative z-20 bg-white p-6 rounded-3xl shadow-md border border-green-100 border-l-4 border-l-[#1d5c23] space-y-4"
+                    className="relative z-20 bg-white p-3.5 sm:p-4 rounded-3xl shadow-sm border border-green-100 border-l-4 border-l-[#1d5c23] space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-gray-400">
+                      <span className="text-[10px] font-bold text-gray-400">
                         {validIndex + 1} / {activeTasks.length}
                       </span>
                       <Badge type="crop">
-                        {topTask.tasks?.target_crop || topTask.target_crop || '春野菜'}
+                        {topTask.tasks?.target_crop || topTask.target_crop || '共通'}
                       </Badge>
                     </div>
 
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-black text-gray-900 leading-snug">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-black text-gray-900 leading-snug line-clamp-1">
                         {topTask.tasks?.title || topTask.title || 'タスク'}
                       </h3>
-                      <p className="text-xs text-gray-500 line-clamp-2">
+                      <p className="text-[11px] text-gray-500 line-clamp-1">
                         {topTask.tasks?.description ||
                           topTask.description ||
                           'しっかり観察して作業を進めましょう。'}
@@ -410,14 +410,14 @@ export default function TaskSlider({ tasks, onSelect, onUncomplete }: TaskSlider
                     </div>
 
                     {/* アクションボタン: 詳細展開 */}
-                    <div className="pt-2 border-t border-gray-100">
+                    <div className="pt-1.5 border-t border-gray-100">
                       <button
                         type="button"
                         onClick={() => onSelect(topTask)}
-                        className="w-full py-3 px-4 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                        className="w-full py-2 px-3 bg-[#edf2ea] hover:bg-green-100 active:scale-98 text-[#1d5c23] font-black text-xs rounded-xl transition flex items-center justify-center space-x-1.5 shadow-2xs cursor-pointer"
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3.5 h-3.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"

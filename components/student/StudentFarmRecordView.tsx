@@ -98,9 +98,20 @@ export default function StudentFarmRecordView({
       crop_name: b.crop_name || '未確定 🌱',
     }));
 
-  // 生徒が選択中の対象畝ベッド (初期状態は未選択、クリック時のみ選択)
+  // 生徒が選択中の対象畝ベッド (初期状態は未選択、クリック時のみ選択。'shared' の場合は全体共有)
   const [selectedBedId, setSelectedBedId] = useState<string | null>(null);
-  const currentBed = activeBeds.find((b) => b.id === selectedBedId) || null;
+  const isSharedSelected = selectedBedId === 'shared';
+  const currentBed = isSharedSelected
+    ? null
+    : activeBeds.find((b) => b.id === selectedBedId) || null;
+
+  // 全体共有記録の抽出
+  const sharedRecords = records.filter(
+    (r) =>
+      (!r.bed_id || r.bed_id === 'shared' || r.bed_id.endsWith('_shared')) &&
+      (!r.plot_id || r.plot_id === myPlot?.id)
+  );
+  const sharedRecordsCount = sharedRecords.length;
 
   const [showInputModal, setShowInputModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<CropRecord | null>(null);
@@ -211,7 +222,8 @@ export default function StudentFarmRecordView({
   // 新規または編集の保存
   const handleSubmitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentBed || isSubmittingRecord) return;
+    const isTargetShared = selectedBedId === 'shared';
+    if ((!currentBed && !isTargetShared) || isSubmittingRecord) return;
 
     setIsSubmittingRecord(true);
     try {
@@ -226,29 +238,51 @@ export default function StudentFarmRecordView({
       }
 
       // 🌟 生徒が入力した品種名 (未入力時は既存品種を引き継ぐ) 🌟
-      const finalCrop =
-        customCropName.trim() ||
-        (currentBed.crop_name !== '未確定 🌱' ? currentBed.crop_name : '') ||
-        '未確定 🌱';
+      const enteredCrop = customCropName.trim();
+      const existingCrop =
+        !isTargetShared && currentBed?.crop_name && currentBed.crop_name !== '未確定 🌱'
+          ? currentBed.crop_name
+          : '';
+
+      let bedCropToSave = existingCrop;
+      if (enteredCrop) {
+        if (!existingCrop) {
+          bedCropToSave = enteredCrop;
+        } else if (existingCrop.includes(enteredCrop)) {
+          bedCropToSave = existingCrop;
+        } else {
+          bedCropToSave = enteredCrop;
+        }
+      } else {
+        bedCropToSave = existingCrop || (isTargetShared ? '全体共通' : '未確定 🌱');
+      }
+
+      const finalCrop = enteredCrop || existingCrop || (isTargetShared ? '全体共通' : '未確定 🌱');
       const cleanNotes = notes
         .replace(/\[IMG:[\s\S]+?\]/g, '')
         .replace(/【.*?】/g, '')
         .trim();
       const taggedNotes = finalCrop !== '未確定 🌱' ? `【${finalCrop}】${cleanNotes}` : cleanNotes;
 
-      // 1. Supabase farm_beds の作物品種名を更新 (即時DB反映)
-      try {
-        if (updateBedCrop) {
-          await updateBedCrop(currentBed.id, finalCrop);
-        } else {
-          await supabase.from('farm_beds').update({ crop_name: finalCrop }).eq('id', currentBed.id);
+      // 1. Supabase farm_beds の作物品種名を更新 (畝選択時のみ)
+      if (!isTargetShared && currentBed) {
+        try {
+          if (updateBedCrop) {
+            await updateBedCrop(currentBed.id, bedCropToSave);
+          } else {
+            await supabase
+              .from('farm_beds')
+              .update({ crop_name: bedCropToSave })
+              .eq('id', currentBed.id);
+          }
+        } catch (e) {
+          console.warn('farm_beds crop update notice:', e);
         }
-      } catch (e) {
-        console.warn('farm_beds crop update notice:', e);
       }
 
       if (editingRecord) {
         updateCropRecord(editingRecord.id, {
+          crop_name: finalCrop,
           growth_stage: selectedStage,
           height_cm: Number(heightCm),
           work_types: selectedWorks,
@@ -259,11 +293,13 @@ export default function StudentFarmRecordView({
         setToastMessage('✏️ 過去の観察記録を更新しました！');
       } else {
         const todayStr = new Date().toLocaleDateString('ja-JP');
-        addCropRecord(currentBed.id, {
-          bed_id: currentBed.id,
+        addCropRecord(isTargetShared ? 'shared' : currentBed!.id, {
+          bed_id: isTargetShared ? null : currentBed!.id,
+          plot_id: myPlot?.id || null,
           date: todayStr,
+          crop_name: finalCrop,
           growth_stage: selectedStage,
-          height_cm: Number(heightCm),
+          height_cm: isTargetShared ? undefined : Number(heightCm),
           work_types: selectedWorks,
           notes: taggedNotes,
           harvest_amount: harvestAmount.trim() || undefined,
@@ -274,15 +310,18 @@ export default function StudentFarmRecordView({
         try {
           const resolvedStudentId =
             studentId ||
-            (currentBed as { student_id?: string })?.student_id ||
+            (!isTargetShared && (currentBed as { student_id?: string })?.student_id) ||
             myPlot?.student_id ||
             null;
 
           const hasHttpImg = finalImageUrl && finalImageUrl.startsWith('http');
+          const headerTag = isTargetShared
+            ? '【区画全体・共通】'
+            : `【畝 ${currentBed!.bed_number} (${finalCrop})】`;
           const journalContent =
             finalImageUrl && !hasHttpImg
-              ? `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}\n[IMG:${finalImageUrl}]`
-              : `【畝 ${currentBed.bed_number} (${finalCrop})】${cleanNotes}`;
+              ? `${headerTag}${cleanNotes}\n[IMG:${finalImageUrl}]`
+              : `${headerTag}${cleanNotes}`;
 
           const { error: jErr } = await supabase.from('journals').insert([
             {
@@ -300,7 +339,9 @@ export default function StudentFarmRecordView({
         }
 
         setToastMessage(
-          `🎉 畝 ${currentBed.bed_number} (${finalCrop}) に新しい記録を登録しました！`
+          isTargetShared
+            ? '🎉 区画の全体共有作業として記録を登録しました！'
+            : `🎉 畝 ${currentBed!.bed_number} (${finalCrop}) に新しい記録を登録しました！`
         );
       }
 
@@ -401,15 +442,21 @@ export default function StudentFarmRecordView({
     };
   }, [fetchStudentJournals]);
 
-  // 選択した畝(ベッド)の時系列記録 (該当区画および選択した畝のみに厳密絞り込み)
-  const currentBedRecords = currentBed
-    ? records
-        .filter((r) => r.bed_id === currentBed.id)
-        .sort(
-          (a, b) =>
-            new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()
-        )
-    : [];
+  // 選択した畝(ベッド)の時系列記録 (該当区画および選択した畝、または全体共有に厳密絞り込み)
+  const currentBedRecords = isSharedSelected
+    ? sharedRecords.sort(
+        (a, b) =>
+          new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()
+      )
+    : currentBed
+      ? records
+          .filter((r) => r.bed_id === currentBed.id)
+          .sort(
+            (a, b) =>
+              new Date(b.created_at || b.date).getTime() -
+              new Date(a.created_at || a.date).getTime()
+          )
+      : [];
 
   // 観察記録 (cropRecords) と 講師からの返信 (journals) を合成したタイムラインリスト
   type ObservationTimelineItem = {
@@ -434,7 +481,7 @@ export default function StudentFarmRecordView({
   const bedNumberStr = currentBed ? String(currentBed.bed_number) : '';
 
   const synthesizedTimelineItems = (() => {
-    if (!currentBed) return [];
+    if (!currentBed && !isSharedSelected) return [];
 
     const observationItems: CombinedTimelineItem[] = currentBedRecords.map((rec) => ({
       id: `rec_${rec.id}`,
@@ -450,39 +497,47 @@ export default function StudentFarmRecordView({
       const content = String(j.content || j.text || '');
       const replyText = String(j.reply || '').trim();
 
-      // 送信元の畝・作物の厳密一致判定
-      const bedTagMatch = content.match(/【畝\s*([0-9]+)/) || content.match(/畝\s*([0-9]+)/);
-      if (bedTagMatch) {
-        const taggedBedNum = bedTagMatch[1];
-        if (taggedBedNum !== bedNumberStr) {
+      if (isSharedSelected) {
+        // 全体共有の場合: 特定畝タグのない全般・共通日誌を対象
+        const bedTagMatch = content.match(/【畝\s*([0-9]+)/) || content.match(/畝\s*([0-9]+)/);
+        if (bedTagMatch) {
           return;
         }
-      } else {
-        // 畝指定がない場合、現在選択されている畝の作物品種名で厳密判定
-        const currentCrop = currentBed.crop_name
-          ? currentBed.crop_name.replace(/🌱/g, '').trim()
-          : '';
-        const isValidCurrentCrop = Boolean(currentCrop && currentCrop !== '未確定');
+      } else if (currentBed) {
+        // 送信元の畝・作物の厳密一致判定
+        const bedTagMatch = content.match(/【畝\s*([0-9]+)/) || content.match(/畝\s*([0-9]+)/);
+        if (bedTagMatch) {
+          const taggedBedNum = bedTagMatch[1];
+          if (taggedBedNum !== bedNumberStr) {
+            return;
+          }
+        } else {
+          // 畝番号タグがない場合、現在選択されている畝の作物品種名で厳密判定
+          const currentCrop = currentBed.crop_name
+            ? currentBed.crop_name.replace(/🌱/g, '').trim()
+            : '';
+          const isValidCurrentCrop = Boolean(currentCrop && currentCrop !== '未確定');
 
-        let isCropMatched = false;
-        if (isValidCurrentCrop) {
-          if (content.includes(currentCrop)) {
-            isCropMatched = true;
-          } else {
-            const bracketMatches = Array.from(content.matchAll(/【([^】]+)】/g)).map((m) =>
-              m[1].trim()
-            );
-            for (const tag of bracketMatches) {
-              if (tag && (currentCrop.includes(tag) || tag.includes(currentCrop))) {
-                isCropMatched = true;
-                break;
+          let isCropMatched = false;
+          if (isValidCurrentCrop) {
+            if (content.includes(currentCrop)) {
+              isCropMatched = true;
+            } else {
+              const bracketMatches = Array.from(content.matchAll(/【([^】]+)】/g)).map((m) =>
+                m[1].trim()
+              );
+              for (const tag of bracketMatches) {
+                if (tag && (currentCrop.includes(tag) || tag.includes(currentCrop))) {
+                  isCropMatched = true;
+                  break;
+                }
               }
             }
           }
-        }
 
-        if (!isCropMatched) {
-          return;
+          if (!isCropMatched) {
+            return;
+          }
         }
       }
 
@@ -572,7 +627,7 @@ export default function StudentFarmRecordView({
   }
 
   return (
-    <div className="space-y-5 animate-fade-in text-gray-800">
+    <div className="space-y-3 animate-fade-in text-gray-800">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* 🌟 1. 上部: 進行中のタスク (TaskSlider) 🌟 */}
@@ -585,23 +640,44 @@ export default function StudentFarmRecordView({
         />
       )}
 
-      {/* 🌟 2. 担当区画内の畝(ベッド)一覧 🌟 */}
-      <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between border-b pb-2.5 gap-2">
+      {/* 🌟 2. 担当区画内の畝(ベッド)一覧 (縦位置・余白を調整し画面内に収まりやすく改善) 🌟 */}
+      <div className="bg-white p-3.5 sm:p-5 rounded-3xl border border-gray-200 shadow-xs space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between border-b pb-2 gap-2">
           <div className="flex items-center gap-2">
-            <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
+            <h3 className="font-black text-gray-900 text-xs sm:text-sm flex items-center gap-1.5">
               <span>🌱 {myPlot.name} の畝一覧</span>
-              <span className="text-xs font-bold text-gray-400">
+              <span className="text-[11px] font-bold text-gray-400">
                 ({activeBeds.length}畝 栽培中)
               </span>
             </h3>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* 🌐 全体共有ボタン */}
+            <button
+              type="button"
+              onClick={() => setSelectedBedId(isSharedSelected ? null : 'shared')}
+              className={`px-2.5 py-1 rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer shadow-2xs border ${
+                isSharedSelected
+                  ? 'bg-emerald-700 text-white border-emerald-800 ring-2 ring-emerald-400'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+              }`}
+            >
+              <span>🌐 全体共有</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  isSharedSelected ? 'bg-white text-emerald-900' : 'bg-emerald-800 text-white'
+                }`}
+              >
+                {sharedRecordsCount}
+              </span>
+            </button>
+
             {/* 📦 過去の作物を見るボタン */}
             <button
+              type="button"
               onClick={() => setShowArchiveModal(true)}
-              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-black transition flex items-center gap-1 cursor-pointer shadow-2xs"
             >
               <span>📦 過去の作物を見る</span>
               <span className="bg-emerald-800 text-white text-[10px] px-1.5 py-0.2 rounded-full">
@@ -609,8 +685,12 @@ export default function StudentFarmRecordView({
               </span>
             </button>
 
-            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              {currentBed ? `畝 ${currentBed.bed_number} 選択中` : '畝をタップして記録を表示'}
+            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              {isSharedSelected
+                ? '全体共有 選択中'
+                : currentBed
+                  ? `畝 ${currentBed.bed_number} 選択中`
+                  : '畝をタップして記録を表示'}
             </span>
           </div>
         </div>
@@ -722,39 +802,42 @@ export default function StudentFarmRecordView({
         </div>
       )}
 
-      {currentBed ? (
-        <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs space-y-4 animate-fade-in">
+      {currentBed || isSharedSelected ? (
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-gray-200 shadow-xs space-y-4 animate-fade-in">
           <div className="flex flex-wrap items-center justify-between border-b pb-3 gap-2">
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-gray-900 text-base">
-                  📅 畝 {currentBed.bed_number}{' '}
-                  {currentBed.crop_name ? `(${currentBed.crop_name})` : ''} の記録
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-gray-900 text-sm sm:text-base">
+                  {isSharedSelected
+                    ? '🌐 全体共有・共通作業の記録'
+                    : `📅 畝 ${currentBed?.bed_number} ${currentBed?.crop_name ? `(${currentBed.crop_name})` : ''} の記録`}
                 </h3>
                 <span className="text-xs text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold">
                   全 {currentBedRecords.length} 件
                 </span>
-                {currentBed.status === 'completed_pending' && (
+                {!isSharedSelected && currentBed?.status === 'completed_pending' && (
                   <span className="text-xs text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-full font-black animate-pulse">
                     ⏳ 収穫完了・講師確認待ち (記録ロック中)
                   </span>
                 )}
-                {currentBed.status === 'rejected' && (
+                {!isSharedSelected && currentBed?.status === 'rejected' && (
                   <span className="text-xs text-red-900 bg-red-200 px-2.5 py-0.5 rounded-full font-black animate-pulse">
                     ⚠️ 差し戻し（要再提出）
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-gray-400 font-bold">
-                {currentBed.status === 'completed_pending'
-                  ? '※ 講師の確認待ちのため、この畝の記録は閲覧専用（編集・新規追加不可）となります'
-                  : '過去の記録は「編集」または「削除」できます'}
+              <p className="text-[11px] text-gray-400 font-bold mt-0.5">
+                {isSharedSelected
+                  ? '※ 区画全体や農園共通の作業・タスク完了のタイムラインです'
+                  : currentBed?.status === 'completed_pending'
+                    ? '※ 講師の確認待ちのため、この畝の記録は閲覧専用（編集・新規追加不可）となります'
+                    : '過去の記録は「編集」または「削除」できます'}
               </p>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* 🏆 収穫完了報告ボタン */}
-              {currentBed.status !== 'completed_pending' && (
+              {/* 🏆 収穫完了報告ボタン (畝選択時のみ) */}
+              {!isSharedSelected && currentBed && currentBed.status !== 'completed_pending' && (
                 <button
                   type="button"
                   onClick={() => setShowCompletionModal(true)}
@@ -764,11 +847,11 @@ export default function StudentFarmRecordView({
                 </button>
               )}
 
-              {currentBed.status === 'completed_pending' ? (
+              {!isSharedSelected && currentBed?.status === 'completed_pending' ? (
                 <div className="px-3 py-1.5 bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 flex items-center gap-1">
                   <span>🔒 承認待ち（入力不可）</span>
                 </div>
-              ) : currentBed.status === 'rejected' ? (
+              ) : !isSharedSelected && currentBed?.status === 'rejected' ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -780,6 +863,7 @@ export default function StudentFarmRecordView({
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={() => {
                     setEditingRecord(null);
                     setNotes('');
@@ -791,11 +875,20 @@ export default function StudentFarmRecordView({
                   <span>＋ 新規記録</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setSelectedBedId(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 text-xs font-bold rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                title="選択を解除して閉じる"
+              >
+                ✕
+              </button>
             </div>
           </div>
 
           {/* 承認待ちバナー */}
-          {currentBed.status === 'completed_pending' && (
+          {currentBed?.status === 'completed_pending' && (
             <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-300 text-xs text-amber-950 font-bold flex items-center gap-2.5">
               <span className="text-xl">⏳</span>
               <div>
@@ -809,15 +902,15 @@ export default function StudentFarmRecordView({
           )}
 
           {/* 🌟 差し戻し理由バナー 🌟 */}
-          {currentBed.status === 'rejected' && (
+          {currentBed?.status === 'rejected' && (
             <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-300 text-xs text-red-950 font-bold space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-xl">⚠️</span>
                 <p className="font-black text-red-900 text-sm">講師からの差し戻しメッセージ</p>
               </div>
               <div className="bg-white p-3 rounded-xl border border-red-200 text-gray-800 font-bold">
-                {currentBed.reject_reason ||
-                  currentBed.completion_notes ||
+                {currentBed?.reject_reason ||
+                  currentBed?.completion_notes ||
                   '内容の再確認をお願いします'}
               </div>
               <p className="text-[11px] text-red-700">
@@ -830,7 +923,7 @@ export default function StudentFarmRecordView({
           {synthesizedTimelineItems.length === 0 ? (
             <div className="py-12 text-center text-gray-400 font-bold text-sm space-y-3">
               <p>この畝にはまだ記録が登録されていません。</p>
-              {currentBed.status !== 'completed_pending' && (
+              {currentBed?.status !== 'completed_pending' && (
                 <button
                   onClick={() => {
                     setEditingRecord(null);
@@ -898,7 +991,7 @@ export default function StudentFarmRecordView({
                           </span>
 
                           {/* 🌟 承認待ち以外の場合のみ「✏️ 編集」「🗑️ 削除」を表示 🌟 */}
-                          {currentBed.status !== 'completed_pending' && (
+                          {currentBed?.status !== 'completed_pending' && (
                             <>
                               <button
                                 onClick={() => handleOpenEditModal(rec)}
@@ -946,19 +1039,25 @@ export default function StudentFarmRecordView({
             </div>
           )}
 
-          {/* 🌟 畝観察ノートの下に移設した「気づきメモ・講師への報告」 🌟 */}
+          {/* 🌟 畝観察ノート・全体共有の下の「気づきメモ・講師への報告」 🌟 */}
           <div className="pt-4 border-t border-gray-200 space-y-2">
             <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
               <span>📝 気づきメモ・講師への報告</span>
               <span className="text-[11px] text-gray-400 font-normal">
-                （畝 #{currentBed.bed_number} の状況も踏まえて講師へ送信）
+                {isSharedSelected
+                  ? '（区画全体・共通の状況を踏まえて講師へ送信）'
+                  : `（畝 #${currentBed?.bed_number} の状況も踏まえて講師へ送信）`}
               </span>
             </h4>
             <div className="space-y-2">
               <textarea
                 value={newJournal || ''}
                 onChange={(e) => setNewJournal && setNewJournal(e.target.value)}
-                placeholder={`畝 ${currentBed.bed_number} (${currentBed.crop_name || '作物'}) についての気づきや相談、講師への日誌メモを入力...`}
+                placeholder={
+                  isSharedSelected
+                    ? '農園全体や区画共通の作業・気づき、講師への相談メモを入力...'
+                    : `畝 ${currentBed?.bed_number} (${currentBed?.crop_name || '作物'}) についての気づきや相談、講師への日誌メモを入力...`
+                }
                 rows={3}
                 className="w-full p-3 rounded-2xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs font-medium leading-relaxed"
               />
@@ -980,12 +1079,23 @@ export default function StudentFarmRecordView({
           </div>
         </div>
       ) : (
-        <div className="bg-white/90 p-8 rounded-3xl border border-dashed border-emerald-300 text-center space-y-2 text-gray-500 shadow-2xs">
-          <span className="text-3xl">👆</span>
-          <h4 className="font-extrabold text-gray-800 text-sm">畝（ベッド）をタップしてください</h4>
+        <div className="bg-white/90 p-6 rounded-3xl border border-dashed border-emerald-300 text-center space-y-2 text-gray-500 shadow-2xs">
+          <span className="text-2xl">👆</span>
+          <h4 className="font-extrabold text-gray-800 text-sm">
+            畝または全体共有を選択してください
+          </h4>
           <p className="text-xs text-gray-500 font-bold max-w-xs mx-auto leading-relaxed">
-            上の畝番号をタップすると、その畝の栽培記録やタスク履歴の確認、新しい観察ノートの登録ができます。
+            上の畝番号をタップすると、その畝の栽培記録の確認や登録ができます。「全体共有」では共通作業のログを確認できます。
           </p>
+          <div className="pt-1 flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedBedId('shared')}
+              className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl transition cursor-pointer shadow-2xs"
+            >
+              🌐 全体共有の記録を見る ({sharedRecordsCount}件)
+            </button>
+          </div>
         </div>
       )}
 
@@ -1015,11 +1125,12 @@ export default function StudentFarmRecordView({
               <div>
                 <label className="block text-gray-700 mb-1">対象の畝(ベッド) *</label>
                 <select
-                  value={selectedBedId || activeBeds[0]?.id || ''}
+                  value={selectedBedId || 'shared'}
                   onChange={(e) => setSelectedBedId(e.target.value)}
                   disabled={!!editingRecord}
-                  className="w-full p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-sm"
+                  className="w-full p-3 rounded-2xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 font-black text-sm cursor-pointer"
                 >
+                  <option value="shared">🌐 全体共有（区画全体 / 共通作業）</option>
                   {activeBeds.map((b) => (
                     <option key={b.id} value={b.id}>
                       畝 {b.bed_number}{' '}

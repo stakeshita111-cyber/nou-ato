@@ -16,6 +16,25 @@ interface BedCompletionModalProps {
   }) => void;
 }
 
+// 現在の日付から動的に栽培シーズン候補を生成するヘルパー (年またぎ対応)
+export const getDefaultSeason = (now = new Date()): string => {
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  // 3〜8月は春夏、9〜2月は秋冬
+  return month >= 3 && month <= 8 ? `${year}年 春夏` : `${month < 3 ? year - 1 : year}年 秋冬`;
+};
+
+export const getSeasonOptions = (now = new Date()): string[] => {
+  const currentYear = now.getFullYear();
+  const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+  const options: string[] = [];
+  years.forEach((y) => {
+    options.push(`${y}年 春夏`);
+    options.push(`${y}年 秋冬`);
+  });
+  return options;
+};
+
 export default function BedCompletionModal({
   isOpen,
   onClose,
@@ -24,7 +43,7 @@ export default function BedCompletionModal({
 }: BedCompletionModalProps) {
   const [totalHarvest, setTotalHarvest] = useState('');
   const [completionNotes, setCompletionNotes] = useState('');
-  const [season, setSeason] = useState('2026年 春夏');
+  const [season, setSeason] = useState(() => getDefaultSeason());
   const [imageUrl, setImageUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -114,7 +133,7 @@ export default function BedCompletionModal({
       if (isNewlyOpened || isBedChanged) {
         setTotalHarvest(bed.total_harvest || '');
         setCompletionNotes(bed.completion_notes || '');
-        setSeason(bed.season || '2026年 春夏');
+        setSeason(bed.season || getDefaultSeason());
         setImageUrl(bed.completion_image_url || '');
         prevBedIdRef.current = bed.id;
       }
@@ -225,10 +244,11 @@ export default function BedCompletionModal({
               onChange={(e) => setSeason(e.target.value)}
               className="w-full text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition"
             >
-              <option value="2026年 春夏">2026年 春夏シーズン</option>
-              <option value="2026年 秋冬">2026年 秋冬シーズン</option>
-              <option value="2027年 春夏">2027年 春夏シーズン</option>
-              <option value="2027年 秋冬">2027年 秋冬シーズン</option>
+              {getSeasonOptions().map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}シーズン
+                </option>
+              ))}
             </select>
           </div>
 

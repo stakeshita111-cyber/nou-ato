@@ -372,29 +372,33 @@ export default function StudentPage() {
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
       {/* モックヘッダー */}
-      <header className="w-full max-w-md bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-xs shrink-0">
+      {/* モックヘッダー (縦幅をスリム化し画面領域を最大化) */}
+      <header className="w-full max-w-md bg-white border-b border-gray-200 px-3.5 py-1.5 flex items-center justify-between sticky top-0 z-30 shadow-2xs shrink-0">
         <Link
           href="/login"
           title="ログイン画面に戻る"
-          className="text-gray-500 hover:text-gray-800 text-lg font-bold"
+          className="text-gray-400 hover:text-gray-700 text-base font-bold p-1 leading-none"
         >
           ✕
         </Link>
-        <div className="text-center flex flex-col items-center">
-          <h1 className="font-bold text-gray-800 text-sm leading-tight tracking-wide">NOU-ATO</h1>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] text-gray-500 font-semibold truncate max-w-[140px]">
+        <div className="text-center flex items-center gap-2">
+          <h1 className="font-extrabold text-gray-800 text-xs sm:text-sm leading-none tracking-wide">
+            NOU-ATO
+          </h1>
+          <span className="text-gray-300 text-xs leading-none">|</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-500 font-semibold truncate max-w-[130px] leading-none">
               👤 {userAccountName}
             </span>
             {/* 🔔 通知ベルアイコン */}
             <button
               onClick={handleOpenNotificationModal}
-              className="relative p-1 text-gray-600 hover:text-amber-600 transition flex items-center justify-center rounded-full hover:bg-amber-50 cursor-pointer"
+              className="relative p-0.5 text-gray-500 hover:text-amber-600 transition flex items-center justify-center rounded-full hover:bg-amber-50 cursor-pointer leading-none"
               title="📢 講師からのお知らせ"
             >
-              <span className="text-sm leading-none">🔔</span>
+              <span className="text-xs leading-none">🔔</span>
               {hasUnreadBroadcasts && (
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full ring-2 ring-white animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-white animate-pulse" />
               )}
             </button>
           </div>
@@ -404,7 +408,7 @@ export default function StudentPage() {
         <div className="relative" ref={accountMenuRef}>
           <button
             onClick={() => setShowAccountMenu(!showAccountMenu)}
-            className="p-1.5 text-gray-600 hover:text-gray-900 rounded-full hover:bg-gray-100 transition flex items-center justify-center font-bold text-lg"
+            className="p-1 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition flex items-center justify-center font-bold text-base leading-none"
           >
             ⋮
           </button>

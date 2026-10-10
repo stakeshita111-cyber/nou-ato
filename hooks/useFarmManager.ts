@@ -1267,15 +1267,19 @@ export function useFarmManager() {
   };
 
   const addCropRecord = async (
-    bedId: string,
-    recordData: Omit<CropRecord, 'id' | 'created_at'>
+    bedId: string | null | undefined,
+    recordData: Omit<CropRecord, 'id' | 'created_at'> & { plot_id?: string | null }
   ) => {
     const newRecordId = `rec_${Date.now()}`;
     const todayStr = new Date().toISOString().split('T')[0];
 
+    const safeBedId = bedId === 'shared' || !bedId ? null : bedId;
+
     const newRecord: CropRecord = {
       ...recordData,
       id: newRecordId,
+      bed_id: safeBedId,
+      plot_id: recordData.plot_id || null,
       created_at: new Date().toLocaleString('ja-JP'),
     };
 
@@ -1289,7 +1293,8 @@ export function useFarmManager() {
       recordData.notes?.match(/【(.*?)】/)?.[1] || recordData.crop_name || '未確定';
     await insertCropRecordDb({
       id: newRecordId,
-      bed_id: bedId,
+      bed_id: safeBedId,
+      plot_id: recordData.plot_id || null,
       date: todayStr,
       crop_name: extractedCropName,
       growth_stage: recordData.growth_stage,

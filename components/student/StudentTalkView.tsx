@@ -34,7 +34,7 @@ interface MatchedKnowledgeItem {
 }
 
 interface StudentTalkViewProps {
-  journals?: any[];
+  journals?: Record<string, unknown>[];
   studentName?: string;
   studentId?: string;
   customDailyLimit?: number;
@@ -148,7 +148,7 @@ export default function StudentTalkView({
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
   const loadChatHistory = useCallback(async () => {
     try {
-      let targetList: any[] = [];
+      let targetList: Record<string, unknown>[] = [];
 
       if (studentId) {
         const { data: dbJournals } = await supabase
@@ -158,11 +158,11 @@ export default function StudentTalkView({
           .order('created_at', { ascending: true });
 
         // 自分のデータのみを使用（0件なら0件のまま。他人の会話には絶対にフォールバックしない）
-        targetList = dbJournals || [];
+        targetList = (dbJournals || []) as unknown as Record<string, unknown>[];
       } else if (journals && journals.length > 0) {
         // studentId 未設定の場合でも、他人のデータ混入を防止
         targetList = journals.filter(
-          (j: any) => !j.student_id || j.student_id === 'student_default'
+          (j: Record<string, unknown>) => !j.student_id || j.student_id === 'student_default'
         );
       }
 
@@ -178,8 +178,8 @@ export default function StudentTalkView({
         timestamp: '現在',
       });
 
-      (targetList || []).forEach((j: any) => {
-        const c = (j.content || '').trim();
+      (targetList || []).forEach((j: Record<string, unknown>) => {
+        const c = String(j.content || '').trim();
 
         if (
           !c ||
@@ -489,7 +489,7 @@ export default function StudentTalkView({
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Chat sending error:', err);
       const fallbackMsg: MessageItem = {
         id: 'bot_err_' + Date.now(),
@@ -574,14 +574,16 @@ export default function StudentTalkView({
     <div className="flex flex-col h-full flex-1 min-h-0 bg-white rounded-3xl border border-gray-200/90 shadow-lg overflow-hidden relative">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
 
-      {/* 🌟 1. ヘッダー 🌟 */}
-      <div className="px-4 py-3 bg-gradient-to-r from-emerald-800 to-[#1c4d21] text-white flex items-center justify-between shadow-xs shrink-0">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-full bg-amber-400 border border-amber-200 flex items-center justify-center text-base shadow-2xs">
+      {/* 🌟 1. ヘッダー (縦幅をスリム化しチャット画面領域を拡大) 🌟 */}
+      <div className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-800 to-[#1c4d21] text-white flex items-center justify-between shadow-2xs shrink-0">
+        <div className="flex items-center space-x-2">
+          <div className="w-6 h-6 rounded-full bg-amber-400 border border-amber-200 flex items-center justify-center text-xs shadow-2xs shrink-0">
             🧑‍🌾
           </div>
           <div>
-            <h3 className="font-extrabold text-sm tracking-wide">農家のしるべぇ(農業AI)に相談</h3>
+            <h3 className="font-extrabold text-xs sm:text-sm tracking-wide leading-none">
+              農家のしるべぇ(農業AI)に相談
+            </h3>
           </div>
         </div>
 
@@ -592,7 +594,7 @@ export default function StudentTalkView({
             if (showSearch) setSearchKeyword('');
           }}
           className={
-            'px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer ' +
+            'px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center space-x-1 cursor-pointer ' +
             (showSearch
               ? 'bg-white text-emerald-900 shadow-xs'
               : 'bg-black/20 hover:bg-black/30 text-emerald-100')

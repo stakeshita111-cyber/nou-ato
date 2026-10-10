@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { uploadImageToStorage } from '@/lib/storage';
+import { TaskSliderItem } from './TaskSlider';
 
 interface TaskDetailModalProps {
-  task: any;
+  task: TaskSliderItem;
   studentId?: string;
   studentName?: string;
   onClose: () => void;
@@ -42,16 +43,31 @@ export default function TaskDetailModal({
         (Number(a.bed_number) || 0) - (Number(b.bed_number) || 0)
     );
 
-  const [selectedBedId, setSelectedBedId] = useState<string>(myBeds[0]?.id || '');
+  // タスクの対象作物に合致する畝を検索 (共通または見つからない場合は 'shared')
+  const matchedBed =
+    task &&
+    (task.tasks?.target_crop || task.target_crop) &&
+    (task.tasks?.target_crop || task.target_crop) !== '共通'
+      ? myBeds.find(
+          (b) =>
+            b.crop_name &&
+            (b.crop_name.includes(task.tasks?.target_crop || task.target_crop) ||
+              (task.tasks?.target_crop || task.target_crop).includes(b.crop_name))
+        )
+      : null;
+
+  const defaultBedChoice = matchedBed ? matchedBed.id : 'shared';
+
+  const [selectedBedId, setSelectedBedId] = useState<string>(defaultBedChoice);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [reportMemo, setReportMemo] = useState<string>('');
   const [checkedSteps, setCheckedSteps] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
-    if (myBeds.length > 0 && !selectedBedId) {
-      setSelectedBedId(myBeds[0].id);
+    if (!selectedBedId) {
+      setSelectedBedId(defaultBedChoice);
     }
-  }, [myBeds, selectedBedId]);
+  }, [defaultBedChoice, selectedBedId]);
 
   if (!task) return null;
 
@@ -152,27 +168,30 @@ export default function TaskDetailModal({
       }
     }
 
-    const targetBed = myBeds.find((b) => b.id === selectedBedId) || myBeds[0];
+    const isShared = selectedBedId === 'shared' || !selectedBedId;
+    const targetBed = isShared ? null : myBeds.find((b) => b.id === selectedBedId);
 
-    // 対象の畝ベッドへ作業記録・現場写真を送信保存
-    if (targetBed) {
-      addCropRecord(targetBed.id, {
-        bed_id: targetBed.id,
-        date: new Date().toLocaleDateString('ja-JP'),
-        growth_stage:
-          t.phase === '準備・植付'
-            ? '播種・苗植え'
-            : t.phase === '収穫・片付け'
-              ? '収穫期'
-              : '本葉展開・つる伸び',
-        height_cm: 75,
-        work_types: [t.title],
-        notes: reportMemo.trim() || `${t.title}の作業を完了しました。`,
-        harvest_amount: finalPhotoUrl ? '📷 現場写真あり' : undefined,
-        image_url: finalPhotoUrl || undefined,
-        photo_url: finalPhotoUrl || undefined,
-      });
-    }
+    // 全体共有または対象の畝ベッドへ作業記録・現場写真を送信保存
+    addCropRecord(targetBed ? targetBed.id : 'shared', {
+      bed_id: targetBed ? targetBed.id : null,
+      plot_id: myPlot?.id || null,
+      date: new Date().toLocaleDateString('ja-JP'),
+      growth_stage:
+        t.phase === '準備・植付'
+          ? '播種・苗植え'
+          : t.phase === '収穫・片付け'
+            ? '収穫期'
+            : '本葉展開・つる伸び',
+      height_cm: targetBed ? 75 : undefined,
+      crop_name: targetBed
+        ? targetBed.crop_name || t.target_crop || '未確定'
+        : t.target_crop || '全体共有',
+      work_types: [t.title],
+      notes: reportMemo.trim() || `${t.title}の作業を完了しました。`,
+      harvest_amount: finalPhotoUrl ? '📷 現場写真あり' : undefined,
+      image_url: finalPhotoUrl || undefined,
+      photo_url: finalPhotoUrl || undefined,
+    });
 
     if (onComplete) {
       onComplete(task.id, selectedBedId, finalPhotoUrl || undefined, reportMemo);
@@ -411,23 +430,19 @@ export default function TaskDetailModal({
                   <label className="block text-[11px] font-bold text-emerald-900">
                     🌱 作業した畝（ベッド）を選択 *
                   </label>
-                  {myBeds.length > 0 ? (
-                    <select
-                      value={selectedBedId}
-                      onChange={(e) => setSelectedBedId(e.target.value)}
-                      className="w-full p-2.5 rounded-xl border-2 border-emerald-600 bg-white text-emerald-950 font-black text-xs cursor-pointer shadow-xs outline-none"
-                    >
-                      {myBeds.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          区画 {myPlot?.code} - 畝 {b.bed_number}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="text-[11px] text-gray-500 bg-white p-2 rounded-xl border">
-                      担当区画の畝に記録されます
-                    </p>
-                  )}
+                  <select
+                    value={selectedBedId}
+                    onChange={(e) => setSelectedBedId(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border-2 border-emerald-600 bg-white text-emerald-950 font-black text-xs cursor-pointer shadow-xs outline-none"
+                  >
+                    <option value="shared">🌐 全体共有（区画全体 / 共通作業）</option>
+                    {myBeds.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        区画 {myPlot?.code || ''} - 畝 {b.bed_number}
+                        {b.crop_name && b.crop_name !== '未確定 🌱' ? ` (${b.crop_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* 2. 作業メモ・気づきの入力 */}
@@ -493,7 +508,11 @@ export default function TaskDetailModal({
                   className="w-full py-3 bg-[#1d5c23] hover:bg-[#16471a] text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer mt-1"
                 >
                   <span>✓</span>
-                  <span>畝に記録して作業完了を報告する</span>
+                  <span>
+                    {selectedBedId === 'shared'
+                      ? '全体共有に記録して作業完了を報告する'
+                      : '畝に記録して作業完了を報告する'}
+                  </span>
                 </button>
               </div>
             )}

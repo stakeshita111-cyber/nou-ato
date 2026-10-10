@@ -6,7 +6,8 @@ export type WorkType =
 
 export type CropRecord = {
   id: string;
-  bed_id: string;
+  bed_id?: string | null;
+  plot_id?: string | null;
   date: string;
   growth_stage: GrowthStage;
   height_cm?: number;

@@ -71,7 +71,7 @@ describe('TaskSlider Component', () => {
 
     // 2nd card stacked transform style scale(0.95)
     expect(html).toContain('scale(0.95)');
-    expect(html).toContain('translateY(10px)');
+    expect(html).toContain('translateY(6px)');
   });
 
   it('renders 3-card stack when 3 or more active tasks exist', () => {
@@ -96,7 +96,7 @@ describe('TaskSlider Component', () => {
     // Check stacked card transforms
     expect(html).toContain('scale(0.95)');
     expect(html).toContain('scale(0.90)');
-    expect(html).toContain('translateY(20px)');
+    expect(html).toContain('translateY(12px)');
   });
 
   it('renders empty state when tasks list is empty', () => {

@@ -178,7 +178,8 @@ export interface Database {
       crop_records: {
         Row: {
           id: string;
-          bed_id: string;
+          bed_id: string | null;
+          plot_id: string | null;
           date: string;
           crop_name: string | null;
           growth_stage: string | null;
@@ -191,7 +192,8 @@ export interface Database {
         };
         Insert: {
           id: string;
-          bed_id: string;
+          bed_id?: string | null;
+          plot_id?: string | null;
           date: string;
           crop_name?: string | null;
           growth_stage?: string | null;
@@ -204,7 +206,8 @@ export interface Database {
         };
         Update: {
           id?: string;
-          bed_id?: string;
+          bed_id?: string | null;
+          plot_id?: string | null;
           date?: string;
           crop_name?: string | null;
           growth_stage?: string | null;

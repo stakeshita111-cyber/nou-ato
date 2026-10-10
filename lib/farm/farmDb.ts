@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Database } from '@/types/supabase';
 import { FarmPlot, CropRecord, Farm } from '@/types/farm';
 import {
   buildPlotUpsertPayload,
@@ -63,17 +64,18 @@ export async function fetchStudentsDb(
     return { students: [], studentMap };
   }
 
-  const filtered = usersData.filter((u: any) => {
+  type UserRow = Database['public']['Tables']['users']['Row'];
+  const filtered = (usersData as UserRow[]).filter((u: UserRow) => {
     if (currentUserId && u.id === currentUserId) return false;
     if (teacherDisplayName && u.display_name === teacherDisplayName) return false;
     return u.farm_id === activeFarmId;
   });
 
-  filtered.forEach((u: any) => {
+  filtered.forEach((u: UserRow) => {
     studentMap.set(u.id, u.display_name || '受講生');
   });
 
-  const students: StudentProfile[] = filtered.map((u: any) => ({
+  const students: StudentProfile[] = filtered.map((u: UserRow) => ({
     id: u.id,
     full_name: u.display_name || '受講生',
     role: u.role,
@@ -90,7 +92,10 @@ export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
 
   if (!cropRecs || cropRecs.length === 0) return [];
 
-  return cropRecs.map((r: any) => {
+  type CropRecRow = Database['public']['Tables']['crop_records']['Row'] & {
+    photo_url?: string | null;
+  };
+  return (cropRecs as CropRecRow[]).map((r: CropRecRow) => {
     let cleanNotes = r.notes || '';
     let imgUrl = r.image_url || r.photo_url || undefined;
     const imgMatch = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
@@ -101,6 +106,7 @@ export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
     return {
       id: r.id,
       bed_id: r.bed_id,
+      plot_id: r.plot_id,
       date: r.date || new Date(r.created_at).toLocaleDateString('ja-JP'),
       growth_stage: r.growth_stage || '観察記録',
       height_cm: r.height_cm,
@@ -139,7 +145,8 @@ export async function fetchPendingJournalsDb() {
       .limit(20);
 
     if (pendingJournals && pendingJournals.length > 0) {
-      pendingJournals.forEach((j: any) => {
+      type JournalRow = Database['public']['Tables']['journals']['Row'];
+      (pendingJournals as JournalRow[]).forEach((j: JournalRow) => {
         if (j.content && j.content.includes('【収穫完了報告】') && !j.is_approved) {
           const bedMatch = j.content.match(/畝\s*([0-9]+)/);
           const harvestMatch = j.content.match(/収穫量:\s*([^\n]+)/);
@@ -171,7 +178,7 @@ export async function savePlotsAndBedsToDb(
   updatedPlots: FarmPlot[],
   activeFarmId: string,
   dims: { cols: number; rows: number; unassigned_beds: number },
-  farmMeta: { address?: string; weatherLocation?: any },
+  farmMeta: { address?: string; weatherLocation?: Record<string, unknown> | null },
   lastSavedPlotsMap: Map<string, string>,
   lastSavedBedsMap: Map<string, string>
 ) {
@@ -237,7 +244,11 @@ export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {
   if (!plotId || !orderedBedIds || orderedBedIds.length === 0) return;
 
   try {
-    const { error } = await (supabase.rpc as any)('reorder_beds', {
+    const rpcCaller = supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ error: Error | null }>;
+    const { error } = await rpcCaller('reorder_beds', {
       p_plot_id: plotId,
       p_bed_ids: orderedBedIds,
     });
@@ -256,7 +267,7 @@ export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {
   }
 }
 
-export async function insertBedDb(payload: any) {
+export async function insertBedDb(payload: Database['public']['Tables']['farm_beds']['Insert']) {
   const { data, error } = await supabase.from('farm_beds').upsert(payload).select().single();
   if (error) {
     console.error('insertBedDb error:', error);
@@ -275,7 +286,8 @@ export async function deleteBedDb(bedId: string) {
 
 export async function insertCropRecordDb(record: {
   id: string;
-  bed_id: string;
+  bed_id?: string | null;
+  plot_id?: string | null;
   date: string;
   crop_name: string;
   growth_stage?: string;
@@ -286,10 +298,12 @@ export async function insertCropRecordDb(record: {
 }) {
   try {
     await supabase.from('crop_records').insert(record);
-    await supabase.from('farm_beds').upsert({
-      id: record.bed_id,
-      progress_percent: 100,
-    });
+    if (record.bed_id && record.bed_id !== 'shared' && !record.bed_id.endsWith('_shared')) {
+      await supabase.from('farm_beds').upsert({
+        id: record.bed_id,
+        progress_percent: 100,
+      });
+    }
   } catch (e) {
     console.error('insertCropRecordDb error:', e);
   }
@@ -321,7 +335,7 @@ export async function deleteCropRecordDb(recordId: string) {
 }
 
 export async function addFarmDb(id: string, name: string, ownerId?: string) {
-  const payload: any = {
+  const payload: Database['public']['Tables']['farms']['Insert'] = {
     id,
     name,
     created_at: new Date().toISOString(),
