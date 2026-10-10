@@ -13,7 +13,7 @@ export type CropRecord = {
   height_cm?: number;
   work_types: WorkType[];
   notes: string;
-  harvest_amount?: string;
+  harvest_amount?: string | number;
   image_url?: string;
   photo_url?: string;
   is_question?: boolean;
@@ -57,6 +57,13 @@ export type FarmPlot = {
   is_vacant?: boolean;
   position: { x: number; y: number };
   beds: FarmBed[];
+};
+
+export type PresetFaqItem = {
+  id: string;
+  chipLabel: string;
+  question: string;
+  answer: string;
 };
 
 export type Farm = {

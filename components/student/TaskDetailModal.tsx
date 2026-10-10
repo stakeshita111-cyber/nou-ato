@@ -235,8 +235,10 @@ export default function TaskDetailModal({
         ? targetBed.crop_name || t.target_crop || '未確定'
         : t.target_crop || '全体共有',
       work_types: [t.title || '手入れ'] as WorkType[],
-      notes: reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
-      harvest_amount: finalPhotoUrl ? '📷 現場写真あり' : undefined,
+      notes: finalPhotoUrl
+        ? `${reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`} [📷 現場写真あり]`
+        : reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
+      harvest_amount: undefined,
       image_url: finalPhotoUrl || undefined,
       photo_url: finalPhotoUrl || undefined,
     });

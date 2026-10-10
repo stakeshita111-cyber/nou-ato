@@ -32,6 +32,8 @@ interface MatchedKnowledgeItem {
   answer: string;
   matchedKeywords: string[];
 }
+import { PresetFaqItem } from '@/types/farm';
+import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
 
 export interface JournalItem {
   id?: string;
@@ -51,39 +53,8 @@ interface StudentTalkViewProps {
   studentId?: string;
   customDailyLimit?: number;
   planType?: TicketPlanType;
+  presetFaqs?: PresetFaqItem[];
 }
-
-// 定型よくある質問（無料・チケット非消費）
-const PRESET_FAQS = [
-  {
-    id: 'faq_fertilizer',
-    chipLabel: '🌱 追肥のやり方',
-    question: '追肥のタイミングやおすすめのやり方を教えてください',
-    answer:
-      '【農園アドバイス：追肥の基本】🌱\n\n植え付けから2〜3週間後、または一番果（最初の実）がついた頃が1回目の追肥タイミングです！\n株元から少し離れた場所に肥料を一握り施し、土と軽く混ぜてあげてくださいね。有機ぼかし肥や油かすを使うと根を傷めず元気に育ちます✨',
-  },
-  {
-    id: 'faq_yellow_leaf',
-    chipLabel: '🍅 葉が黄色い',
-    question: '葉っぱが黄色くなってきました。どうすればいいですか？',
-    answer:
-      '【農園アドバイス：葉の黄変について】🍅\n\n・一番下の古い葉が黄色い場合：自然な老化ですので、風通しを良くするため根本からハサミで切り取って大丈夫です。\n・株全体や上部が黄色い場合：水切れ、または肥料切れ（チッソ不足）の可能性があります。土の乾き具合を確認し、必要に応じて追肥を行ってみてくださいね！',
-  },
-  {
-    id: 'faq_pest',
-    chipLabel: '🐛 害虫の対策',
-    question: '害虫（ハダニやアブラムシ）を見つけました。無農薬での対策は？',
-    answer:
-      '【農園アドバイス：安心な害虫対策】🐛\n\n・アブラムシ・ハダニ：葉の裏に勢いよく水をかける「葉水」がとても効果的です。水で薄めたお酢や牛乳スプレーも窒息効果があります。\n・アオムシ等：見つけたら割り箸などで優しく捕殺するのが確実です。早めの発見が大切ですので、葉の裏をこまめに観察してくださいね！',
-  },
-  {
-    id: 'faq_watering',
-    chipLabel: '💧 水やりの頻度',
-    question: '夏の水やりのタイミングや頻度を教えてください',
-    answer:
-      '【農園アドバイス：水やりのコツ】💧\n\n基本は「朝の涼しい時間帯（早朝〜8時頃）」にたっぷりとあげるのがベストです！\n日中の暑い時間に水をあげるとお湯のようになって根を傷める原因になります。土の表面が乾いて白っぽくなったら、株元にしっかりあげてくださいね🌱',
-  },
-];
 
 export default function StudentTalkView({
   journals = [],
@@ -91,6 +62,7 @@ export default function StudentTalkView({
   studentId,
   customDailyLimit = DEFAULT_DAILY_TICKETS,
   planType = 'limited',
+  presetFaqs,
 }: StudentTalkViewProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
@@ -107,6 +79,37 @@ export default function StudentTalkView({
 
   // 💡 ナレッジ共有許可 (オプトアウト) State (デフォルト: ON)
   const [allowKnowledgeShare, setAllowKnowledgeShare] = useState(true);
+
+  // 💡 農園独自の定型FAQ State
+  const [currentFaqs, setCurrentFaqs] = useState<PresetFaqItem[]>(
+    presetFaqs && presetFaqs.length > 0 ? presetFaqs : DEFAULT_PRESET_FAQS
+  );
+
+  useEffect(() => {
+    if (presetFaqs && presetFaqs.length > 0) {
+      setCurrentFaqs(presetFaqs);
+      return;
+    }
+    const fetchFaqs = async () => {
+      try {
+        const studentFarmId =
+          typeof window !== 'undefined' ? localStorage.getItem('nouato_invite_farm_id') : null;
+        const url = studentFarmId
+          ? `/api/settings?farm_id=${encodeURIComponent(studentFarmId)}`
+          : '/api/settings';
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.presetFaqs && Array.isArray(data.presetFaqs) && data.presetFaqs.length > 0) {
+            setCurrentFaqs(data.presetFaqs);
+          }
+        }
+      } catch {
+        // ignore fetch error
+      }
+    };
+    fetchFaqs();
+  }, [presetFaqs, studentId]);
 
   // 検索機能 State
   const [showSearch, setShowSearch] = useState(false);
@@ -518,7 +521,7 @@ export default function StudentTalkView({
       const fallbackMsg: MessageItem = {
         id: 'bot_err_' + Date.now(),
         sender: 'teacher',
-        text: '【しるべぇ】メッセージを受け付けました！次回来園時に講師より詳しくお伝えしますね🧑‍🌾',
+        text: '【しるべぇ】申し訳ありません。一時的な通信エラーが発生しました。電波の良い場所で再度お試しいただくか、次回来園時に講師にご相談くださいね🌱',
         timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -529,7 +532,7 @@ export default function StudentTalkView({
 
   // プリセットFAQタップ
   const handleQuickFaqClick = (faqId: string) => {
-    const faq = PRESET_FAQS.find((f) => f.id === faqId);
+    const faq = currentFaqs.find((f) => f.id === faqId);
     if (!faq) return;
 
     const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -907,7 +910,7 @@ export default function StudentTalkView({
 
       {/* 🌟 4. 定型文サジェストチップ (無料・チケット非消費) 🌟 */}
       <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-200/80 flex items-center space-x-1.5 overflow-x-auto text-[11px] font-bold text-gray-600 shrink-0 scrollbar-none">
-        {PRESET_FAQS.map((faq) => (
+        {currentFaqs.map((faq) => (
           <button
             key={faq.id}
             type="button"
@@ -931,6 +934,7 @@ export default function StudentTalkView({
         <div className="flex-1 min-w-0">
           <textarea
             value={inputText}
+            maxLength={1000}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => {
               if (

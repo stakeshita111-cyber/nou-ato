@@ -63,12 +63,26 @@ export default function TeacherOverviewView({
   const [showQRModal, setShowQRModal] = useState(false);
 
   const [origin, setOrigin] = useState('http://localhost:3000');
+  const [inviteCode, setInviteCode] = useState<string>('');
 
   const fetchCounts = async (targetFarmId?: string) => {
     const currentFid =
       targetFarmId ||
       farmId ||
       (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+
+    if (currentFid) {
+      try {
+        const { data: fData } = await supabase
+          .from('farms')
+          .select('invite_code')
+          .eq('id', currentFid)
+          .maybeSingle();
+        if (fData?.invite_code) {
+          setInviteCode(fData.invite_code);
+        }
+      } catch {}
+    }
 
     // 1. 本日以降のイベント・講習予約件数
     const todayStr = new Date().toISOString().split('T')[0];
@@ -85,9 +99,11 @@ export default function TeacherOverviewView({
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          const futureEvents = parsed.filter((ev: any) => ev.date >= todayStr);
+          const futureEvents = (parsed as Array<{ date?: string }>).filter(
+            (ev) => (ev.date || '') >= todayStr
+          );
           setEventsCount(futureEvents.length);
-        } catch (e) {
+        } catch {
           setEventsCount(0);
         }
       } else {
@@ -106,7 +122,7 @@ export default function TeacherOverviewView({
       if (savedRec) {
         try {
           setReportCount(JSON.parse(savedRec).length);
-        } catch (e) {
+        } catch {
           setReportCount(0);
         }
       } else {
@@ -122,7 +138,7 @@ export default function TeacherOverviewView({
     const { data: jData } = await jQuery;
 
     if (jData) {
-      const unrepliedNotices = jData.filter((j: any) => {
+      const unrepliedNotices = jData.filter((j) => {
         const content = (j.content || '').trim();
         return (
           content &&
@@ -160,7 +176,8 @@ export default function TeacherOverviewView({
     fetchCounts(farmId);
   }, [farmId]);
 
-  const inviteUrl = `${origin}/invite?farm_id=${farmId}`;
+  const effectiveInviteCode = inviteCode || farmId;
+  const inviteUrl = `${origin}/invite?code=${effectiveInviteCode}`;
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl);

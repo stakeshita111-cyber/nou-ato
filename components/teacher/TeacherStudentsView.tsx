@@ -105,6 +105,7 @@ export default function TeacherStudentsView() {
     }
     return '農園';
   });
+  const [inviteCode, setInviteCode] = useState<string>('');
 
   const effectiveFarmId = activeFarmId || farmId;
   const effectiveFarmName = activeFarmName || farmName;
@@ -131,6 +132,16 @@ export default function TeacherStudentsView() {
 
         if (currentFarmId) {
           usersQuery = usersQuery.eq('farm_id', currentFarmId);
+          try {
+            const { data: fData } = await supabase
+              .from('farms')
+              .select('invite_code')
+              .eq('id', currentFarmId)
+              .maybeSingle();
+            if (fData?.invite_code) {
+              setInviteCode(fData.invite_code);
+            }
+          } catch {}
         }
 
         const { data: usersData, error: usersError } = await usersQuery;
@@ -141,15 +152,13 @@ export default function TeacherStudentsView() {
           // ① farm_plots (主たる区画割り当てテーブル) から取得
           const { data: dbPlots } = await supabase
             .from('farm_plots')
-            .select('id, code, student_id, student_name, name, description');
+            .select('id, code, student_id, name, description');
           if (dbPlots && dbPlots.length > 0) {
-            dbPlots.forEach((p: Record<string, unknown>) => {
+            dbPlots.forEach((p) => {
               const sid = String(p.student_id || '');
-              const sname = String(p.student_name || '');
               const code = String(p.code || '').toUpperCase();
               const label = code ? `区画 ${code}` : String(p.name || '区画');
               if (sid) plotMap[sid] = label;
-              if (sname) plotMap[sname] = label;
             });
           }
         } catch (err) {
@@ -465,7 +474,8 @@ export default function TeacherStudentsView() {
     };
   }, [fetchStudents]);
 
-  const inviteUrl = `${origin}/invite?farm_id=${effectiveFarmId}`;
+  const effectiveInviteCode = inviteCode || effectiveFarmId;
+  const inviteUrl = `${origin}/invite?code=${effectiveInviteCode}`;
 
   const handleCopyInviteUrl = async () => {
     try {
@@ -787,42 +797,24 @@ export default function TeacherStudentsView() {
       const studentId = deleteTargetStudent.id;
       const studentName = deleteTargetStudent.name;
 
-      // 1. farm_beds で該当生徒が割り当てられていた区画・畝を解放
-      try {
-        await supabase
-          .from('farm_beds')
-          .update({
-            student_id: null,
-            student_name: null,
-          })
-          .or(`student_id.eq.${studentId},student_name.eq.${studentName}`);
-      } catch (err) {
-        console.warn('farm_beds release error:', err);
+      // 1. 安全な退会処理 (Postgres 関数 withdraw_student を呼び出し)
+      // ※ 講師権限および同一農園を検証した上で、student_id 一致の畝解放と farm_id 解除をアトミックに実行
+      const { error: rpcErr } = await supabase.rpc('withdraw_student', {
+        p_student_id: studentId,
+      });
+
+      if (rpcErr) {
+        console.error('withdraw_student RPC error:', rpcErr);
+        setToastMessage(`❌ 退会処理に失敗しました: ${rpcErr.message}`);
+        setShowToast(true);
+        return;
       }
 
       if (deleteMode === 'purge') {
-        // 完全消去モード: CASCADE制約/トリガーに任せて users テーブルから単一DELETE実行
+        // 完全消去モード選択時は追加で users レコードを削除試行
         const { error: delErr } = await supabase.from('users').delete().eq('id', studentId);
         if (delErr) {
-          console.error('Purge user error:', delErr);
-          setToastMessage(`❌ 生徒の完全削除に失敗しました: ${delErr.message}`);
-          setShowToast(true);
-          return;
-        }
-      } else {
-        // アクセス遮断（推奨）モード: farm_id 解除 & deleted_at 記録
-        const { error: updateErr } = await supabase
-          .from('users')
-          .update({
-            farm_id: null,
-            deleted_at: new Date().toISOString(),
-          })
-          .eq('id', studentId);
-        if (updateErr) {
-          console.error('Deactivate user error:', updateErr);
-          setToastMessage(`❌ 退会処理に失敗しました: ${updateErr.message}`);
-          setShowToast(true);
-          return;
+          console.warn('Purge user warning (withdrawn successfully):', delErr);
         }
       }
 

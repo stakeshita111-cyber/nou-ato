@@ -12,6 +12,7 @@ import Toast from '@/components/ui/Toast';
 import StudentTaskPreviewModal from '@/components/templates/StudentTaskPreviewModal';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
+import type { Database } from '@/types/supabase';
 
 // 公式テンプレートとカスタムテンプレートを安全にマージする関数
 const mergeTemplates = (customList: TaskTemplate[]): TaskTemplate[] => {
@@ -59,15 +60,18 @@ export default function TeacherTemplatesView() {
           .is('deleted_at', null);
 
         if (dbTemplates && dbTemplates.length > 0) {
-          customTemplates = dbTemplates.map((t: any) => {
-            const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
+          customTemplates = dbTemplates.map((t): TaskTemplate => {
+            const cl =
+              t.checklist && typeof t.checklist === 'object' && !Array.isArray(t.checklist)
+                ? (t.checklist as Record<string, unknown>)
+                : {};
             return {
               id: t.id,
               title: t.title,
-              category: t.category || '共通',
+              category: (t.category as TaskCategory) || '共通',
               target_crop: t.target_crop || '共通',
-              phase: cl.phase || '育成管理',
-              season: cl.season || '通年',
+              phase: (cl.phase as TaskPhase) || '育成・管理',
+              season: (cl.season as TaskSeason) || '通年',
               estimated_time: t.estimated_time || '30分',
               tools_needed: t.tools_needed || '軍手',
               description: t.description || '',
@@ -75,8 +79,8 @@ export default function TeacherTemplatesView() {
               exp: t.exp || 50,
               difficulty: t.difficulty || 1,
               require_photo: Boolean(t.require_photo),
-              badge_name: cl.badge_name || '栽培マスター',
-              badge_icon: cl.badge_icon || '🌿',
+              badge_name: (cl.badge_name as string) || '栽培マスター',
+              badge_icon: (cl.badge_icon as string) || '🌿',
             };
           });
         }
@@ -224,7 +228,9 @@ export default function TeacherTemplatesView() {
         farm_id: farmId || null,
       };
 
-      const { error } = await supabase.from('tasks').insert([newTaskData] as any);
+      const { error } = await supabase
+        .from('tasks')
+        .insert([newTaskData] as Database['public']['Tables']['tasks']['Insert'][]);
       if (error) {
         throw error;
       }
@@ -238,9 +244,10 @@ export default function TeacherTemplatesView() {
         `✨ テンプレート「${tpl.title}」を教材・タスクに追加しました！看板ボード（教材準備）で配信できます。`
       );
       setShowToast(true);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('handleAddToTasks error:', e);
-      setToastMessage(`❌ タスクの追加に失敗しました: ${e?.message || '不明なエラー'}`);
+      const msg = e instanceof Error ? e.message : '不明なエラー';
+      setToastMessage(`❌ タスクの追加に失敗しました: ${msg}`);
       setShowToast(true);
     } finally {
       setAddingId(null);
@@ -1049,7 +1056,10 @@ export default function TeacherTemplatesView() {
                   <select
                     value={editingTemplate.category}
                     onChange={(e) =>
-                      setEditingTemplate({ ...editingTemplate, category: e.target.value as any })
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        category: e.target.value as TaskCategory,
+                      })
                     }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
@@ -1065,7 +1075,10 @@ export default function TeacherTemplatesView() {
                   <select
                     value={editingTemplate.season || '春夏'}
                     onChange={(e) =>
-                      setEditingTemplate({ ...editingTemplate, season: e.target.value as any })
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        season: e.target.value as TaskSeason,
+                      })
                     }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
@@ -1080,7 +1093,10 @@ export default function TeacherTemplatesView() {
                   <select
                     value={editingTemplate.phase || '準備・植付'}
                     onChange={(e) =>
-                      setEditingTemplate({ ...editingTemplate, phase: e.target.value as any })
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        phase: e.target.value as TaskPhase,
+                      })
                     }
                     className="w-full p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >

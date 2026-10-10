@@ -301,7 +301,7 @@ export async function searchSimilarKnowledge(userQuestion: string): Promise<Refe
       }
     });
 
-    dbData.forEach((item: any) => {
+    dbData.forEach((item) => {
       if (!item.reply) return;
 
       const itemReply = item.reply.toLowerCase();
@@ -440,13 +440,9 @@ ${knowledgeSection}`;
     const preferredModel = process.env.GEMINI_MODEL;
     const modelsToTry = [
       preferredModel,
-      'gemini-flash-lite-latest',
-      'gemini-3.1-flash-lite',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-3.8-flash',
-      'gemini-3.7-flash',
-      'gemini-3.6-flash',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro',
     ].filter(Boolean) as string[];
 
     const uniqueModels = Array.from(new Set(modelsToTry));
@@ -481,12 +477,18 @@ ${knowledgeSection}`;
         );
 
         if (response.ok) {
-          const resData = await response.json();
+          const resData = (await response.json()) as {
+            candidates?: Array<{
+              content?: {
+                parts?: Array<{ text?: string; thought?: boolean }>;
+              };
+            }>;
+          };
           const parts = resData.candidates?.[0]?.content?.parts || [];
           const generatedText =
             parts
-              .filter((p: any) => !p.thought && p.text)
-              .map((p: any) => p.text)
+              .filter((p) => !p.thought && p.text)
+              .map((p) => p.text)
               .join('\n')
               .trim() || parts[0]?.text?.trim();
 

@@ -16,6 +16,8 @@ import WeatherWidget from '@/components/ui/WeatherWidget';
 import EventCalendar from '@/components/ui/EventCalendar';
 import { SproutLoader } from '@/components/SproutLoader';
 import { formatDate } from '@/lib/utils/formatHelper';
+import { PresetFaqItem } from '@/types/farm';
+import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
 
 export default function StudentPage() {
   const router = useRouter();
@@ -39,6 +41,7 @@ export default function StudentPage() {
 
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [presetFaqs, setPresetFaqs] = useState<PresetFaqItem[]>(DEFAULT_PRESET_FAQS);
   const VALID_STUDENT_TABS = ['myfarm', 'weather', 'events', 'talk', 'feed', 'library'];
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -186,6 +189,9 @@ export default function StudentPage() {
               localStorage.setItem('nouato_show_student_talk_tab', String(isEnabled));
             }
           }
+          if (data.presetFaqs && Array.isArray(data.presetFaqs) && data.presetFaqs.length > 0) {
+            setPresetFaqs(data.presetFaqs);
+          }
         }
       } catch {
         // ignore fetch error
@@ -277,16 +283,28 @@ export default function StudentPage() {
 
   // タスク完了トリガー
   const handleCompleteTask = async (id: string) => {
-    await completeTask(id);
-    setToastMessage('🎉 タスク完了を報告しました！');
-    setShowToast(true);
+    try {
+      await completeTask(id);
+      setToastMessage('🎉 タスク完了を報告しました！');
+      setShowToast(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '更新に失敗しました';
+      setToastMessage(`❌ タスク完了報告に失敗しました: ${msg}`);
+      setShowToast(true);
+    }
   };
 
   // タスク未完了復元トリガー
   const handleUncompleteTask = async (id: string) => {
-    await uncompleteTask(id);
-    setToastMessage('↩️ タスクを未完了（進行中）に戻しました');
-    setShowToast(true);
+    try {
+      await uncompleteTask(id);
+      setToastMessage('↩️ タスクを未完了（進行中）に戻しました');
+      setShowToast(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '更新に失敗しました';
+      setToastMessage(`❌ ステータス変更に失敗しました: ${msg}`);
+      setShowToast(true);
+    }
   };
 
   // 気づきメモ投稿
@@ -296,9 +314,15 @@ export default function StudentPage() {
       setShowToast(true);
       return;
     }
-    await addJournal();
-    setToastMessage('📝 講師へ日誌・気づきメモを送信しました！');
-    setShowToast(true);
+    try {
+      await addJournal();
+      setToastMessage('📝 講師へ日誌・気づきメモを送信しました！');
+      setShowToast(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '保存に失敗しました';
+      setToastMessage(`❌ 日誌の送信に失敗しました: ${msg}`);
+      setShowToast(true);
+    }
   };
 
   // 生徒: カレンダーからイベント参加予約申し込み
@@ -504,12 +528,15 @@ export default function StudentPage() {
               journals={journals}
               studentName={userAccountName}
               studentId={user?.id}
+              presetFaqs={presetFaqs}
             />
           </div>
         )}
 
         {/* 5. 成長 タブ */}
-        {activeTab === 'feed' && <StudentSkillBoardView tasks={tasks} user={user} />}
+        {activeTab === 'feed' && (
+          <StudentSkillBoardView tasks={tasks} user={user} journals={journals} />
+        )}
 
         {/* Library タブ */}
         {activeTab === 'library' && (

@@ -29,6 +29,9 @@ jobs:
       - name: Run Clean Code & Secrets Gate
         run: npm run check:clean
 
+      - name: Run Schema & Type Integrity Gate
+        run: npm run check:schema
+
       - name: Strict Any Check on Changed Files (PR Only)
         if: github.event_name == 'pull_request'
         run: |

@@ -58,8 +58,6 @@ describe('farmCalculations & Payload Builders', () => {
     expect(payload.name).toBe('区画 A1 - 山田 太郎');
     expect(payload.code).toBe('A1');
     expect(payload.student_id).toBe('11111111-2222-3333-4444-555555555555');
-    expect(payload.student_name).toBe('山田 太郎');
-    expect(payload.is_vacant).toBe(false);
 
     const meta = JSON.parse(payload.description);
     expect(meta.is_vacant).toBe(false);

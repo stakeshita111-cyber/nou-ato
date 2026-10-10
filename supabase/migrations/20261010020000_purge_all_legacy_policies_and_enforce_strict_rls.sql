@@ -40,12 +40,11 @@ ALTER TABLE public.ai_tickets ENABLE ROW LEVEL SECURITY;
 -- ------------------------------------------------------------------------------
 
 -- 【farms】
--- 閲覧: 自農園所属者、オーナー講師、または未ログイン招待コード照会
+-- 閲覧: 自農園所属者、オーナー講師のみ (anonによる全農園列挙を完全防止)
 CREATE POLICY "farms_select_policy" ON public.farms
     FOR SELECT USING (
         id = public.current_user_farm_id()
         OR owner_id = auth.uid()
-        OR auth.role() = 'anon'
     );
 
 -- 更新: オーナー講師のみ
@@ -330,3 +329,38 @@ CREATE POLICY "payments_modify_policy" ON public.payments
               AND u.farm_id = public.current_user_farm_id()
         )
     );
+
+-- ------------------------------------------------------------------------------
+-- 4. 招待コード安全照会用 SECURITY DEFINER 関数
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_farm_by_invite_code(target_invite_code text)
+RETURNS TABLE (
+    farm_id UUID,
+    farm_name text,
+    teacher_name text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    clean_code text;
+BEGIN
+    clean_code := trim(COALESCE(target_invite_code, ''));
+    IF clean_code = '' THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT 
+        f.id AS farm_id,
+        f.name AS farm_name,
+        COALESCE(u.display_name, '講師') AS teacher_name
+    FROM public.farms f
+    LEFT JOIN public.users u ON u.id = f.owner_id
+    WHERE f.invite_code = clean_code
+    LIMIT 1;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_farm_by_invite_code(text) TO anon, authenticated;

@@ -2,21 +2,36 @@ import { z } from 'zod';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/utils/supabase/server';
+import { PresetFaqItem } from '@/types/farm';
+import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
+import { Database } from '@/types/supabase';
 
 interface ServerSettings {
   showStudentTalkTab: boolean;
+  presetFaqs?: PresetFaqItem[];
   [key: string]: unknown;
 }
 
 const DEFAULT_SETTINGS: ServerSettings = {
   showStudentTalkTab: true,
+  presetFaqs: DEFAULT_PRESET_FAQS,
 };
+
+const presetFaqItemSchema = z.object({
+  id: z.string(),
+  chipLabel: z.string().min(1, 'ラベルを入力してください'),
+  question: z.string().min(1, '質問文を入力してください'),
+  answer: z.string().min(1, '回答文を入力してください'),
+});
 
 const settingsRequestBodySchema = z
   .object({
-    showStudentTalkTab: z.boolean({
-      message: 'showStudentTalkTab は真偽値である必要があります',
-    }),
+    showStudentTalkTab: z
+      .boolean({
+        message: 'showStudentTalkTab は真偽値である必要があります',
+      })
+      .optional(),
+    presetFaqs: z.array(presetFaqItemSchema).optional(),
   })
   .passthrough();
 
@@ -63,11 +78,12 @@ export async function GET(request?: Request) {
     }
 
     let showStudentTalkTab = DEFAULT_SETTINGS.showStudentTalkTab !== false;
+    let presetFaqs: PresetFaqItem[] = DEFAULT_PRESET_FAQS;
 
     if (targetFarmId) {
       const { data: farmData } = await supabase
         .from('farms')
-        .select('show_student_talk_tab')
+        .select('show_student_talk_tab, preset_faqs')
         .eq('id', targetFarmId)
         .maybeSingle();
 
@@ -78,11 +94,18 @@ export async function GET(request?: Request) {
       ) {
         showStudentTalkTab = farmData.show_student_talk_tab !== false;
       }
+      if (
+        farmData?.preset_faqs &&
+        Array.isArray(farmData.preset_faqs) &&
+        farmData.preset_faqs.length > 0
+      ) {
+        presetFaqs = farmData.preset_faqs as unknown as PresetFaqItem[];
+      }
     } else {
       // フォールバック: DB全体の先頭農園の設定を取得
       const { data: defaultFarm } = await supabase
         .from('farms')
-        .select('show_student_talk_tab')
+        .select('show_student_talk_tab, preset_faqs')
         .limit(1)
         .maybeSingle();
 
@@ -93,14 +116,23 @@ export async function GET(request?: Request) {
       ) {
         showStudentTalkTab = defaultFarm.show_student_talk_tab !== false;
       }
+      if (
+        defaultFarm?.preset_faqs &&
+        Array.isArray(defaultFarm.preset_faqs) &&
+        defaultFarm.preset_faqs.length > 0
+      ) {
+        presetFaqs = defaultFarm.preset_faqs as unknown as PresetFaqItem[];
+      }
     }
 
     return ApiResponse.success({
       settings: {
         ...DEFAULT_SETTINGS,
         showStudentTalkTab,
+        presetFaqs,
       },
       showStudentTalkTab,
+      presetFaqs,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : '設定の取得に失敗しました';
@@ -122,7 +154,7 @@ export async function POST(request: Request) {
       return ApiResponse.badRequest(issue?.message || 'リクエストボディが不正です');
     }
 
-    const { showStudentTalkTab, ...extraSettings } = parseResult.data;
+    const { showStudentTalkTab, presetFaqs, ...extraSettings } = parseResult.data;
 
     const supabase = await createClient();
     const {
@@ -151,15 +183,20 @@ export async function POST(request: Request) {
       .select('id')
       .or(`owner_id.eq.${user.id}${userData?.farm_id ? `,id.eq.${userData.farm_id}` : ''}`);
 
+    type FarmUpdate = Database['public']['Tables']['farms']['Update'];
+    const updateFields: FarmUpdate = {
+      updated_at: new Date().toISOString(),
+    };
+    if (showStudentTalkTab !== undefined) {
+      updateFields.show_student_talk_tab = showStudentTalkTab;
+    }
+    if (presetFaqs !== undefined) {
+      updateFields.preset_faqs = presetFaqs;
+    }
+
     if (ownedFarms && ownedFarms.length > 0) {
       const farmIds = ownedFarms.map((f) => f.id);
-      await supabase
-        .from('farms')
-        .update({
-          show_student_talk_tab: showStudentTalkTab,
-          updated_at: new Date().toISOString(),
-        })
-        .in('id', farmIds);
+      await supabase.from('farms').update(updateFields).in('id', farmIds);
     } else {
       // 農園レコードが未登録の場合は新規作成/upsert
       const newFarmId = userData?.farm_id || crypto.randomUUID();
@@ -168,7 +205,8 @@ export async function POST(request: Request) {
           id: newFarmId,
           name: 'マイ農園',
           owner_id: user.id,
-          show_student_talk_tab: showStudentTalkTab,
+          show_student_talk_tab: showStudentTalkTab !== undefined ? showStudentTalkTab : true,
+          preset_faqs: presetFaqs !== undefined ? presetFaqs : DEFAULT_PRESET_FAQS,
           updated_at: new Date().toISOString(),
         },
       ]);
@@ -180,18 +218,21 @@ export async function POST(request: Request) {
     const settings: ServerSettings = {
       ...DEFAULT_SETTINGS,
       ...extraSettings,
-      showStudentTalkTab,
+      showStudentTalkTab: showStudentTalkTab !== undefined ? showStudentTalkTab : true,
+      presetFaqs: presetFaqs !== undefined ? presetFaqs : DEFAULT_PRESET_FAQS,
     };
 
     logger.info('Updated global server settings', 'api/settings', {
-      showStudentTalkTab,
+      showStudentTalkTab: settings.showStudentTalkTab,
+      presetFaqsCount: settings.presetFaqs?.length,
       userId: user.id,
     });
 
     return ApiResponse.success({
       success: true,
       settings,
-      showStudentTalkTab,
+      showStudentTalkTab: settings.showStudentTalkTab,
+      presetFaqs: settings.presetFaqs,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : '設定の更新に失敗しました';

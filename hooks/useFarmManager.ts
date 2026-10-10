@@ -155,16 +155,7 @@ export function useFarmManager() {
         const seenStudentIds = new Set<string>();
         loadedBasePlots = dbPlots.map((dp: Database['public']['Tables']['farm_plots']['Row']) => {
           let sId = dp.student_id ? dp.student_id : undefined;
-          let sName = dp.student_name ? dp.student_name : sId ? studentMap.get(sId) : undefined;
-
-          if (!sId && sName) {
-            for (const [id, name] of studentMap.entries()) {
-              if (name === sName || sName.includes(name) || name.includes(sName)) {
-                sId = id;
-                break;
-              }
-            }
-          }
+          let sName = sId ? studentMap.get(sId) : undefined;
 
           if (sId && seenStudentIds.has(sId)) {
             sId = undefined;
@@ -196,7 +187,6 @@ export function useFarmManager() {
             code: dp.code,
             student_id: isVac ? undefined : sId,
             student_name: isVac ? undefined : sName,
-            grid_index: dp.grid_index ?? undefined,
             is_vacant: isVac,
             position: (dp.position as { x: number; y: number } | null) || { x: 0, y: 0 },
             beds: [],

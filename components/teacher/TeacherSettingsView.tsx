@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react';
 import Toast from '@/components/ui/Toast';
 import { useThemeStore, ThemeSettings } from '@/store/useThemeStore';
 import { formatDate, formatNumber } from '@/lib/utils/formatHelper';
+import { PresetFaqItem } from '@/types/farm';
+import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
 
 export default function TeacherSettingsView() {
   const { settings, updateSettings, resetSettings } = useThemeStore();
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // 💡 農園独自のクイック相談（よくある質問）リスト
+  const [presetFaqs, setPresetFaqs] = useState<PresetFaqItem[]>(DEFAULT_PRESET_FAQS);
+  const [editingFaq, setEditingFaq] = useState<PresetFaqItem | null>(null);
+  const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
 
   // DBから最新の設定値を同期取得
   useEffect(() => {
@@ -21,6 +28,9 @@ export default function TeacherSettingsView() {
           if (data.showStudentTalkTab !== undefined) {
             updateSettings({ showStudentTalkTab: data.showStudentTalkTab !== false });
           }
+          if (data.presetFaqs && Array.isArray(data.presetFaqs) && data.presetFaqs.length > 0) {
+            setPresetFaqs(data.presetFaqs);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch settings:', err);
@@ -28,6 +38,76 @@ export default function TeacherSettingsView() {
     };
     fetchSettings();
   }, [updateSettings]);
+
+  const handleSaveFaqsToDb = async (updatedList: PresetFaqItem[]) => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presetFaqs: updatedList }),
+      });
+      if (!res.ok) throw new Error('保存に失敗しました');
+      setPresetFaqs(updatedList);
+      setToastMessage('✨ 生徒向けクイック質問チップを保存しました！');
+      setShowToast(true);
+    } catch {
+      setToastMessage('⚠️ 設定の保存に失敗しました');
+      setShowToast(true);
+    }
+  };
+
+  const handleOpenAddFaqModal = () => {
+    setEditingFaq({
+      id: 'faq_' + Date.now(),
+      chipLabel: '🌱 新しい質問',
+      question: '',
+      answer: '',
+    });
+    setIsFaqModalOpen(true);
+  };
+
+  const handleOpenEditFaqModal = (faq: PresetFaqItem) => {
+    setEditingFaq({ ...faq });
+    setIsFaqModalOpen(true);
+  };
+
+  const handleDeleteFaq = async (id: string) => {
+    if (presetFaqs.length <= 1) {
+      setToastMessage('⚠️ 最低1つの質問チップを残してください');
+      setShowToast(true);
+      return;
+    }
+    const updated = presetFaqs.filter((f) => f.id !== id);
+    await handleSaveFaqsToDb(updated);
+  };
+
+  const handleResetFaqsToDefault = async () => {
+    if (window.confirm('質問チップを初期標準の4問（追肥・黄変・害虫・水やり）に戻しますか？')) {
+      await handleSaveFaqsToDb(DEFAULT_PRESET_FAQS);
+    }
+  };
+
+  const handleSaveFaqModalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFaq) return;
+    if (!editingFaq.chipLabel.trim() || !editingFaq.question.trim() || !editingFaq.answer.trim()) {
+      setToastMessage('⚠️ すべての項目を入力してください');
+      setShowToast(true);
+      return;
+    }
+
+    const exists = presetFaqs.some((f) => f.id === editingFaq.id);
+    let updated: PresetFaqItem[];
+    if (exists) {
+      updated = presetFaqs.map((f) => (f.id === editingFaq.id ? editingFaq : f));
+    } else {
+      updated = [...presetFaqs, editingFaq];
+    }
+
+    setIsFaqModalOpen(false);
+    setEditingFaq(null);
+    await handleSaveFaqsToDb(updated);
+  };
 
   const handleToggleContrast = (enabled: boolean) => {
     updateSettings({ outdoorHighContrast: enabled });
@@ -665,12 +745,93 @@ export default function TeacherSettingsView() {
               </button>
             </div>
           </div>
+
+          {/* 13. 生徒画面: タッチで聞けるクイック相談（よくある質問）の管理 */}
+          <div className="p-5 flex flex-col gap-4 hover:bg-gray-50/50 transition">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-sm font-black text-gray-900 flex items-center gap-2">
+                  <span>💡 生徒向けクイック相談（よくある質問）のカスタマイズ</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                    全 {presetFaqs.length} 件
+                  </span>
+                </span>
+                <span className="text-[11px] text-gray-500 font-medium">
+                  生徒の相談画面下部に並ぶ無料の質問チップと、即座に返信されるアドバイス本文を農園独自に設定できます
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenAddFaqModal}
+                  className="px-3.5 py-2 bg-[#1c4d21] hover:bg-[#153e19] text-white rounded-xl text-xs font-bold transition shadow-2xs flex items-center gap-1 cursor-pointer"
+                >
+                  <span>＋ 新規追加</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetFaqsToDefault}
+                  title="初期の標準4問に戻す"
+                  className="px-3 py-2 bg-white hover:bg-gray-100 text-gray-600 border border-gray-300 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                >
+                  <span>🔄 初期標準に戻す</span>
+                </button>
+              </div>
+            </div>
+
+            {/* チップ一覧カード表示 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              {presetFaqs.map((faq, idx) => (
+                <div
+                  key={faq.id || idx}
+                  className="bg-white border border-gray-200 rounded-2xl p-3.5 shadow-2xs space-y-2 text-left hover:border-emerald-300 transition"
+                >
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <span className="text-xs font-extrabold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      {faq.chipLabel}
+                    </span>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditFaqModal(faq)}
+                        className="px-2 py-1 text-xs text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg font-bold transition cursor-pointer"
+                      >
+                        ✏️ 編集
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFaq(faq.id)}
+                        className="px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg font-bold transition cursor-pointer"
+                      >
+                        🗑️ 削除
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold block">
+                      【生徒の質問文】
+                    </span>
+                    <p className="text-xs text-gray-800 font-bold line-clamp-1">{faq.question}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold block">
+                      【即答アドバイス返答】
+                    </span>
+                    <p className="text-xs text-gray-600 line-clamp-2 whitespace-pre-wrap">
+                      {faq.answer}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 下部初期化ボタン */}
         <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center flex-wrap gap-2">
           <span className="text-xs text-gray-500 font-bold">
-            💡 選択した設定は端末のローカルストレージに自動保存されます
+            💡 選択した設定は端末のローカルストレージおよび農園設定に保存されます
           </span>
           <button
             type="button"
@@ -685,6 +846,89 @@ export default function TeacherSettingsView() {
           </button>
         </div>
       </div>
+
+      {/* 🌟 クイック質問チップ作成・編集モーダル 🌟 */}
+      {isFaqModalOpen && editingFaq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-gray-200 relative max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 shrink-0">
+              <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
+                <span>💬 クイック相談チップの編集</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsFaqModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveFaqModalSubmit}
+              className="space-y-4 flex-1 overflow-y-auto pr-1"
+            >
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  チップ表示名 (絵文字 + 簡潔なキーワード)
+                </label>
+                <input
+                  type="text"
+                  value={editingFaq.chipLabel}
+                  onChange={(e) => setEditingFaq({ ...editingFaq, chipLabel: e.target.value })}
+                  placeholder="例: 🥦 収穫のサイン, 🐛 害虫対策"
+                  required
+                  className="w-full px-3.5 py-2.5 bg-gray-50 focus:bg-white border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  タップ時に送信される質問文
+                </label>
+                <input
+                  type="text"
+                  value={editingFaq.question}
+                  onChange={(e) => setEditingFaq({ ...editingFaq, question: e.target.value })}
+                  placeholder="例: ブロッコリーの収穫適期や見極め方を教えてください"
+                  required
+                  className="w-full px-3.5 py-2.5 bg-gray-50 focus:bg-white border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  即座に返信される農園アドバイス本文 (AIチケット非消費)
+                </label>
+                <textarea
+                  value={editingFaq.answer}
+                  onChange={(e) => setEditingFaq({ ...editingFaq, answer: e.target.value })}
+                  placeholder="例: 【農園アドバイス：ブロッコリーの収穫】🥦&#10;&#10;花蕾（つぼみ）が固く締まって直径10〜15cmほどになったら収穫適期です！朝の涼しい時間帯に茎を斜めに切り落としてくださいね。"
+                  required
+                  rows={4}
+                  className="w-full p-3 bg-gray-50 focus:bg-white border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsFaqModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#1c4d21] hover:bg-[#153e19] text-white rounded-xl text-xs font-bold transition shadow-xs"
+                >
+                  保存する
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

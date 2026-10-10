@@ -1,2 +1,4 @@
-npx lint-staged
 npm run check:clean
+npm run check:schema
+npm run typecheck
+npx lint-staged

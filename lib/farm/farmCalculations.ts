@@ -12,8 +12,6 @@ export interface PlotUpsertPayload {
   name: string;
   code: string;
   student_id: string | null;
-  student_name: string | null;
-  is_vacant: boolean;
   farm_id: string | null;
   description: string;
 }
@@ -65,14 +63,14 @@ export function buildPlotUpsertPayload(
   plot: FarmPlot,
   activeFarmId: string,
   dims: { cols: number; rows: number; unassigned_beds: number },
-  farmMeta: { address?: string; weatherLocation?: any }
+  farmMeta: { address?: string; weatherLocation?: unknown }
 ): PlotUpsertPayload {
   const isVac = Boolean(plot.is_vacant);
   const plotName = plot.student_name
     ? `区画 ${plot.code} - ${plot.student_name}`
     : `区画 ${plot.code}`;
 
-  const bedsMeta: { [bed_id: string]: any } = {};
+  const bedsMeta: { [bed_id: string]: Record<string, unknown> } = {};
   (plot.beds || []).forEach((b) => {
     if (
       b.status === 'completed_pending' ||
@@ -101,8 +99,6 @@ export function buildPlotUpsertPayload(
     name: plotName,
     code: plot.code,
     student_id: isVac ? null : validStudentId,
-    student_name: isVac ? null : plot.student_name || null,
-    is_vacant: isVac,
     farm_id: validFarmId,
     description: JSON.stringify({
       is_vacant: isVac,
@@ -179,7 +175,8 @@ export const buildFixedPlots = (
 
       if (existing && !existing.id.startsWith('plot_placeholder_')) {
         const isVacantStatus =
-          Boolean(existing.is_vacant) || (existing as any).description === 'vacant';
+          Boolean(existing.is_vacant) ||
+          (existing as Record<string, unknown>).description === 'vacant';
 
         fixedPlots.push({
           ...existing,

@@ -10,13 +10,14 @@ import Link from 'next/link';
 function InviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const farmIdParam = searchParams.get('farm_id') || searchParams.get('code');
+  const inviteCodeParam = searchParams.get('code') || searchParams.get('farm_id');
 
   // 農園選択・情報
-  const [selectedFarmId, setSelectedFarmId] = useState<string>(farmIdParam || '');
+  const [inviteCode, setInviteCode] = useState<string>(inviteCodeParam || '');
+  const [selectedFarmId, setSelectedFarmId] = useState<string>('');
   const [farmName, setFarmName] = useState('たなか自然農園 (体験デモ)');
   const [teacherName, setTeacherName] = useState('田中 太郎');
-  const [isDemo, setIsDemo] = useState(!farmIdParam);
+  const [isDemo, setIsDemo] = useState(!inviteCodeParam);
 
   // 入力フォームステート
   const [name, setName] = useState('');
@@ -28,59 +29,27 @@ function InviteContent() {
   const [showToast, setShowToast] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 特定の農園情報を取得 (未ログイン時にも農園一覧全件取得を行わないようセキュリティ向上)
+  // 招待コードから農園情報を安全に取得 (RLS anonバイパス不要のSECURITY DEFINER RPCを使用)
   useEffect(() => {
     const fetchCurrentFarm = async () => {
       try {
-        if (farmIdParam) {
-          // IDによる直検索
-          let { data: farm, error: farmErr } = await supabase
-            .from('farms')
-            .select('id, name, owner_id, invite_code')
-            .eq('id', farmIdParam)
-            .single();
+        if (inviteCodeParam) {
+          const { data, error } = await supabase.rpc('get_farm_by_invite_code', {
+            target_invite_code: inviteCodeParam,
+          });
 
-          if (farmErr || !farm) {
-            // invite_code での検索を試行
-            const { data: farmByCode, error: codeErr } = await supabase
-              .from('farms')
-              .select('id, name, owner_id, invite_code')
-              .eq('invite_code', farmIdParam)
-              .single();
-            if (!codeErr && farmByCode) {
-              farm = farmByCode;
-              farmErr = null;
-            }
-          }
-
-          if (!farmErr && farm) {
-            setFarmName(farm.name || '自然農園');
-            setSelectedFarmId(farm.id);
+          if (!error && data && data.length > 0) {
+            const farmInfo = data[0];
+            setFarmName(farmInfo.farm_name || '自然農園');
+            setTeacherName(farmInfo.teacher_name || '講師');
+            setSelectedFarmId(farmInfo.farm_id);
+            setInviteCode(inviteCodeParam);
             setIsDemo(false);
-
-            let teacherDisplayName = '';
-
-            // owner_id があれば users テーブルから表示名を取得
-            if (!teacherDisplayName && farm.owner_id) {
-              const { data: ownerUser } = await supabase
-                .from('users')
-                .select('display_name, email')
-                .eq('id', farm.owner_id)
-                .single();
-
-              if (ownerUser?.display_name) {
-                teacherDisplayName = ownerUser.display_name;
-              } else if (ownerUser?.email) {
-                teacherDisplayName = ownerUser.email.split('@')[0];
-              }
-            }
-
-            setTeacherName(teacherDisplayName || '講師');
             return;
           }
         }
 
-        // URLに農園ID指定がない、または該当なしの場合はデモ設定
+        // URLに招待コード指定がない、または該当なしの場合はデモ設定
         setFarmName('たなか自然農園 (体験デモ)');
         setTeacherName('田中 太郎');
         setIsDemo(true);
@@ -90,7 +59,7 @@ function InviteContent() {
     };
 
     fetchCurrentFarm();
-  }, [farmIdParam]);
+  }, [inviteCodeParam]);
 
   const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
 
@@ -108,13 +77,17 @@ function InviteContent() {
         localStorage.setItem('nouato_invite_farm_id', selectedFarmId);
         document.cookie = `nouato_invite_farm_id=${selectedFarmId}; path=/; max-age=3600`;
       }
+      if (inviteCode) {
+        localStorage.setItem('nouato_invite_code', inviteCode);
+        document.cookie = `nouato_invite_code=${inviteCode}; path=/; max-age=3600`;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'custom:line' as unknown as Provider,
         options: {
           scopes: 'openid profile email',
-          redirectTo: `${origin}/auth/callback?next=/student&farm_id=${encodeURIComponent(selectedFarmId)}`,
+          redirectTo: `${origin}/auth/callback?next=/student&code=${encodeURIComponent(inviteCode)}`,
           queryParams: {
-            farm_id: selectedFarmId,
+            code: inviteCode,
           },
         },
       });
@@ -156,8 +129,6 @@ function InviteContent() {
     setLoading(true);
 
     try {
-      const targetFarmId = selectedFarmId || farmIdParam || '';
-
       // 1. まずログインを試行
       const { data: signInData, error: loginError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -199,16 +170,32 @@ function InviteContent() {
         }
 
         // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を呼び出し)
-        if (targetFarmId) {
-          const { error: joinErr } = await supabase.rpc('join_farm', { invite_code: targetFarmId });
+        if (inviteCode) {
+          const { data: joinRes, error: joinErr } = await supabase.rpc('join_farm', {
+            invite_code: inviteCode,
+          });
           if (joinErr) {
             console.error('join_farm error:', joinErr);
+            setToastMessage(`農園への参加に失敗しました: ${joinErr.message}`);
+            setShowToast(true);
+            setLoading(false);
+            return;
+          }
+          const joinResult = joinRes as { success?: boolean; error?: string } | null;
+          if (joinResult && joinResult.success === false) {
+            console.error('join_farm returned failure:', joinResult.error);
+            setToastMessage(
+              `農園への参加に失敗しました: ${joinResult.error || '招待コードが無効です'}`
+            );
+            setShowToast(true);
+            setLoading(false);
+            return;
           }
         }
       }
 
-      if (targetFarmId) {
-        localStorage.setItem('nouato_invite_farm_id', targetFarmId);
+      if (selectedFarmId) {
+        localStorage.setItem('nouato_invite_farm_id', selectedFarmId);
       }
 
       setToastMessage(`🎉 「${farmName}」への参加登録が完了しました！`);

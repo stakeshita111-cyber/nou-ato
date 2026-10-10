@@ -14,6 +14,7 @@ export interface StudentTaskItem {
   task_id?: string;
   status: string;
   title?: string;
+  completed_at?: string | null;
   tasks?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -200,10 +201,16 @@ export function useStudentDashboard() {
               const resolvedBadgeIcon =
                 (pt.badge_icon as string) || (cl.badge_icon as string) || '🏆';
 
+              const stCompletedAt =
+                (stMatch as Record<string, unknown>)?.completed_at ||
+                (stMatch as Record<string, unknown>)?.updated_at ||
+                null;
+
               taskList.push({
                 id: stMatchTyped?.id ? stMatchTyped.id : `task_${pt.id}`,
                 task_id: ptId,
                 status: isDone ? 'completed' : 'not_started',
+                completed_at: isDone ? (stCompletedAt as string) || new Date().toISOString() : null,
                 tasks: {
                   id: pt.id,
                   title: pt.title,
@@ -267,10 +274,14 @@ export function useStudentDashboard() {
               const resolvedBadgeIcon =
                 (st.badge_icon as string) || (cl.badge_icon as string) || '🏆';
 
+              const stCompletedAt =
+                (st.completed_at as string) || (st.updated_at as string) || null;
+
               taskList.push({
                 id: stId,
                 task_id: effectiveKey,
                 status: isDone ? 'completed' : 'not_started',
+                completed_at: isDone ? (stCompletedAt as string) || new Date().toISOString() : null,
                 tasks: {
                   id: effectiveKey,
                   title: st.title,
@@ -336,56 +347,51 @@ export function useStudentDashboard() {
 
           // 1. 対象範囲のOR条件を構築:
           //    - ログイン生徒自身宛て (student_id.eq.currentStudentId)
-          //    - 自農園宛て (farm_id.eq.studentFarmId)
-          //    - 全農園・全体宛て (farm_id.is.null)
-          //    - 全生徒宛て (student_id.is.null)
-          const scopeConditions: string[] = ['farm_id.is.null', 'student_id.is.null'];
-          if (currentStudentId && isUuid(currentStudentId)) {
-            scopeConditions.push(`student_id.eq.${currentStudentId}`);
-          }
-          if (studentFarmId && isUuid(studentFarmId)) {
-            scopeConditions.push(`farm_id.eq.${studentFarmId}`);
-          }
-
-          // .in("role", ["broadcast", "announcement"]) を使い、.or() は scopeConditions のみで単一呼び出しにする
-          const { data, error } = await supabase
+          // 配信の取得:
+          // 1. 本人宛て (student_id = currentStudentId) または 全体宛て (student_id IS NULL)
+          // 2. 自農園宛て (farm_id = studentFarmId) または 全農園宛て (farm_id IS NULL)
+          let query = supabase
             .from('journals')
             .select('*')
-            .in('role', ['broadcast', 'announcement'])
-            .or(scopeConditions.join(','))
-            .order('created_at', { ascending: false })
-            .limit(30);
+            .in('role', ['broadcast', 'announcement']);
 
-          if (data && data.length > 0) {
-            bcData = data as Record<string, unknown>[];
+          if (currentStudentId && isUuid(currentStudentId)) {
+            query = query.or(`student_id.is.null,student_id.eq.${currentStudentId}`);
           } else {
-            // フォールバック: テスト環境や農園ID未紐付け時でも配信を逃さないよう、直近の全体お知らせを確実に取得
-            const { data: fallbackData } = await supabase
-              .from('journals')
-              .select('*')
-              .in('role', ['broadcast', 'announcement'])
-              .order('created_at', { ascending: false })
-              .limit(10);
-            if (fallbackData && fallbackData.length > 0) {
-              bcData = fallbackData as Record<string, unknown>[];
-            }
+            query = query.is('student_id', null);
           }
+
+          if (studentFarmId && isUuid(studentFarmId)) {
+            query = query.or(`farm_id.is.null,farm_id.eq.${studentFarmId}`);
+          }
+
+          const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
+
           if (error) {
             console.warn('useStudentDashboard bcQuery error:', error);
+          }
+
+          if (data && data.length > 0) {
+            // 防御的フィルタ: 他受講生の個別配信や他農園の配信を確実に物理除外
+            bcData = (data as Record<string, unknown>[]).filter((j) => {
+              const targetStudentId = j.student_id ? String(j.student_id) : null;
+              if (targetStudentId !== null && targetStudentId !== currentStudentId) {
+                return false;
+              }
+              if (studentFarmId && j.farm_id && String(j.farm_id) !== studentFarmId) {
+                return false;
+              }
+              return true;
+            });
           }
         } catch (e) {
           console.warn('useStudentDashboard bcQuery exception:', e);
         }
 
-        // LocalStorage からのアナウンスキャッシュ取得 (自農園キー ＆ 共通キー)
-        const bcFarmKey = studentFarmId
-          ? `nouato_broadcast_announcements_${studentFarmId}`
-          : 'nouato_broadcast_announcements';
+        // LocalStorage からのアナウンスキャッシュ取得 (自農園キーのみ。他者混入防止のため共通キーフォールバックは廃止)
+        const bcFarmKey = studentFarmId ? `nouato_broadcast_announcements_${studentFarmId}` : null;
         const savedBcAnnouncementsStr =
-          typeof window !== 'undefined'
-            ? localStorage.getItem(bcFarmKey) ||
-              localStorage.getItem('nouato_broadcast_announcements')
-            : null;
+          typeof window !== 'undefined' && bcFarmKey ? localStorage.getItem(bcFarmKey) : null;
         let localBcArr: BroadcastItem[] = [];
         if (savedBcAnnouncementsStr) {
           try {
@@ -539,7 +545,10 @@ export function useStudentDashboard() {
     ).replace(/^task_/, '');
     const currentStudentId = user?.id || 'student_default';
 
-    // 1. ローカル UI ステートを即時完了に変更 (IDで厳密一致)
+    // ロールバック用に直前のタスク一覧を保持
+    const previousTasks = [...tasks];
+
+    // 1. ローカル UI ステートを即時完了に変更 (楽観的更新)
     setTasks((prev) =>
       prev.map((t) => {
         const tBaseId = String((t.tasks as { id?: string })?.id || t.task_id || t.id || '').replace(
@@ -547,7 +556,7 @@ export function useStudentDashboard() {
           ''
         );
         if (t.id === targetTask.id || (tBaseId && tBaseId === baseTaskId)) {
-          return { ...t, status: 'completed' };
+          return { ...t, status: 'completed', completed_at: new Date().toISOString() };
         }
         return t;
       })
@@ -555,10 +564,12 @@ export function useStudentDashboard() {
 
     // 2. Supabase DB (student_tasks) の status を 'completed' に更新 (base_task_id で厳密更新)
     try {
-      const { data: userSts } = await supabase
+      const { data: userSts, error: fetchErr } = await supabase
         .from('student_tasks')
         .select('id, base_task_id')
         .eq('student_id', currentStudentId);
+
+      if (fetchErr) throw fetchErr;
 
       let updated = false;
       if (userSts && userSts.length > 0) {
@@ -573,7 +584,7 @@ export function useStudentDashboard() {
             const isMatch = st.base_task_id === baseTaskId || st.id === targetTask.id;
             if (isMatch) {
               updated = true;
-              await supabase
+              const { error: updateErr } = await supabase
                 .from('student_tasks')
                 .update({
                   base_task_id: baseTaskId,
@@ -581,13 +592,14 @@ export function useStudentDashboard() {
                   completed_at: new Date().toISOString(),
                 })
                 .eq('id', st.id);
+              if (updateErr) throw updateErr;
             }
           }
         }
       }
 
       if (!updated && currentStudentId && currentStudentId !== 'student_default') {
-        await supabase.from('student_tasks').upsert(
+        const { error: upsertErr } = await supabase.from('student_tasks').upsert(
           {
             student_id: currentStudentId,
             base_task_id: baseTaskId,
@@ -597,9 +609,12 @@ export function useStudentDashboard() {
           },
           { onConflict: 'student_id,base_task_id' }
         );
+        if (upsertErr) throw upsertErr;
       }
     } catch (e) {
-      console.warn('completeTask DB update error:', e);
+      console.error('completeTask DB update failed, rolling back:', e);
+      setTasks(previousTasks);
+      throw e;
     }
 
     // 3. リアルタイム同調イベントを発火
@@ -626,6 +641,8 @@ export function useStudentDashboard() {
     ).replace(/^task_/, '');
     const currentStudentId = user?.id || 'student_default';
 
+    const previousTasks = [...tasks];
+
     // 1. ローカル UI ステートを即時未完了に変更 (IDで厳密一致)
     setTasks((prev) =>
       prev.map((t) => {
@@ -634,7 +651,7 @@ export function useStudentDashboard() {
           ''
         );
         if (t.id === targetTask.id || (tBaseId && tBaseId === baseTaskId)) {
-          return { ...t, status: 'not_started' };
+          return { ...t, status: 'not_started', completed_at: null };
         }
         return t;
       })
@@ -642,17 +659,19 @@ export function useStudentDashboard() {
 
     // 2. Supabase DB (student_tasks) の status を 'pending' に更新 (base_task_id で厳密更新)
     try {
-      const { data: userSts } = await supabase
+      const { data: userSts, error: fetchErr } = await supabase
         .from('student_tasks')
         .select('id, base_task_id')
         .eq('student_id', currentStudentId);
+
+      if (fetchErr) throw fetchErr;
 
       let updated = false;
       if (userSts && userSts.length > 0) {
         for (const st of userSts) {
           if (st.base_task_id === baseTaskId || st.id === targetTask.id) {
             updated = true;
-            await supabase
+            const { error: updateErr } = await supabase
               .from('student_tasks')
               .update({
                 base_task_id: baseTaskId,
@@ -660,12 +679,13 @@ export function useStudentDashboard() {
                 completed_at: null,
               })
               .eq('id', st.id);
+            if (updateErr) throw updateErr;
           }
         }
       }
 
       if (!updated && currentStudentId && currentStudentId !== 'student_default') {
-        await supabase.from('student_tasks').upsert(
+        const { error: upsertErr } = await supabase.from('student_tasks').upsert(
           {
             student_id: currentStudentId,
             base_task_id: baseTaskId,
@@ -675,9 +695,12 @@ export function useStudentDashboard() {
           },
           { onConflict: 'student_id,base_task_id' }
         );
+        if (upsertErr) throw upsertErr;
       }
     } catch (e) {
-      console.warn('uncompleteTask DB update error:', e);
+      console.error('uncompleteTask DB update failed, rolling back:', e);
+      setTasks(previousTasks);
+      throw e;
     }
 
     // 3. リアルタイム同調イベントを発火
@@ -698,7 +721,7 @@ export function useStudentDashboard() {
     const contentToSave = newJournal.trim();
 
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('journals')
         .insert([
           {
@@ -709,21 +732,19 @@ export function useStudentDashboard() {
         ])
         .select();
 
+      if (error) {
+        throw error;
+      }
+
       if (data && data.length > 0) {
         setJournals((prev) => [data[0], ...prev]);
+        setNewJournal('');
       } else {
-        setJournals((prev) => [
-          {
-            id: `j_${Date.now()}`,
-            content: contentToSave,
-            student_id: studentId,
-            created_at: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+        throw new Error('日誌の登録結果が空でした');
       }
     } catch (e) {
       console.error('addJournal error:', e);
+      throw e;
     }
 
     // リアルタイム同期イベント

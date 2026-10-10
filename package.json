@@ -6,14 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint --max-warnings 207",
+    "lint": "eslint --max-warnings 188",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "check:clean": "node scripts/check-clean-code.mjs",
-    "verify": "npm run check:clean && npm run typecheck && npm run test && npm run format:check && npm run lint"
+    "check:schema": "node scripts/check-schema-integrity.mjs",
+    "verify": "npm run check:clean && npm run check:schema && npm run typecheck && npm run test && npm run format:check && npm run lint"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

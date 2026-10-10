@@ -434,7 +434,7 @@ export default function StudentFarmRecordView({
         .replace(/\[IMG:[\s\S]+?\]/g, '')
         .trim()
     );
-    setHarvestAmount(rec.harvest_amount || '');
+    setHarvestAmount(rec.harvest_amount != null ? String(rec.harvest_amount) : '');
     setShowInputModal(true);
   };
 

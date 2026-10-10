@@ -49,7 +49,10 @@ export interface Database {
           owner_id: string | null;
           show_student_talk_tab: boolean | null;
           invite_code?: string | null;
-          owner_name?: string | null;
+          preset_faqs?:
+            | Array<{ id: string; chipLabel: string; question: string; answer: string }>
+            | Json
+            | null;
         };
         Insert: {
           id?: string;
@@ -60,7 +63,10 @@ export interface Database {
           owner_id?: string | null;
           show_student_talk_tab?: boolean | null;
           invite_code?: string | null;
-          owner_name?: string | null;
+          preset_faqs?:
+            | Array<{ id: string; chipLabel: string; question: string; answer: string }>
+            | Json
+            | null;
         };
         Update: {
           id?: string;
@@ -70,6 +76,10 @@ export interface Database {
           deleted_at?: string | null;
           owner_id?: string | null;
           show_student_talk_tab?: boolean | null;
+          preset_faqs?:
+            | Array<{ id: string; chipLabel: string; question: string; answer: string }>
+            | Json
+            | null;
         };
         Relationships: [];
       };
@@ -83,9 +93,6 @@ export interface Database {
           position: Json | null;
           created_at: string;
           student_id: string | null;
-          student_name?: string | null;
-          grid_index?: number | null;
-          is_vacant?: boolean | null;
         };
         Insert: {
           id: string;
@@ -96,9 +103,6 @@ export interface Database {
           position?: Json | null;
           created_at?: string;
           student_id?: string | null;
-          student_name?: string | null;
-          grid_index?: number | null;
-          is_vacant?: boolean | null;
         };
         Update: {
           id?: string;
@@ -109,9 +113,6 @@ export interface Database {
           position?: Json | null;
           created_at?: string;
           student_id?: string | null;
-          student_name?: string | null;
-          grid_index?: number | null;
-          is_vacant?: boolean | null;
         };
         Relationships: [];
       };
@@ -186,7 +187,7 @@ export interface Database {
           height_cm: number | null;
           work_types: Json | null;
           notes: string | null;
-          harvest_amount: string | null;
+          harvest_amount: number | null;
           image_url: string | null;
           created_at: string;
         };
@@ -200,7 +201,7 @@ export interface Database {
           height_cm?: number | null;
           work_types?: Json | null;
           notes?: string | null;
-          harvest_amount?: string | null;
+          harvest_amount?: number | null;
           image_url?: string | null;
           created_at?: string;
         };
@@ -214,7 +215,7 @@ export interface Database {
           height_cm?: number | null;
           work_types?: Json | null;
           notes?: string | null;
-          harvest_amount?: string | null;
+          harvest_amount?: number | null;
           image_url?: string | null;
           created_at?: string;
         };
@@ -680,6 +681,22 @@ export interface Database {
           display_name?: string;
         };
         Returns: Json;
+      };
+      withdraw_student: {
+        Args: {
+          p_student_id: string;
+        };
+        Returns: Json;
+      };
+      get_farm_by_invite_code: {
+        Args: {
+          target_invite_code: string;
+        };
+        Returns: {
+          farm_id: string;
+          farm_name: string;
+          teacher_name: string;
+        }[];
       };
     };
     Enums: {

@@ -38,15 +38,16 @@ AS $$
 DECLARE
     current_count INTEGER;
 BEGIN
+    INSERT INTO public.ai_usage (user_id, date, count, created_at, updated_at)
+    VALUES (p_user_id, p_date, 0, NOW(), NOW())
+    ON CONFLICT (user_id, date) DO NOTHING;
+
     SELECT count INTO current_count
     FROM public.ai_usage
-    WHERE user_id = p_user_id AND date = p_date;
+    WHERE user_id = p_user_id AND date = p_date
+    FOR UPDATE;
 
-    IF current_count IS NULL THEN
-        INSERT INTO public.ai_usage (user_id, date, count, created_at, updated_at)
-        VALUES (p_user_id, p_date, 1, NOW(), NOW());
-        RETURN TRUE;
-    ELSIF current_count < p_limit THEN
+    IF current_count < p_limit THEN
         UPDATE public.ai_usage
         SET count = count + 1,
             updated_at = NOW()
