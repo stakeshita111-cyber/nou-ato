@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
@@ -135,8 +136,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       const saved = localStorage.getItem('nouato_slide_settings');
       if (saved) {
         try {
-          setSlideSettings(JSON.parse(saved));
-        } catch (e) {}
+          const parsed = JSON.parse(saved);
+          queueMicrotask(() => {
+            setSlideSettings(parsed);
+          });
+        } catch {}
       }
     }
   }, []);
@@ -159,154 +163,158 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     'forward'
   );
 
-  const fetchJournals = async (isInitial: boolean = false) => {
-    if (isInitial) {
-      setLoading(true);
-    }
-    try {
-      // ログイン講師の現在選択中農園IDを取得
-      let farmId =
-        activeFarmId ||
-        useFarmStore.getState().activeFarmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-      if (!farmId) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('farm_id')
-            .eq('id', user.id)
-            .maybeSingle();
-          if (userData?.farm_id) farmId = userData.farm_id;
-        }
-      }
-
-      // 自農園に所属する生徒のID一覧を取得
-      let myStudentIds: string[] = [];
-      if (farmId) {
-        const { data: farmStudents } = await supabase
-          .from('users')
-          .select('id')
-          .eq('farm_id', farmId)
-          .eq('role', 'student');
-        if (farmStudents) {
-          myStudentIds = farmStudents.map((s) => s.id);
-        }
-      }
-
-      let jDataQuery = supabase.from('journals').select('*');
-
-      if (farmId) {
-        if (myStudentIds.length > 0) {
-          jDataQuery = jDataQuery.or(
-            `farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(',')})`
-          );
-        } else {
-          jDataQuery = jDataQuery.eq('farm_id', farmId);
-        }
-      }
-
-      const { data: journalData, error: journalError } = await jDataQuery.order('created_at', {
-        ascending: false,
-      });
-
-      if (journalError) {
-        console.warn('Journals fetch info:', journalError.message || journalError);
-        setJournals([]);
-        return;
-      }
-
-      if (!journalData || journalData.length === 0) {
-        setJournals([]);
-        return;
-      }
-
-      const studentIds = Array.from(
-        new Set(journalData.map((j) => j.student_id).filter((id): id is string => Boolean(id)))
-      );
-      const userMap: { [key: string]: string } = {};
-
-      if (studentIds.length > 0) {
-        const { data: usersData } = await supabase
-          .from('users')
-          .select('id, email, display_name')
-          .in('id', studentIds);
-
-        if (usersData) {
-          usersData.forEach((u) => {
-            if (u.id) {
-              userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
-            }
-          });
-        }
-      }
-
-      // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
-      const filteredData = journalData.filter((j) => {
-        const content = (j.content || '').trim();
-        if (!content) return false;
-        if (
-          content.includes('【収穫完了報告】') ||
-          content.includes('【差し戻し通知】') ||
-          content.includes('を完了報告しました') ||
-          content === '（コメントなし）'
-        ) {
-          return false;
-        }
-        return true;
-      });
-
-      const formatted: JournalItem[] = filteredData.map((j) => {
-        const name = (j.student_id ? userMap[j.student_id] : undefined) || '受講生徒';
-        let cleanContent = j.content || '';
-        let imgUrl = j.image_url || undefined;
-        const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
-        if (imgMatch) {
-          imgUrl = imgMatch[1];
-          cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
-        }
-
-        const isPrivate =
-          Boolean(j.is_private) ||
-          cleanContent.includes('【非公開相談】') ||
-          cleanContent.includes('【非公開】') ||
-          cleanContent.includes('非公開希望') ||
-          cleanContent.includes('完全個別相談');
-
-        return {
-          id: j.id,
-          student_id: j.student_id || '',
-          studentName: name,
-          studentAvatar: name.slice(0, 2).toUpperCase(),
-          created_at: j.created_at
-            ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString('ja-JP', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}`
-            : '最近',
-          taskTitle:
-            j.task_title ||
-            (isRegularRecord(cleanContent) ? '🌱 畝の観察記録' : '💡 気づきメモ・質問相談'),
-          content: cleanContent,
-          imageUrl: imgUrl,
-          reply: j.reply || '',
-          is_approved: j.is_approved || false,
-          is_private: isPrivate,
-        };
-      });
-
-      setJournals(formatted);
-    } catch (e) {
-      console.error('Journals error exception:', e);
-      setJournals([]);
-    } finally {
+  const fetchJournals = useCallback(
+    async (isInitial: boolean = false) => {
+      await Promise.resolve();
       if (isInitial) {
-        setLoading(false);
+        setLoading(true);
       }
-    }
-  };
+      try {
+        // ログイン講師の現在選択中農園IDを取得
+        let farmId =
+          activeFarmId ||
+          useFarmStore.getState().activeFarmId ||
+          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+        if (!farmId) {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('farm_id')
+              .eq('id', user.id)
+              .maybeSingle();
+            if (userData?.farm_id) farmId = userData.farm_id;
+          }
+        }
+
+        // 自農園に所属する生徒のID一覧を取得
+        let myStudentIds: string[] = [];
+        if (farmId) {
+          const { data: farmStudents } = await supabase
+            .from('users')
+            .select('id')
+            .eq('farm_id', farmId)
+            .eq('role', 'student');
+          if (farmStudents) {
+            myStudentIds = farmStudents.map((s) => s.id);
+          }
+        }
+
+        let jDataQuery = supabase.from('journals').select('*');
+
+        if (farmId) {
+          if (myStudentIds.length > 0) {
+            jDataQuery = jDataQuery.or(
+              `farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(',')})`
+            );
+          } else {
+            jDataQuery = jDataQuery.eq('farm_id', farmId);
+          }
+        }
+
+        const { data: journalData, error: journalError } = await jDataQuery.order('created_at', {
+          ascending: false,
+        });
+
+        if (journalError) {
+          console.warn('Journals fetch info:', journalError.message || journalError);
+          setJournals([]);
+          return;
+        }
+
+        if (!journalData || journalData.length === 0) {
+          setJournals([]);
+          return;
+        }
+
+        const studentIds = Array.from(
+          new Set(journalData.map((j) => j.student_id).filter((id): id is string => Boolean(id)))
+        );
+        const userMap: { [key: string]: string } = {};
+
+        if (studentIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, email, display_name')
+            .in('id', studentIds);
+
+          if (usersData) {
+            usersData.forEach((u) => {
+              if (u.id) {
+                userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
+              }
+            });
+          }
+        }
+
+        // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
+        const filteredData = journalData.filter((j) => {
+          const content = (j.content || '').trim();
+          if (!content) return false;
+          if (
+            content.includes('【収穫完了報告】') ||
+            content.includes('【差し戻し通知】') ||
+            content.includes('を完了報告しました') ||
+            content === '（コメントなし）'
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+        const formatted: JournalItem[] = filteredData.map((j) => {
+          const name = (j.student_id ? userMap[j.student_id] : undefined) || '受講生徒';
+          let cleanContent = j.content || '';
+          let imgUrl = j.image_url || undefined;
+          const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
+          if (imgMatch) {
+            imgUrl = imgMatch[1];
+            cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
+          }
+
+          const isPrivate =
+            Boolean(j.is_private) ||
+            cleanContent.includes('【非公開相談】') ||
+            cleanContent.includes('【非公開】') ||
+            cleanContent.includes('非公開希望') ||
+            cleanContent.includes('完全個別相談');
+
+          return {
+            id: j.id,
+            student_id: j.student_id || '',
+            studentName: name,
+            studentAvatar: name.slice(0, 2).toUpperCase(),
+            created_at: j.created_at
+              ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString('ja-JP', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`
+              : '最近',
+            taskTitle:
+              j.task_title ||
+              (isRegularRecord(cleanContent) ? '🌱 畝の観察記録' : '💡 気づきメモ・質問相談'),
+            content: cleanContent,
+            imageUrl: imgUrl,
+            reply: j.reply || '',
+            is_approved: j.is_approved || false,
+            is_private: isPrivate,
+          };
+        });
+
+        setJournals(formatted);
+      } catch (e) {
+        console.error('Journals error exception:', e);
+        setJournals([]);
+      } finally {
+        if (isInitial) {
+          setLoading(false);
+        }
+      }
+    },
+    [activeFarmId]
+  );
 
   // 返信送信＆再編集保存 (返信と同時にナレッジ承認も保存可能)
   const handleSendReply = async (id: string) => {
@@ -648,7 +656,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
   // フィルター変更時にページ番号が範囲外にならないようリセット
   useEffect(() => {
-    setCurrentPage(0);
+    queueMicrotask(() => {
+      setCurrentPage(0);
+    });
   }, [filterTab, selectedStudentFilter, searchQuery]);
 
   const handlePrevPage = () => {
@@ -815,7 +825,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (recData && recData.length > 0) {
         (recData as SlideCropRecord[]).forEach((r, idx: number) => {
           const rawDate = r.created_at || r.date;
-          const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
+          const { timestamp, timeStr } = extractDateInfo(rawDate);
           const bedInfo = r.bed_id ? bedMap[r.bed_id] : null;
           const plotInfo = bedInfo?.plot_id ? plotMap[bedInfo.plot_id] : null;
           const resolvedStudentId = r.student_id || bedInfo?.student_id || plotInfo?.student_id;
@@ -900,7 +910,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             }
 
             const rawDate = j.created_at;
-            const { timestamp, dateKey, timeStr } = extractDateInfo(rawDate);
+            const { timestamp, timeStr } = extractDateInfo(rawDate);
             const studentName = (j.student_id && userMap[j.student_id]) || '受講生';
 
             let cleanContent = j.content || '';
@@ -1078,22 +1088,25 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   }, [slideSettings, activeFarmId]);
 
   useEffect(() => {
-    fetchJournals(true);
-    fetchCropRecords();
+    const load = async () => {
+      await fetchJournals(true);
+      await fetchCropRecords();
+    };
+    void load();
 
     // 🌟 1. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = () => {
-        fetchJournals(false);
-        fetchCropRecords();
+        void fetchJournals(false);
+        void fetchCropRecords();
       };
-    } catch (e) {}
+    } catch {}
 
     const handleSync = () => {
-      fetchJournals(false);
-      fetchCropRecords();
+      void fetchJournals(false);
+      void fetchCropRecords();
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('nouato_sync_event', handleSync);
@@ -1108,7 +1121,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         window.removeEventListener('focus', handleSync);
       }
     };
-  }, [fetchCropRecords, activeFarmId]);
+  }, [fetchJournals, fetchCropRecords, activeFarmId]);
 
   // 🌟【要件: 30%低速化 & ホバー一時停止 & 左側ホバーで逆スライド & 設定連動】🌟
   useEffect(() => {
@@ -1509,9 +1522,12 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   </div>
                   {currentJournal.imageUrl && (
                     <div className="mt-3 max-w-sm rounded-2xl overflow-hidden border border-emerald-200 shadow-sm">
-                      <img
+                      <Image
                         src={currentJournal.imageUrl}
                         alt="生徒添付写真"
+                        width={384}
+                        height={256}
+                        unoptimized
                         className="w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition"
                         onClick={() => window.open(currentJournal.imageUrl, '_blank')}
                       />
@@ -1735,15 +1751,15 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                           }}
                           className="w-80 sm:w-96 h-[126px] shrink-0 bg-white p-2.5 rounded-2xl border border-emerald-100/90 shadow-2xs hover:shadow-md hover:border-emerald-400 hover:bg-emerald-50/20 transition-all duration-200 flex space-x-3 group text-left relative overflow-hidden cursor-pointer"
                         >
-                          {hasRealImage && (
+                          {hasRealImage && item.imageUrl && (
                             <div className="w-24 sm:w-28 h-full rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-2xs bg-emerald-50 relative group-hover:scale-[1.02] transition-transform duration-300">
-                              <img
+                              <Image
                                 src={item.imageUrl}
                                 alt="観察写真"
+                                width={112}
+                                height={112}
+                                unoptimized
                                 className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLElement).style.display = 'none';
-                                }}
                               />
                             </div>
                           )}

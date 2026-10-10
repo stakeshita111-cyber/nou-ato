@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -127,9 +128,11 @@ export default function TeacherSidebar({
           <div className="p-5 border-b border-emerald-100/60 flex items-center justify-between bg-gradient-to-r from-emerald-50/40 via-white to-transparent">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-md border border-emerald-200 shrink-0 bg-emerald-50 flex items-center justify-center">
-                <img
+                <Image
                   src="/nouato_logo.jpg"
                   alt="農跡(のうあと) ロゴ"
+                  width={40}
+                  height={40}
                   className="w-full h-full object-cover"
                 />
               </div>

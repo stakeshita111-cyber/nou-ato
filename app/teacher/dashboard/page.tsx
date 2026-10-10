@@ -81,17 +81,23 @@ export default function TeacherDashboardPage() {
   const [activeMenu, setActiveMenu] = useState<string>('dashboard');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tabParam = urlParams.get('tab');
-      if (tabParam && VALID_TEACHER_MENUS.includes(tabParam)) {
-        setActiveMenu(tabParam);
-        return;
-      }
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    let targetMenu: string | null = null;
+    if (tabParam && VALID_TEACHER_MENUS.includes(tabParam)) {
+      targetMenu = tabParam;
+    } else {
       const savedMenu = sessionStorage.getItem('nouato_teacher_active_menu');
       if (savedMenu && VALID_TEACHER_MENUS.includes(savedMenu)) {
-        setActiveMenu(savedMenu);
+        targetMenu = savedMenu;
       }
+    }
+    if (targetMenu) {
+      const menuToSet = targetMenu;
+      queueMicrotask(() => {
+        setActiveMenu(menuToSet);
+      });
     }
   }, []);
 

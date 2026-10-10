@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { uploadImageToStorage } from '@/lib/storage';
 import { WorkType } from '@/types/farm';
@@ -106,16 +107,12 @@ export default function TaskDetailModal({
 
   const defaultBedChoice = matchedBed ? matchedBed.id : 'shared';
 
-  const [selectedBedId, setSelectedBedId] = useState<string>(defaultBedChoice);
+  const [userSelectedBedId, setUserSelectedBedId] = useState<string | null>(null);
+  const selectedBedId = userSelectedBedId ?? defaultBedChoice;
+  const setSelectedBedId = setUserSelectedBedId;
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [reportMemo, setReportMemo] = useState<string>('');
   const [checkedSteps, setCheckedSteps] = useState<{ [key: number]: boolean }>({});
-
-  useEffect(() => {
-    if (!selectedBedId) {
-      setSelectedBedId(defaultBedChoice);
-    }
-  }, [defaultBedChoice, selectedBedId]);
 
   if (!task) return null;
 
@@ -153,7 +150,7 @@ export default function TaskDetailModal({
     const reader = new FileReader();
     reader.onload = (readerEvent) => {
       const rawResult = readerEvent.target?.result as string;
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         const maxDim = 800;
         let w = img.width;
@@ -529,10 +526,13 @@ export default function TaskDetailModal({
                     />
                     {photoPreview ? (
                       <div className="flex flex-col items-center gap-1.5 py-1 z-10">
-                        <img
+                        <Image
                           src={photoPreview}
                           alt="現場写真"
-                          className="h-24 object-cover rounded-xl shadow-xs"
+                          width={160}
+                          height={96}
+                          unoptimized
+                          className="h-24 w-auto object-cover rounded-xl shadow-xs"
                         />
                         <button
                           type="button"

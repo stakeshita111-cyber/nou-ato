@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function GlobalError({
   error,
@@ -9,6 +10,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
   useEffect(() => {
     console.error('Global Application Error:', error);
   }, [error]);
@@ -41,9 +43,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.location.href = '/login';
-              }
+              router.push('/login');
             }}
             className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-slate-100 text-slate-700 font-bold text-xs rounded-2xl hover:bg-slate-200 transition"
           >

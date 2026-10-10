@@ -727,7 +727,7 @@ export default function TeacherStudentsView() {
   }, [effectiveFarmId, students]);
 
   // 🗑️ 配信履歴の削除処理 (Delete - CRUD)
-  const handleDeleteBroadcast = async (broadcastId: string) => {
+  const handleDeleteBroadcast = useCallback(async (broadcastId: string) => {
     if (!confirm('この配信を削除してもよろしいですか？受講生の通知一覧からも削除されます。'))
       return;
     try {
@@ -755,7 +755,7 @@ export default function TeacherStudentsView() {
       setToastMessage('削除中にエラーが発生しました');
       setShowToast(true);
     }
-  };
+  }, []);
 
   // 🌟 受講生の退会・データ削除の実行処理 🌟
   const handleExecuteStudentDelete = async () => {

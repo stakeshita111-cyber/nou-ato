@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { FarmPlot, FarmBed } from '@/types/farm';
 import { formatHarvestAmount } from '@/lib/utils/formatHelper';
 
@@ -59,9 +60,12 @@ export default function BedApprovalNotificationBanner({
             <div className="flex gap-3 items-center">
               {bed.completion_image_url ? (
                 <div className="w-13 h-13 rounded-xl overflow-hidden shrink-0 border-2 border-amber-400 shadow-xs bg-black/5">
-                  <img
+                  <Image
                     src={bed.completion_image_url}
                     alt="収穫写真"
+                    width={52}
+                    height={52}
+                    unoptimized
                     className="w-full h-full object-cover group-hover:scale-105 transition"
                   />
                 </div>

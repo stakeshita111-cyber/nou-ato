@@ -12,20 +12,30 @@ function AuthCodeErrorContent() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
+    let ignore = false;
     const supabase = createClient();
 
-    // URLハッシュに access_token が含まれている場合（認証成功時）、セッションを取得して遷移
-    if (window.location.hash.includes('access_token')) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkAuth = async () => {
+      if (window.location.hash.includes('access_token')) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (ignore) return;
         if (session) {
           router.replace('/student');
           return;
         }
+      }
+      if (!ignore) {
         setCheckingSession(false);
-      });
-    } else {
-      setCheckingSession(false);
-    }
+      }
+    };
+
+    void checkAuth();
+
+    return () => {
+      ignore = true;
+    };
   }, [router]);
 
   if (checkingSession) {

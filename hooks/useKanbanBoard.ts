@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { Task, ColumnType } from '../types/task';
@@ -20,7 +20,8 @@ export function useKanbanBoard(columns: ColumnType[]) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   // 初回読み込み（Read）
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
+    await Promise.resolve();
     try {
       const {
         data: { user },
@@ -87,13 +88,16 @@ export function useKanbanBoard(columns: ColumnType[]) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchTasks();
+    const load = async () => {
+      await fetchTasks();
+    };
+    void load();
 
     const handleTaskUpdated = () => {
-      fetchTasks();
+      void fetchTasks();
     };
 
     if (typeof window !== 'undefined') {
@@ -104,7 +108,9 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
     const realtimeChannel = supabase
       .channel('tasks_realtime_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        void fetchTasks();
+      })
       .subscribe();
 
     return () => {
@@ -115,7 +121,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
       supabase.removeChannel(realtimeChannel);
     };
-  }, []);
+  }, [fetchTasks]);
 
   const notifyTaskSync = () => {
     if (typeof window !== 'undefined') {

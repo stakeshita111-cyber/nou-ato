@@ -71,7 +71,7 @@ export default function UnifiedLoginPage() {
       setShowToast(true);
 
       setTimeout(() => {
-        window.location.href = destination;
+        router.push(destination);
       }, 800);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';

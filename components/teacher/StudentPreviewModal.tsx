@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import type { StudentData } from '@/components/teacher/TeacherStudentsView';
 
 export type StudentPreviewData = StudentData;
@@ -103,9 +104,12 @@ export default function StudentPreviewModal({
 
             {lastJournal?.photo_url ? (
               <div className="h-32 bg-gray-100 rounded-lg overflow-hidden relative">
-                <img
+                <Image
                   src={lastJournal.photo_url}
                   alt="提出写真"
+                  width={380}
+                  height={128}
+                  unoptimized
                   className="w-full h-full object-cover"
                 />
               </div>

@@ -328,16 +328,18 @@ export default function FarmFootprintChart({
 
     // 獲得日が現在の表示範囲外なら全期間に自動展開
     const isInView = filteredDailyFootprints.some((df) => df.date === selectedBadgeEarnedDate);
-    if (!isInView && timeRange !== 'all') {
-      setTimeRange('all');
-    }
+    queueMicrotask(() => {
+      if (!isInView && timeRange !== 'all') {
+        setTimeRange('all');
+      }
 
-    // 表示モードが月別の場合は日別に自動切り替え
-    if (viewMode === 'monthly') {
-      setViewMode('daily');
-    }
+      // 表示モードが月別の場合は日別に自動切り替え
+      if (viewMode === 'monthly') {
+        setViewMode('daily');
+      }
 
-    setActiveDateKey(selectedBadgeEarnedDate);
+      setActiveDateKey(selectedBadgeEarnedDate);
+    });
 
     // バー要素へ自動スクロール
     const timer = setTimeout(() => {

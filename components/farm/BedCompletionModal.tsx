@@ -141,7 +141,7 @@ export default function BedCompletionModal({
       prevBedIdRef.current = null;
     }
     prevIsOpenRef.current = isOpen;
-  }, [isOpen, bed?.id]);
+  }, [isOpen, bed]);
 
   if (!isOpen || !bed) return null;
 

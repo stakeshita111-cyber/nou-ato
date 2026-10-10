@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import Image from 'next/image';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { FarmBed, FarmPlot, CropRecord } from '@/types/farm';
 import Toast from '@/components/ui/Toast';
@@ -47,7 +48,6 @@ export default function TeacherFarmCanvasView({
   const {
     isLoading,
     farms,
-    setFarms,
     activeFarmId,
     setActiveFarmId,
     gridCols,
@@ -56,30 +56,21 @@ export default function TeacherFarmCanvasView({
     setGridRows,
     unassignedBedsCount,
     setUnassignedBedsCount,
-    addFarm,
     plots,
     setPlots,
     savePlotsGridIndicesToSupabase,
     currentFarmPlots,
     records,
     supabaseStudents,
-    snapToNonCollidingPosition,
-    updatePlotPositionFree,
-    addPlot,
-    deletePlot,
     addBedToPlot,
     deleteBedFromPlot,
-    reorderBedsInPlot,
-    updatePlotBedsCount,
     updateAllUnassignedBedsCount,
     assignStudentToPlot,
     assignAllUnassignedStudents,
     unassignStudentFromPlot,
     updatePlotStatus,
-    confirmBedArchived,
     approveAndAddNewBed,
     rejectBedCompletion,
-    addNewBedForPlot,
     unarchiveBed,
   } = useFarmManager();
 
@@ -93,106 +84,110 @@ export default function TeacherFarmCanvasView({
   const [bedRecords, setBedRecords] = useState<BedTimelineRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
 
-  const fetchBedRecords = async (
-    plotCode: string,
-    bedNumber: number,
-    bedId?: string,
-    studentName?: string,
-    latestRec?: BedTimelineRecord | CropRecord | null,
-    cropName?: string
-  ) => {
-    setIsLoadingRecords(true);
-    try {
-      // 🌟 新しく追加された畝（未確定 🌱）で、新規記録がない場合は過去ログを完全除外 🌟
-      if (cropName === '未確定 🌱' && !latestRec) {
-        setBedRecords([]);
-        return;
-      }
+  const fetchBedRecords = useCallback(
+    async (
+      plotCode: string,
+      bedNumber: number,
+      bedId?: string,
+      studentName?: string,
+      latestRec?: BedTimelineRecord | CropRecord | null,
+      cropName?: string
+    ) => {
+      await Promise.resolve();
+      setIsLoadingRecords(true);
+      try {
+        // 🌟 新しく追加された畝（未確定 🌱）で、新規記録がない場合は過去ログを完全除外 🌟
+        if (cropName === '未確定 🌱' && !latestRec) {
+          setBedRecords([]);
+          return;
+        }
 
-      // 1. crop_records から取得
-      const { data: cData } = await supabase
-        .from('crop_records')
-        .select('*')
-        .order('created_at', { ascending: false });
+        // 1. crop_records から取得
+        const { data: cData } = await supabase
+          .from('crop_records')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      // 2. journals から取得
-      const { data: jData } = await supabase
-        .from('journals')
-        .select('*')
-        .order('created_at', { ascending: false });
+        // 2. journals から取得
+        const { data: jData } = await supabase
+          .from('journals')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      const combined: BedTimelineRecord[] = [];
+        const combined: BedTimelineRecord[] = [];
 
-      if (cData && cData.length > 0) {
-        cData.forEach((r) => {
-          // bed_id の完全一致を最優先
-          const isBedIdMatch = bedId && r.bed_id === bedId;
-          const rRecord = r as Record<string, unknown>;
-          const rPlotCode = (rRecord.plot_code as string | undefined) || '';
-          const matchCodeAndBed =
-            rPlotCode === plotCode &&
-            (r.bed_id?.includes(`bed_${bedNumber}`) || r.bed_id?.endsWith(`_${bedNumber}`));
+        if (cData && cData.length > 0) {
+          cData.forEach((r) => {
+            // bed_id の完全一致を最優先
+            const isBedIdMatch = bedId && r.bed_id === bedId;
+            const rRecord = r as Record<string, unknown>;
+            const rPlotCode = (rRecord.plot_code as string | undefined) || '';
+            const matchCodeAndBed =
+              rPlotCode === plotCode &&
+              (r.bed_id?.includes(`bed_${bedNumber}`) || r.bed_id?.endsWith(`_${bedNumber}`));
 
-          if (isBedIdMatch || matchCodeAndBed) {
-            combined.push({
-              id: r.id,
-              date: r.date
-                ? formatDate(r.date)
-                : r.created_at
-                  ? formatDate(r.created_at)
-                  : '記録日',
-              notes: r.notes || '観察記録',
-              photo_url: (rRecord.photo_url as string | undefined) || r.image_url,
-              growth_stage: r.growth_stage || '作業記録',
-              height_cm: r.height_cm,
-              harvest_amount: r.harvest_amount != null ? String(r.harvest_amount) : undefined,
-              work_types: Array.isArray(r.work_types) ? (r.work_types as string[]) : undefined,
-              created_at: r.created_at,
-            });
-          }
-        });
-      }
-
-      if (jData && jData.length > 0) {
-        jData.forEach((j) => {
-          const content = j.content || '';
-          if (
-            content &&
-            !content.includes('を完了報告しました') &&
-            content !== '（コメントなし）'
-          ) {
-            const hasBedHint =
-              content.includes(`畝 ${bedNumber}`) || content.includes(`畝#${bedNumber}`);
-            if (hasBedHint) {
-              const jRecord = j as Record<string, unknown>;
+            if (isBedIdMatch || matchCodeAndBed) {
               combined.push({
-                id: j.id,
-                date: j.created_at ? formatDate(j.created_at) : '最近',
-                notes: content,
-                photo_url:
-                  (j.image_url as string | null) ||
-                  (jRecord.photo_url as string | null) ||
-                  undefined,
-                growth_stage: j.task_title || '💡 質問・相談日誌',
-                created_at: j.created_at,
+                id: r.id,
+                date: r.date
+                  ? formatDate(r.date)
+                  : r.created_at
+                    ? formatDate(r.created_at)
+                    : '記録日',
+                notes: r.notes || '観察記録',
+                photo_url: (rRecord.photo_url as string | undefined) || r.image_url,
+                growth_stage: r.growth_stage || '作業記録',
+                height_cm: r.height_cm,
+                harvest_amount: r.harvest_amount != null ? String(r.harvest_amount) : undefined,
+                work_types: Array.isArray(r.work_types) ? (r.work_types as string[]) : undefined,
+                created_at: r.created_at,
               });
             }
-          }
-        });
-      }
+          });
+        }
 
-      // latestRec があれば追加
-      if (latestRec && !combined.some((r) => r.notes === latestRec.notes)) {
-        combined.unshift(latestRec);
-      }
+        if (jData && jData.length > 0) {
+          jData.forEach((j) => {
+            const content = j.content || '';
+            if (
+              content &&
+              !content.includes('を完了報告しました') &&
+              content !== '（コメントなし）'
+            ) {
+              const hasBedHint =
+                content.includes(`畝 ${bedNumber}`) || content.includes(`畝#${bedNumber}`);
+              if (hasBedHint) {
+                const jRecord = j as Record<string, unknown>;
+                combined.push({
+                  id: j.id,
+                  date: j.created_at ? formatDate(j.created_at) : '最近',
+                  notes: content,
+                  photo_url:
+                    (j.image_url as string | null) ||
+                    (jRecord.photo_url as string | null) ||
+                    undefined,
+                  growth_stage: j.task_title || '💡 質問・相談日誌',
+                  created_at: j.created_at,
+                });
+              }
+            }
+          });
+        }
 
-      setBedRecords(combined);
-    } catch (e) {
-      console.error('fetchBedRecords error:', e);
-    } finally {
-      setIsLoadingRecords(false);
-    }
-  };
+        // latestRec があれば追加
+        if (latestRec && !combined.some((r) => r.notes === latestRec.notes)) {
+          combined.unshift(latestRec);
+        }
+
+        setBedRecords(combined);
+      } catch (e) {
+        console.error('fetchBedRecords error:', e);
+      } finally {
+        setIsLoadingRecords(false);
+      }
+    },
+    []
+  );
 
   const unassignedList = useMemo<UnassignedStudent[]>(() => {
     const assignedStudentIds = new Set(
@@ -236,14 +231,6 @@ export default function TeacherFarmCanvasView({
   // キャンバス参照
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // 🌟 mousedown / mousemove / mouseup 状態管理 (最前面z-index + 実座標スナップ) 🌟
-  const [activePlotId, setActivePlotId] = useState<string | null>(null);
-  const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [plotStartPos, setPlotStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [currentDraggingPos, setCurrentDraggingPos] = useState<{ x: number; y: number } | null>(
-    null
-  );
-
   // 生徒カードのドロップ State
   const [draggingStudent, setDraggingStudent] = useState<UnassignedStudent | null>(null);
 
@@ -252,15 +239,6 @@ export default function TeacherFarmCanvasView({
     plot: FarmPlot;
     newStudent: UnassignedStudent;
   } | null>(null);
-
-  // ベッド並べ替え State
-  const [draggingBedIndex, setDraggingBedIndex] = useState<{
-    plotId: string;
-    index: number;
-  } | null>(null);
-
-  const [selectedBed, setSelectedBed] = useState<FarmBed | null>(null);
-  const [selectedPlot, setSelectedPlot] = useState<FarmPlot | null>(null);
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -272,28 +250,7 @@ export default function TeacherFarmCanvasView({
   const [emailInput, setEmailInput] = useState('');
   const [farmAddressInput, setFarmAddressInput] = useState('');
 
-  // 🏰 農園設備・インフラオブジェクト (ハウス、水場、作業小屋等)
-  interface FarmFacility {
-    id: string;
-    type: 'greenhouse' | 'water' | 'shed' | 'rest' | 'path' | 'compost';
-    title: string;
-    icon: string;
-    x: number;
-    y: number;
-  }
-
-  const [facilities, setFacilities] = useState<FarmFacility[]>([
-    { id: 'fac_1', type: 'greenhouse', title: '育苗ビニールハウス A', icon: '🏠', x: 40, y: 640 },
-    { id: 'fac_2', type: 'water', title: 'メイン水栓・散水ポンプ', icon: '💧', x: 380, y: 640 },
-    { id: 'fac_3', type: 'shed', title: '農機具・資材保管庫', icon: '🛠️', x: 720, y: 640 },
-  ]);
-
-  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
-  const [showGridlines, setShowGridlines] = useState<boolean>(true);
-
   // 🌟 Excelスタイル正方形グリッド（useFarmManagerでDB・localStorage・農園設定と完全自動同期） 🌟
-
-  const [draggedGridIndex, setDraggedGridIndex] = useState<number | null>(null);
   const [dragOverPlotCode, setDragOverPlotCode] = useState<string | null>(null);
   const [draggedPlotCode, setDraggedPlotCode] = useState<string | null>(null);
 
@@ -324,7 +281,9 @@ export default function TeacherFarmCanvasView({
       );
       if (target) {
         handledInitialPlotRef.current = initialPlotCode;
-        setDetailPlot(target);
+        queueMicrotask(() => {
+          setDetailPlot(target);
+        });
       }
     }
   }, [initialPlotCode, currentFarmPlots]);
@@ -333,26 +292,36 @@ export default function TeacherFarmCanvasView({
   useEffect(() => {
     if (detailPlot) {
       const updated = plots.find((p) => p.id === detailPlot.id || p.code === detailPlot.code);
-      if (updated) {
-        setDetailPlot(updated);
+      if (
+        updated &&
+        (updated.name !== detailPlot.name ||
+          updated.description !== detailPlot.description ||
+          updated.beds?.length !== detailPlot.beds?.length)
+      ) {
+        queueMicrotask(() => {
+          setDetailPlot(updated);
+        });
       }
     }
-  }, [plots]);
+  }, [plots, detailPlot]);
 
   // 🌟 開いている観察記録タイムラインを最新データとリアルタイム同期 (リロード不要) 🌟
   useEffect(() => {
     if (selectedBedForRecords && detailPlot) {
       const displayNum = selectedBedForRecords.bed_number || 1;
-      fetchBedRecords(
-        detailPlot.code,
-        displayNum,
-        selectedBedForRecords.id,
-        detailPlot.student_name,
-        selectedBedForRecords.latest_record,
-        selectedBedForRecords.crop_name
-      );
+      const load = async () => {
+        await fetchBedRecords(
+          detailPlot.code,
+          displayNum,
+          selectedBedForRecords.id,
+          detailPlot.student_name,
+          selectedBedForRecords.latest_record,
+          selectedBedForRecords.crop_name
+        );
+      };
+      void load();
     }
-  }, [records, plots]);
+  }, [records, plots, detailPlot, selectedBedForRecords, fetchBedRecords]);
 
   // 🚚 D&D マス目への純粋スワップハンドラー (セルアドレス A1, B2 等の位置固定・中身データのみ1対1相互交換)
   const handleMovePlotToGridCell = async (
@@ -505,7 +474,7 @@ export default function TeacherFarmCanvasView({
           'nouato_grid_dimensions',
           JSON.stringify({ cols: newCols, rows: gridRows })
         );
-      } catch (e) {}
+      } catch {}
     }
 
     const defaultBeds = unassignedBedsCount || 7;
@@ -615,7 +584,7 @@ export default function TeacherFarmCanvasView({
           'nouato_grid_dimensions',
           JSON.stringify({ cols: gridCols, rows: newRows })
         );
-      } catch (e) {}
+      } catch {}
     }
 
     const defaultBeds = unassignedBedsCount || 7;
@@ -713,6 +682,7 @@ export default function TeacherFarmCanvasView({
 
   useEffect(() => {
     const fetchUserAndFarm = async () => {
+      await Promise.resolve();
       const savedOwner =
         typeof window !== 'undefined' ? localStorage.getItem('nouato_owner_name') || '' : '';
       const savedAddress =
@@ -758,8 +728,8 @@ export default function TeacherFarmCanvasView({
       }
     };
 
-    fetchUserAndFarm();
-  }, []);
+    void fetchUserAndFarm();
+  }, [plots]);
 
   const handleSaveFarmSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -804,80 +774,6 @@ export default function TeacherFarmCanvasView({
     }
   };
 
-  // 🌟 エリア編集 Modal State 🌟
-  const [showEditAreaModal, setShowEditAreaModal] = useState(false);
-  const [editAreaNameInput, setEditAreaNameInput] = useState('');
-  const [newAreaNameInModal, setNewAreaNameInModal] = useState('');
-
-  const openEditAreaModal = () => {
-    const currentF = farms.find((f) => f.id === activeFarmId);
-    setEditAreaNameInput(currentF?.name || '第1エリア (メイン区画エリア)');
-    setShowEditAreaModal(true);
-  };
-
-  const handleSaveEditArea = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editAreaNameInput.trim()) return;
-
-    const cleanName = editAreaNameInput.trim();
-
-    const updatedFarms = farms.map((f) => (f.id === activeFarmId ? { ...f, name: cleanName } : f));
-    setFarms(updatedFarms);
-
-    try {
-      await supabase.from('farms').update({ name: cleanName }).eq('id', activeFarmId);
-    } catch (err) {
-      console.error('handleSaveEditArea error:', err);
-    }
-
-    setShowEditAreaModal(false);
-    setToastMessage(`✨ エリア名を「${cleanName}」に変更保存しました！`);
-    setShowToast(true);
-  };
-
-  const handleAddNewAreaFromModal = async () => {
-    if (!newAreaNameInModal.trim()) return;
-
-    const createdFarm = await addFarm(newAreaNameInModal.trim());
-    setNewAreaNameInModal('');
-    setShowEditAreaModal(false);
-    setToastMessage(`🎉 新しいエリア「${createdFarm.name}」を作成し、キャンバスを切り替えました！`);
-    setShowToast(true);
-  };
-
-  const handleDeleteArea = async () => {
-    const currentF = farms.find((f) => f.id === activeFarmId);
-    if (farms.length <= 1) {
-      setToastMessage('⚠️ 最後の1つのエリアは削除できません');
-      setShowToast(true);
-      return;
-    }
-
-    if (!confirm(`エリア「${currentF?.name}」を削除しますか？紐づく区画も削除されます。`)) return;
-
-    const nextFarms = farms.filter((f) => f.id !== activeFarmId);
-    setFarms(nextFarms);
-    setActiveFarmId(nextFarms[0].id);
-
-    try {
-      await supabase.from('farms').delete().eq('id', activeFarmId);
-    } catch (err) {
-      console.error(err);
-    }
-
-    setShowEditAreaModal(false);
-    setToastMessage(`🗑️ エリア「${currentF?.name}」を削除しました`);
-    setShowToast(true);
-  };
-
-  // 新区画追加 Modal State
-  const [showAddPlotModal, setShowAddPlotModal] = useState(false);
-  const [newBedCount, setNewBedCount] = useState(4);
-
-  // 新農園作成 Modal State
-  const [showAddFarmModal, setShowAddFarmModal] = useState(false);
-  const [newFarmNameInput, setNewFarmNameInput] = useState('');
-
   // 検索フィルター
   const filteredStudents = unassignedList.filter(
     (s) => s.name.includes(searchQuery) || s.grade.includes(searchQuery)
@@ -901,100 +797,6 @@ export default function TeacherFarmCanvasView({
       canvasEl.removeEventListener('wheel', handleWheel);
     };
   }, []);
-
-  // 🌟 mousedown: ドラッグ開始 (ボタン以外のカード全域) 🌟
-  const handlePlotCardMouseDown = (e: React.MouseEvent, plot: FarmPlot) => {
-    const targetElement = e.target as HTMLElement;
-    if (targetElement.closest('button') || targetElement.closest('input')) {
-      return;
-    }
-
-    e.preventDefault();
-    setActivePlotId(plot.id);
-    setDragStartPos({ x: e.clientX, y: e.clientY });
-    const initX = plot.position?.x || 40;
-    const initY = plot.position?.y || 40;
-    setPlotStartPos({ x: initX, y: initY });
-    setCurrentDraggingPos({ x: initX, y: initY });
-  };
-
-  // 🌟 mousemove ＆ mouseup: カーソル差分計算 (実座標変換) ＆ AABB 衝突判定スナップ 🌟
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!activePlotId) return;
-
-      // 表示座標 = 実座標 × scale ➔ ドラッグ時は実座標に変換して処理 (scaleで除算)
-      const scale = zoomLevel / 100;
-      const dx = (e.clientX - dragStartPos.x) / scale;
-      const dy = (e.clientY - dragStartPos.y) / scale;
-
-      const newX = Math.max(10, Math.round(plotStartPos.x + dx));
-      const newY = Math.max(10, Math.round(plotStartPos.y + dy));
-
-      setCurrentDraggingPos({ x: newX, y: newY });
-      updatePlotPositionFree(activePlotId, newX, newY);
-    };
-
-    const handleMouseUp = () => {
-      if (activePlotId && currentDraggingPos) {
-        // 衝突判定 ＆ 重ならない位置への自動スナップ実行
-        const finalPos = snapToNonCollidingPosition(
-          activePlotId,
-          currentDraggingPos.x,
-          currentDraggingPos.y,
-          290
-        );
-
-        setActivePlotId(null);
-        setCurrentDraggingPos(null);
-
-        if (finalPos.x !== currentDraggingPos.x || finalPos.y !== currentDraggingPos.y) {
-          setToastMessage(
-            '🧲 他のカードと交差したため、重ならない隣の位置へ自動スナップしました！'
-          );
-        } else {
-          setToastMessage('📍 カードの位置を配置設定しました');
-        }
-        setShowToast(true);
-      }
-    };
-
-    if (activePlotId) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [activePlotId, dragStartPos, plotStartPos, currentDraggingPos, zoomLevel]);
-
-  // ベッド並べ替え
-  const handleBedDragStart = (e: React.DragEvent, plotId: string, index: number) => {
-    e.stopPropagation();
-    setDraggingBedIndex({ plotId, index });
-  };
-
-  const handleBedDrop = (targetPlotId: string, targetIndex: number) => {
-    if (!draggingBedIndex || draggingBedIndex.plotId !== targetPlotId) return;
-
-    const plot = currentFarmPlots.find((p) => p.id === targetPlotId);
-    if (!plot) return;
-
-    const newBeds = [...plot.beds];
-    const [movedBed] = newBeds.splice(draggingBedIndex.index, 1);
-    newBeds.splice(targetIndex, 0, movedBed);
-
-    newBeds.forEach((b, idx) => {
-      b.bed_number = idx + 1;
-    });
-
-    plot.beds = newBeds;
-    setDraggingBedIndex(null);
-    setToastMessage(`↕️ 「${plot.name}」の畝ベッドを並べ替えました！`);
-    setShowToast(true);
-  };
 
   // 生徒カードドラッグ＆ドロップ
   const handleStudentDragStart = (student: UnassignedStudent) => {
@@ -1033,79 +835,6 @@ export default function TeacherFarmCanvasView({
 
     setToastMessage(
       `✨ ${plot.code}区画の担当者を ${newStudent.name} さんに変更しました！ (${plot.code} - ${newStudent.name})`
-    );
-    setShowToast(true);
-  };
-
-  const handleUnassignPlot = (plot: FarmPlot) => {
-    if (!plot.student_name) return;
-
-    unassignStudentFromPlot(plot.id);
-    setSelectedPlot(null);
-
-    setToastMessage(`↩️ 「区画 ${plot.code}」の生徒割り当てを解除しました`);
-    setShowToast(true);
-  };
-
-  const handleCreateNewFarm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFarmNameInput.trim()) return;
-
-    const createdFarm = await addFarm(newFarmNameInput.trim());
-    setShowAddFarmModal(false);
-    setNewFarmNameInput('');
-
-    setToastMessage(
-      `🎉 新しい農園「${createdFarm.name}」を作成し、管理キャンバスに切り替えました！`
-    );
-    setShowToast(true);
-  };
-
-  const handleCreateNewPlot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const addedPlot = await addPlot(Number(newBedCount));
-
-    setShowAddPlotModal(false);
-    setToastMessage(`✨ 新しい「${addedPlot.name}」をキャンバスに追加しました！`);
-    setShowToast(true);
-  };
-
-  // 🌟 区画の複製/コピー機能 (畝数のみ複製し、生徒/ベッド状態はリセット) 🌟
-  const handleDuplicatePlot = async (plot: FarmPlot) => {
-    const bedCount = plot.beds ? plot.beds.length : 4;
-    const newPlot = await addPlot(bedCount);
-    setToastMessage(
-      `📋 「区画 ${plot.code}」をコピーし、新しい「区画 ${newPlot.code}（畝数: ${bedCount}）」を作成しました！`
-    );
-    setShowToast(true);
-  };
-
-  // 🌟 区画情報の編集 Modal State 🌟
-  const [editingPlot, setEditingPlot] = useState<FarmPlot | null>(null);
-  const [editPlotCode, setEditPlotCode] = useState('');
-  const [editBedCount, setEditBedCount] = useState(4);
-
-  const handleSaveEditPlot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPlot) return;
-
-    const targetPlot = (currentFarmPlots || []).find((p) => p.id === editingPlot.id);
-    if (!targetPlot) return;
-
-    try {
-      await supabase
-        .from('farm_plots')
-        .update({ code: editPlotCode, name: `区画 ${editPlotCode}` })
-        .eq('id', editingPlot.id);
-
-      await updatePlotBedsCount(editingPlot.id, editBedCount);
-    } catch (err) {
-      console.error('handleSaveEditPlot error:', err);
-    }
-
-    setEditingPlot(null);
-    setToastMessage(
-      `✨ 区画「${editPlotCode}」の設定（畝数: ${editBedCount}）を変更保存しました！`
     );
     setShowToast(true);
   };
@@ -1435,7 +1164,7 @@ export default function TeacherFarmCanvasView({
                     try {
                       const dataStr = e.dataTransfer.getData('application/json');
                       if (dataStr) droppedStudentData = JSON.parse(dataStr);
-                    } catch (err) {}
+                    } catch {}
                     if (plot) {
                       handleDropStudentOnPlot(plot, droppedStudentData);
                     }
@@ -1925,14 +1654,13 @@ export default function TeacherFarmCanvasView({
                                             className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-emerald-200 shadow-xs cursor-pointer hover:opacity-90 hover:scale-105 transition-transform bg-gray-100 flex items-center justify-center group relative"
                                             title="クリックして拡大表示"
                                           >
-                                            <img
+                                            <Image
                                               src={imgUrl}
                                               alt="観察記録写真"
+                                              width={64}
+                                              height={64}
+                                              unoptimized
                                               className="w-full h-full object-cover"
-                                              onError={(e) => {
-                                                // 万が一画像リンク切れの場合
-                                                (e.target as HTMLElement).style.display = 'none';
-                                              }}
                                             />
                                             <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[8px] px-1 rounded font-bold opacity-0 group-hover:opacity-100 transition">
                                               🔍
@@ -2108,6 +1836,103 @@ export default function TeacherFarmCanvasView({
                 変更する
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚙️ 農園・代表者設定 Modal ⚙️ */}
+      {showFarmSettingsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-gray-800"
+          onClick={() => setShowFarmSettingsModal(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-black text-base text-gray-900 flex items-center gap-2">
+                <span>⚙️</span>
+                <span>農園・代表者設定</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowFarmSettingsModal(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFarmSettings} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  農園名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={farmSettingsName}
+                  onChange={(e) => setFarmSettingsName(e.target.value)}
+                  placeholder="例: たなか農園"
+                  required
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  代表者氏名（講師名） <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={ownerNameInput}
+                  onChange={(e) => setOwnerNameInput(e.target.value)}
+                  placeholder="例: 田中 太郎"
+                  required
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">メールアドレス</label>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="例: teacher@example.com"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  農園所在地・住所
+                </label>
+                <input
+                  type="text"
+                  value={farmAddressInput}
+                  onChange={(e) => setFarmAddressInput(e.target.value)}
+                  placeholder="例: 神奈川県横浜市青葉区..."
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowFarmSettingsModal(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow transition cursor-pointer"
+                >
+                  保存する
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

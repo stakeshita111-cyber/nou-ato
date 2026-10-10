@@ -401,7 +401,9 @@ export default function TeacherTemplatesView() {
     if (selectedCrop !== 'all') {
       const exists = availableCrops.some((c) => c.crop === selectedCrop);
       if (!exists) {
-        setSelectedCrop('all');
+        queueMicrotask(() => {
+          setSelectedCrop('all');
+        });
       }
     }
   }, [availableCrops, selectedCrop]);

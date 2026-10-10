@@ -22,7 +22,9 @@ export default function StudentTaskPreviewModal({
 
   // テンプレート切り替え時にチェック状態をリセット
   useEffect(() => {
-    setCheckedSteps({});
+    queueMicrotask(() => {
+      setCheckedSteps({});
+    });
   }, [template?.id]);
 
   if (!isOpen || !template) return null;

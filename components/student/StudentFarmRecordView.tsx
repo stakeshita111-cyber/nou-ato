@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
 import { uploadImageToStorage } from '@/lib/storage';
 import {
-  parseCrops,
   formatBedCropLabel,
   isRecordMatchingCrop,
   mergeCrops,
@@ -470,7 +469,10 @@ export default function StudentFarmRecordView({
   }, [studentId, myPlot?.student_id]);
 
   useEffect(() => {
-    fetchStudentJournals();
+    const load = async () => {
+      await fetchStudentJournals();
+    };
+    void load();
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -478,7 +480,7 @@ export default function StudentFarmRecordView({
       bc.onmessage = () => {
         fetchStudentJournals();
       };
-    } catch (e) {}
+    } catch {}
 
     const handleSync = () => {
       fetchStudentJournals();
@@ -684,7 +686,7 @@ export default function StudentFarmRecordView({
           .then();
       }
     }
-  }, [currentBed?.id, currentBed?.crop_name, currentBedCrops, updateBedCrop]);
+  }, [currentBed, currentBedCrops, updateBedCrop]);
 
   const filteredTimelineItems = synthesizedTimelineItems.filter((item) => {
     if (selectedCropFilter === 'all') return true;

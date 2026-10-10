@@ -1,61 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
 import type { EventItem, Attendee } from '@/types/event';
-
-const INITIAL_EVENTS: EventItem[] = [
-  {
-    id: 'ev1',
-    title: '🥔 春のジャガイモ大収穫祭 ＆ 掘りたて試食会',
-    date: '2026-05-24',
-    dateDisplay: '2026年5月24日(日)',
-    time: '10:00 - 12:30',
-    location: '農園 A区画メインエリア',
-    capacity: 12,
-    reservedCount: 9,
-    fee: '無料 (受講生特典)',
-    category: 'harvest',
-    description:
-      '手塩にかけて育てたジャガイモをみんなで一斉に収穫します！採れたて新ジャガイモのじゃがバタ試食会も同時開催。',
-    attendees: [
-      { id: 'u1', name: '渡辺 結衣', plot: '区画 A-1', status: 'confirmed' },
-      { id: 'u2', name: '田中 健司', plot: '区画 A-2', status: 'confirmed' },
-      { id: 'u3', name: '佐藤 恵', plot: '区画 A-3', status: 'pending' },
-    ],
-  },
-  {
-    id: 'ev2',
-    title: '✂️ 初心者向け 夏野菜のわき芽かき・3本仕立て実践講習会',
-    date: '2026-06-07',
-    dateDisplay: '2026年6月7日(日)',
-    time: '14:00 - 15:30',
-    location: '農園 講習スペース',
-    capacity: 8,
-    reservedCount: 4,
-    fee: '500円 (資材代)',
-    category: 'workshop',
-    description:
-      'トマトやナスの収穫量を2倍にする仕立て技術をプロが現場で直接伝授します。初心者大歓迎！',
-    attendees: [{ id: 'u4', name: '高橋 陸', plot: '区画 A-4', status: 'confirmed' }],
-  },
-];
 
 export function useEvents(farmId?: string) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const getEffectiveFarmId = () => {
+  const getEffectiveFarmId = useCallback(() => {
     if (farmId) return farmId;
     if (typeof window !== 'undefined') {
       return localStorage.getItem('nouato_active_farm_id') || null;
     }
     return null;
-  };
+  }, [farmId]);
 
   // Supabase / LocalStorage からイベントデータを取得して同期
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
+    await Promise.resolve();
     setLoading(true);
     const fid = getEffectiveFarmId();
     const eventKey = fid ? `nouato_shared_events_${fid}` : 'nouato_shared_events';
@@ -89,7 +53,7 @@ export function useEvents(farmId?: string) {
         try {
           localStorage.setItem(eventKey, JSON.stringify(formatted));
           localStorage.setItem('nouato_shared_events', JSON.stringify(formatted));
-        } catch (_) {}
+        } catch {}
       } else if (!saved) {
         setEvents([]);
       }
@@ -98,22 +62,25 @@ export function useEvents(farmId?: string) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getEffectiveFarmId]);
 
   useEffect(() => {
-    fetchEvents();
+    const load = async () => {
+      await fetchEvents();
+    };
+    void load();
 
     // Supabase Realtime でイベント変更を全端末・全画面に即座に同期
     const channel = supabase
       .channel('events_realtime_channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
-        fetchEvents();
+        void fetchEvents();
       })
       .subscribe();
 
     if (typeof window !== 'undefined') {
       const handleSync = () => {
-        fetchEvents();
+        void fetchEvents();
       };
       window.addEventListener('nouato_events_updated', handleSync);
       window.addEventListener('nouato_sync_event', handleSync);
@@ -127,7 +94,7 @@ export function useEvents(farmId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [farmId]);
+  }, [farmId, fetchEvents]);
 
   // ローカル更新・共有保存ヘルパー
   const saveSharedEvents = (newEvents: EventItem[]) => {

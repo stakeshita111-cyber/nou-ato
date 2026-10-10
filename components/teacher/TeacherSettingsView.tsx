@@ -666,7 +666,7 @@ export default function TeacherSettingsView() {
                         type: 'SETTINGS_UPDATED',
                         settings: { ...settings, showStudentTalkTab: true },
                       });
-                    } catch (e) {}
+                    } catch {}
                     // プレビュー用iframeへの直接postMessage送信
                     document.querySelectorAll('iframe').forEach((iframe) => {
                       try {
@@ -674,7 +674,7 @@ export default function TeacherSettingsView() {
                           { type: 'TALK_TAB_TOGGLE', show: true },
                           '*'
                         );
-                      } catch (e) {}
+                      } catch {}
                     });
                     // サーバー共有APIへの保存（全端末リアルタイム同期）
                     fetch('/api/settings', {
@@ -715,7 +715,7 @@ export default function TeacherSettingsView() {
                         type: 'SETTINGS_UPDATED',
                         settings: { ...settings, showStudentTalkTab: false },
                       });
-                    } catch (e) {}
+                    } catch {}
                     // プレビュー用iframeへの直接postMessage送信
                     document.querySelectorAll('iframe').forEach((iframe) => {
                       try {
@@ -723,7 +723,7 @@ export default function TeacherSettingsView() {
                           { type: 'TALK_TAB_TOGGLE', show: false },
                           '*'
                         );
-                      } catch (e) {}
+                      } catch {}
                     });
                     // サーバー共有APIへの保存（全端末リアルタイム同期）
                     fetch('/api/settings', {

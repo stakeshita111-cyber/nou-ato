@@ -46,7 +46,7 @@ export const useFarmStore = create<FarmStoreState>()(
             const bc = new BroadcastChannel('nouato_farm_sync_channel');
             bc.postMessage({ type: 'FARM_SWITCHED', farmId, farmName });
             bc.close();
-          } catch (e) {}
+          } catch {}
         }
       },
 
@@ -101,7 +101,7 @@ export const useFarmStore = create<FarmStoreState>()(
             try {
               localStorage.setItem('nouato_active_farm_id', targetFarm.id);
               localStorage.setItem('nouato_current_farm_name', targetFarm.name);
-            } catch (e) {}
+            } catch {}
           }
 
           return farmList;
@@ -163,7 +163,7 @@ export const useFarmStore = create<FarmStoreState>()(
                 farmName: createdItem.name,
               });
               bc.close();
-            } catch (e) {}
+            } catch {}
           }
 
           return createdItem;

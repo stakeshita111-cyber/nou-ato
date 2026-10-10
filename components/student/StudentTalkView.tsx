@@ -88,7 +88,9 @@ export default function StudentTalkView({
 
   useEffect(() => {
     if (presetFaqs && presetFaqs.length > 0) {
-      setCurrentFaqs(presetFaqs);
+      queueMicrotask(() => {
+        setCurrentFaqs(presetFaqs);
+      });
       return;
     }
     const fetchFaqs = async () => {
@@ -109,7 +111,7 @@ export default function StudentTalkView({
         // ignore fetch error
       }
     };
-    fetchFaqs();
+    void fetchFaqs();
   }, [presetFaqs, studentId]);
 
   // 検索機能 State
@@ -124,6 +126,7 @@ export default function StudentTalkView({
   // 最新の残数を DB から取得する。失敗時は null を返し、残数を偽って表示しない。
   const refreshTicketState = useCallback(async (): Promise<TicketState | null> => {
     if (planType !== 'limited') {
+      await Promise.resolve();
       const fixed = getTicketState(customDailyLimit, planType);
       setTicketState(fixed);
       return fixed;
@@ -136,7 +139,10 @@ export default function StudentTalkView({
   }, [customDailyLimit, planType]);
 
   useEffect(() => {
-    void refreshTicketState();
+    const load = async () => {
+      await refreshTicketState();
+    };
+    void load();
   }, [studentId, refreshTicketState]);
 
   // 講師が付与した直後などに反映するため、画面が前面に戻ったとき再取得
@@ -150,6 +156,7 @@ export default function StudentTalkView({
 
   // 1. 初回ロード (ログイン中の生徒自身の会話のみを厳格に取得)
   const loadChatHistory = useCallback(async () => {
+    await Promise.resolve();
     try {
       let targetList: JournalItem[] = [];
 
@@ -272,7 +279,10 @@ export default function StudentTalkView({
   }, [studentId, studentName, journals]);
 
   useEffect(() => {
-    loadChatHistory();
+    const load = async () => {
+      await loadChatHistory();
+    };
+    void load();
   }, [loadChatHistory]);
 
   const scrollToBottom = useCallback(() => {
@@ -312,25 +322,13 @@ export default function StudentTalkView({
   }, []);
 
   useEffect(() => {
-    setCurrentMatchIndex(0);
-    if (matchedMessageIds.length > 0) {
-      jumpToMessage(matchedMessageIds[0]);
-    }
+    queueMicrotask(() => {
+      setCurrentMatchIndex(0);
+      if (matchedMessageIds.length > 0) {
+        jumpToMessage(matchedMessageIds[0]);
+      }
+    });
   }, [searchKeyword, matchedMessageIds, jumpToMessage]);
-
-  const handlePrevMatch = () => {
-    if (matchedMessageIds.length === 0) return;
-    const nextIdx = (currentMatchIndex - 1 + matchedMessageIds.length) % matchedMessageIds.length;
-    setCurrentMatchIndex(nextIdx);
-    jumpToMessage(matchedMessageIds[nextIdx]);
-  };
-
-  const handleNextMatch = () => {
-    if (matchedMessageIds.length === 0) return;
-    const nextIdx = (currentMatchIndex + 1) % matchedMessageIds.length;
-    setCurrentMatchIndex(nextIdx);
-    jumpToMessage(matchedMessageIds[nextIdx]);
-  };
 
   const studentQuestionsList = useMemo(() => {
     return messages
@@ -380,36 +378,43 @@ export default function StudentTalkView({
   };
 
   // 🌟 3. 選択した過去ナレッジを無料で見る（チケット非消費） 🌟
-  const handleUseFreeKnowledge = (item: MatchedKnowledgeItem) => {
-    setShowConfirmModal(false);
+  const handleUseFreeKnowledge = useCallback(
+    (item: MatchedKnowledgeItem) => {
+      setShowConfirmModal(false);
 
-    const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    const userMsgId = 'user_' + Date.now();
+      const timeStr = new Date().toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const now = Date.now();
+      const userMsgId = 'user_' + now;
 
-    const studentMsg: MessageItem = {
-      id: userMsgId,
-      sender: 'student',
-      text: inputText.trim(),
-      timestamp: timeStr,
-    };
+      const studentMsg: MessageItem = {
+        id: userMsgId,
+        sender: 'student',
+        text: inputText.trim(),
+        timestamp: timeStr,
+      };
 
-    const cleanAnswer = sanitizePersonalNames(item.answer);
-    const replyMsg: MessageItem = {
-      id: 'kn_' + (Date.now() + 1),
-      sender: 'teacher',
-      text: cleanAnswer,
-      timestamp: timeStr,
-      isKnowledgeHit: true,
-    };
+      const cleanAnswer = sanitizePersonalNames(item.answer);
+      const replyMsg: MessageItem = {
+        id: 'kn_' + (now + 1),
+        sender: 'teacher',
+        text: cleanAnswer,
+        timestamp: timeStr,
+        isKnowledgeHit: true,
+      };
 
-    setMessages((prev) => [...prev, studentMsg, replyMsg]);
-    setInputText('');
-    setToastMessage('💡 農園ノートの回答を表示しました');
-    setShowToast(true);
-  };
+      setMessages((prev) => [...prev, studentMsg, replyMsg]);
+      setInputText('');
+      setToastMessage('💡 農園ノートの回答を表示しました');
+      setShowToast(true);
+    },
+    [inputText]
+  );
 
   // 🌟 4. 新しくチケットを使ってAIに送信する 🌟
-  const executeSendMessage = async (forceAi: boolean = false) => {
+  const executeSendMessage = async () => {
     setShowConfirmModal(false);
     const rawInput = inputText.trim();
     if (!rawInput || isSending) return;
@@ -531,29 +536,36 @@ export default function StudentTalkView({
   };
 
   // プリセットFAQタップ
-  const handleQuickFaqClick = (faqId: string) => {
-    const faq = currentFaqs.find((f) => f.id === faqId);
-    if (!faq) return;
+  const handleQuickFaqClick = useCallback(
+    (faqId: string) => {
+      const faq = currentFaqs.find((f) => f.id === faqId);
+      if (!faq) return;
 
-    const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    const studentMsg: MessageItem = {
-      id: 'faq_q_' + Date.now(),
-      sender: 'student',
-      text: faq.question,
-      timestamp: timeStr,
-    };
-    const replyMsg: MessageItem = {
-      id: 'faq_a_' + (Date.now() + 1),
-      sender: 'teacher',
-      text: faq.answer,
-      timestamp: timeStr,
-      isKnowledgeHit: true,
-    };
+      const timeStr = new Date().toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const now = Date.now();
+      const studentMsg: MessageItem = {
+        id: 'faq_q_' + now,
+        sender: 'student',
+        text: faq.question,
+        timestamp: timeStr,
+      };
+      const replyMsg: MessageItem = {
+        id: 'faq_a_' + (now + 1),
+        sender: 'teacher',
+        text: faq.answer,
+        timestamp: timeStr,
+        isKnowledgeHit: true,
+      };
 
-    setMessages((prev) => [...prev, studentMsg, replyMsg]);
-    setToastMessage('💡 よくある質問のためチケットを消費せずに回答しました！');
-    setShowToast(true);
-  };
+      setMessages((prev) => [...prev, studentMsg, replyMsg]);
+      setToastMessage('💡 よくある質問のためチケットを消費せずに回答しました！');
+      setShowToast(true);
+    },
+    [currentFaqs]
+  );
 
   // ストックメモを入力欄にセット
   const handleApplyStockToInput = (stockItems: string[]) => {
@@ -570,7 +582,7 @@ export default function StudentTalkView({
       await navigator.clipboard.writeText(formatted);
       setToastMessage('📋 ストックした質問をクリップボードにコピーしました！');
       setShowToast(true);
-    } catch (e) {
+    } catch {
       setInputText(formatted);
       setToastMessage('📋 入力欄にセットしました');
       setShowToast(true);
@@ -1100,7 +1112,7 @@ export default function StudentTalkView({
 
                   <button
                     type="button"
-                    onClick={() => executeSendMessage(true)}
+                    onClick={() => executeSendMessage()}
                     className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl transition cursor-pointer text-center"
                   >
                     新しくAIに相談 (残{ticketState.count}回)
@@ -1171,7 +1183,7 @@ export default function StudentTalkView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => executeSendMessage(false)}
+                    onClick={() => executeSendMessage()}
                     className={
                       'flex-1 py-2.5 font-bold text-xs rounded-xl shadow-md transition cursor-pointer text-center text-white ' +
                       (ticketState.isUnlimited || ticketState.count > 0

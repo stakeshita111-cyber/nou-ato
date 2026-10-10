@@ -258,7 +258,10 @@ export default function EventCalendar({
               {events.map((ev) => (
                 <div
                   key={ev.id}
-                  onClick={() => setSelectedDateStr(ev.date)}
+                  onClick={() => {
+                    setSelectedDateStr(ev.date);
+                    onSelectEvent?.(ev);
+                  }}
                   className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between text-xs ${
                     selectedDateStr === ev.date
                       ? 'bg-emerald-50 border-emerald-500 font-bold'

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
 
 export default function TeacherSignUpPage() {
+  const router = useRouter();
   // フォームステート
   const [farmName, setFarmName] = useState('');
   const [teacherName, setTeacherName] = useState('');
@@ -114,7 +116,7 @@ export default function TeacherSignUpPage() {
       setShowToast(true);
 
       setTimeout(() => {
-        window.location.href = '/teacher/dashboard';
+        router.push('/teacher/dashboard');
       }, 800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

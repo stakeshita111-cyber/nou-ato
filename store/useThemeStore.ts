@@ -95,7 +95,7 @@ export const useThemeStore = create<ThemeState>()(
               if (bc) {
                 bc.postMessage({ type: 'SETTINGS_UPDATED', settings: next });
               }
-            } catch (e) {}
+            } catch {}
             window.dispatchEvent(new CustomEvent('nouato_settings_updated', { detail: next }));
           }
           return { settings: next };
@@ -113,7 +113,7 @@ export const useThemeStore = create<ThemeState>()(
               if (bc) {
                 bc.postMessage({ type: 'SETTINGS_UPDATED', settings: next });
               }
-            } catch (e) {}
+            } catch {}
             window.dispatchEvent(new CustomEvent('nouato_settings_updated', { detail: next }));
           }
           return { settings: next };
@@ -136,7 +136,7 @@ if (typeof window !== 'undefined') {
         if (parsed.state?.settings) {
           useThemeStore.setState({ settings: parsed.state.settings });
         }
-      } catch (err) {}
+      } catch {}
     }
   });
 }

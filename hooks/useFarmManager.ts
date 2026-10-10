@@ -174,7 +174,7 @@ export function useFarmManager() {
               if (typeof meta?.is_vacant === 'boolean') {
                 isVac = meta.is_vacant;
               }
-            } catch (e) {}
+            } catch {}
           }
           if (sId || sName) {
             isVac = false;
@@ -232,7 +232,7 @@ export function useFarmManager() {
 
                 if (hasExplicitSavedDims) break;
               }
-            } catch (e) {}
+            } catch {}
           }
         }
       }
@@ -456,71 +456,75 @@ export function useFarmManager() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeFarmId]);
-
-  // Supabase DB への一括保存 (DB SSOT: localStorage依存脱却)
-  const savePlotsGridIndicesToSupabase = async (
-    updatedPlots: FarmPlot[],
-    explicitDims?: { cols?: number; rows?: number; unassigned_beds?: number }
-  ) => {
-    setPlots(updatedPlots);
-    plotsRef.current = updatedPlots;
-    isSavingRef.current = true;
-    lastSaveTimeRef.current = Date.now();
-
-    const currentCols = explicitDims?.cols ?? gridColsRef.current ?? gridCols ?? 6;
-    const currentRows = explicitDims?.rows ?? gridRowsRef.current ?? gridRows ?? 8;
-    const currentBeds =
-      explicitDims?.unassigned_beds ?? unassignedBedsRef.current ?? unassignedBedsCount ?? 7;
-
-    gridColsRef.current = currentCols;
-    gridRowsRef.current = currentRows;
-    unassignedBedsRef.current = currentBeds;
-
-    try {
-      let farmAddress = '';
-      let weatherLocation: { name: string; lat: number; lon: number } | null = null;
-      if (typeof window !== 'undefined') {
-        farmAddress = localStorage.getItem('nouato_farm_address') || '';
-        const wName = localStorage.getItem('nouato_weather_city_name');
-        const wLat = localStorage.getItem('nouato_weather_lat');
-        const wLon = localStorage.getItem('nouato_weather_lon');
-        if (wName && wLat && wLon) {
-          weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
-        }
-      }
-      const farmMeta = { address: farmAddress, weatherLocation };
-      const dims = { cols: currentCols, rows: currentRows, unassigned_beds: currentBeds };
-
-      await savePlotsAndBedsToDb(
-        updatedPlots,
-        activeFarmId,
-        dims,
-        farmMeta,
-        lastSavedPlotsMapRef.current,
-        lastSavedBedsMapRef.current
-      );
-    } catch (err) {
-      console.warn('savePlotsGridIndicesToSupabase info:', err);
-    } finally {
-      isSavingRef.current = false;
-    }
-
-    notifyBroadcast();
-  };
+  }, []);
 
   const notifyBroadcast = useCallback(() => {
     if (broadcastRef.current) {
       try {
         broadcastRef.current.postMessage({ type: 'FARM_DATA_UPDATED', timestamp: Date.now() });
-      } catch (e) {
-        console.error(e);
-      }
+      } catch {}
     }
   }, []);
 
+  // Supabase DB への一括保存 (DB SSOT: localStorage依存脱却)
+  const savePlotsGridIndicesToSupabase = useCallback(
+    async (
+      updatedPlots: FarmPlot[],
+      explicitDims?: { cols?: number; rows?: number; unassigned_beds?: number }
+    ) => {
+      setPlots(updatedPlots);
+      plotsRef.current = updatedPlots;
+      isSavingRef.current = true;
+      lastSaveTimeRef.current = Date.now();
+
+      const currentCols = explicitDims?.cols ?? gridColsRef.current ?? gridCols ?? 6;
+      const currentRows = explicitDims?.rows ?? gridRowsRef.current ?? gridRows ?? 8;
+      const currentBeds =
+        explicitDims?.unassigned_beds ?? unassignedBedsRef.current ?? unassignedBedsCount ?? 7;
+
+      gridColsRef.current = currentCols;
+      gridRowsRef.current = currentRows;
+      unassignedBedsRef.current = currentBeds;
+
+      try {
+        let farmAddress = '';
+        let weatherLocation: { name: string; lat: number; lon: number } | null = null;
+        if (typeof window !== 'undefined') {
+          farmAddress = localStorage.getItem('nouato_farm_address') || '';
+          const wName = localStorage.getItem('nouato_weather_city_name');
+          const wLat = localStorage.getItem('nouato_weather_lat');
+          const wLon = localStorage.getItem('nouato_weather_lon');
+          if (wName && wLat && wLon) {
+            weatherLocation = { name: wName, lat: Number(wLat), lon: Number(wLon) };
+          }
+        }
+        const farmMeta = { address: farmAddress, weatherLocation };
+        const dims = { cols: currentCols, rows: currentRows, unassigned_beds: currentBeds };
+
+        await savePlotsAndBedsToDb(
+          updatedPlots,
+          activeFarmId,
+          dims,
+          farmMeta,
+          lastSavedPlotsMapRef.current,
+          lastSavedBedsMapRef.current
+        );
+      } catch (err) {
+        console.warn('savePlotsGridIndicesToSupabase info:', err);
+      } finally {
+        isSavingRef.current = false;
+      }
+
+      notifyBroadcast();
+    },
+    [activeFarmId, gridCols, gridRows, unassignedBedsCount, notifyBroadcast]
+  );
+
   useEffect(() => {
-    reloadAllFromSupabase();
+    const load = async () => {
+      await reloadAllFromSupabase();
+    };
+    void load();
 
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const channel = new BroadcastChannel('nouato_farm_sync_channel');
@@ -589,12 +593,12 @@ export function useFarmManager() {
       if (broadcastRef.current) {
         try {
           broadcastRef.current.close();
-        } catch (e) {}
+        } catch {}
       }
       if (realtimeChannel) {
         try {
           supabase.removeChannel(realtimeChannel);
-        } catch (e) {}
+        } catch {}
       }
       window.removeEventListener('nouato_sync_event', handleCustomSync);
       window.removeEventListener('nouato_active_farm_changed', handleFarmChanged);
@@ -1368,7 +1372,6 @@ export function useFarmManager() {
   ) => {
     const todayStr = new Date().toLocaleDateString('ja-JP');
     let targetCropName = '未確定 🌱';
-    let targetStudentName = '受講生徒';
     let targetStudentId: string | null = null;
     let targetPlotCode = 'C3';
     let targetBedNum = 1;
@@ -1382,7 +1385,6 @@ export function useFarmManager() {
 
       if (isMatchPlot) {
         targetPlotCode = plot.code || 'C3';
-        targetStudentName = plot.student_name || '受講生徒';
         targetStudentId = plot.student_id || null;
 
         const nextBeds = (plot.beds || []).map((bed) => {
@@ -1394,7 +1396,6 @@ export function useFarmManager() {
             targetCropName = bed.crop_name || '未確定 🌱';
             targetBedNum = bed.bed_number;
             if (bed.student_id) targetStudentId = bed.student_id;
-            if (bed.student_name) targetStudentName = bed.student_name;
             return {
               ...bed,
               status: 'completed_pending' as const,
@@ -1496,7 +1497,7 @@ export function useFarmManager() {
 
             return {
               ...bed,
-              crop_name: '未確定 🌱',
+              crop_name: newCropName,
               status: 'active' as const,
               season: newSeason,
               progress_percent: 0,
@@ -1625,7 +1626,7 @@ export function useFarmManager() {
         .from('journals')
         .update({ is_approved: true })
         .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
-    } catch (e) {}
+    } catch {}
 
     await savePlotsGridIndicesToSupabase(finalPlots);
     notifyBroadcast();
@@ -1684,7 +1685,7 @@ export function useFarmManager() {
         .from('journals')
         .update({ is_approved: true })
         .like('content', `%【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum}%`);
-    } catch (e) {}
+    } catch {}
 
     await savePlotsGridIndicesToSupabase(nextPlots);
     notifyBroadcast();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import QRCodeModal from '@/components/ui/QRCodeModal';
@@ -65,116 +65,125 @@ export default function TeacherOverviewView({
   const [origin, setOrigin] = useState('http://localhost:3000');
   const [inviteCode, setInviteCode] = useState<string>('');
 
-  const fetchCounts = async (targetFarmId?: string) => {
-    const currentFid =
-      targetFarmId ||
-      farmId ||
-      (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+  const fetchCounts = useCallback(
+    async (targetFarmId?: string) => {
+      const currentFid =
+        targetFarmId ||
+        farmId ||
+        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
 
-    if (currentFid) {
-      try {
-        const { data: fData } = await supabase
-          .from('farms')
-          .select('invite_code')
-          .eq('id', currentFid)
-          .maybeSingle();
-        if (fData?.invite_code) {
-          setInviteCode(fData.invite_code);
-        }
-      } catch {}
-    }
-
-    // 1. 本日以降のイベント・講習予約件数
-    const todayStr = new Date().toISOString().split('T')[0];
-    const { count: eCount } = await supabase
-      .from('events')
-      .select('*', { count: 'exact' })
-      .gte('date', todayStr);
-
-    if (eCount !== null && eCount !== undefined) {
-      setEventsCount(eCount);
-    } else {
-      const eventKey = currentFid ? `nouato_shared_events_${currentFid}` : 'nouato_shared_events';
-      const saved = typeof window !== 'undefined' ? localStorage.getItem(eventKey) : null;
-      if (saved) {
+      if (currentFid) {
         try {
-          const parsed = JSON.parse(saved);
-          const futureEvents = (parsed as Array<{ date?: string }>).filter(
-            (ev) => (ev.date || '') >= todayStr
-          );
-          setEventsCount(futureEvents.length);
-        } catch {
+          const { data: fData } = await supabase
+            .from('farms')
+            .select('invite_code')
+            .eq('id', currentFid)
+            .maybeSingle();
+          if (fData?.invite_code) {
+            setInviteCode(fData.invite_code);
+          }
+        } catch {}
+      }
+
+      // 1. 本日以降のイベント・講習予約件数
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { count: eCount } = await supabase
+        .from('events')
+        .select('*', { count: 'exact' })
+        .gte('date', todayStr);
+
+      if (eCount !== null && eCount !== undefined) {
+        setEventsCount(eCount);
+      } else {
+        const eventKey = currentFid ? `nouato_shared_events_${currentFid}` : 'nouato_shared_events';
+        const saved = typeof window !== 'undefined' ? localStorage.getItem(eventKey) : null;
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const futureEvents = (parsed as Array<{ date?: string }>).filter(
+              (ev) => (ev.date || '') >= todayStr
+            );
+            setEventsCount(futureEvents.length);
+          } catch {
+            setEventsCount(0);
+          }
+        } else {
           setEventsCount(0);
         }
-      } else {
-        setEventsCount(0);
       }
-    }
 
-    // 2. 本日の作業記録件数 (crop_records)
-    const { count: cCount } = await supabase.from('crop_records').select('*', { count: 'exact' });
+      // 2. 本日の作業記録件数 (crop_records)
+      const { count: cCount } = await supabase.from('crop_records').select('*', { count: 'exact' });
 
-    if (cCount !== null && cCount !== undefined) {
-      setReportCount(cCount);
-    } else {
-      const cropKey = currentFid ? `nouato_crop_records_${currentFid}` : 'nouato_crop_records';
-      const savedRec = typeof window !== 'undefined' ? localStorage.getItem(cropKey) : null;
-      if (savedRec) {
-        try {
-          setReportCount(JSON.parse(savedRec).length);
-        } catch {
+      if (cCount !== null && cCount !== undefined) {
+        setReportCount(cCount);
+      } else {
+        const cropKey = currentFid ? `nouato_crop_records_${currentFid}` : 'nouato_crop_records';
+        const savedRec = typeof window !== 'undefined' ? localStorage.getItem(cropKey) : null;
+        if (savedRec) {
+          try {
+            setReportCount(JSON.parse(savedRec).length);
+          } catch {
+            setReportCount(0);
+          }
+        } else {
           setReportCount(0);
         }
-      } else {
-        setReportCount(0);
       }
-    }
 
-    // 3. 未回答の質問・気づきメモ (自農園スコープ)
-    let jQuery = supabase.from('journals').select('*').is('reply', null);
-    if (currentFid) {
-      jQuery = jQuery.eq('farm_id', currentFid);
-    }
-    const { data: jData } = await jQuery;
+      // 3. 未回答の質問・気づきメモ (自農園スコープ)
+      let jQuery = supabase.from('journals').select('*').is('reply', null);
+      if (currentFid) {
+        jQuery = jQuery.eq('farm_id', currentFid);
+      }
+      const { data: jData } = await jQuery;
 
-    if (jData) {
-      const unrepliedNotices = jData.filter((j) => {
-        const content = (j.content || '').trim();
-        return (
-          content &&
-          !content.includes('【収穫完了報告】') &&
-          !content.includes('【差し戻し通知】') &&
-          !content.includes('を完了報告しました') &&
-          content !== '（コメントなし）' &&
-          !isRegularRecord(content)
-        );
-      });
-      setUnrepliedCount(unrepliedNotices.length);
-    } else {
-      setUnrepliedCount(0);
-    }
+      if (jData) {
+        const unrepliedNotices = jData.filter((j) => {
+          const content = (j.content || '').trim();
+          return (
+            content &&
+            !content.includes('【収穫完了報告】') &&
+            !content.includes('【差し戻し通知】') &&
+            !content.includes('を完了報告しました') &&
+            content !== '（コメントなし）' &&
+            !isRegularRecord(content)
+          );
+        });
+        setUnrepliedCount(unrepliedNotices.length);
+      } else {
+        setUnrepliedCount(0);
+      }
 
-    // 4. 受講生数 (自農園スコープ)
-    let sQuery = supabase
-      .from('users')
-      .select('*', { count: 'exact' })
-      .eq('role', 'student')
-      .is('deleted_at', null);
-    if (currentFid) {
-      sQuery = sQuery.eq('farm_id', currentFid);
-    }
-    const { count: sCount } = await sQuery;
-    if (sCount !== null && sCount !== undefined) {
-      setStudentsCount(sCount);
-    }
-  };
+      // 4. 受講生数 (自農園スコープ)
+      let sQuery = supabase
+        .from('users')
+        .select('*', { count: 'exact' })
+        .eq('role', 'student')
+        .is('deleted_at', null);
+      if (currentFid) {
+        sQuery = sQuery.eq('farm_id', currentFid);
+      }
+      const { count: sCount } = await sQuery;
+      if (sCount !== null && sCount !== undefined) {
+        setStudentsCount(sCount);
+      }
+    },
+    [farmId]
+  );
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setOrigin(window.location.origin);
+      const locOrigin = window.location.origin;
+      queueMicrotask(() => {
+        setOrigin(locOrigin);
+      });
     }
-    fetchCounts(farmId);
-  }, [farmId]);
+    const load = async () => {
+      await fetchCounts(farmId);
+    };
+    void load();
+  }, [farmId, fetchCounts]);
 
   const effectiveInviteCode = inviteCode || farmId;
   const inviteUrl = `${origin}/invite?code=${effectiveInviteCode}`;
@@ -197,11 +206,49 @@ export default function TeacherOverviewView({
 
       {/* ☀️ 1. 気象スマート連動ウィジェット (天気) ☀️ */}
       <div className="space-y-2">
-        <div className="flex justify-between items-center px-1">
+        <div className="flex flex-wrap justify-between items-center gap-2 px-1">
           <span className="text-gray-900 font-black text-base flex items-center gap-2">
             <span>🌤️</span>
             <span>天気予報</span>
           </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {onAddNewTaskClick && (
+              <button
+                type="button"
+                onClick={onAddNewTaskClick}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+              >
+                <span>＋</span>
+                <span>タスク作成</span>
+              </button>
+            )}
+            {onNavigateToTasks && (
+              <button
+                type="button"
+                onClick={onNavigateToTasks}
+                className="px-3 py-1.5 bg-white border border-gray-200 hover:border-emerald-400 text-gray-700 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+              >
+                <span>📋</span>
+                <span>タスク管理</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowQRModal(true)}
+              className="px-3 py-1.5 bg-white border border-gray-200 hover:border-emerald-400 text-gray-700 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+            >
+              <span>📱</span>
+              <span>LINE招待QR</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyInviteLink}
+              className="px-3 py-1.5 bg-white border border-gray-200 hover:border-emerald-400 text-gray-700 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+            >
+              <span>🔗</span>
+              <span>招待リンク</span>
+            </button>
+          </div>
         </div>
         <WeatherWidget />
       </div>

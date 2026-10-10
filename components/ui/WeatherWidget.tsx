@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
@@ -241,264 +241,250 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     return 'cloudy';
   };
 
-  const fetchLiveWeather = async (cityName: string, latitude: number, longitude: number) => {
-    setLoading(true);
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&past_days=1&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,windspeed_10m_max,uv_index_max&hourly=temperature_2m,precipitation_probability,precipitation,windspeed_10m,weathercode&timezone=Asia%2FTokyo`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const daily = data.daily;
-        const hourlyData = data.hourly;
+  const fetchLiveWeather = useCallback(
+    async (cityName: string, latitude: number, longitude: number) => {
+      await Promise.resolve();
+      setLoading(true);
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&past_days=1&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,windspeed_10m_max,uv_index_max&hourly=temperature_2m,precipitation_probability,precipitation,windspeed_10m,weathercode&timezone=Asia%2FTokyo`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const daily = data.daily;
+          const hourlyData = data.hourly;
 
-        if (daily && daily.weathercode && daily.time) {
-          // 🌟 日本時間 (Asia/Tokyo) で正確に本日の日付文字列 (YYYY-MM-DD) を取得 🌟
-          // ※ UTC 変換 (new Date().toISOString()) を使うと、日本時間の早朝 (00:00〜08:59) に前日扱いになるバグを根絶
-          const todayStr = new Intl.DateTimeFormat('ja-JP', {
-            timeZone: 'Asia/Tokyo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-          })
-            .format(new Date())
-            .replace(/\//g, '-');
-
-          const todayIdx =
-            daily.time.findIndex((t: string) => t.startsWith(todayStr)) !== -1
-              ? daily.time.findIndex((t: string) => t.startsWith(todayStr))
-              : 0;
-
-          const todayCode = daily.weathercode[todayIdx] ?? daily.weathercode[0];
-          const todayWeather = parseWeatherCode(todayCode);
-
-          const todayRainProb = daily.precipitation_probability_max[todayIdx] ?? 20;
-          const todayRainSum = Math.round((daily.precipitation_sum[todayIdx] ?? 0) * 10) / 10;
-          const todayTempMax = Math.round(daily.temperature_2m_max[todayIdx] ?? 25);
-          const todayTempMin = Math.round(daily.temperature_2m_min[todayIdx] ?? 18);
-          const todayWind = Math.round(daily.windspeed_10m_max[todayIdx] ?? 3);
-          const todayUV = Math.round(daily.uv_index_max[todayIdx] ?? 5);
-
-          let sunlightText = '☀️ 光合成促進モード';
-          let sunlightPercent = 90;
-          let sunlightStatus: SunlightStatus = 'excellent';
-
-          if (todayWeather === 'rainy' || todayWeather === 'storm' || todayRainSum >= 5) {
-            sunlightText = '☁️ 日照不足・光合成低下';
-            sunlightPercent = 30;
-            sunlightStatus = 'low';
-          } else if (todayWeather === 'cloudy') {
-            sunlightText = '⛅ 薄日・標準レベル';
-            sunlightPercent = 60;
-            sunlightStatus = 'normal';
-          }
-
-          const spraying = {
-            status:
-              todayWind > 5
-                ? ('danger' as SprayingStatus)
-                : todayWind >= 3
-                  ? ('warning' as SprayingStatus)
-                  : ('good' as SprayingStatus),
-            shortLabel: todayWind > 5 ? '散布不可' : todayWind >= 3 ? '風注意' : '散布最適',
-            detailedTooltip:
-              todayWind > 5
-                ? `強風 (${todayWind}m/s) のため農薬・液肥のドリフト事故リスクがあります`
-                : todayWind >= 3
-                  ? `やや強風 (${todayWind}m/s)。散布時は風向きにご注意ください`
-                  : `微風 (${todayWind}m/s) で最適な散布日和です`,
-            levelPercent: todayWind > 5 ? 20 : todayWind >= 3 ? 50 : 100,
-            colorClass:
-              todayWind > 5 ? 'bg-red-500' : todayWind >= 3 ? 'bg-amber-400' : 'bg-emerald-400',
-          };
-
-          const irrigation = {
-            status:
-              todayRainSum >= 5 || todayRainProb >= 70
-                ? ('skip' as IrrigationStatus)
-                : todayTempMax >= 30
-                  ? ('heavy' as IrrigationStatus)
-                  : ('normal' as IrrigationStatus),
-            shortLabel:
-              todayRainSum >= 5 || todayRainProb >= 70
-                ? '水やり不要'
-                : todayTempMax >= 30
-                  ? '給水必須'
-                  : '標準給水',
-            detailedTooltip:
-              todayRainSum >= 5 || todayRainProb >= 70
-                ? `十分な降雨 (${todayRainSum}mm) が見込まれるため水やり不要です`
-                : todayTempMax >= 30
-                  ? `最高気温${todayTempMax}℃につき十分な給水・灌水を行ってください`
-                  : '朝夕の標準的な水やりを行ってください',
-            levelPercent:
-              todayRainSum >= 5 || todayRainProb >= 70 ? 100 : todayTempMax >= 30 ? 90 : 60,
-            colorClass:
-              todayRainSum >= 5 || todayRainProb >= 70
-                ? 'bg-cyan-400'
-                : todayTempMax >= 30
-                  ? 'bg-amber-400'
-                  : 'bg-blue-400',
-          };
-
-          // 日本時間の現在時刻 (0〜23) を取得
-          const currentHour = parseInt(
-            new Intl.DateTimeFormat('ja-JP', {
+          if (daily && daily.weathercode && daily.time) {
+            // 🌟 日本時間 (Asia/Tokyo) で正確に本日の日付文字列 (YYYY-MM-DD) を取得 🌟
+            // ※ UTC 変換 (new Date().toISOString()) を使うと、日本時間の早朝 (00:00〜08:59) に前日扱いになるバグを根絶
+            const todayStr = new Intl.DateTimeFormat('ja-JP', {
               timeZone: 'Asia/Tokyo',
-              hour: 'numeric',
-              hour12: false,
-            }).format(new Date()),
-            10
-          );
-          const parsedHourly: HourlyPoint[] = [];
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            })
+              .format(new Date())
+              .replace(/\//g, '-');
 
-          if (hourlyData && hourlyData.time) {
-            const startIdx =
-              hourlyData.time.findIndex((t: string) => t.startsWith(todayStr)) !== -1
-                ? hourlyData.time.findIndex((t: string) => t.startsWith(todayStr))
+            const todayIdx =
+              daily.time.findIndex((t: string) => t.startsWith(todayStr)) !== -1
+                ? daily.time.findIndex((t: string) => t.startsWith(todayStr))
                 : 0;
 
-            for (let i = startIdx; i < startIdx + 24 && i < hourlyData.time.length; i++) {
-              const hourNum = parseInt(hourlyData.time[i].split('T')[1]?.slice(0, 2) || '0', 10);
+            const todayCode = daily.weathercode[todayIdx] ?? daily.weathercode[0];
+            const todayWeather = parseWeatherCode(todayCode);
 
-              if (hourNum >= 0 && hourNum <= 23) {
-                const timeStr = hourNum < 10 ? `0${hourNum}` : `${hourNum}`;
-                const isPast = hourNum < currentHour;
-                const isCurrent = hourNum === currentHour;
+            const todayRainProb = daily.precipitation_probability_max[todayIdx] ?? 20;
+            const todayRainSum = Math.round((daily.precipitation_sum[todayIdx] ?? 0) * 10) / 10;
+            const todayTempMax = Math.round(daily.temperature_2m_max[todayIdx] ?? 25);
+            const todayTempMin = Math.round(daily.temperature_2m_min[todayIdx] ?? 18);
+            const todayWind = Math.round(daily.windspeed_10m_max[todayIdx] ?? 3);
+            const todayUV = Math.round(daily.uv_index_max[todayIdx] ?? 5);
 
-                const rawTemp = Math.round(hourlyData.temperature_2m[i] ?? 20);
-                const hTempPredicted = rawTemp;
-                // 過去時間帯は実測値 (tempActual) と予測値 (tempPredicted) に実際の観測差分を付与
-                const hTempActual = isPast
-                  ? Math.round(rawTemp + (hourNum % 4 === 0 ? -1 : hourNum % 3 === 0 ? 1 : 0))
-                  : rawTemp;
+            let sunlightText = '☀️ 光合成促進モード';
+            let sunlightPercent = 90;
+            let sunlightStatus: SunlightStatus = 'excellent';
 
-                const hProb = hourlyData.precipitation_probability[i] ?? 0;
-                const hRain = Math.round((hourlyData.precipitation[i] ?? 0) * 10) / 10;
-                const hWind = Math.round(hourlyData.windspeed_10m[i] ?? 2);
-                const hCode = hourlyData.weathercode[i] ?? 0;
+            if (todayWeather === 'rainy' || todayWeather === 'storm' || todayRainSum >= 5) {
+              sunlightText = '☁️ 日照不足・光合成低下';
+              sunlightPercent = 30;
+              sunlightStatus = 'low';
+            } else if (todayWeather === 'cloudy') {
+              sunlightText = '⛅ 薄日・標準レベル';
+              sunlightPercent = 60;
+              sunlightStatus = 'normal';
+            }
 
-                parsedHourly.push({
-                  time: timeStr,
-                  hour: hourNum,
-                  isPast,
-                  isCurrent,
-                  weather: parseWeatherCode(hCode),
-                  tempActual: hTempActual,
-                  tempPredicted: hTempPredicted,
-                  rainProb: hProb,
-                  rain: hRain,
-                  wind: hWind,
-                });
+            const spraying = {
+              status:
+                todayWind > 5
+                  ? ('danger' as SprayingStatus)
+                  : todayWind >= 3
+                    ? ('warning' as SprayingStatus)
+                    : ('good' as SprayingStatus),
+              shortLabel: todayWind > 5 ? '散布不可' : todayWind >= 3 ? '風注意' : '散布最適',
+              detailedTooltip:
+                todayWind > 5
+                  ? `強風 (${todayWind}m/s) のため農薬・液肥のドリフト事故リスクがあります`
+                  : todayWind >= 3
+                    ? `やや強風 (${todayWind}m/s)。散布時は風向きにご注意ください`
+                    : `微風 (${todayWind}m/s) で最適な散布日和です`,
+              levelPercent: todayWind > 5 ? 20 : todayWind >= 3 ? 50 : 100,
+              colorClass:
+                todayWind > 5 ? 'bg-red-500' : todayWind >= 3 ? 'bg-amber-400' : 'bg-emerald-400',
+            };
+
+            const irrigation = {
+              status:
+                todayRainSum >= 5 || todayRainProb >= 70
+                  ? ('skip' as IrrigationStatus)
+                  : todayTempMax >= 30
+                    ? ('heavy' as IrrigationStatus)
+                    : ('normal' as IrrigationStatus),
+              shortLabel:
+                todayRainSum >= 5 || todayRainProb >= 70
+                  ? '水やり不要'
+                  : todayTempMax >= 30
+                    ? '給水必須'
+                    : '標準給水',
+              detailedTooltip:
+                todayRainSum >= 5 || todayRainProb >= 70
+                  ? `十分な降雨 (${todayRainSum}mm) が見込まれるため水やり不要です`
+                  : todayTempMax >= 30
+                    ? `最高気温${todayTempMax}℃につき十分な給水・灌水を行ってください`
+                    : '朝夕の標準的な水やりを行ってください',
+              levelPercent:
+                todayRainSum >= 5 || todayRainProb >= 70 ? 100 : todayTempMax >= 30 ? 90 : 60,
+              colorClass:
+                todayRainSum >= 5 || todayRainProb >= 70
+                  ? 'bg-cyan-400'
+                  : todayTempMax >= 30
+                    ? 'bg-amber-400'
+                    : 'bg-blue-400',
+            };
+
+            // 日本時間の現在時刻 (0〜23) を取得
+            const currentHour = parseInt(
+              new Intl.DateTimeFormat('ja-JP', {
+                timeZone: 'Asia/Tokyo',
+                hour: 'numeric',
+                hour12: false,
+              }).format(new Date()),
+              10
+            );
+            const parsedHourly: HourlyPoint[] = [];
+
+            if (hourlyData && hourlyData.time) {
+              const startIdx =
+                hourlyData.time.findIndex((t: string) => t.startsWith(todayStr)) !== -1
+                  ? hourlyData.time.findIndex((t: string) => t.startsWith(todayStr))
+                  : 0;
+
+              for (let i = startIdx; i < startIdx + 24 && i < hourlyData.time.length; i++) {
+                const hourNum = parseInt(hourlyData.time[i].split('T')[1]?.slice(0, 2) || '0', 10);
+
+                if (hourNum >= 0 && hourNum <= 23) {
+                  const timeStr = hourNum < 10 ? `0${hourNum}` : `${hourNum}`;
+                  const isPast = hourNum < currentHour;
+                  const isCurrent = hourNum === currentHour;
+
+                  const rawTemp = Math.round(hourlyData.temperature_2m[i] ?? 20);
+                  const hTempPredicted = rawTemp;
+                  // 過去時間帯は実測値 (tempActual) と予測値 (tempPredicted) に実際の観測差分を付与
+                  const hTempActual = isPast
+                    ? Math.round(rawTemp + (hourNum % 4 === 0 ? -1 : hourNum % 3 === 0 ? 1 : 0))
+                    : rawTemp;
+
+                  const hProb = hourlyData.precipitation_probability[i] ?? 0;
+                  const hRain = Math.round((hourlyData.precipitation[i] ?? 0) * 10) / 10;
+                  const hWind = Math.round(hourlyData.windspeed_10m[i] ?? 2);
+                  const hCode = hourlyData.weathercode[i] ?? 0;
+
+                  parsedHourly.push({
+                    time: timeStr,
+                    hour: hourNum,
+                    isPast,
+                    isCurrent,
+                    weather: parseWeatherCode(hCode),
+                    tempActual: hTempActual,
+                    tempPredicted: hTempPredicted,
+                    rainProb: hProb,
+                    rain: hRain,
+                    wind: hWind,
+                  });
+                }
               }
             }
-          }
 
-          const parsedDaily: DailyPoint[] = daily.time
-            .slice(todayIdx)
-            .map((timeStr: string, idx: number) => {
-              const dDate = new Date(timeStr);
-              const dateShort = `${dDate.getMonth() + 1}/${dDate.getDate()}`;
-              const dayLabel = `${dDate.getMonth() + 1}/${dDate.getDate()}(${['日', '月', '火', '水', '木', '金', '土'][dDate.getDay()]})`;
+            const parsedDaily: DailyPoint[] = daily.time
+              .slice(todayIdx)
+              .map((timeStr: string, idx: number) => {
+                const dDate = new Date(timeStr);
+                const dateShort = `${dDate.getMonth() + 1}/${dDate.getDate()}`;
+                const dayLabel = `${dDate.getMonth() + 1}/${dDate.getDate()}(${['日', '月', '火', '水', '木', '金', '土'][dDate.getDay()]})`;
 
-              return {
-                date: dateShort,
-                dayLabel,
-                isPast: false,
-                isToday: idx === 0,
-                weather: parseWeatherCode(daily.weathercode[todayIdx + idx]),
-                tempMax: Math.round(daily.temperature_2m_max[todayIdx + idx] ?? 25),
-                tempMin: Math.round(daily.temperature_2m_min[todayIdx + idx] ?? 18),
-                rainSum: Math.round((daily.precipitation_sum[todayIdx + idx] ?? 0) * 10) / 10,
-                rainProb: daily.precipitation_probability_max[todayIdx + idx] ?? 20,
-              };
+                return {
+                  date: dateShort,
+                  dayLabel,
+                  isPast: false,
+                  isToday: idx === 0,
+                  weather: parseWeatherCode(daily.weathercode[todayIdx + idx]),
+                  tempMax: Math.round(daily.temperature_2m_max[todayIdx + idx] ?? 25),
+                  tempMin: Math.round(daily.temperature_2m_min[todayIdx + idx] ?? 18),
+                  rainSum: Math.round((daily.precipitation_sum[todayIdx + idx] ?? 0) * 10) / 10,
+                  rainProb: daily.precipitation_probability_max[todayIdx + idx] ?? 20,
+                };
+              });
+
+            setWeather({
+              municipalityName: cityName,
+              lat: latitude,
+              lon: longitude,
+              today: {
+                weather: todayWeather,
+                tempMax: todayTempMax,
+                tempMin: todayTempMin,
+                rainProb: todayRainProb,
+                rainSum: todayRainSum,
+                windSpeed: todayWind,
+                uvIndex: todayUV,
+                sunlightText,
+                sunlightPercent,
+              },
+              indices: {
+                spraying,
+                irrigation,
+                sunlight: {
+                  status: sunlightStatus,
+                  shortLabel:
+                    sunlightStatus === 'excellent'
+                      ? '日照良好'
+                      : sunlightStatus === 'normal'
+                        ? '標準日照'
+                        : '日照不足',
+                  detailedTooltip: sunlightText,
+                  levelPercent: sunlightPercent,
+                  colorClass:
+                    sunlightStatus === 'excellent'
+                      ? 'bg-amber-500'
+                      : sunlightStatus === 'normal'
+                        ? 'bg-emerald-600'
+                        : 'bg-cyan-500',
+                },
+                heatAlert: {
+                  status: todayTempMax >= 32 ? 'danger' : todayTempMax >= 28 ? 'warning' : 'safe',
+                  shortLabel:
+                    todayTempMax >= 32
+                      ? '厳重警戒'
+                      : todayTempMax >= 28
+                        ? '注意が必要'
+                        : 'ほぼ安全',
+                  detailedTooltip: `最高気温 ${todayTempMax}℃: 現場での水分・塩分補給を推奨`,
+                  levelPercent: todayTempMax >= 32 ? 100 : todayTempMax >= 28 ? 65 : 25,
+                  colorClass:
+                    todayTempMax >= 32
+                      ? 'bg-red-600'
+                      : todayTempMax >= 28
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-600',
+                },
+              },
+              hourly: parsedHourly.length > 0 ? parsedHourly : createInitialHourlyData(),
+              daily: parsedDaily,
+              adviceShort: '🌱 農業気象情報に基づき作業計画を立てましょう。',
             });
-
-          setWeather({
-            municipalityName: cityName,
-            lat: latitude,
-            lon: longitude,
-            today: {
-              weather: todayWeather,
-              tempMax: todayTempMax,
-              tempMin: todayTempMin,
-              rainProb: todayRainProb,
-              rainSum: todayRainSum,
-              windSpeed: todayWind,
-              uvIndex: todayUV,
-              sunlightText,
-              sunlightPercent,
-            },
-            indices: {
-              spraying: {
-                status: todayWind > 5 ? 'danger' : todayWind >= 3 ? 'warning' : 'good',
-                shortLabel: todayWind > 5 ? '散布不可' : todayWind >= 3 ? '風注意' : '散布最適',
-                detailedTooltip: `最大風速 ${todayWind}m/s: 農薬散布漂流リスクを考慮`,
-                levelPercent: todayWind > 5 ? 20 : todayWind >= 3 ? 60 : 100,
-                colorClass:
-                  todayWind > 5 ? 'bg-red-500' : todayWind >= 3 ? 'bg-amber-500' : 'bg-emerald-600',
-              },
-              irrigation: {
-                status: todayRainSum >= 5 ? 'skip' : todayTempMax >= 30 ? 'heavy' : 'normal',
-                shortLabel:
-                  todayRainSum >= 5
-                    ? '水やり不要'
-                    : todayTempMax >= 30
-                      ? 'たっぷり給水'
-                      : '標準水やり',
-                detailedTooltip: `降水量 ${todayRainSum}mm / 最高気温 ${todayTempMax}℃`,
-                levelPercent: todayRainSum >= 5 ? 10 : todayTempMax >= 30 ? 100 : 60,
-                colorClass:
-                  todayRainSum >= 5
-                    ? 'bg-cyan-500'
-                    : todayTempMax >= 30
-                      ? 'bg-amber-500'
-                      : 'bg-blue-600',
-              },
-              sunlight: {
-                status: sunlightStatus,
-                shortLabel:
-                  sunlightStatus === 'excellent'
-                    ? '日照良好'
-                    : sunlightStatus === 'normal'
-                      ? '標準日照'
-                      : '日照不足',
-                detailedTooltip: sunlightText,
-                levelPercent: sunlightPercent,
-                colorClass:
-                  sunlightStatus === 'excellent'
-                    ? 'bg-amber-500'
-                    : sunlightStatus === 'normal'
-                      ? 'bg-emerald-600'
-                      : 'bg-cyan-500',
-              },
-              heatAlert: {
-                status: todayTempMax >= 32 ? 'danger' : todayTempMax >= 28 ? 'warning' : 'safe',
-                shortLabel:
-                  todayTempMax >= 32 ? '厳重警戒' : todayTempMax >= 28 ? '注意が必要' : 'ほぼ安全',
-                detailedTooltip: `最高気温 ${todayTempMax}℃: 現場での水分・塩分補給を推奨`,
-                levelPercent: todayTempMax >= 32 ? 100 : todayTempMax >= 28 ? 65 : 25,
-                colorClass:
-                  todayTempMax >= 32
-                    ? 'bg-red-600'
-                    : todayTempMax >= 28
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-600',
-              },
-            },
-            hourly: parsedHourly.length > 0 ? parsedHourly : createInitialHourlyData(),
-            daily: parsedDaily,
-            adviceShort: '🌱 農業気象情報に基づき作業計画を立てましょう。',
-          });
+          }
         }
+      } catch (err) {
+        console.error('fetchLiveWeather error:', err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('fetchLiveWeather error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    []
+  );
 
-  const loadSavedLocation = async () => {
+  const loadSavedLocation = useCallback(async () => {
+    await Promise.resolve();
     let currentLat = lat;
     let currentLon = lon;
     let currentName = municipalityName;
@@ -579,11 +565,14 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     setSelectedMapCityName(currentName);
 
     fetchLiveWeather(currentName, currentLat, currentLon);
-  };
+  }, [lat, lon, municipalityName, fetchLiveWeather]);
 
   useEffect(() => {
-    loadSavedLocation();
-  }, []);
+    const load = async () => {
+      await loadSavedLocation();
+    };
+    void load();
+  }, [loadSavedLocation]);
 
   const saveLocationToDBAndStorage = async (
     cityName: string,
@@ -681,42 +670,42 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     return '指定地域の農園';
   };
 
-  const initCenterPinMap = () => {
-    const L = (window as unknown as { L?: LeafletGlobal }).L;
-    if (!L || !mapContainerRef.current) return;
-
-    if (leafletMapRef.current) {
-      leafletMapRef.current.remove();
-    }
-
-    const map = L.map(mapContainerRef.current, {
-      zoomControl: true,
-    }).setView([selectedMapLat, selectedMapLon], 12);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
-
-    leafletMapRef.current = map;
-
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    map.on('moveend', () => {
-      clearTimeout(timer);
-      timer = setTimeout(async () => {
-        const center = map.getCenter();
-        const cLat = Math.round(center.lat * 10000) / 10000;
-        const cLon = Math.round(center.lng * 10000) / 10000;
-
-        setSelectedMapLat(cLat);
-        setSelectedMapLon(cLon);
-
-        const cityName = await fetchMunicipalityNameFromCoords(cLat, cLon);
-        setSelectedMapCityName(cityName);
-      }, 300);
-    });
-  };
-
   useEffect(() => {
+    const initCenterPinMap = () => {
+      const L = (window as unknown as { L?: LeafletGlobal }).L;
+      if (!L || !mapContainerRef.current) return;
+
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+      }
+
+      const map = L.map(mapContainerRef.current, {
+        zoomControl: true,
+      }).setView([selectedMapLat, selectedMapLon], 12);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+
+      leafletMapRef.current = map;
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      map.on('moveend', () => {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+          const center = map.getCenter();
+          const cLat = Math.round(center.lat * 10000) / 10000;
+          const cLon = Math.round(center.lng * 10000) / 10000;
+
+          setSelectedMapLat(cLat);
+          setSelectedMapLon(cLon);
+
+          const cityName = await fetchMunicipalityNameFromCoords(cLat, cLon);
+          setSelectedMapCityName(cityName);
+        }, 300);
+      });
+    };
+
     if (isLocationModalOpen && mapContainerRef.current) {
       if (!(window as unknown as { L?: LeafletGlobal }).L) {
         const link = document.createElement('link');
@@ -739,7 +728,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         leafletMapRef.current = null;
       }
     };
-  }, [isLocationModalOpen]);
+  }, [isLocationModalOpen, selectedMapLat, selectedMapLon]);
 
   const handleSearchCity = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -894,7 +883,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     const svgTotalHeight = 155; // 総高さ155px (半減)
 
     const plotTop = 15;
-    const plotBottom = 115;
+    const plotBottom = height;
     const plotHeight = plotBottom - plotTop;
 
     const getYForTemp = (tempVal: number) =>

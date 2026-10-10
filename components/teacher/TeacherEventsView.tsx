@@ -23,7 +23,7 @@ export default function TeacherEventsView() {
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [farmName, setFarmName] = useState<string>(() => {
+  const [farmName] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('nouato_current_farm_name') || '当農園';
     }
