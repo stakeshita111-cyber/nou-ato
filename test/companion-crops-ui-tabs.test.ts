@@ -185,5 +185,37 @@ describe('混植（コンパニオンプランツ）UI・タブ絞り込み機�
       const allCrops = getBedAllCrops(null, pastRecords as CropRecord[]);
       expect(allCrops).toEqual(['きゅうり']);
     });
+
+    it('ノートに【ミニトマト、きゅうり】のように複数品種が合体してタグ付けされていても、単一品種に分解され合体タブが生成されないこと', () => {
+      const pastRecords: Partial<CropRecord>[] = [
+        { crop_name: 'ミニトマト、きゅうり', notes: '【ミニトマト、きゅうり】2品種目' },
+        { crop_name: 'きゃべつ', notes: '【きゃべつ】キャベツ健苗定植' },
+      ];
+
+      const allCrops = getBedAllCrops(
+        'ミニトマト、きゃべつ、きゅうり、ミニトマト、きゅうり',
+        pastRecords as CropRecord[]
+      );
+
+      // 重複せず、かつ合体した「ミニトマト、きゅうり」という単一要素は存在しないこと
+      expect(allCrops).toEqual(['ミニトマト', 'きゃべつ', 'きゅうり']);
+      expect(allCrops).not.toContain('ミニトマト、きゅうり');
+    });
+  });
+
+  describe('#6 複数品種記録の各品種タブへの正確な割り振り (isRecordMatchingCrop)', () => {
+    it('【ミニトマト、きゅうり】の記録は、ミニトマトタブときゅうりタブの両方に割り振られること', () => {
+      const multiRecordNotes = '【ミニトマト、きゅうり】2品種のわき芽かきと水やり';
+      const multiCropName = 'ミニトマト、きゅうり';
+
+      // ミニトマトタブで表示対象となること
+      expect(isRecordMatchingCrop(multiCropName, multiRecordNotes, 'ミニトマト')).toBe(true);
+
+      // きゅうりタブでも表示対象となること
+      expect(isRecordMatchingCrop(multiCropName, multiRecordNotes, 'きゅうり')).toBe(true);
+
+      // 無関係なきゃべつタブでは除外されること
+      expect(isRecordMatchingCrop(multiCropName, multiRecordNotes, 'きゃべつ')).toBe(false);
+    });
   });
 });

@@ -76,8 +76,12 @@ export function getBedAllCrops(
   bedCropName?: string | null,
   records: Array<{ crop_name?: string | null; notes?: string | null }> = []
 ): string[] {
-  const cropSet = new Set<string>(parseCrops(bedCropName));
+  const cropSet = new Set<string>();
 
+  // 1. 畝の登録名から品種を分解して追加
+  parseCrops(bedCropName).forEach((c) => cropSet.add(c));
+
+  // 2. 各記録の crop_name および notes 内の【品種タグ】から分解して追加
   records.forEach((r) => {
     if (r.crop_name) {
       parseCrops(r.crop_name).forEach((c) => cropSet.add(c));
@@ -85,19 +89,28 @@ export function getBedAllCrops(
     if (r.notes) {
       const matches = Array.from(r.notes.matchAll(/【(.*?)】/g));
       matches.forEach((m) => {
-        const tag = m[1].trim();
-        if (
-          tag &&
-          tag !== '全体共通' &&
-          tag !== '未確定 🌱' &&
-          tag !== '未確定' &&
-          tag !== '手入れ' &&
-          !tag.includes('収穫完了') &&
-          !tag.includes('返信') &&
-          !tag.startsWith('畝')
-        ) {
-          cropSet.add(tag);
-        }
+        const rawTag = m[1].trim();
+        // 括弧付き表記（例: "畝 1 (ミニトマト、きゅうり)"）なら括弧内を取り出す
+        const bracketMatch = rawTag.match(/\((.*?)\)/);
+        const targetString = bracketMatch ? bracketMatch[1] : rawTag;
+
+        // カンマや読点で各単一品種に分解
+        const subCrops = parseCrops(targetString);
+        subCrops.forEach((c) => {
+          if (
+            c &&
+            c !== '全体共通' &&
+            c !== '未確定 🌱' &&
+            c !== '未確定' &&
+            c !== '未設定' &&
+            c !== '手入れ' &&
+            !c.includes('収穫完了') &&
+            !c.includes('返信') &&
+            !c.startsWith('畝')
+          ) {
+            cropSet.add(c);
+          }
+        });
       });
     }
   });
@@ -107,6 +120,7 @@ export function getBedAllCrops(
 
 /**
  * 記録が対象の作目に合致しているかを判定（#2: 品種フィルタータブ用）
+ * 複数品種が記録されたログ（例: 【ミニトマト、きゅうり】）は各対象品種タブの両方に正しく割り振られる
  * @param recordCropName 記録に保存されている crop_name
  * @param recordNotes 記録の本文（【きゅうり】タグ等を含む）
  * @param targetCrop 絞り込み対象の品種名、または 'all'（全件）
@@ -121,25 +135,31 @@ export function isRecordMatchingCrop(
   const cleanTarget = targetCrop.trim();
   if (!cleanTarget) return true;
 
-  // 1. notes に【作目タグ】が明記されている場合はそれを最優先判定
+  // 1. notes に【作目タグ】が明記されている場合はそれを最優先判定（タグが存在すればタグで完結判定）
   if (recordNotes) {
     const tagMatch = recordNotes.match(/【(.*?)】/);
     if (tagMatch) {
       const tagContent = tagMatch[1].trim();
-      return tagContent === cleanTarget || tagContent.includes(cleanTarget);
+      const bracketMatch = tagContent.match(/\((.*?)\)/);
+      const targetString = bracketMatch ? bracketMatch[1] : tagContent;
+      const cropsInTag = parseCrops(targetString);
+
+      // 管理系タグ（全体共通など）以外の場合はタグで厳密判定
+      if (
+        targetString !== '全体共通' &&
+        !targetString.includes('収穫完了') &&
+        !targetString.includes('返信') &&
+        !targetString.startsWith('畝')
+      ) {
+        return cropsInTag.includes(cleanTarget) || targetString.includes(cleanTarget);
+      }
     }
   }
 
-  // 2. タグがない場合は recordCropName を判定
+  // 2. 作目タグがない場合は recordCropName を判定
   if (recordCropName) {
     const crops = parseCrops(recordCropName);
-    if (crops.length === 1 && crops[0] === cleanTarget) {
-      return true;
-    }
-    if (crops.length > 1 && crops.includes(cleanTarget)) {
-      return true;
-    }
-    if (recordCropName === cleanTarget) {
+    if (crops.includes(cleanTarget) || recordCropName.includes(cleanTarget)) {
       return true;
     }
   }
