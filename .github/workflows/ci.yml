@@ -37,6 +37,9 @@ jobs:
         with:
           version: latest
 
+      - name: Start Supabase Local Database
+        run: supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
       - name: Verify Supabase Migrations with Database Linter
         run: supabase db lint --level error
 
