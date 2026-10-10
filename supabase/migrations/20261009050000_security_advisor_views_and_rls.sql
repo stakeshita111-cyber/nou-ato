@@ -123,7 +123,25 @@ CREATE POLICY "student_tasks_select_policy" ON public.student_tasks
         auth.uid() = student_id
         OR (
             public.current_user_role() = 'teacher'
-            AND farm_id = public.current_user_farm_id()
+            AND EXISTS (
+                SELECT 1 FROM public.users u
+                WHERE u.id = student_tasks.student_id
+                  AND u.farm_id = public.current_user_farm_id()
+            )
+        )
+    );
+
+DROP POLICY IF EXISTS "student_tasks_insert_policy" ON public.student_tasks;
+CREATE POLICY "student_tasks_insert_policy" ON public.student_tasks
+    FOR INSERT WITH CHECK (
+        auth.uid() = student_id
+        OR (
+            public.current_user_role() = 'teacher'
+            AND EXISTS (
+                SELECT 1 FROM public.users u
+                WHERE u.id = student_tasks.student_id
+                  AND u.farm_id = public.current_user_farm_id()
+            )
         )
     );
 
@@ -133,7 +151,11 @@ CREATE POLICY "student_tasks_update_policy" ON public.student_tasks
         auth.uid() = student_id
         OR (
             public.current_user_role() = 'teacher'
-            AND farm_id = public.current_user_farm_id()
+            AND EXISTS (
+                SELECT 1 FROM public.users u
+                WHERE u.id = student_tasks.student_id
+                  AND u.farm_id = public.current_user_farm_id()
+            )
         )
     );
 
@@ -141,40 +163,166 @@ DROP POLICY IF EXISTS "student_tasks_delete_policy" ON public.student_tasks;
 CREATE POLICY "student_tasks_delete_policy" ON public.student_tasks
     FOR DELETE USING (
         public.current_user_role() = 'teacher'
-        AND farm_id = public.current_user_farm_id()
+        AND EXISTS (
+            SELECT 1 FROM public.users u
+            WHERE u.id = student_tasks.student_id
+              AND u.farm_id = public.current_user_farm_id()
+        )
     );
 
 -- crop_records: 生徒本人のみ作成・閲覧、講師は自農園の生徒作物を閲覧
 DROP POLICY IF EXISTS "crop_records_select_policy" ON public.crop_records;
 CREATE POLICY "crop_records_select_policy" ON public.crop_records
     FOR SELECT USING (
-        auth.uid() = student_id
-        OR (
-            public.current_user_role() = 'teacher'
-            AND EXISTS (
-                SELECT 1 FROM public.farm_beds b
-                WHERE b.id = crop_records.bed_id
-                  AND b.farm_id = public.current_user_farm_id()
-            )
+        EXISTS (
+            SELECT 1 FROM public.farm_beds b
+            WHERE b.id = crop_records.bed_id
+              AND (
+                  b.student_id = auth.uid()
+                  OR EXISTS (
+                      SELECT 1 FROM public.farm_plots p
+                      WHERE p.id = b.plot_id
+                        AND p.farm_id = public.current_user_farm_id()
+                  )
+              )
         )
     );
 
 DROP POLICY IF EXISTS "crop_records_insert_policy" ON public.crop_records;
 CREATE POLICY "crop_records_insert_policy" ON public.crop_records
-    FOR INSERT WITH CHECK (auth.uid() = student_id);
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.farm_beds b
+            WHERE b.id = crop_records.bed_id
+              AND (
+                  b.student_id = auth.uid()
+                  OR (
+                      public.current_user_role() = 'teacher'
+                      AND EXISTS (
+                          SELECT 1 FROM public.farm_plots p
+                          WHERE p.id = b.plot_id
+                            AND p.farm_id = public.current_user_farm_id()
+                      )
+                  )
+              )
+        )
+    );
 
--- farm_beds / farm_plots / tasks: 自農園所属者のみ閲覧、講師のみ編集
+DROP POLICY IF EXISTS "crop_records_modify_policy" ON public.crop_records;
+CREATE POLICY "crop_records_modify_policy" ON public.crop_records
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.farm_beds b
+            WHERE b.id = crop_records.bed_id
+              AND (
+                  b.student_id = auth.uid()
+                  OR (
+                      public.current_user_role() = 'teacher'
+                      AND EXISTS (
+                          SELECT 1 FROM public.farm_plots p
+                          WHERE p.id = b.plot_id
+                            AND p.farm_id = public.current_user_farm_id()
+                      )
+                  )
+              )
+        )
+    );
+
+-- farm_plots: 自農園所属者のみ閲覧、講師のみ編集
 DROP POLICY IF EXISTS "farm_plots_select_policy" ON public.farm_plots;
 CREATE POLICY "farm_plots_select_policy" ON public.farm_plots
     FOR SELECT USING (farm_id = public.current_user_farm_id());
 
+DROP POLICY IF EXISTS "farm_plots_modify_policy" ON public.farm_plots;
+CREATE POLICY "farm_plots_modify_policy" ON public.farm_plots
+    FOR ALL USING (
+        public.current_user_role() = 'teacher'
+        AND farm_id = public.current_user_farm_id()
+    );
+
+-- farm_beds: 生徒本人または自農園所属者のみ閲覧、講師および担当生徒のみ編集
 DROP POLICY IF EXISTS "farm_beds_select_policy" ON public.farm_beds;
 CREATE POLICY "farm_beds_select_policy" ON public.farm_beds
-    FOR SELECT USING (farm_id = public.current_user_farm_id());
+    FOR SELECT USING (
+        student_id = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM public.farm_plots p
+            WHERE p.id = farm_beds.plot_id
+              AND p.farm_id = public.current_user_farm_id()
+        )
+    );
 
+DROP POLICY IF EXISTS "farm_beds_modify_policy" ON public.farm_beds;
+CREATE POLICY "farm_beds_modify_policy" ON public.farm_beds
+    FOR ALL USING (
+        (
+            public.current_user_role() = 'teacher'
+            AND EXISTS (
+                SELECT 1 FROM public.farm_plots p
+                WHERE p.id = farm_beds.plot_id
+                  AND p.farm_id = public.current_user_farm_id()
+            )
+        )
+        OR (
+            student_id = auth.uid()
+        )
+    );
+
+-- tasks: 自農園所属者のみ閲覧、講師のみ作成・編集・削除
 DROP POLICY IF EXISTS "tasks_select_policy" ON public.tasks;
 CREATE POLICY "tasks_select_policy" ON public.tasks
     FOR SELECT USING (farm_id = public.current_user_farm_id());
+
+DROP POLICY IF EXISTS "tasks_modify_policy" ON public.tasks;
+CREATE POLICY "tasks_modify_policy" ON public.tasks
+    FOR ALL USING (
+        public.current_user_role() = 'teacher'
+        AND farm_id = public.current_user_farm_id()
+    );
+
+-- events: 全員閲覧、講師のみ作成・更新・削除
+DROP POLICY IF EXISTS "events_select_policy" ON public.events;
+CREATE POLICY "events_select_policy" ON public.events
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "events_modify_policy" ON public.events;
+CREATE POLICY "events_modify_policy" ON public.events
+    FOR ALL USING (public.current_user_role() = 'teacher');
+
+-- reservations: 本人または講師のみ閲覧・操作
+DROP POLICY IF EXISTS "reservations_select_policy" ON public.reservations;
+CREATE POLICY "reservations_select_policy" ON public.reservations
+    FOR SELECT USING (auth.uid() = student_id OR public.current_user_role() = 'teacher');
+
+DROP POLICY IF EXISTS "reservations_modify_policy" ON public.reservations;
+CREATE POLICY "reservations_modify_policy" ON public.reservations
+    FOR ALL USING (auth.uid() = student_id OR public.current_user_role() = 'teacher');
+
+-- payments: 本人または自農園講師のみ閲覧・操作
+DROP POLICY IF EXISTS "payments_select_policy" ON public.payments;
+CREATE POLICY "payments_select_policy" ON public.payments
+    FOR SELECT USING (
+        auth.uid() = student_id
+        OR (
+            public.current_user_role() = 'teacher'
+            AND EXISTS (
+                SELECT 1 FROM public.users u
+                WHERE u.id = payments.student_id
+                  AND u.farm_id = public.current_user_farm_id()
+            )
+        )
+    );
+
+DROP POLICY IF EXISTS "payments_modify_policy" ON public.payments;
+CREATE POLICY "payments_modify_policy" ON public.payments
+    FOR ALL USING (
+        public.current_user_role() = 'teacher'
+        AND EXISTS (
+            SELECT 1 FROM public.users u
+            WHERE u.id = payments.student_id
+              AND u.farm_id = public.current_user_farm_id()
+        )
+    );
 
 -- ------------------------------------------------------------------------------
 -- 5. SECURITY DEFINER 関数の search_path セキュリティ保護の再確認
