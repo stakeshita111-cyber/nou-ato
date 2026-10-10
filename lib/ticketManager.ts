@@ -34,13 +34,6 @@ export function getJstDateString(): string {
 }
 
 /**
- * 秘密の呪文判定（廃止のため常に false を返却）
- */
-export function isSecretTicketSpell(_text: string): boolean {
-  return false;
-}
-
-/**
  * ローカルストレージからチケット情報を取得（JST 0:00 を過ぎていれば自動リセット）
  */
 
@@ -120,7 +113,7 @@ export function getTicketState(
       dailyLimit: parsed.dailyLimit || customLimit,
       isUnlimited: false,
     };
-  } catch (e) {
+  } catch {
     return {
       date: todayJst,
       count: customLimit,
@@ -199,7 +192,7 @@ export function grantTicket(
           new CustomEvent('nouato_tickets_updated', { detail: { userId, updated } })
         );
         window.dispatchEvent(new Event('nouato_sync_event'));
-      } catch (e) {
+      } catch {
         // ignore event errors
       }
     }
@@ -210,7 +203,7 @@ export function grantTicket(
         bc.postMessage({ type: 'TICKETS_UPDATED', userId, updated, timestamp: Date.now() });
         bc.close();
       }
-    } catch (e) {
+    } catch {
       // ignore channel errors
     }
   }
@@ -231,7 +224,7 @@ export function getQuestionStock(userId: string = 'default'): string[] {
   try {
     const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }

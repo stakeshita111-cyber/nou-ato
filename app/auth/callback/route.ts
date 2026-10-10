@@ -92,7 +92,7 @@ export async function GET(request: Request) {
           }
 
           // 3. 農園紐づけ (join_farm RPC を使用して安全に更新)
-          if (userRole !== 'teacher' && farmIdParam && farmIdParam !== 'tanaka_farm') {
+          if (userRole !== 'teacher' && farmIdParam) {
             const { error: joinErr } = await supabase.rpc('join_farm', {
               invite_code: farmIdParam,
             });

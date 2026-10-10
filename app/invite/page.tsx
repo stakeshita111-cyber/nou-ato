@@ -36,7 +36,7 @@ function InviteContent() {
           // IDによる直検索
           let { data: farm, error: farmErr } = await supabase
             .from('farms')
-            .select('id, name, owner_id, owner_name, invite_code')
+            .select('id, name, owner_id, invite_code')
             .eq('id', farmIdParam)
             .single();
 
@@ -44,7 +44,7 @@ function InviteContent() {
             // invite_code での検索を試行
             const { data: farmByCode, error: codeErr } = await supabase
               .from('farms')
-              .select('id, name, owner_id, owner_name, invite_code')
+              .select('id, name, owner_id, invite_code')
               .eq('invite_code', farmIdParam)
               .single();
             if (!codeErr && farmByCode) {
@@ -58,7 +58,7 @@ function InviteContent() {
             setSelectedFarmId(farm.id);
             setIsDemo(false);
 
-            let teacherDisplayName = farm.owner_name || '';
+            let teacherDisplayName = '';
 
             // owner_id があれば users テーブルから表示名を取得
             if (!teacherDisplayName && farm.owner_id) {
@@ -199,7 +199,7 @@ function InviteContent() {
         }
 
         // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を呼び出し)
-        if (targetFarmId && targetFarmId !== 'tanaka_farm') {
+        if (targetFarmId) {
           const { error: joinErr } = await supabase.rpc('join_farm', { invite_code: targetFarmId });
           if (joinErr) {
             console.error('join_farm error:', joinErr);

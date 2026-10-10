@@ -25,6 +25,7 @@
 *.pem
 *.tsv
 scratch/
+supabase/.temp/
 
 # debug
 npm-debug.log*
