@@ -65,6 +65,16 @@ const mockRecords: CropRecord[] = [
   },
 ];
 
+const mockJournals = [
+  {
+    id: 'journal-lettuce-1',
+    student_id: 'student-1',
+    content: 'レタスの苗が虫食いで育ちませんでした。対策教えて',
+    reply: 'こんにちは！レタスの苗が虫食いで思うように育たなかったとのこと...',
+    created_at: '2026-10-05T14:49:00Z',
+  },
+];
+
 vi.mock('@/hooks/useFarmManager', () => ({
   useFarmManager: () => ({
     plots: [mockPlot],
@@ -80,10 +90,14 @@ vi.mock('@/hooks/useFarmManager', () => ({
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          order: () => Promise.resolve({ data: [], error: null }),
+          order: () =>
+            Promise.resolve({
+              data: table === 'journals' ? mockJournals : [],
+              error: null,
+            }),
         }),
       }),
       insert: () => Promise.resolve({ error: null }),
@@ -92,37 +106,57 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 & 案BタイムラインUI検証', () => {
+describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 & 共通タイムライン分離検証', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Element.prototype.scrollIntoView のモック
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it('全体共有バーが最上部に表示され、タップすると全体共有タイムラインが表示されること', async () => {
+  it('共通バーが最上部に表示され、タップすると共通タイムラインが表示されること', async () => {
     render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
 
-    // 全体共有切り替えバーが存在すること
-    const sharedBar = screen.getByRole('button', {
-      name: /全体共有（区画全体 \/ 共通作業）/,
-    });
+    // 共通切り替えバーが存在すること（補足なしのシンプルな「共通」ボタン）
+    const sharedBar = screen.getAllByRole('button', { name: /共通/ })[0];
     expect(sharedBar).toBeDefined();
 
-    // タップして全体共有タイムラインを表示
+    // タップして共通タイムラインを表示
     await act(async () => {
       fireEvent.click(sharedBar);
       await new Promise((r) => setTimeout(r, 100));
     });
 
-    expect(screen.getByText('🌐 全体共有・共通作業の記録')).toBeDefined();
+    expect(screen.getByText('🌐 共通の記録')).toBeDefined();
     expect(screen.getAllByText(/全 1 件/).length).toBeGreaterThan(0);
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('特定作物(レタス)の相談・返信は共通タイムラインから除外され、畝2(レタス)にのみ表示されること', async () => {
+    render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
+
+    // 1. 共通を選択
+    const sharedBar = screen.getAllByRole('button', { name: /共通/ })[0];
+    await act(async () => {
+      fireEvent.click(sharedBar);
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    // 共通タイムラインにはレタスの返信が表示されないこと
+    expect(screen.queryByText(/レタスの苗が虫食いで育ちませんでした/)).toBeNull();
+
+    // 2. 畝2 (レタス) を選択
+    const bed2Btn = screen.getByRole('button', { name: /畝 2/ });
+    await act(async () => {
+      fireEvent.click(bed2Btn);
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    // 畝2のタイムラインにはレタスの返信が表示されること
+    expect(screen.getByText(/レタスの苗が虫食いで育ちませんでした/)).toBeDefined();
   });
 
   it('畝ボタンをタップすると、その畝のタイムラインが表示されスムーズスクロールが呼ばれること', async () => {
     render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
 
-    // 畝1ボタンをタップ
     const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
     await act(async () => {
       fireEvent.click(bed1Btn);
@@ -130,20 +164,18 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
     });
 
     expect(screen.getByText(/📅 畝 1 \(きゅうり\) の記録/)).toBeDefined();
-    expect(screen.getByText('👇 現在表示中')).toBeDefined();
+    expect(screen.queryByText('👇 現在表示中')).toBeNull();
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
-  it('過去の観察記録の編集モーダルを開いたとき、セレクトボックスがロック解除されており、全体共有へ変更して保存できること', async () => {
+  it('過去の観察記録の編集モーダルを開いたとき、セレクトボックスがロック解除されており、共通へ変更して保存できること', async () => {
     render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
 
-    // 畝1を選択してタイムラインを表示
     const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
     await act(async () => {
       fireEvent.click(bed1Btn);
     });
 
-    // 編集ボタンをクリック
     const editBtn = screen.getByText('✏️ 編集');
     await act(async () => {
       fireEvent.click(editBtn);
@@ -151,24 +183,21 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
 
     expect(screen.getByText('✏️ 過去の観察記録を編集')).toBeDefined();
 
-    // セレクトボックスを取得
     const select = screen.getByRole('combobox') as HTMLSelectElement;
-    expect(select.disabled).toBe(false); // disabled が解除されていること
+    expect(select.disabled).toBe(false);
     expect(select.value).toBe('bed-1');
 
-    // 「全体共有」に切り替え
+    // 「共通」に切り替え
     await act(async () => {
       fireEvent.change(select, { target: { value: 'shared' } });
     });
     expect(select.value).toBe('shared');
 
-    // 保存ボタンをクリック
     const submitBtn = screen.getByText('変更内容を更新する');
     await act(async () => {
       fireEvent.click(submitBtn);
     });
 
-    // updateCropRecord が bed_id: null, plot_id: 'plot-A1' で呼ばれたこと（畝1から全体共有へ引っ越し成功）
     expect(mockUpdateCropRecord).toHaveBeenCalledTimes(1);
     const [recIdArg, payloadArg] = mockUpdateCropRecord.mock.calls[0];
     expect(recIdArg).toBe('rec-1');
@@ -179,20 +208,17 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
   it('過去の観察記録を別の畝（畝1から畝2）に変更して保存できること', async () => {
     render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
 
-    // 畝1を選択
     const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
     await act(async () => {
       fireEvent.click(bed1Btn);
     });
 
-    // 編集ボタンをクリック
     const editBtn = screen.getByText('✏️ 編集');
     await act(async () => {
       fireEvent.click(editBtn);
     });
 
     const select = screen.getByRole('combobox') as HTMLSelectElement;
-    // 「畝2」に切り替え
     await act(async () => {
       fireEvent.change(select, { target: { value: 'bed-2' } });
     });

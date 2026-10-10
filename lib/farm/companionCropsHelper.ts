@@ -45,6 +45,67 @@ export function formatBedCropLabel(cropName?: string | null): string {
 }
 
 /**
+ * 既存の品種文字列と新しく入力された品種を安全にマージ（混植追加時に既存品種を消さない）
+ * 例: ("きゅうり", "ミニトマト") -> "きゅうり、ミニトマト"
+ * 例: ("きゅうり、ミニトマト", "きゅうり") -> "きゅうり、ミニトマト" (重複排除)
+ * 例: ("", "ミニトマト") -> "ミニトマト"
+ */
+export function mergeCrops(existingCropName?: string | null, newCropName?: string | null): string {
+  const existing = parseCrops(existingCropName);
+  const incoming = parseCrops(newCropName);
+
+  if (existing.length === 0 && incoming.length === 0) {
+    return newCropName?.trim() || existingCropName?.trim() || '未確定 🌱';
+  }
+  if (existing.length === 0) {
+    return incoming.join('、');
+  }
+  if (incoming.length === 0) {
+    return existing.join('、');
+  }
+
+  const merged = Array.from(new Set([...existing, ...incoming]));
+  return merged.join('、');
+}
+
+/**
+ * 畝の登録品種名と、その畝に紐づく過去の記録からすべての品種を漏れなく収集
+ * （畝名が過去に上書きされていても、過去ログから自動的に品種を復元・補完できる）
+ */
+export function getBedAllCrops(
+  bedCropName?: string | null,
+  records: Array<{ crop_name?: string | null; notes?: string | null }> = []
+): string[] {
+  const cropSet = new Set<string>(parseCrops(bedCropName));
+
+  records.forEach((r) => {
+    if (r.crop_name) {
+      parseCrops(r.crop_name).forEach((c) => cropSet.add(c));
+    }
+    if (r.notes) {
+      const matches = Array.from(r.notes.matchAll(/【(.*?)】/g));
+      matches.forEach((m) => {
+        const tag = m[1].trim();
+        if (
+          tag &&
+          tag !== '全体共通' &&
+          tag !== '未確定 🌱' &&
+          tag !== '未確定' &&
+          tag !== '手入れ' &&
+          !tag.includes('収穫完了') &&
+          !tag.includes('返信') &&
+          !tag.startsWith('畝')
+        ) {
+          cropSet.add(tag);
+        }
+      });
+    }
+  });
+
+  return Array.from(cropSet);
+}
+
+/**
  * 記録が対象の作目に合致しているかを判定（#2: 品種フィルタータブ用）
  * @param recordCropName 記録に保存されている crop_name
  * @param recordNotes 記録の本文（【きゅうり】タグ等を含む）

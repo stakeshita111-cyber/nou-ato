@@ -65,7 +65,7 @@ describe('TaskDetailModal Component - 全体共有タスクと畝選択の連動
 
     const select = screen.getByRole('combobox') as HTMLSelectElement;
     expect(select.value).toBe('shared');
-    expect(screen.getByText('🌐 全体共有（区画全体 / 共通作業）')).toBeDefined();
+    expect(screen.getByText('🌐 共通')).toBeDefined();
   });
 
   it('特定作物のタスクの場合、合致する畝が初期選択されること', () => {
@@ -94,7 +94,7 @@ describe('TaskDetailModal Component - 全体共有タスクと畝選択の連動
       />
     );
 
-    const submitBtn = screen.getByText('全体共有に記録して作業完了を報告する');
+    const submitBtn = screen.getByText('共通に記録して作業完了を報告する');
     await act(async () => {
       fireEvent.click(submitBtn);
     });

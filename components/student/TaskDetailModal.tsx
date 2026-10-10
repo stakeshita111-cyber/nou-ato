@@ -488,7 +488,7 @@ export default function TaskDetailModal({
                     onChange={(e) => setSelectedBedId(e.target.value)}
                     className="w-full p-2.5 rounded-xl border-2 border-emerald-600 bg-white text-emerald-950 font-black text-xs cursor-pointer shadow-xs outline-none"
                   >
-                    <option value="shared">🌐 全体共有（区画全体 / 共通作業）</option>
+                    <option value="shared">🌐 共通</option>
                     {myBeds.map((b) => (
                       <option key={b.id} value={b.id}>
                         区画 {myPlot?.code || ''} - 畝 {b.bed_number}
@@ -563,7 +563,7 @@ export default function TaskDetailModal({
                   <span>✓</span>
                   <span>
                     {selectedBedId === 'shared'
-                      ? '全体共有に記録して作業完了を報告する'
+                      ? '共通に記録して作業完了を報告する'
                       : '畝に記録して作業完了を報告する'}
                   </span>
                 </button>

@@ -295,17 +295,29 @@ export default function StudentTalkView({
   }, [messages, isSending, scrollToBottom]);
 
   // 検索ロジック
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
   const matchedMessageIds = useMemo(() => {
     if (!searchKeyword.trim()) return [];
     const q = searchKeyword.trim().toLowerCase();
     return messages.filter((m) => m.text.toLowerCase().includes(q)).map((m) => m.id);
   }, [messages, searchKeyword]);
 
+  const matchedMessagesList = useMemo(() => {
+    if (!searchKeyword.trim()) return [];
+    const q = searchKeyword.trim().toLowerCase();
+    return messages.filter((m) => m.text.toLowerCase().includes(q));
+  }, [messages, searchKeyword]);
+
   const jumpToMessage = useCallback((messageId: string) => {
+    setHighlightedMessageId(messageId);
     const el = messageRefs.current[messageId];
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+    setTimeout(() => {
+      setHighlightedMessageId((curr) => (curr === messageId ? null : curr));
+    }, 3000);
   }, []);
 
   useEffect(() => {
@@ -838,26 +850,8 @@ export default function StudentTalkView({
         </div>
       )}
 
-      {/* 🌟 4. 定型文サジェストチップ (無料・チケット非消費) ＆ 履歴検索 🌟 */}
+      {/* 🌟 4. 定型文サジェストチップ (無料・チケット非消費) 🌟 */}
       <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-200/80 flex items-center space-x-1.5 overflow-x-auto text-[11px] font-bold text-gray-600 shrink-0 scrollbar-none">
-        <button
-          type="button"
-          onClick={() => {
-            setShowSearch(!showSearch);
-            if (showSearch) setSearchKeyword('');
-          }}
-          className={
-            'px-2.5 py-1 rounded-full text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shrink-0 border ' +
-            (showSearch
-              ? 'bg-[#1c4d21] text-white border-[#1c4d21] shadow-2xs'
-              : 'bg-white hover:bg-emerald-50 text-emerald-900 border-emerald-200/80 shadow-2xs')
-          }
-          title="会話履歴を検索"
-        >
-          <span>🔍</span>
-          <span>履歴検索</span>
-        </button>
-
         {PRESET_FAQS.map((faq) => (
           <button
             key={faq.id}

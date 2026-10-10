@@ -3,6 +3,8 @@ import {
   parseCrops,
   formatBedCropLabel,
   isRecordMatchingCrop,
+  mergeCrops,
+  getBedAllCrops,
 } from '@/lib/farm/companionCropsHelper';
 import { CropRecord } from '@/types/farm';
 
@@ -117,6 +119,71 @@ describe('混植（コンパニオンプランツ）UI・タブ絞り込み機�
       expect(taggedNotes).toBe('【ミニトマト】わき芽かきを実施しました。');
       expect(isRecordMatchingCrop(selectedCrop, taggedNotes, 'ミニトマト')).toBe(true);
       expect(isRecordMatchingCrop(selectedCrop, taggedNotes, 'きゅうり')).toBe(false);
+    });
+  });
+
+  describe('#4 品種の安全マージ (mergeCrops: 既存品種の上書き消去を防止)', () => {
+    it('「きゅうり」の畝に「ミニトマト」を追加した際、上書きされずに「きゅうり、ミニトマト」にマージされること', () => {
+      const result = mergeCrops('きゅうり', 'ミニトマト');
+      expect(result).toBe('きゅうり、ミニトマト');
+    });
+
+    it('既に「きゅうり、ミニトマト」が存在するときに「きゅうり」を追加しても重複しないこと', () => {
+      const result = mergeCrops('きゅうり、ミニトマト', 'きゅうり');
+      expect(result).toBe('きゅうり、ミニトマト');
+    });
+
+    it('3品種目「中玉トマト」をさらに追加した際、3品種すべてが保持されること', () => {
+      const result = mergeCrops('きゅうり、ミニトマト', '中玉トマト');
+      expect(result).toBe('きゅうり、ミニトマト、中玉トマト');
+    });
+
+    it('既存が未確定・空文字の場合は新しい品種のみとなること', () => {
+      expect(mergeCrops('未確定 🌱', 'きゅうり')).toBe('きゅうり');
+      expect(mergeCrops('', 'きゅうり')).toBe('きゅうり');
+      expect(mergeCrops(null, 'きゅうり')).toBe('きゅうり');
+    });
+
+    it('新入力が空文字の場合は既存品種がそのまま維持されること', () => {
+      expect(mergeCrops('きゅうり、ミニトマト', '')).toBe('きゅうり、ミニトマト');
+      expect(mergeCrops('きゅうり', null)).toBe('きゅうり');
+    });
+  });
+
+  describe('#5 過去ログからの全品種自動復元・収集 (getBedAllCrops)', () => {
+    it('畝のcrop_nameがミニトマトで上書きされてしまっていても、過去記録からきゅうりを含めた全品種が復元されること', () => {
+      const pastRecords: Partial<CropRecord>[] = [
+        { crop_name: 'きゅうり', notes: '【きゅうり】苗を定植しました' },
+        { crop_name: 'ミニトマト', notes: '【ミニトマト】わき芽かき' },
+      ];
+
+      // 畝のcrop_nameが「ミニトマト」単体になっていたとしても
+      const allCrops = getBedAllCrops('ミニトマト', pastRecords as CropRecord[]);
+      expect(allCrops).toContain('きゅうり');
+      expect(allCrops).toContain('ミニトマト');
+      expect(allCrops).toHaveLength(2);
+    });
+
+    it('記録のnotes内に【品種名】タグが含まれている場合も漏れなく抽出・復元できること', () => {
+      const pastRecords: Partial<CropRecord>[] = [
+        { crop_name: 'きゅうり', notes: '【きゅうり】つるの誘引' },
+        { crop_name: '混植', notes: '【中玉トマト】第2花房が開花' },
+      ];
+
+      const allCrops = getBedAllCrops('きゅうり', pastRecords as CropRecord[]);
+      expect(allCrops).toContain('きゅうり');
+      expect(allCrops).toContain('中玉トマト');
+    });
+
+    it('全体共通や未確定、管理タグ（収穫完了等）は品種として収集されないこと', () => {
+      const pastRecords: Partial<CropRecord>[] = [
+        { crop_name: '全体共通', notes: '【全体共通】畑の清掃' },
+        { crop_name: '未確定 🌱', notes: '【未確定】準備' },
+        { crop_name: 'きゅうり', notes: '【収穫完了】全株撤去' },
+      ];
+
+      const allCrops = getBedAllCrops(null, pastRecords as CropRecord[]);
+      expect(allCrops).toEqual(['きゅうり']);
     });
   });
 });
