@@ -163,13 +163,36 @@ export function useStudentDashboard() {
             const ptId = String(pt.id || '');
             if (ptId && !seenTaskIds.has(ptId)) {
               seenTaskIds.add(ptId);
-              // base_task_id で厳密照合 (タイトル部分一致の誤照合を排除)
+              // base_task_id で厳密照合 (旧データ救済として base_task_id が null の場合はタイトル完全一致も許可)
               const stMatch = stData?.find((st: Record<string, unknown>) => {
                 const baseId = String(st.base_task_id || st.task_id || '');
-                return baseId === ptId || String(st.id) === ptId;
+                if (baseId === ptId || String(st.id) === ptId) return true;
+                if (
+                  !baseId &&
+                  st.title &&
+                  pt.title &&
+                  String(st.title).trim() === String(pt.title).trim()
+                ) {
+                  return true;
+                }
+                return false;
               });
-              const stMatchTyped = stMatch as { id?: string; status?: string } | undefined;
+              const stMatchTyped = stMatch as
+                { id?: string; status?: string; base_task_id?: string | null } | undefined;
               const isDone = stMatchTyped ? stMatchTyped.status === 'completed' : false;
+
+              // 旧データで base_task_id が欠落していた場合はバックグラウンドで自己修復
+              const targetStId = stMatchTyped?.id;
+              if (targetStId && !stMatchTyped.base_task_id) {
+                void (async () => {
+                  try {
+                    await supabase
+                      .from('student_tasks')
+                      .update({ base_task_id: ptId })
+                      .eq('id', targetStId);
+                  } catch {}
+                })();
+              }
 
               const cl = (pt.checklist as Record<string, unknown>) || {};
               const resolvedBadgeName =
@@ -209,6 +232,7 @@ export function useStudentDashboard() {
 
         // ② 生徒の個別割当タスク (student_tasks) に直接存在するタスクも合流
         // ※ ただし、base_task_id がある場合は publicTasks に実在するもののみ許可 (講師完全削除タスクの排除)
+        // ※ すでに ① で照合済みの同名タスクは重複合流を防止
         if (stData && stData.length > 0) {
           stData.forEach((st: Record<string, unknown>) => {
             const baseTaskId = String(st.base_task_id || st.task_id || '');
@@ -225,8 +249,15 @@ export function useStudentDashboard() {
               }
             }
 
+            // すでに ① で処理済みのタスク（またはタイトルが一致する教材タスク）は二重追加しない
+            const alreadyProcessedAsPublic =
+              (baseTaskId && seenTaskIds.has(baseTaskId)) ||
+              publicTasks?.some(
+                (pt: Record<string, unknown>) => String(pt.title).trim() === String(st.title).trim()
+              );
+
             const effectiveKey = baseTaskId || stId;
-            if (effectiveKey && !seenTaskIds.has(effectiveKey)) {
+            if (effectiveKey && !seenTaskIds.has(effectiveKey) && !alreadyProcessedAsPublic) {
               seenTaskIds.add(effectiveKey);
               const isDone = st.status === 'completed';
 
@@ -532,12 +563,25 @@ export function useStudentDashboard() {
       let updated = false;
       if (userSts && userSts.length > 0) {
         for (const st of userSts) {
-          if (st.base_task_id === baseTaskId || st.id === targetTask.id) {
-            updated = true;
-            await supabase
-              .from('student_tasks')
-              .update({ status: 'completed', completed_at: new Date().toISOString() })
-              .eq('id', st.id);
+          if (
+            st.base_task_id === baseTaskId ||
+            st.id === targetTask.id ||
+            (!st.base_task_id && st.id && targetTask.title && st.id === targetTask.id) ||
+            (!st.base_task_id && targetTask.title)
+          ) {
+            // 対象タスクの特定: base_task_id一致、ID一致、または未紐付け同名
+            const isMatch = st.base_task_id === baseTaskId || st.id === targetTask.id;
+            if (isMatch) {
+              updated = true;
+              await supabase
+                .from('student_tasks')
+                .update({
+                  base_task_id: baseTaskId,
+                  status: 'completed',
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', st.id);
+            }
           }
         }
       }
@@ -610,7 +654,11 @@ export function useStudentDashboard() {
             updated = true;
             await supabase
               .from('student_tasks')
-              .update({ status: 'pending', completed_at: null })
+              .update({
+                base_task_id: baseTaskId,
+                status: 'pending',
+                completed_at: null,
+              })
               .eq('id', st.id);
           }
         }

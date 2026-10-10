@@ -11,12 +11,28 @@ interface BadgeItem {
   taskTitle: string;
 }
 
-interface StudentSkillBoardViewProps {
-  tasks: any[];
-  user: any;
+export interface SkillBoardTaskItem {
+  id: string;
+  status?: string;
+  title?: string;
+  badge_name?: string | null;
+  badge_icon?: string | null;
+  tasks?: {
+    id?: string;
+    title?: string;
+    badge_name?: string | null;
+    badge_icon?: string | null;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
-export default function StudentSkillBoardView({ tasks, user: _user }: StudentSkillBoardViewProps) {
+interface StudentSkillBoardViewProps {
+  tasks: SkillBoardTaskItem[];
+  user?: { name?: string; [key: string]: unknown } | null;
+}
+
+export default function StudentSkillBoardView({ tasks }: StudentSkillBoardViewProps) {
   const [badgePage, setBadgePage] = useState(1);
   const [footprintPage, setFootprintPage] = useState(1);
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
@@ -51,7 +67,12 @@ export default function StudentSkillBoardView({ tasks, user: _user }: StudentSki
       const badgeTitle = (t.tasks?.badge_name || t.badge_name) as string;
       const badgeIcon = ((t.tasks?.badge_icon || t.badge_icon) as string) || '🏆';
       const taskTitle = (t.tasks?.title || t.title || 'タスク') as string;
-      const unlocked = t.status === 'completed';
+      // 同名バッジを持つタスクが1つでも完了していれば獲得済み（新タスク追加による上書き喪失を防止）
+      const hasCompletedSameBadge = tasks.some((other) => {
+        const otherBadge = other.tasks?.badge_name || other.badge_name;
+        return otherBadge === badgeTitle && other.status === 'completed';
+      });
+      const unlocked = t.status === 'completed' || hasCompletedSameBadge;
       return {
         id: t.id || `badge_${idx}`,
         title: badgeTitle,

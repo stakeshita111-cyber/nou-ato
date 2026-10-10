@@ -3,14 +3,31 @@
 import { useState, useRef, useEffect } from 'react';
 import Badge from '@/components/ui/Badge';
 
+export interface TaskSliderItem {
+  id: string;
+  task_id?: string;
+  title?: string;
+  target_crop?: string;
+  description?: string;
+  status?: string;
+  tasks?: {
+    id?: string;
+    title?: string;
+    target_crop?: string;
+    description?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 interface TaskSliderProps {
-  tasks: any[];
-  onSelect: (task: any) => void;
-  onComplete: (id: string) => void;
+  tasks: TaskSliderItem[];
+  onSelect: (task: TaskSliderItem) => void;
+  onComplete?: (id: string) => void;
   onUncomplete?: (id: string) => void;
 }
 
-export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }: TaskSliderProps) {
+export default function TaskSlider({ tasks, onSelect }: TaskSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletedList, setShowCompletedList] = useState(false);
 
@@ -136,9 +153,9 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
   const n = activeTasks.length;
   const topTask = activeTasks[validIndex];
 
-  let card2Task: any = null;
+  let card2Task: TaskSliderItem | null = null;
   let card2Index = -1;
-  let card3Task: any = null;
+  let card3Task: TaskSliderItem | null = null;
   let card3Index = -1;
 
   if (n >= 2) {
@@ -301,7 +318,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 {/* 3枚目カード（最背面） */}
                 {card3Task && (
                   <div
-                    key={card3Task.id || card3Index}
+                    key={`deck-card3-${card3Task.id || card3Index}`}
                     style={{
                       ...getCard3Style(),
                       transformOrigin: 'top center',
@@ -333,7 +350,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 {/* 2枚目カード（中間） */}
                 {card2Task && (
                   <div
-                    key={card2Task.id || card2Index}
+                    key={`deck-card2-${card2Task.id || card2Index}`}
                     style={{
                       ...getCard2Style(),
                       transformOrigin: 'top center',
@@ -365,7 +382,7 @@ export default function TaskSlider({ tasks, onSelect, onComplete, onUncomplete }
                 {/* 最前面カード */}
                 {topTask && (
                   <div
-                    key={topTask.id || validIndex}
+                    key={`deck-top-${topTask.id || validIndex}`}
                     style={{
                       ...getTopCardStyle(),
                       transformOrigin: 'bottom center',
