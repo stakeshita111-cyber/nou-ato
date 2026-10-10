@@ -583,40 +583,8 @@ export default function StudentTalkView({
   };
 
   return (
-    <div className="flex flex-col h-full flex-1 min-h-0 bg-white rounded-3xl border border-gray-200/90 shadow-lg overflow-hidden relative">
+    <div className="flex flex-col h-full flex-1 min-h-0 bg-white overflow-hidden relative">
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
-
-      {/* 🌟 1. ヘッダー (縦幅をスリム化しチャット画面領域を拡大) 🌟 */}
-      <div className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-800 to-[#1c4d21] text-white flex items-center justify-between shadow-2xs shrink-0">
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 rounded-full bg-amber-400 border border-amber-200 flex items-center justify-center text-xs shadow-2xs shrink-0">
-            🧑‍🌾
-          </div>
-          <div>
-            <h3 className="font-extrabold text-xs sm:text-sm tracking-wide leading-none">
-              農家のしるべぇ(農業AI)に相談
-            </h3>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setShowSearch(!showSearch);
-            if (showSearch) setSearchKeyword('');
-          }}
-          className={
-            'px-2 py-0.5 rounded-lg text-[11px] font-bold transition flex items-center space-x-1 cursor-pointer ' +
-            (showSearch
-              ? 'bg-white text-emerald-900 shadow-xs'
-              : 'bg-black/20 hover:bg-black/30 text-emerald-100')
-          }
-          title="会話履歴を検索"
-        >
-          <span>🔍</span>
-          <span className="hidden sm:inline">履歴検索</span>
-        </button>
-      </div>
 
       {/* 🌟 2. 検索バー 🌟 */}
       {showSearch && (
@@ -870,8 +838,26 @@ export default function StudentTalkView({
         </div>
       )}
 
-      {/* 🌟 4. 定型文サジェストチップ (無料・チケット非消費) 🌟 */}
+      {/* 🌟 4. 定型文サジェストチップ (無料・チケット非消費) ＆ 履歴検索 🌟 */}
       <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-200/80 flex items-center space-x-1.5 overflow-x-auto text-[11px] font-bold text-gray-600 shrink-0 scrollbar-none">
+        <button
+          type="button"
+          onClick={() => {
+            setShowSearch(!showSearch);
+            if (showSearch) setSearchKeyword('');
+          }}
+          className={
+            'px-2.5 py-1 rounded-full text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shrink-0 border ' +
+            (showSearch
+              ? 'bg-[#1c4d21] text-white border-[#1c4d21] shadow-2xs'
+              : 'bg-white hover:bg-emerald-50 text-emerald-900 border-emerald-200/80 shadow-2xs')
+          }
+          title="会話履歴を検索"
+        >
+          <span>🔍</span>
+          <span>履歴検索</span>
+        </button>
+
         {PRESET_FAQS.map((faq) => (
           <button
             key={faq.id}
@@ -888,84 +874,97 @@ export default function StudentTalkView({
         ))}
       </div>
 
-      {/* 🌟 5. 入力バー ＆ ナレッジ共有許可トグル ＆ 送信ボタン 🌟 */}
+      {/* 🌟 5. 入力バー ＆ 送信ボタン ＆ 共有許可チェック 🌟 */}
       <form
         onSubmit={handleOpenConfirm}
-        className="p-2.5 bg-white border-t border-gray-200 flex flex-col gap-2 shrink-0"
+        className="p-2.5 bg-white border-t border-gray-200 flex items-end gap-2.5 shrink-0"
       >
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
+        <div className="flex-1 min-w-0">
+          <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                typeof window !== 'undefined' &&
+                window.innerWidth >= 640
+              ) {
+                e.preventDefault();
+                if (inputText.trim() && !isSending && !isCheckingKnowledge) {
+                  handleOpenConfirm(e);
+                }
+              }
+            }}
             placeholder={
               ticketState.isUnlimited || ticketState.count > 0
                 ? '栽培の質問や相談を入力...'
                 : '次回質問用のメモを入力 (ストックに追記)...'
             }
             disabled={isSending || isCheckingKnowledge}
-            className="flex-1 min-w-0 px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 focus:bg-white border border-gray-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] transition placeholder-gray-400"
+            rows={2}
+            className="w-full h-20 min-h-[72px] p-2.5 bg-gray-50 hover:bg-gray-100/60 focus:bg-white border border-gray-300 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] transition placeholder-gray-400 resize-none leading-relaxed"
           />
-
-          <div className="flex flex-col items-center justify-center space-y-1 shrink-0">
-            <button
-              type="submit"
-              disabled={!inputText.trim() || isSending || isCheckingKnowledge}
-              className={
-                'w-9 h-9 rounded-2xl font-black transition flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 ' +
-                (!inputText.trim() || isSending || isCheckingKnowledge
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : ticketState.isUnlimited || ticketState.count > 0
-                    ? 'bg-[#1c4d21] text-white hover:bg-[#153e19]'
-                    : 'bg-amber-700 text-white hover:bg-amber-800')
-              }
-              title="相談内容を確認して送信"
-            >
-              {isCheckingKnowledge ? (
-                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              ) : (
-                <svg
-                  className="w-4 h-4 fill-current transform rotate-45 -translate-y-0.5 translate-x-0.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                </svg>
-              )}
-            </button>
-
-            <div
-              className="flex items-center space-x-1"
-              title={'本日残り ' + ticketState.count + ' / ' + ticketState.dailyLimit + ' 回'}
-            >
-              {Array.from({ length: Math.max(3, ticketState.count) }).map((_, i) => (
-                <span
-                  key={i}
-                  className={
-                    'w-1.5 h-1.5 rounded-full transition-all ' +
-                    (ticketState.isUnlimited
-                      ? 'bg-emerald-600 scale-110'
-                      : i < ticketState.count
-                        ? 'bg-emerald-600 shadow-2xs scale-110'
-                        : 'bg-gray-300')
-                  }
-                ></span>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* 🌟 チャット入力フォーム直下の共有許可トグル (Yes/No) 🌟 */}
-        <div className="px-3 py-1.5 bg-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between text-xs">
-          <label className="flex items-center space-x-2 cursor-pointer select-none">
+        <div className="flex flex-col items-center justify-between shrink-0 space-y-1.5 pb-0.5">
+          <button
+            type="submit"
+            disabled={!inputText.trim() || isSending || isCheckingKnowledge}
+            className={
+              'w-10 h-10 rounded-2xl font-black transition flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 ' +
+              (!inputText.trim() || isSending || isCheckingKnowledge
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : ticketState.isUnlimited || ticketState.count > 0
+                  ? 'bg-[#1c4d21] text-white hover:bg-[#153e19]'
+                  : 'bg-amber-700 text-white hover:bg-amber-800')
+            }
+            title="相談内容を確認して送信"
+          >
+            {isCheckingKnowledge ? (
+              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <svg
+                className="w-4 h-4 fill-current transform rotate-45 -translate-y-0.5 translate-x-0.5"
+                viewBox="0 0 24 24"
+              >
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            )}
+          </button>
+
+          <div
+            className="flex items-center space-x-1"
+            title={'本日残り ' + ticketState.count + ' / ' + ticketState.dailyLimit + ' 回'}
+          >
+            {Array.from({ length: Math.max(3, ticketState.count) }).map((_, i) => (
+              <span
+                key={i}
+                className={
+                  'w-1.5 h-1.5 rounded-full transition-all ' +
+                  (ticketState.isUnlimited
+                    ? 'bg-emerald-600 scale-110'
+                    : i < ticketState.count
+                      ? 'bg-emerald-600 shadow-2xs scale-110'
+                      : 'bg-gray-300')
+                }
+              ></span>
+            ))}
+          </div>
+
+          {/* 🌟 送信ボタン直下の共有許可チェックボックス (YES表記なし) 🌟 */}
+          <label
+            className="flex items-center space-x-1 cursor-pointer select-none pt-0.5"
+            title="チェックを入れると相談内容を匿名で農園ナレッジに共有します"
+          >
             <input
               type="checkbox"
               checked={allowKnowledgeShare}
               onChange={(e) => setAllowKnowledgeShare(e.target.checked)}
-              className="w-4 h-4 text-emerald-700 bg-white border-emerald-300 rounded focus:ring-emerald-600 cursor-pointer"
+              className="w-3.5 h-3.5 text-[#1c4d21] bg-white border-gray-300 rounded focus:ring-[#1c4d21] cursor-pointer"
             />
-            <span className="text-[11px] font-bold text-emerald-950">
-              共有許可 ({allowKnowledgeShare ? 'Yes' : 'No'})
-            </span>
+            <span className="text-[10px] font-bold text-gray-600 whitespace-nowrap">共有許可</span>
           </label>
         </div>
       </form>
