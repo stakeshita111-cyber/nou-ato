@@ -234,7 +234,7 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
     expect(payloadArg.bed_id).toBe('bed-2');
   });
 
-  it('畝の作物品種名がきゅうりの場合、過去記録に他品種があっても見出しは設定品種のみとなりボタンと完全一致すること', async () => {
+  it('単一品種（きゅうり）の場合はボタンと見出しにきゅうりのみが表示されること', async () => {
     render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
 
     const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
@@ -242,9 +242,42 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
       fireEvent.click(bed1Btn);
     });
 
-    // 選択ボタンが「畝 1 きゅうり」であり、見出しも「📅 畝 1 (きゅうり) の記録」と完全一致すること
+    // 選択ボタンが「畝 1 きゅうり」であり、見出しも「📅 畝 1 (きゅうり) の記録」と一致すること
     expect(screen.getByText('📅 畝 1 (きゅうり) の記録')).toBeDefined();
-    // キャベツなどの過去の無関係な品種名は見出しに混入しないこと
-    expect(screen.queryByText(/きゃべつ/)).toBeNull();
+  });
+
+  it('畝に複数品種の記録がある場合（混植）、ボタンに「他◯種」が表示され、見出しに全品種が表示され、品種タブが出現すること', async () => {
+    // 畝1にミニトマトの記録を追加して混植状態にする
+    mockRecords.push({
+      id: 'rec-tomato-1',
+      bed_id: 'bed-1',
+      plot_id: 'plot-A1',
+      crop_name: 'ミニトマト',
+      date: '2026/10/10',
+      notes: '【ミニトマト】第一花房開花',
+      growth_stage: '開花・受粉',
+      height_cm: 60,
+      work_types: ['水やり'],
+      created_at: '2026-10-10T11:00:00Z',
+    });
+
+    render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
+
+    // 畝1のボタンが「きゅうり他1種」と表示されていること
+    expect(screen.getByText('きゅうり他1種')).toBeDefined();
+
+    // 畝1ボタンをタップ
+    const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
+    await act(async () => {
+      fireEvent.click(bed1Btn);
+    });
+
+    // 見出しに「きゅうり」と「ミニトマト」の両方が含まれること
+    expect(screen.getByText(/📅 畝 1 \(.*きゅうり.*ミニトマト.*\) の記録/)).toBeDefined();
+
+    // 品種フィルタータブ（すべて、きゅうり、ミニトマト）が表示されること
+    expect(screen.getByRole('button', { name: /すべて/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /きゅうり\s*\(1\)/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /ミニトマト\s*\(1\)/ })).toBeDefined();
   });
 });

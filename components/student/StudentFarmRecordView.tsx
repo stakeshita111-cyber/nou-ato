@@ -666,8 +666,25 @@ export default function StudentFarmRecordView({
     return [...observationItems, ...replyItems].sort((a, b) => b.timestamp - a.timestamp);
   })();
 
-  // 🌟 現在の畝に設定されている栽培品種一覧 (過去の別作物のログを現在の作物名として誤認・混入させない) 🌟
-  const currentBedCrops = parseCrops(currentBed?.crop_name);
+  // 🌟 #2: 混植畝の登録品種一覧: 畝の登録名および記録ログから全品種を動的に収集 🌟
+  const currentBedCrops = getBedAllCrops(currentBed?.crop_name, currentBedRecords);
+
+  // 🌟 自己修復: 混植データが存在するのに畝名が過去に上書きされていた場合、自動でDBを修復同期 🌟
+  useEffect(() => {
+    if (!currentBed || !currentBed.id || currentBedCrops.length <= 1) return;
+    const combinedCrops = currentBedCrops.join('、');
+    if (currentBed.crop_name !== combinedCrops) {
+      if (updateBedCrop) {
+        updateBedCrop(currentBed.id, combinedCrops);
+      } else {
+        supabase
+          .from('farm_beds')
+          .update({ crop_name: combinedCrops })
+          .eq('id', currentBed.id)
+          .then();
+      }
+    }
+  }, [currentBed?.id, currentBed?.crop_name, currentBedCrops, updateBedCrop]);
 
   const filteredTimelineItems = synthesizedTimelineItems.filter((item) => {
     if (selectedCropFilter === 'all') return true;
@@ -856,9 +873,16 @@ export default function StudentFarmRecordView({
                     <span>畝 {bed.bed_number}</span>
                     {isSelected && <span className="text-amber-400 text-[10px]">✓</span>}
                   </span>
-                  <span className="text-[10.5px] opacity-80 font-bold max-w-[85px] truncate leading-tight">
-                    {formatBedCropLabel(bed.crop_name)}
-                  </span>
+                  {(() => {
+                    const bedAllCrops = getBedAllCrops(bed.crop_name, bedRecs);
+                    const bedCropLabel =
+                      bedAllCrops.length > 0 ? bedAllCrops.join('、') : bed.crop_name;
+                    return (
+                      <span className="text-[10.5px] opacity-80 font-bold max-w-[85px] truncate leading-tight">
+                        {formatBedCropLabel(bedCropLabel)}
+                      </span>
+                    );
+                  })()}
                 </button>
               );
             })}
@@ -978,8 +1002,7 @@ export default function StudentFarmRecordView({
                     if (isSharedSelected) {
                       setCustomCropName('全体共通');
                     } else if (currentBed) {
-                      const crops = parseCrops(currentBed.crop_name);
-                      setCustomCropName(crops.length === 1 ? crops[0] : '');
+                      setCustomCropName(currentBedCrops.length === 1 ? currentBedCrops[0] : '');
                     } else {
                       setCustomCropName('');
                     }
