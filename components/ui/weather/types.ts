@@ -56,6 +56,36 @@ export type DailyPoint = {
   rainProb: number;
 };
 
+export function getWeatherIcon(type: string): string {
+  switch (type) {
+    case 'sunny':
+      return '☀️';
+    case 'cloudy':
+      return '☁️';
+    case 'rainy':
+      return '🌧️';
+    case 'storm':
+      return '🌩️';
+    default:
+      return '☀️';
+  }
+}
+
+export function getWeatherText(type: string): string {
+  switch (type) {
+    case 'sunny':
+      return '晴れ';
+    case 'cloudy':
+      return '曇り';
+    case 'rainy':
+      return '雨';
+    case 'storm':
+      return '荒天';
+    default:
+      return '晴れ';
+  }
+}
+
 export type WeatherData = {
   municipalityName: string;
   lat: number;

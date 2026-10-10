@@ -9,14 +9,16 @@ import {
 } from './weather/useWeatherLive';
 import { CitySearchModal } from './weather/CitySearchModal';
 import { WeatherForecastCards } from './weather/WeatherForecastCards';
-import type {
-  SprayingStatus,
-  IrrigationStatus,
-  SunlightStatus,
-  HeatAlertStatus,
-  HourlyPoint,
-  DailyPoint,
-  WeatherData,
+import {
+  getWeatherIcon,
+  getWeatherText,
+  type SprayingStatus,
+  type IrrigationStatus,
+  type SunlightStatus,
+  type HeatAlertStatus,
+  type HourlyPoint,
+  type DailyPoint,
+  type WeatherData,
 } from './weather/types';
 
 export type {
@@ -129,36 +131,6 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
     setToastMessage('✨ 全受講生へ気象注意報・農作業アドバイスを一括送信しました！');
     setShowToast(true);
-  };
-
-  const getWeatherIcon = (type: string) => {
-    switch (type) {
-      case 'sunny':
-        return '☀️';
-      case 'cloudy':
-        return '☁️';
-      case 'rainy':
-        return '🌧️';
-      case 'storm':
-        return '🌩️';
-      default:
-        return '☀️';
-    }
-  };
-
-  const getWeatherText = (type: string) => {
-    switch (type) {
-      case 'sunny':
-        return '晴れ';
-      case 'cloudy':
-        return '曇り';
-      case 'rainy':
-        return '雨';
-      case 'storm':
-        return '荒天';
-      default:
-        return '晴れ';
-    }
   };
 
   return (

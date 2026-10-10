@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { WeatherData, HourlyPoint } from './types';
+import { getWeatherIcon, getWeatherText, type WeatherData, type HourlyPoint } from './types';
 
 interface WeatherForecastCardsProps {
   weather: WeatherData;
@@ -27,36 +27,6 @@ export function WeatherForecastCards({
     y: number;
     hourData: HourlyPoint;
   } | null>(null);
-
-  const getWeatherIcon = (type: string) => {
-    switch (type) {
-      case 'sunny':
-        return '☀️';
-      case 'cloudy':
-        return '☁️';
-      case 'rainy':
-        return '🌧️';
-      case 'storm':
-        return '🌩️';
-      default:
-        return '☀️';
-    }
-  };
-
-  const getWeatherText = (type: string) => {
-    switch (type) {
-      case 'sunny':
-        return '晴れ';
-      case 'cloudy':
-        return '曇り';
-      case 'rainy':
-        return '雨';
-      case 'storm':
-        return '荒天';
-      default:
-        return '晴れ';
-    }
-  };
 
   const render24hLineChart = () => {
     const data = weather.hourly;
