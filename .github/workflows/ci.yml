@@ -32,6 +32,14 @@ jobs:
       - name: Run Database & Schema Security Gate
         run: npm run check:db
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify Supabase Migrations with Database Linter
+        run: supabase db lint --level error
+
       - name: Strict Any Check on Changed Files (PR Only)
         if: github.event_name == 'pull_request'
         run: |
