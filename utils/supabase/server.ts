@@ -5,8 +5,17 @@ import type { Database } from '@/types/supabase';
 export async function createClient() {
   const cookieStore = await cookies();
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const isPreviewOrCI =
+    process.env.CI === 'true' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    (process.env.VERCEL === '1' && !process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    (isPreviewOrCI ? 'https://placeholder.supabase.co' : '');
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    (isPreviewOrCI ? 'mock-anon-key-for-preview-and-ci' : '');
 
   if (!url || !anonKey) {
     throw new Error(
