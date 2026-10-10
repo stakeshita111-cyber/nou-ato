@@ -82,7 +82,7 @@ export default function UnifiedLoginPage() {
     }
   };
 
-  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED === 'false';
+  const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED !== 'true';
 
   // LINE サインイン処理
   const handleLineLogin = async () => {
