@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
+import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
@@ -9,6 +10,12 @@ import Toast from '@/components/ui/Toast';
 import SlideSettingsModal, { SlideSettings } from '@/components/teacher/SlideSettingsModal';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
 import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
+
+const slideSettingsSchema = z.object({
+  sortBy: z.enum(['newest', 'oldest', 'studentName', 'hasImage', 'hasHarvest', 'isQuestion']),
+  limitPerStudent: z.union([z.literal(1), z.literal(3), z.literal(5), z.literal(0)]),
+  speed: z.enum(['slow', 'normal', 'fast', 'paused']),
+});
 
 interface JournalItem {
   id: string;
@@ -136,10 +143,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       const saved = localStorage.getItem('nouato_slide_settings');
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
-          queueMicrotask(() => {
-            setSlideSettings(parsed);
-          });
+          const rawParsed: unknown = JSON.parse(saved);
+          const result = slideSettingsSchema.safeParse(rawParsed);
+          if (result.success) {
+            const validSettings = result.data;
+            queueMicrotask(() => {
+              setSlideSettings(validSettings);
+            });
+          }
         } catch {}
       }
     }
@@ -600,9 +611,18 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   };
 
   // 🌟 生徒一覧（ドロップダウン用） 🌟
-  const studentList = Array.from(
-    new Set(journals.map((j) => JSON.stringify({ id: j.student_id, name: j.studentName })))
-  ).map((s) => JSON.parse(s));
+  const studentList = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    journals.forEach((j) => {
+      if (j.student_id && !map.has(j.student_id)) {
+        map.set(j.student_id, {
+          id: j.student_id,
+          name: j.studentName || '受講生徒',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [journals]);
 
   // 🌟 フィルタリング適用後の日誌リスト 🌟
   const filteredJournals = journals.filter((j) => {
@@ -1092,21 +1112,23 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       await fetchJournals(true);
       await fetchCropRecords();
     };
-    void load();
+    load().catch((err) => {
+      console.error('Failed to load journals and crop records:', err);
+    });
 
     // 🌟 1. BroadcastChannel & CustomEvent によるリアルタイム即時同期 🌟
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = () => {
-        void fetchJournals(false);
-        void fetchCropRecords();
+        fetchJournals(false).catch((err) => console.error('bc fetchJournals error:', err));
+        fetchCropRecords().catch((err) => console.error('bc fetchCropRecords error:', err));
       };
     } catch {}
 
     const handleSync = () => {
-      void fetchJournals(false);
-      void fetchCropRecords();
+      fetchJournals(false).catch((err) => console.error('handleSync fetchJournals error:', err));
+      fetchCropRecords().catch((err) => console.error('handleSync fetchCropRecords error:', err));
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('nouato_sync_event', handleSync);

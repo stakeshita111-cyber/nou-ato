@@ -110,11 +110,8 @@ const eslintConfig = defineConfig([
       'app/student/page.tsx',
       'components/student/StudentTalkView.tsx',
       'components/teacher/TeacherFarmCanvasView.tsx',
-      'components/teacher/TeacherJournalsView.tsx',
-      'components/teacher/TeacherSettingsView.tsx',
       'components/ui/weather/useWeatherLive.ts',
       'hooks/useFarmManager.ts',
-      'hooks/useStudentDashboard.ts',
     ],
     languageOptions: {
       parserOptions: {
