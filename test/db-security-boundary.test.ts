@@ -54,4 +54,37 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql).toMatch(/CREATE\s+POLICY\s+"journals_select_policy"\s+ON\s+public\.journals/i);
     expect(sql).toContain('is_private IS NOT TRUE');
   });
+
+  it('5. search_knowledge_candidates および list_farm_member_names RPC が SECURITY DEFINER かつ authenticated 専用であること', () => {
+    const ragMigration = path.join(
+      migrationsDir,
+      '20261011010000_rag_knowledge_and_journal_triggers.sql'
+    );
+    expect(fs.existsSync(ragMigration)).toBe(true);
+    const sql = fs.readFileSync(ragMigration, 'utf-8');
+
+    // 1. search_knowledge_candidates の検証
+    expect(sql).toContain('FUNCTION public.search_knowledge_candidates');
+    expect(sql).toContain('SECURITY DEFINER');
+    expect(sql).toContain('auth.uid() IS NULL');
+    expect(sql).toContain(
+      'REVOKE ALL ON FUNCTION public.search_knowledge_candidates(int) FROM PUBLIC, anon;'
+    );
+    expect(sql).toContain(
+      'GRANT EXECUTE ON FUNCTION public.search_knowledge_candidates(int) TO authenticated;'
+    );
+
+    // 2. list_farm_member_names の検証
+    expect(sql).toContain('FUNCTION public.list_farm_member_names');
+    expect(sql).toContain(
+      'REVOKE ALL ON FUNCTION public.list_farm_member_names() FROM PUBLIC, anon;'
+    );
+    expect(sql).toContain(
+      'GRANT EXECUTE ON FUNCTION public.list_farm_member_names() TO authenticated;'
+    );
+
+    // 3. journals_set_farm_id トリガーによる farm_id 保証の検証
+    expect(sql).toContain('FUNCTION public.journals_set_farm_id()');
+    expect(sql).toContain('CREATE TRIGGER trg_journals_farm');
+  });
 });

@@ -25,14 +25,14 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"message\": \"トマトの脇芽かきはいつ行うべきですか？\",\n  \"studentName\": \"竹下 翔\",\n  \"studentId\": null,\n  \"history\": [],\n  \"isMemoOnly\": false,\n  \"isSpell\": false\n}"
+          "raw": "{\n  \"message\": \"トマトの脇芽かきはいつ行うべきですか？\",\n  \"studentName\": \"受講生\",\n  \"isMemoOnly\": false\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/chat/rag",
           "host": ["{{baseUrl}}"],
           "path": ["api", "chat", "rag"]
         },
-        "description": "Gemini 1.5 Flash-Lite と農園ナレッジを組み合わせたAIしるべぇチャット回答を生成します。"
+        "description": "Gemini と農園蓄積ナレッジを組み合わせたAIしるべぇチャット回答を生成します。認証Cookieが必要です。"
       }
     },
     {
@@ -90,6 +90,28 @@
           "path": ["api", "settings"]
         },
         "description": "講師画面からシステム設定を動的に更新します。"
+      }
+    },
+    {
+      "name": "講師 - 追加チケット付与 (Tickets Grant)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"studentId\": \"00000000-0000-0000-0000-000000000000\",\n  \"amount\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/grant",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "grant"]
+        },
+        "description": "講師が同一農園の受講生に対して、当日のAI相談チケットを追加付与します。講師認証Cookieが必要です。"
       }
     }
   ]

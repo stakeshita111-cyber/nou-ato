@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       reply = `📝【質問メモをお預かりしました】🌱\n\n本日のAI相談チケット（1日3回）を使い切ったため、AIによる即時回答はお休みとなります。\nご相談内容は農園ノートに記録しましたので、次回の来園時に講師より詳しくアドバイスいたしますね！\n\n※チケットは毎晩日本時間0:00に復活します✨`;
     } else {
       try {
-        const ragRes = await generateRagAnswer(message, effectiveStudentName, history, supabase);
+        const ragRes = await generateRagAnswer(supabase, message, effectiveStudentName, history);
         reply = ragRes.reply;
         referencedQa = ragRes.referencedQa;
         isDegraded = ragRes.status === 'degraded';

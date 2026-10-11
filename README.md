@@ -60,6 +60,7 @@
 
 - **講師向け機能 (Teacher Dashboard)**:
   - **受講生・区画マネジメント**: 受講生ごとの進捗率、割り当て畝、未読日誌を一元把握。
+  - **タスク作成・全体配信・個別割当・テンプレート**: 栽培タスクの新規作成、全受講生への一括配信、特定受講生への個別割当、および再利用可能なタスクテンプレート管理。
   - **一括アナウンス配信**: 天候不良や収穫イベントの連絡を受講生全員へ即時配信。
   - **農地キャンバス（畝・区画管理）**: ドラッグ＆ドロップ（@dnd-kit）で畝の栽培状況をグラフィカルに管理。畝ナンバーと作物名に集約したスリムな畝カード設計。
 
@@ -136,9 +137,16 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. 以下の順序で `supabase/migrations/` 配下の SQL ファイル内容を貼り付けて実行 (**Run**) します：
-   - **1st**: `supabase/migrations/00000000000000_initial_schema.sql` (テーブル、RLS、RPC関数、初期デモデータの作成)
-   - **2nd**: `supabase/migrations/20260925_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
+3. `supabase/migrations/` 配下の全9本のマイグレーションファイルをタイムスタンプ順に適用します：
+   - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
+   - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
+   - `20261009040000_prevent_privilege_escalation.sql` (権限昇格防止・RLS強化)
+   - `20261010050000_add_preset_faqs_to_farms.sql` (農園プリセットFAQ追加)
+   - `20261010060000_ai_usage_atomic_and_ticket_hardening.sql` (AIチケット原帳・アトミック更新)
+   - `20261010070000_harden_farm_beds_and_broadcast_rls.sql` (畝並べ替え・配信RLS強化)
+   - `20261011010000_rag_knowledge_and_journal_triggers.sql` (RAGナレッジ・日誌トリガー)
+   - `20261011020000_ai_usage_ledger_and_register_teacher_idempotent.sql` (AI使用台帳・講師登録冪等化)
+   - `20261011030000_announcements_and_farm_metadata.sql` (アナウンス・農園メタデータSSOT)
 
 ---
 
@@ -155,7 +163,6 @@ npx supabase db push
 3. バケット作成後、認証済みユーザーが画像をアップロードできるように RLS ポリシー（Policies）を設定します：
    - **SELECT**: `Public` (全員読み取り可能)
    - **INSERT / UPDATE**: `Authenticated users` (ログイン済みユーザーのみアップロード可能)
-   - _（※ `00000000000000_initial_schema.sql` を適用済みの場合は Storage RLS ポリシーも自動設定されます）_
 
 ---
 
@@ -170,7 +177,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 # Google AI Studio (Gemini API Key)
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-flash-lite-latest # (任意: 未指定時は gemini-flash-lite-latest を優先使用)
+GEMINI_MODEL=gemini-flash-latest # (任意: 自動カスケード gemini-flash-latest / gemini-3.5-flash)
 ```
 
 ### 5. 開発サーバーの起動
@@ -185,10 +192,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全16テストファイル / 103項目全件PASS）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全29テストファイル / 206項目全件PASS）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全103件・100%通過)
+# 1. 自動テストの実行 (全206件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 88%以上達成)

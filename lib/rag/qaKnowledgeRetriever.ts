@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
-import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
+
+export class KnowledgeSearchError extends Error {
+  constructor(message: string) {
+    super(`Knowledge search failed: ${message}`);
+    this.name = 'KnowledgeSearchError';
+  }
+}
 
 export interface ReferencedQA {
   id?: string;
@@ -117,37 +124,25 @@ export const STOP_WORDS = [
  * DBから受講生の表示名（display_name）リストを動的取得
  * 自農園のメンバー一覧をRPCから取得し、生徒権限でも確実にPIIマスキングが可能
  */
-export async function fetchStudentDisplayNames(
-  client?: SupabaseClient<Database>
-): Promise<string[]> {
-  const db = client || supabase;
-  try {
-    const { data, error } = await db.rpc('list_farm_member_names');
-    if (!error && data && data.length > 0) {
-      return data
-        .map((u) => u.display_name?.trim())
-        .filter((name): name is string => Boolean(name && name.length >= 2));
-    }
-  } catch (e) {
-    console.warn('list_farm_member_names RPC notice:', e);
+export async function fetchStudentDisplayNames(db: SupabaseClient<Database>): Promise<string[]> {
+  const { data, error } = await db.rpc('list_farm_member_names');
+  if (error) {
+    logger.error(
+      'list_farm_member_names RPC failed',
+      'lib/rag/qaKnowledgeRetriever',
+      undefined,
+      error
+    );
+    throw new Error(`Failed to fetch student display names: ${error.message}`);
   }
 
-  // フォールバック: users テーブルからの直接取得
-  try {
-    const { data, error } = await db
-      .from('users')
-      .select('display_name')
-      .not('display_name', 'is', null)
-      .neq('display_name', '');
-
-    if (error || !data) return [];
-    return data
-      .map((u) => u.display_name?.trim())
-      .filter((name): name is string => Boolean(name && name.length >= 2));
-  } catch (e) {
-    console.error('fetchStudentDisplayNames error:', e);
+  if (!data || data.length === 0) {
     return [];
   }
+
+  return data
+    .map((u) => u.display_name?.trim())
+    .filter((name): name is string => Boolean(name && name.length >= 2));
 }
 
 /**
@@ -283,141 +278,109 @@ export function extractTopicFromReply(reply: string): string {
  * 🌟 非公開相談(is_private = true)はDB層で厳密に除外 🌟
  */
 export async function searchSimilarKnowledge(
-  userQuestion: string,
-  client?: SupabaseClient<Database>
+  db: SupabaseClient<Database>,
+  userQuestion: string
 ): Promise<ReferencedQA[]> {
-  const db = client || supabase;
-  try {
-    let candidateReplies: { id: string; reply: string; is_approved?: boolean | null }[] = [];
+  const { data: rpcData, error: rpcErr } = await db.rpc('search_knowledge_candidates', {
+    p_limit: 50,
+  });
 
-    // 1. セキュアな RPC による候補検索 (同農園・承認済・非公開除外)
-    try {
-      const { data: rpcData, error: rpcErr } = await db.rpc('search_knowledge_candidates', {
-        p_limit: 50,
-      });
-      if (!rpcErr && rpcData && rpcData.length > 0) {
-        candidateReplies = rpcData.map((r) => ({
-          id: r.id,
-          reply: r.reply,
-          is_approved: true,
-        }));
-      } else if (rpcErr) {
-        console.warn('search_knowledge_candidates notice:', rpcErr.message);
-      }
-    } catch (rpcEx) {
-      console.warn('search_knowledge_candidates exception:', rpcEx);
-    }
-
-    // 2. フォールバック: journals テーブルからの直接取得
-    if (candidateReplies.length === 0) {
-      const { data: dbData, error } = await db
-        .from('journals')
-        .select('id, reply, is_approved, is_private, student_id')
-        .eq('is_approved', true)
-        .eq('is_private', false)
-        .not('reply', 'is', null)
-        .neq('reply', '')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error || !dbData || dbData.length === 0) {
-        return [];
-      }
-      candidateReplies = dbData
-        .filter((d): d is typeof d & { reply: string } => Boolean(d.reply))
-        .map((d) => ({
-          id: d.id,
-          reply: d.reply,
-          is_approved: d.is_approved,
-        }));
-    }
-
-    const pastQa: (ReferencedQA & { id?: string })[] = [];
-
-    // ユーザー質問に含まれる作物を特定
-    const queryCrops = CROPS_LIST.filter((crop) => userQuestion.includes(crop));
-
-    // 助詞除去＆重要キーワード抽出 (STOP_WORDSを除外)
-    const rawTokens = userQuestion
-      .toLowerCase()
-      .replace(/[、。！？!?,.\n\r]/g, ' ')
-      .split(/\s+/)
-      .filter((t) => t.length > 0);
-
-    const questionKeywords: string[] = [];
-    rawTokens.forEach((token) => {
-      let current = token;
-      STOP_WORDS.forEach((sw) => {
-        if (current === sw) {
-          current = '';
-        } else if (current.length > sw.length && (current.endsWith(sw) || current.startsWith(sw))) {
-          current = current.replace(new RegExp(`^${sw}|${sw}$`, 'g'), '');
-        }
-      });
-      if (current.length >= 2 && !STOP_WORDS.includes(current)) {
-        questionKeywords.push(current);
-      }
-    });
-
-    candidateReplies.forEach((item) => {
-      if (!item.reply) return;
-
-      const itemReply = item.reply.toLowerCase();
-
-      // 🌟【重要】作物の厳格チェック: ユーザーが作物を指定している場合、他作物のノウハウは除外 🌟
-      if (queryCrops.length > 0) {
-        // この回答（および相談トピック）に対象作物が含まれているか？
-        const containsTargetCrop = queryCrops.some((crop) =>
-          itemReply.includes(crop.toLowerCase())
-        );
-        if (!containsTargetCrop) {
-          return; // 対象作物が含まれていなければスキップ
-        }
-      }
-
-      let score = 0;
-
-      // 1. 重要キーワードの一致 (生徒の生質問文contentは完全未参照・replyのみから照合)
-      questionKeywords.forEach((kw) => {
-        if (itemReply.includes(kw)) {
-          score += kw.length >= 3 ? 6 : 4;
-        }
-      });
-
-      // 2. 講師承認済みナレッジ (is_approved = true) の重みづけ 1.2倍
-      if (item.is_approved === true) {
-        score *= 1.2;
-      }
-
-      // スコアが十分に高い（明確な重要語一致がある）ものだけ抽出
-      if (score >= 4) {
-        const extractedTopic = extractTopicFromReply(item.reply);
-        pastQa.push({
-          id: (item.id || '').toString(),
-          question: extractedTopic,
-          answer: sanitizePiiText(item.reply),
-          similarityScore: score,
-        });
-      }
-    });
-
-    // 類似スコアが高い順にソートして最大3件抽出
-    pastQa.sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
-    return pastQa.slice(0, 3);
-  } catch (e) {
-    console.error('searchSimilarKnowledge error:', e);
-    return [];
+  if (rpcErr) {
+    logger.error(
+      'search_knowledge_candidates RPC failed',
+      'lib/rag/qaKnowledgeRetriever',
+      undefined,
+      rpcErr
+    );
+    throw new KnowledgeSearchError(rpcErr.message);
   }
+
+  const candidateReplies = (rpcData || []).map((r) => ({
+    id: r.id,
+    reply: r.reply,
+    is_approved: true,
+  }));
+
+  const pastQa: (ReferencedQA & { id?: string })[] = [];
+
+  // ユーザー質問に含まれる作物を特定
+  const queryCrops = CROPS_LIST.filter((crop) => userQuestion.includes(crop));
+
+  // 助詞除去＆重要キーワード抽出 (STOP_WORDSを除外)
+  const rawTokens = userQuestion
+    .toLowerCase()
+    .replace(/[、。！？!?,.\n\r]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+
+  const questionKeywords: string[] = [];
+  rawTokens.forEach((token) => {
+    let current = token;
+    STOP_WORDS.forEach((sw) => {
+      if (current === sw) {
+        current = '';
+      } else if (current.length > sw.length && (current.endsWith(sw) || current.startsWith(sw))) {
+        current = current.replace(new RegExp(`^${sw}|${sw}$`, 'g'), '');
+      }
+    });
+    if (current.length >= 2 && !STOP_WORDS.includes(current)) {
+      questionKeywords.push(current);
+    }
+  });
+
+  candidateReplies.forEach((item) => {
+    if (!item.reply) return;
+
+    const itemReply = item.reply.toLowerCase();
+
+    // 🌟【重要】作物の厳格チェック: ユーザーが作物を指定している場合、他作物のノウハウは除外 🌟
+    if (queryCrops.length > 0) {
+      // この回答（および相談トピック）に対象作物が含まれているか？
+      const containsTargetCrop = queryCrops.some((crop) => itemReply.includes(crop.toLowerCase()));
+      if (!containsTargetCrop) {
+        return; // 対象作物が含まれていなければスキップ
+      }
+    }
+
+    let score = 0;
+
+    // 1. 重要キーワードの一致 (生徒の生質問文contentは完全未参照・replyのみから照合)
+    questionKeywords.forEach((kw) => {
+      if (itemReply.includes(kw)) {
+        score += kw.length >= 3 ? 6 : 4;
+      }
+    });
+
+    // 2. 講師承認済みナレッジ (is_approved = true) の重みづけ 1.2倍
+    if (item.is_approved === true) {
+      score *= 1.2;
+    }
+
+    // スコアが十分に高い（明確な重要語一致がある）ものだけ抽出
+    if (score >= 4) {
+      const extractedTopic = extractTopicFromReply(item.reply);
+      pastQa.push({
+        id: (item.id || '').toString(),
+        question: extractedTopic,
+        answer: sanitizePiiText(item.reply),
+        similarityScore: score,
+      });
+    }
+  });
+
+  // 類似スコアが高い順にソートして最大3件抽出
+  pastQa.sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
+  return pastQa.slice(0, 3);
 }
 
 /**
  * 過去のQ&Aナレッジをプロンプトに注入し、最適なAI回答を生成 (systemInstruction分離・ヘッダー認証・タイムアウト・自動カスケード)
  */
 export async function getAnswerWithRag(
+  db: SupabaseClient<Database>,
   userQuestion: string,
   studentName: string = '受講生',
-  recentHistoryText: string = '',
-  client?: SupabaseClient<Database>
+  recentHistoryText: string = ''
 ): Promise<RagAnswerResult> {
   // 🌟「大量質問テスト」トリガーの即時ルールベース返信 🌟
   if (userQuestion.includes('大量質問テスト')) {
@@ -430,7 +393,25 @@ export async function getAnswerWithRag(
   }
 
   // 🌟 DBから受講生表示名リストを取得 & Gemini送信前サニタイズパイプライン 🌟
-  const studentDisplayNames = await fetchStudentDisplayNames(client);
+  let studentDisplayNames: string[] = [];
+  try {
+    studentDisplayNames = await fetchStudentDisplayNames(db);
+  } catch (err) {
+    logger.error(
+      'Failed to retrieve student display names for PII masking:',
+      'lib/rag/qaKnowledgeRetriever',
+      undefined,
+      err
+    );
+    // PIIマスキングが抜けるリスクがあるため、Geminiへの送信を抑止してdegraded返却
+    return {
+      reply:
+        '【AI相棒（しるべぇ）よりお知らせ】🌱\n\n現在、たくさんの受講生のみなさまからご質問・ご相談をいただいており、本日のAI自動対話枠が上限（混雑状態）に達しております🙇\n\nご入力いただいたメッセージは交換日記として大切にお預かりしておりますので、講師からの直接の回答をお待ちいただくか、お時間を空けて再度お試しくださいね✨\n\n美味しい野菜づくりを応援しています🧑‍🌾',
+      referencedQa: [],
+      status: 'degraded',
+    };
+  }
+
   const allStudentNames = Array.from(
     new Set([...studentDisplayNames, studentName].filter(Boolean))
   );
@@ -439,7 +420,19 @@ export async function getAnswerWithRag(
   const cleanRecentHistoryText = sanitizePiiText(recentHistoryText, allStudentNames);
 
   // 1. 類似ナレッジを検索 (重み1.2倍を優先)
-  const referencedQa = await searchSimilarKnowledge(cleanUserQuestion, client);
+  let referencedQa: ReferencedQA[] = [];
+  try {
+    referencedQa = await searchSimilarKnowledge(db, cleanUserQuestion);
+  } catch (err) {
+    logger.error(
+      'Knowledge search failed during RAG answer generation:',
+      'lib/rag/qaKnowledgeRetriever',
+      undefined,
+      err
+    );
+    // ナレッジ検索失敗時は安全にナレッジなしでフォールバック
+    referencedQa = [];
+  }
 
   // 2. Gemini API 呼び出し
   const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -579,13 +572,13 @@ export interface ChatHistoryItem {
 }
 
 export async function generateRagAnswer(
+  db: SupabaseClient<Database>,
   userQuestion: string,
   studentName: string = '受講生',
-  history: ChatHistoryItem[] = [],
-  client?: SupabaseClient<Database>
+  history: ChatHistoryItem[] = []
 ): Promise<RagAnswerResult> {
   const historyText = history
     .map((h) => `${h.sender === 'student' ? '受講生' : 'しるべぇ(AI)'}: ${h.text}`)
     .join('\n');
-  return getAnswerWithRag(userQuestion, studentName, historyText, client);
+  return getAnswerWithRag(db, userQuestion, studentName, historyText);
 }

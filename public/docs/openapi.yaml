@@ -19,8 +19,8 @@ paths:
     post:
       summary: AI しるべぇ (農園特化型 RAG) チャット相談
       description: |
-        受講生の農業に関する質問を受け付け、Gemini 1.5 Flash-Lite と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。
-        1日3回のチケット制に対応し、呪文による回復やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。
+        受講生の農業に関する質問を受け付け、Gemini と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。
+        1日3回のチケット制に対応し、サーバー側でのアトミック原帳管理やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。
       operationId: postChatRag
       requestBody:
         required: true
@@ -30,11 +30,8 @@ paths:
               $ref: '#/components/schemas/ChatRagRequest'
             example:
               message: 'ミニトマトの脇芽かきはいつ行うべきですか？'
-              studentName: '竹下 翔'
-              studentId: 'usr_student_01'
-              history: []
+              studentName: '受講生'
               isMemoOnly: false
-              isSpell: false
       responses:
         '200':
           description: チャット回答生成成功
@@ -52,6 +49,18 @@ paths:
                 timestamp: '2026-09-25T12:00:00.000Z'
         '400':
           description: 不正なリクエスト (メッセージ未指定など)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 未ログイン・認証エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: 本日のAI相談上限超過 (RFC 7807)
           content:
             application/problem+json:
               schema:
@@ -162,6 +171,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
 
+  /api/tickets/grant:
+    post:
+      summary: 講師による受講生追加チケット付与
+      description: 講師が同一農園の受講生に対して、当日のAI相談チケットを追加付与します。
+      operationId: postGrantTickets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - studentId
+                - amount
+              properties:
+                studentId:
+                  type: string
+                  format: uuid
+                  description: 対象受講生のユーザーID
+                amount:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  description: 付与するチケット枚数（1〜10枚）
+                  example: 1
+      responses:
+        '200':
+          description: 付与成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  studentId:
+                    type: string
+                    format: uuid
+                  grantedTickets:
+                    type: integer
+                  newTotal:
+                    type: integer
+        '401':
+          description: 未ログイン (RFC 7807)
+        '403':
+          description: 講師権限なし または 他農園の受講生 (RFC 7807)
+
 components:
   schemas:
     ChatRagRequest:
@@ -171,36 +227,14 @@ components:
       properties:
         message:
           type: string
-          description: 受講生の質問・相談メッセージ本文
+          description: 受講生の質問・相談メッセージ本文（1〜1000文字）
         studentName:
           type: string
           description: 受講生氏名（パーソナライズ用）
           default: '受講生'
-        studentId:
-          type: string
-          nullable: true
-          description: 受講生のユーザーUUID
-        history:
-          type: array
-          description: 直近の対話履歴
-          items:
-            type: object
-            required:
-              - role
-              - text
-            properties:
-              role:
-                type: string
-                enum: [user, model]
-              text:
-                type: string
         isMemoOnly:
           type: boolean
           description: チケット0枚時のメモ専用モードフラグ
-          default: false
-        isSpell:
-          type: boolean
-          description: 秘密のチケット全回復呪文フラグ
           default: false
 
     ChatRagResponse:

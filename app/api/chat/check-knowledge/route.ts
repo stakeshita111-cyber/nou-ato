@@ -105,7 +105,18 @@ export async function POST(request: Request) {
 
     // 2. Supabase DB (journals承認済みナレッジ) の厳格検索
     // 🌟 生徒の生相談文には依存せず、回答文(k.answer)および回答内から抽出された相談トピック(k.question)のみから一致キーワードを抽出 🌟
-    const dbKnowledge = await searchSimilarKnowledge(qClean);
+    let dbKnowledge: Awaited<ReturnType<typeof searchSimilarKnowledge>> = [];
+    try {
+      dbKnowledge = await searchSimilarKnowledge(supabase, qClean);
+    } catch (kErr) {
+      logger.error(
+        'Failed to search DB knowledge in check-knowledge:',
+        'api/chat/check-knowledge',
+        undefined,
+        kErr
+      );
+      dbKnowledge = [];
+    }
     if (dbKnowledge && dbKnowledge.length > 0) {
       for (const k of dbKnowledge) {
         if ((k.similarityScore || 0) >= 4) {
