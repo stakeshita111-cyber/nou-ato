@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:changed": "vitest run --changed",
     "test:coverage": "vitest run --coverage",
     "check:clean": "node scripts/check-clean-code.mjs",
     "check:db": "node scripts/check-database.mjs",
