@@ -24,14 +24,30 @@ export const isRegularRecord = (content?: string): boolean => {
 };
 
 /**
- * 送信前メッセージのフォーマットヘルパー（オプトアウト・非公開相談タグ付与）
+ * 送信前メッセージのフォーマットヘルパー（全体共有不可・非公開メモタグの制御）
  */
 export const prepareMessageForSend = (rawInput: string, allowKnowledgeShare: boolean): string => {
   const trimmed = rawInput.trim();
   if (!trimmed) return '';
-  return allowKnowledgeShare || trimmed.startsWith('【非公開相談】')
-    ? trimmed
-    : `【非公開相談】${trimmed}`;
+
+  // 明示的な個人メモ（講師非公開）タグが既にある場合
+  if (trimmed.startsWith('【非公開メモ】') || trimmed.startsWith('【個人メモ】')) {
+    return trimmed;
+  }
+
+  // 共有許可(allowKnowledgeShare)が ON の場合
+  if (allowKnowledgeShare) {
+    return trimmed.replace(/^【(?:非公開相談|全体共有不可)】/, '');
+  }
+
+  // 共有許可が OFF (オプトアウト) の場合: 講師への相談(is_private = false)としつつ全体共有不可タグを付与
+  if (trimmed.startsWith('【全体共有不可】')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('【非公開相談】')) {
+    return trimmed.replace(/^【非公開相談】/, '【全体共有不可】');
+  }
+  return `【全体共有不可】${trimmed}`;
 };
 
 export interface MatchedKnowledgeTopicItem {

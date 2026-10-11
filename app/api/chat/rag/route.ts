@@ -129,7 +129,10 @@ export async function POST(request: Request) {
 
     // 4. Supabase の journals テーブルに対話履歴・質問メモを保存
     //    フォールバック(degraded)時は reply を null (質問メモ) として保存し、ナレッジ汚染を物理防止
-    const isPrivate = parseResult.data.isPrivate === true || message.startsWith('【非公開相談】');
+    const isPrivate =
+      parseResult.data.isPrivate === true ||
+      message.startsWith('【非公開メモ】') ||
+      message.startsWith('【個人メモ】');
     const journalReply = isMemoOnly || isDegraded ? null : reply;
     let saved = true;
 

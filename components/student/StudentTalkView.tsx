@@ -14,7 +14,7 @@ import {
   clearQuestionStock,
   formatStockText,
 } from '@/lib/ticketManager';
-import { formatQuestionTopic } from '@/lib/utils/journalHelper';
+import { formatQuestionTopic, prepareMessageForSend } from '@/lib/utils/journalHelper';
 import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
@@ -456,10 +456,7 @@ export default function StudentTalkView({
     const rawInput = inputText.trim();
     if (!rawInput || isSending) return;
 
-    const text =
-      allowKnowledgeShare || rawInput.startsWith('【非公開相談】')
-        ? rawInput
-        : `【非公開相談】${rawInput}`;
+    const text = prepareMessageForSend(rawInput, allowKnowledgeShare);
 
     const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     const userMsgId = 'user_' + Date.now();

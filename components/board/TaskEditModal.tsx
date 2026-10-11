@@ -104,9 +104,18 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
       // 2. Supabase DB (tasks テーブル: is_template = true, status = 'template') に保存
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id;
-      const farmId =
+      let farmId =
         useFarmStore.getState().activeFarmId ||
         (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+
+      if (!farmId && userId) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('farm_id')
+          .eq('id', userId)
+          .maybeSingle();
+        if (userData?.farm_id) farmId = userData.farm_id;
+      }
 
       const { error } = await supabase.from('tasks').insert([
         {
