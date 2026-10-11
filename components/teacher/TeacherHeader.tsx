@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { z } from 'zod';
 import { useFarmStore } from '@/store/useFarmStore';
 import Toast from '@/components/ui/Toast';
+
+const farmNameSchema = z.string().trim().min(1, '農園名を入力してください');
 
 interface TeacherHeaderProps {
   title?: string;
@@ -25,11 +28,12 @@ export default function TeacherHeader({
 
   const handleCreateFarm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFarmName.trim()) return;
+    const validation = farmNameSchema.safeParse(newFarmName);
+    if (!validation.success) return;
 
     setIsSubmitting(true);
     try {
-      const created = await createNewFarm(newFarmName.trim());
+      const created = await createNewFarm(validation.data);
       if (created) {
         setToastMessage(
           `🎉 新しい農園「${created.name}」を作成し、ダッシュボードを切り替えました！`
