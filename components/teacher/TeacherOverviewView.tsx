@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import QRCodeModal from '@/components/ui/QRCodeModal';
@@ -99,11 +100,15 @@ export default function TeacherOverviewView({
         const saved = typeof window !== 'undefined' ? localStorage.getItem(eventKey) : null;
         if (saved) {
           try {
-            const parsed = JSON.parse(saved);
-            const futureEvents = (parsed as Array<{ date?: string }>).filter(
-              (ev) => (ev.date || '') >= todayStr
-            );
-            setEventsCount(futureEvents.length);
+            const parsed: unknown = JSON.parse(saved);
+            const eventsSchema = z.array(z.object({ date: z.string().optional() }));
+            const parsedResult = eventsSchema.safeParse(parsed);
+            if (parsedResult.success) {
+              const futureEvents = parsedResult.data.filter((ev) => (ev.date || '') >= todayStr);
+              setEventsCount(futureEvents.length);
+            } else {
+              setEventsCount(0);
+            }
           } catch {
             setEventsCount(0);
           }
@@ -122,7 +127,12 @@ export default function TeacherOverviewView({
         const savedRec = typeof window !== 'undefined' ? localStorage.getItem(cropKey) : null;
         if (savedRec) {
           try {
-            setReportCount(JSON.parse(savedRec).length);
+            const parsedRec: unknown = JSON.parse(savedRec);
+            if (Array.isArray(parsedRec)) {
+              setReportCount(parsedRec.length);
+            } else {
+              setReportCount(0);
+            }
           } catch {
             setReportCount(0);
           }
@@ -179,10 +189,12 @@ export default function TeacherOverviewView({
         setOrigin(locOrigin);
       });
     }
-    const load = async () => {
+    const loadData = async () => {
       await fetchCounts(farmId);
     };
-    void load();
+    loadData().catch((err: unknown) => {
+      console.error('Failed to fetch counts in TeacherOverviewView:', err);
+    });
   }, [farmId, fetchCounts]);
 
   const inviteUrl = inviteCode ? `${origin}/invite?code=${inviteCode}` : '';
@@ -193,7 +205,9 @@ export default function TeacherOverviewView({
       setShowToast(true);
       return;
     }
-    navigator.clipboard.writeText(inviteUrl);
+    navigator.clipboard.writeText(inviteUrl).catch((err: unknown) => {
+      console.error('Failed to copy invite link:', err);
+    });
     setToastMessage('LINE招待リンクをコピーしました！');
     setShowToast(true);
   };
