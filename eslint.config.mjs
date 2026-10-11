@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -72,6 +73,100 @@ const eslintConfig = defineConfig([
             },
           ],
         },
+      ],
+    },
+  },
+  // eslint-comments: directive コメントの厳格管理
+  {
+    plugins: {
+      '@eslint-community/eslint-comments': eslintComments,
+    },
+    rules: {
+      '@eslint-community/eslint-comments/no-use': [
+        'error',
+        { allow: ['eslint-disable-next-line', 'eslint-disable-line'] },
+      ],
+      '@eslint-community/eslint-comments/require-description': [
+        'error',
+        { ignore: ['eslint-disable-next-line', 'eslint-disable-line'] },
+      ],
+      '@eslint-community/eslint-comments/no-unlimited-disable': 'error',
+      '@eslint-community/eslint-comments/disable-enable-pair': 'error',
+    },
+  },
+  // 型付きLint段階導入 (未是正ファイルは ignores で段階移行)
+  {
+    files: [
+      'app/**/*.{ts,tsx}',
+      'components/**/*.{ts,tsx}',
+      'hooks/**/*.{ts,tsx}',
+      'store/**/*.{ts,tsx}',
+      'lib/**/*.{ts,tsx}',
+      'utils/**/*.{ts,tsx}',
+      'context/**/*.{ts,tsx}',
+    ],
+    ignores: [
+      'test/**',
+      'app/api/chat/check-knowledge/route.ts',
+      'app/api/chat/rag/route.ts',
+      'app/api/settings/route.ts',
+      'app/auth/callback/route.ts',
+      'app/auth/forgot-password/page.tsx',
+      'app/auth/merge/page.tsx',
+      'app/auth/reset-password/page.tsx',
+      'app/auth/signup/teacher/page.tsx',
+      'app/invite/page.tsx',
+      'app/login/page.tsx',
+      'app/page.tsx',
+      'app/student/page.tsx',
+      'app/teacher/dashboard/page.tsx',
+      'components/board/TaskEditModal.tsx',
+      'components/board/TaskTemplateModal.tsx',
+      'components/farm/BedApprovalModal.tsx',
+      'components/farm/BedCompletionModal.tsx',
+      'components/student/StudentFarmRecordView.tsx',
+      'components/student/StudentTalkView.tsx',
+      'components/student/TaskDetailModal.tsx',
+      'components/teacher/IndividualTaskAssignModal.tsx',
+      'components/teacher/TeacherEventsView.tsx',
+      'components/teacher/TeacherFarmCanvasView.tsx',
+      'components/teacher/TeacherHeader.tsx',
+      'components/teacher/TeacherJournalsView.tsx',
+      'components/teacher/TeacherOverviewView.tsx',
+      'components/teacher/TeacherPaymentsView.tsx',
+      'components/teacher/TeacherSettingsView.tsx',
+      'components/teacher/TeacherSidebar.tsx',
+      'components/teacher/TeacherStudentsView.tsx',
+      'components/teacher/TeacherTaskBoardView.tsx',
+      'components/teacher/TeacherTemplatesView.tsx',
+      'components/ui/QRCodeModal.tsx',
+      'components/ui/WeatherWidget.tsx',
+      'components/ui/weather/CitySearchModal.tsx',
+      'components/ui/weather/WeatherMapView.tsx',
+      'components/ui/weather/useWeatherLive.ts',
+      'hooks/useEvents.ts',
+      'hooks/useFarmManager.ts',
+      'hooks/useKanbanBoard.ts',
+      'hooks/useStudentDashboard.ts',
+      'lib/ticketManager.ts',
+      'store/useThemeStore.ts',
+    ],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false } },
       ],
     },
   },

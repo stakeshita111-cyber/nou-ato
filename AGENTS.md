@@ -26,6 +26,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - データベースとの通信はSupabaseクライアントを使用し、必ず自動生成された型定義(`Database`型)を適用すること。
 - UIはモバイルファーストで設計し、レスポンシブ対応を徹底する。
 
+### 構造的型安全性（Strict Type Hardening）開発規約
+
+新規機能の実装・ファイル作成時は、以下の「構造的型規約」を厳格に順守すること：
+
+1. **型推論の境界防壁（Zod バリデーション）:**
+   - 外部API、URLパラメータ、フォーム入力、Supabase RPCの引数には、必ず `zod` スキーマを定義し、`.safeParse()` による実行時検証を行うこと。
+   - `any` および安全でない型アサーション（`as unknown as T`）は物理禁止。
+2. **非同期（Promise）のエラーハンドリング義務化:**
+   - イベントハンドラー（`onClick` 等）内の非同期処理は、単に呼び出すのではなく、必ず `try-catch` またはトースト通知などのユーザーフィードバック（エラー表示）を伴う実装にすること（`no-floating-promises` の徹底）。
+3. **新規ファイルの完全準拠（ラチェット原則）:**
+   - 新規作成するすべてのファイルは、ESLintの型厳格ルール（`no-unsafe-*`, `no-floating-promises`）をエラー0件でパスしなければならない。`ignores` に新規ファイルを追加することは禁止する。
+
 ## 4. セキュリティ・アーキテクチャ方針
 
 - マルチテナント保護のため、Supabaseの Row Level Security (RLS) を必ず適用すること。
