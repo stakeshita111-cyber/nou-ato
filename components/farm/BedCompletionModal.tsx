@@ -1,8 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { z } from 'zod';
 import { FarmBed } from '@/types/farm';
 import { uploadImageToStorage } from '@/lib/storage';
+
+const bedCompletionDetailsSchema = z.object({
+  totalHarvest: z.string().optional(),
+  completionNotes: z.string().optional(),
+  imageUrl: z.string().optional(),
+  season: z.string().optional(),
+});
 
 interface BedCompletionModalProps {
   isOpen: boolean;
@@ -54,7 +62,9 @@ export default function BedCompletionModal({
     if (!file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (readerEvent) => {
-      const rawResult = readerEvent.target?.result as string;
+      const result = readerEvent.target?.result;
+      if (typeof result !== 'string') return;
+      const rawResult = result;
       const img = new Image();
       img.onload = () => {
         const maxDim = 480;
@@ -193,12 +203,15 @@ export default function BedCompletionModal({
         return;
       }
     }
-    onComplete({
+    const detailsPayload = {
       totalHarvest: totalHarvest.trim() || undefined,
       completionNotes: completionNotes.trim() || undefined,
       imageUrl: finalImageUrl || undefined,
       season: season,
-    });
+    };
+    const validated = bedCompletionDetailsSchema.safeParse(detailsPayload);
+
+    onComplete(validated.success ? validated.data : detailsPayload);
     setIsSubmitting(false);
     onClose();
   };

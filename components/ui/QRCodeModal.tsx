@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import { z } from 'zod';
 import Toast from '@/components/ui/Toast';
+
+const qrCodeModalPropsSchema = z.object({
+  isOpen: z.boolean(),
+  inviteUrl: z.string(),
+  farmName: z.string().optional(),
+});
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -11,12 +18,21 @@ interface QRCodeModalProps {
   farmName?: string;
 }
 
-export default function QRCodeModal({
-  isOpen,
-  onClose,
-  inviteUrl,
-  farmName = '農園招待',
-}: QRCodeModalProps) {
+export default function QRCodeModal(props: QRCodeModalProps) {
+  const parsed = qrCodeModalPropsSchema.safeParse(props);
+  const {
+    isOpen,
+    onClose,
+    inviteUrl,
+    farmName = '農園招待',
+  } = parsed.success
+    ? props
+    : {
+        isOpen: props.isOpen,
+        onClose: props.onClose,
+        inviteUrl: props.inviteUrl,
+        farmName: props.farmName || '農園招待',
+      };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dataUrl, setDataUrl] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
@@ -71,7 +87,9 @@ export default function QRCodeModal({
       setToastMessage('📋 招待URLをクリップボードにコピーしました！');
       setShowToast(true);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to copy invite URL to clipboard:', err);
+      setToastMessage('❌ コピーに失敗しました');
+      setShowToast(true);
     }
   };
 

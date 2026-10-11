@@ -1,10 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
 import Toast from '@/components/ui/Toast';
 import { formatMoney } from '@/lib/utils/formatHelper';
+
+const studentRecordSchema = z.object({
+  id: z.string(),
+  display_name: z.string().nullable().optional(),
+});
 
 interface PaymentRecord {
   id: string;
@@ -70,7 +76,16 @@ export default function TeacherPaymentsView() {
             .eq('farm_id', fid);
 
           if (farmStudents && farmStudents.length > 0) {
-            const dynamicPayments: PaymentRecord[] = farmStudents.map((s, idx) => ({
+            type StudentRecord = z.infer<typeof studentRecordSchema>;
+            const validatedStudents: StudentRecord[] = [];
+            for (const s of farmStudents) {
+              const res = studentRecordSchema.safeParse(s);
+              if (res.success) {
+                validatedStudents.push(res.data);
+              }
+            }
+
+            const dynamicPayments: PaymentRecord[] = validatedStudents.map((s, idx) => ({
               id: `p_${s.id}`,
               studentName: s.display_name || `受講生 ${idx + 1}`,
               plot: `区画 ${idx + 1}`,
@@ -89,7 +104,10 @@ export default function TeacherPaymentsView() {
         console.error('fetchStudentCount error:', err);
       }
     };
-    fetchStudentCount();
+
+    fetchStudentCount().catch((err: unknown) => {
+      console.error('Unhandled error in fetchStudentCount:', err);
+    });
   }, []);
 
   // シミュレーション自動計算ロジック

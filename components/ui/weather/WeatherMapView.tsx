@@ -1,8 +1,21 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { z } from 'zod';
 import type { LeafletGlobal, LeafletMapInstance } from './types';
 import { fetchMunicipalityNameFromCoords } from './useWeatherLive';
+
+declare global {
+  interface Window {
+    L?: LeafletGlobal;
+  }
+}
+
+const locationChangeSchema = z.object({
+  lat: z.number(),
+  lon: z.number(),
+  cityName: z.string(),
+});
 
 interface WeatherMapViewProps {
   isOpen: boolean;
@@ -24,7 +37,7 @@ export function WeatherMapView({
 
   useEffect(() => {
     const initCenterPinMap = () => {
-      const L = (window as unknown as { L?: LeafletGlobal }).L;
+      const L = window.L;
       if (!L || !mapContainerRef.current) return;
 
       if (leafletMapRef.current) {
@@ -47,19 +60,29 @@ export function WeatherMapView({
       let timer: ReturnType<typeof setTimeout> | undefined;
       map.on('moveend', () => {
         clearTimeout(timer);
-        timer = setTimeout(async () => {
+        timer = setTimeout(() => {
           const center = map.getCenter();
           const cLat = Math.round(center.lat * 10000) / 10000;
           const cLon = Math.round(center.lng * 10000) / 10000;
 
-          const cityName = await fetchMunicipalityNameFromCoords(cLat, cLon);
-          onLocationChange(cLat, cLon, cityName);
+          fetchMunicipalityNameFromCoords(cLat, cLon)
+            .then((cityName) => {
+              const validated = locationChangeSchema.safeParse({ lat: cLat, lon: cLon, cityName });
+              if (validated.success) {
+                onLocationChange(validated.data.lat, validated.data.lon, validated.data.cityName);
+              } else {
+                onLocationChange(cLat, cLon, cityName);
+              }
+            })
+            .catch((err: unknown) => {
+              console.error('Failed to fetch municipality name from coords:', err);
+            });
         }, 300);
       });
     };
 
     if (isOpen && mapContainerRef.current) {
-      if (!(window as unknown as { L?: LeafletGlobal }).L) {
+      if (!window.L) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
