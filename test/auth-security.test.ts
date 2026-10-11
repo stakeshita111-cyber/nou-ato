@@ -109,6 +109,22 @@ describe('Security & Authorization Suite (本番コード直撃セキュリテ�
       expect(response.status).toBe(200);
       expect(response.headers.get('location')).toBeNull();
     });
+
+    it('Middleware 内で例外が発生した場合、/login?error=auth_error へ Fail-Closed リダイレクトされること', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // NEXT_PUBLIC_SUPABASE_URL 未設定で例外を発生させる
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+      const request = new NextRequest('http://localhost:3000/teacher/dashboard');
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      const redirectLocation = response.headers.get('location');
+      expect(redirectLocation).toBe('http://localhost:3000/login?error=auth_error');
+
+      consoleSpy.mockRestore();
+    });
   });
 
   // ===========================================================================
