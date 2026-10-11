@@ -109,6 +109,17 @@ describe('Security & Authorization Suite (本番コード直撃セキュリテ�
       expect(response.status).toBe(200);
       expect(response.headers.get('location')).toBeNull();
     });
+
+    it('予期せぬエラー発生時、リクエストを素通りさせず安全側 (/login?error=auth_error) に遮断・リダイレクトすること (Fail-Closed)', async () => {
+      // Supabase環境変数を不正にしてエラーを誘発
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+      const request = new NextRequest('http://localhost:3000/teacher/dashboard');
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe('http://localhost:3000/login?error=auth_error');
+    });
   });
 
   // ===========================================================================
