@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   searchSimilarKnowledge,
   sanitizePiiText,
@@ -7,6 +8,10 @@ import {
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/utils/supabase/server';
+
+const checkKnowledgeRequestBodySchema = z.object({
+  question: z.string().optional(),
+});
 
 interface KnowledgeMatch {
   id: string;
@@ -66,8 +71,9 @@ export async function POST(request: Request) {
       return ApiResponse.unauthorized('ナレッジ照会機能の利用にはログインが必要です');
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { question } = body;
+    const rawBody: unknown = await request.json().catch(() => ({}));
+    const parseResult = checkKnowledgeRequestBodySchema.safeParse(rawBody);
+    const question = parseResult.success ? parseResult.data.question : undefined;
     if (!question || typeof question !== 'string' || !question.trim()) {
       return ApiResponse.success({ matches: [] });
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { z } from 'zod';
 import {
   VEGETABLE_TASK_TEMPLATES,
   TaskTemplate,
@@ -60,14 +61,15 @@ export default function TeacherTemplatesView() {
           .is('deleted_at', null);
 
         if (dbTemplates && dbTemplates.length > 0) {
-          customTemplates = dbTemplates.map((t): TaskTemplate => {
+          const fetchedTemplates: TaskTemplate[] = [];
+          for (const t of dbTemplates) {
             const cl =
               t.checklist && typeof t.checklist === 'object' && !Array.isArray(t.checklist)
                 ? (t.checklist as Record<string, unknown>)
                 : {};
-            return {
-              id: t.id,
-              title: t.title,
+            fetchedTemplates.push({
+              id: String(t.id),
+              title: String(t.title),
               category: (t.category as TaskCategory) || '共通',
               target_crop: t.target_crop || '共通',
               phase: (cl.phase as TaskPhase) || '育成・管理',
@@ -76,13 +78,14 @@ export default function TeacherTemplatesView() {
               tools_needed: t.tools_needed || '軍手',
               description: t.description || '',
               memo: t.memo || '',
-              exp: t.exp || 50,
-              difficulty: t.difficulty || 1,
+              exp: Number(t.exp) || 50,
+              difficulty: Number(t.difficulty) || 1,
               require_photo: Boolean(t.require_photo),
               badge_name: (cl.badge_name as string) || '栽培マスター',
               badge_icon: (cl.badge_icon as string) || '🌿',
-            };
-          });
+            });
+          }
+          customTemplates = fetchedTemplates;
         }
       } catch (e) {
         console.warn('DB custom templates fetch fallback:', e);
@@ -93,12 +96,38 @@ export default function TeacherTemplatesView() {
         const saved = localStorage.getItem('nouato_custom_templates');
         if (saved) {
           try {
-            const localArr: TaskTemplate[] = JSON.parse(saved);
-            localArr.forEach((lt) => {
-              if (!customTemplates.some((ct) => ct.id === lt.id)) {
-                customTemplates.push(lt);
+            const parsedLocal: unknown = JSON.parse(saved);
+            const customTemplatesSchema = z.array(
+              z.object({
+                id: z.string(),
+                title: z.string(),
+                target_crop: z.string(),
+                variety: z.string().optional(),
+                estimated_time: z.string(),
+                tools_needed: z.string(),
+                description: z.string(),
+                memo: z.string(),
+                exp: z.number(),
+                difficulty: z.number(),
+                require_photo: z.boolean(),
+                badge_name: z.string(),
+                badge_icon: z.string(),
+                category: z.enum(['果菜', '根菜', '葉菜', '共通', '土作り']),
+                timing: z.string().optional(),
+                reference_links: z.string().optional(),
+                source: z.string().optional(),
+                season: z.enum(['春夏', '秋冬', '通年']).optional(),
+                phase: z.enum(['準備・植付', '育成・管理', '収穫・片付け']).optional(),
+              })
+            );
+            const parseResult = customTemplatesSchema.safeParse(parsedLocal);
+            if (parseResult.success) {
+              for (const lt of parseResult.data) {
+                if (!customTemplates.some((ct) => ct.id === lt.id)) {
+                  customTemplates.push(lt);
+                }
               }
-            });
+            }
           } catch (e) {
             console.error('Failed to parse custom templates:', e);
           }
@@ -108,7 +137,9 @@ export default function TeacherTemplatesView() {
       setTemplates(mergeTemplates(customTemplates));
     };
 
-    loadTemplates();
+    loadTemplates().catch((err: unknown) => {
+      console.error('Failed to load templates:', err);
+    });
   }, []);
 
   // Escapeキーでモーダルを閉じる
@@ -643,7 +674,9 @@ export default function TeacherTemplatesView() {
         isOpen={!!previewTemplate}
         onClose={() => setPreviewTemplate(null)}
         onAddToTasks={(tpl) => {
-          handleAddToTasks(tpl);
+          handleAddToTasks(tpl).catch((err: unknown) => {
+            console.error('Failed to add template to tasks:', err);
+          });
         }}
         isAdding={addingId === previewTemplate?.id}
       />
@@ -938,7 +971,11 @@ export default function TeacherTemplatesView() {
 
                         <button
                           type="button"
-                          onClick={() => handleAddToTasks(tpl)}
+                          onClick={() => {
+                            handleAddToTasks(tpl).catch((err: unknown) => {
+                              console.error('Failed to add template to tasks:', err);
+                            });
+                          }}
                           disabled={addingId === tpl.id}
                           className="px-3.5 py-2 app-accent-btn font-bold text-xs rounded-xl shadow-xs transition active:scale-95 flex items-center space-x-1 cursor-pointer disabled:opacity-50"
                         >
@@ -970,7 +1007,11 @@ export default function TeacherTemplatesView() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                              onClick={() => {
+                                handleDeleteTemplate(tpl.id, tpl.title).catch((err: unknown) => {
+                                  console.error('Failed to delete template:', err);
+                                });
+                              }}
                               className="px-2.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition cursor-pointer"
                             >
                               🗑 削除
