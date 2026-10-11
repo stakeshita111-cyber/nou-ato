@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+
+const userRoleSchema = z.object({
+  role: z.enum(['teacher', 'student']),
+});
 
 export default function RootPage() {
   const [statusText, setStatusText] = useState('ログイン状態を確認しています...');
@@ -29,7 +34,9 @@ export default function RootPage() {
 
           if (!isMounted) return;
 
-          if (userData?.role === 'teacher') {
+          const parsedUser = userRoleSchema.safeParse(userData);
+
+          if (parsedUser.success && parsedUser.data.role === 'teacher') {
             window.location.replace('/teacher/dashboard');
           } else {
             window.location.replace('/student');
@@ -46,7 +53,12 @@ export default function RootPage() {
       }
     };
 
-    checkAuthAndRedirect();
+    checkAuthAndRedirect().catch((err: unknown) => {
+      console.error('RootPage unhandled error:', err);
+      if (isMounted) {
+        window.location.replace('/login');
+      }
+    });
 
     // 1.5秒経過しても自動遷移しない場合の安全タイマー (フォールバック)
     const timer = setTimeout(() => {
