@@ -82,59 +82,106 @@
           </div>
         </div>
         <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span>最終更新: 2026年9月25日</span>
+          <span>最終更新: 2026年10月11日</span>
           <span>•</span>
-          <span>Vitest 65件テスト通過 (カバレッジ87.7%)</span>
+          <span>Vitest 208件全件通過 (カバレッジ90.14%)</span>
         </div>
       </div>
 
       <!-- 📚 関連ドキュメント・ナビゲーションタブ 📚 -->
-      <div
-        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3 pt-1 border-t border-slate-100 flex flex-wrap items-center gap-2 text-xs font-bold"
-      >
-        <span class="text-slate-400 font-semibold mr-1">📑 関連資料:</span>
-        <a
-          href="review-checklist-dashboard.html"
-          class="px-3 py-1.5 rounded-xl bg-emerald-700 text-white shadow-xs"
-        >
-          ✅ オリアプレビュー項目一覧 (101項目)
-        </a>
-        <a
-          href="api-docs.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          ⚡ API仕様 (Swagger UI)
-        </a>
-        <a
-          href="database-design.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          🗄️ ER図 & テーブル定義書
-        </a>
-        <a
-          href="test-plan.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          🧪 完全品質検査計画書 (QA Master Plan)
-        </a>
-        <a
-          href="architecture-map.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          🗺️ システム & データフロー アーキテクチャマップ
-        </a>
-        <a
-          href="agent-and-skills-guide.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          🤖 エージェント＆スキル活用ガイド
-        </a>
-        <a
-          href="../public/screen_flow.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          📱 完全画面遷移図 (Screen Flow)
-        </a>
+      <div class="border-t border-slate-200/80 bg-slate-50/70 px-4 sm:px-6 lg:px-8 py-2.5">
+        <div class="max-w-7xl mx-auto flex flex-col gap-2">
+          <!-- グループ1: HTML検証・設計ダッシュボード -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+            <span class="text-slate-400 font-semibold px-1 flex items-center gap-1">
+              <span>📊</span><span class="hidden sm:inline">検証・設計:</span>
+            </span>
+            <a
+              href="review-checklist-dashboard.html"
+              class="px-2.5 py-1 rounded-lg bg-emerald-700 text-white shadow-xs"
+            >
+              ✅ オリアプレビュー (101項目)
+            </a>
+            <a
+              href="api-docs.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              ⚡ API仕様 (Swagger UI)
+            </a>
+            <a
+              href="database-design.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🗄️ ER図・DB定義書
+            </a>
+            <a
+              href="test-plan.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🧪 品質検査計画 (QA)
+            </a>
+            <a
+              href="architecture-map.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🗺️ システム構成マップ
+            </a>
+            <a
+              href="agent-and-skills-guide.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🤖 エージェント設計
+            </a>
+            <a
+              href="../public/screen_flow.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📱 画面遷移図
+            </a>
+          </div>
+          <!-- グループ2: Markdown要件・仕様書 -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+            <span class="text-emerald-700 font-semibold px-1 flex items-center gap-1">
+              <span>📑</span><span class="hidden sm:inline">仕様・要件書:</span>
+            </span>
+            <a
+              href="markdown-viewer.html?doc=prd"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📋 要件定義書 (PRD)
+            </a>
+            <a
+              href="markdown-viewer.html?doc=nfr"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🛡️ 非機能要件書
+            </a>
+            <a
+              href="markdown-viewer.html?doc=log"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🪵 ログ設計書
+            </a>
+            <a
+              href="markdown-viewer.html?doc=erd"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📑 DB仕様書 (ERD)
+            </a>
+            <a
+              href="markdown-viewer.html?doc=curl"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🔌 cURLサンプル集
+            </a>
+            <a
+              href="markdown-viewer.html?doc=readme"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📖 プロジェクトREADME
+            </a>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -155,9 +202,9 @@
             <span class="text-emerald-500 text-sm font-bold">✓</span>
           </div>
           <p class="text-3xl font-black text-emerald-700 mt-1">
-            86 <span class="text-sm font-semibold">件</span>
+            88 <span class="text-sm font-semibold">件</span>
           </p>
-          <p class="text-[11px] text-emerald-600 font-medium mt-1">合格率: 92.5%</p>
+          <p class="text-[11px] text-emerald-600 font-medium mt-1">合格率: 94.6%</p>
         </div>
 
         <div class="bg-white p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-xs">
@@ -166,7 +213,7 @@
             <span class="text-amber-500 text-sm font-bold">▲</span>
           </div>
           <p class="text-3xl font-black text-amber-700 mt-1">
-            7 <span class="text-sm font-semibold">件</span>
+            5 <span class="text-sm font-semibold">件</span>
           </p>
           <p class="text-[11px] text-amber-600 font-medium mt-1">改善・拡張推奨</p>
         </div>
@@ -197,18 +244,18 @@
       <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
         <div class="flex items-center justify-between text-xs font-bold">
           <span class="text-slate-700">チェックシート適合進捗率 (有効 93 項目中)</span>
-          <span class="text-emerald-700 font-black text-sm">92.5% 達成</span>
+          <span class="text-emerald-700 font-black text-sm">94.6% 達成</span>
         </div>
         <div
           class="w-full bg-slate-100 rounded-full h-3.5 flex overflow-hidden p-0.5 border border-slate-200"
         >
           <div
-            style="width: 92.5%"
+            style="width: 94.6%"
             class="bg-emerald-600 rounded-full h-full"
-            title="対応済み: 86件"
+            title="対応済み: 88件"
           ></div>
-          <div style="width: 7.5%" class="bg-amber-400 h-full ml-0.5" title="一部対応: 7件"></div>
-          <div style="width: 1.1%" class="bg-rose-500 h-full ml-0.5" title="未対応: 0件"></div>
+          <div style="width: 5.4%" class="bg-amber-400 h-full ml-0.5" title="一部対応: 5件"></div>
+          <div style="width: 0%" class="bg-rose-500 h-full ml-0.5" title="未対応: 0件"></div>
         </div>
         <div class="flex flex-wrap gap-4 text-[11px] font-medium text-slate-500 pt-1">
           <span class="flex items-center gap-1.5"
@@ -1029,7 +1076,7 @@ flowchart LR
 
               <tr
                 class="hover:bg-slate-50/80 transition item-row"
-                data-status="partial"
+                data-status="pass"
                 data-diff="-"
                 data-category="2.設計"
               >
@@ -1043,19 +1090,19 @@ flowchart LR
                 <td class="p-3 font-bold text-slate-900">
                   <div>IAMロールとポリシーが適切に設計されている</div>
                   <div class="text-[10px] text-slate-400 font-normal mt-0.5">
-                    対象: AWS, Java/Python/PHP, AIエンジニア, AI駆動開発, React
+                    対象: AWS・インフラ / Supabase認可
                   </div>
                 </td>
                 <td class="p-3 text-center whitespace-nowrap">
                   <span
-                    class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial"
+                    class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass"
                   >
-                    △ 一部対応
+                    ◯ 対応済み
                   </span>
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
                   Supabase
-                  Authのteacher/studentロール制御およびMiddleware認可を実装済み。全テーブルのRLSポリシー監査が推奨されます。
+                  Authのteacher/studentロール制御およびMiddleware認可に加え、全8テーブルのRLS認可規約とDB直結CRUDマッピング監査書（<code>docs/DATABASE_CRUD_AUDIT.md</code>）を策定・完全準拠。
                 </td>
               </tr>
 
@@ -1345,7 +1392,7 @@ flowchart LR
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
                   <code>.github/workflows/ci.yml</code> を配備。GitHub Actions にて Push/PR
                   時に型チェック、Lint、Vitest
-                  自動テスト全65件が自動実行されるパイプラインを構築完了。
+                  自動テスト全29ファイル・208件が自動実行されるパイプラインを構築完了。
                 </td>
               </tr>
 
@@ -1702,7 +1749,7 @@ flowchart LR
                   </span>
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
-                  タスク一覧、受講生一覧、日誌タイムライン、農園キャンバス表示が正常に動作します。
+                  タスク一覧、受講生一覧（BI統計カード・進捗サマリー付き）、日誌タイムライン、生徒側ヘッダー通知ベル（未読バッジ＆モーダル閲覧）、農園キャンバス表示が正常に動作します。
                 </td>
               </tr>
 
@@ -1764,7 +1811,7 @@ flowchart LR
                   </span>
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
-                  タスク削除（ゴミ箱モーダル）、区画クリア、アーカイブ機能が実装されています。
+                  タスク削除（確認モーダル）、区画クリア、畝の削除機能、およびアナウンス配信履歴のCRUD削除機能を実装完了。
                 </td>
               </tr>
 
@@ -1929,7 +1976,7 @@ flowchart LR
 
               <tr
                 class="hover:bg-slate-50/80 transition item-row"
-                data-status="partial"
+                data-status="pass"
                 data-diff="B"
                 data-category="5.機能"
               >
@@ -1943,18 +1990,18 @@ flowchart LR
                 <td class="p-3 font-bold text-slate-900">
                   <div>ページネーション機能が想定通りに動く</div>
                   <div class="text-[10px] text-slate-400 font-normal mt-0.5">
-                    対象: React, Java/Python/PHP, AIエンジニア, AI駆動開発
+                    対象: Webアプリ共通
                   </div>
                 </td>
                 <td class="p-3 text-center whitespace-nowrap">
                   <span
-                    class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-partial"
+                    class="inline-block px-2.5 py-1 rounded-full text-[11px] font-black status-badge-pass"
                   >
-                    △ 一部対応
+                    ◯ 対応済み
                   </span>
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
-                  横スワイプスライダーおよび無限スクロール表示を採用。従来の数字ページネーションは未導入です。
+                  講師ダッシュボードの受講生一覧画面にて、1ページあたり表示件数切り替え（5件/10件/20件）、前へ・次へ・ページ番号切り替え、総受講生数カウントを備えた完全なページネーション機能を実装完了。
                 </td>
               </tr>
 
@@ -2047,7 +2094,7 @@ flowchart LR
                   </span>
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
-                  日誌の日付降順ソート、受講生の進捗率ソートが正常に動作します。
+                  日誌の日付降順ソート、受講生一覧の多軸ソート（名前順・進捗率順・最終活動順・栽培野菜順）、畝管理のソートが正常に動作します。
                 </td>
               </tr>
 
@@ -2964,7 +3011,7 @@ flowchart LR
                   </span>
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
-                  npm run test で誰でも即座に全40件のテストを実行可能です。
+                  npm run test で誰でも即座に全29ファイル・208件の自動テストを実行・検証可能です。
                 </td>
               </tr>
 
@@ -2996,8 +3043,8 @@ flowchart LR
                 </td>
                 <td class="p-3 text-slate-600 leading-relaxed text-[11px]">
                   <code>vitest.config.mjs</code> にてカバレッジ目標値（Threshold:
-                  70%）を設定し、<code>npm run test:coverage</code> にて Statements 87.7%, Lines
-                  89.3%, Functions 96.2% で大幅クリア。
+                  70%）を設定し、<code>npm run test:coverage</code> にて Statements 90.14%, Lines
+                  93.65%, Functions 96.6% で大幅クリア。
                 </td>
               </tr>
 

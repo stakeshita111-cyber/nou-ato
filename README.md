@@ -137,10 +137,20 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全9本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全19本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
+   - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
+   - `20261009010000_chat_rag_security_defense.sql` (AI相談セキュリティ多層防御・入力サニタイズ)
+   - `20261009020000_ai_tickets.sql` (AI相談チケット管理テーブル・関数)
+   - `20261009030000_batch_student_tasks_cascade.sql` (生徒タスク一括生成・カスケード削除)
    - `20261009040000_prevent_privilege_escalation.sql` (権限昇格防止・RLS強化)
+   - `20261009050000_security_advisor_views_and_rls.sql` (VIEW security_invoker設定・監査準拠)
+   - `20261010000000_farm_beds_ssot_and_reorder.sql` (畝SSOT管理・並べ替えRPC)
+   - `20261010010000_add_description_to_student_tasks.sql` (生徒タスク説明文カラム追加)
+   - `20261010020000_purge_all_legacy_policies_and_enforce_strict_rls.sql` (旧RLSポリシー全廃止・厳格ポリシー適用)
+   - `20261010030000_link_legacy_student_tasks_to_base_task_id.sql` (既存タスクとbase_task_id紐付け)
+   - `20261010040000_crop_records_shared_plot_support.sql` (観察記録の共有区画対応)
    - `20261010050000_add_preset_faqs_to_farms.sql` (農園プリセットFAQ追加)
    - `20261010060000_ai_usage_atomic_and_ticket_hardening.sql` (AIチケット原帳・アトミック更新)
    - `20261010070000_harden_farm_beds_and_broadcast_rls.sql` (畝並べ替え・配信RLS強化)
@@ -192,13 +202,13 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全29テストファイル / 206項目全件PASS）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全29テストファイル / 208項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全206件・100%通過)
+# 1. 自動テストの実行 (全208件・100%通過)
 npm run test
 
-# 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 88%以上達成)
+# 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)
 npm run test:coverage
 
 # 3. TypeScript 型チェック (型エラー0件の検証)
@@ -235,13 +245,15 @@ nou-ato/
 ├── .github/              # GitHub Actions CI/CD パイプライン
 │   └── workflows/        # ci.yml (品質ゲート), deploy.yml (ビルド検証)
 ├── app/                  # Next.js App Router (ルーティング & API)
-│   ├── api/              # API Route Handlers (chat, settings)
+│   ├── api/              # API Route Handlers (chat, settings, tickets)
+│   ├── auth/             # 認証系画面・コールバック (callback, merge, reset-password等)
+│   ├── invite/           # 生徒招待受け取り・参加画面
+│   ├── login/            # 認証・ログイン画面
 │   ├── student/          # 受講生ポータル画面 (畑/天気/予約/相談/成長)
-│   ├── teacher/          # 講師ダッシュボード画面 (概要/タスク/生徒/日誌/設定)
-│   └── login/            # 認証・ログイン画面
-├── components/           # UIコンポーネント (teacher, student, ui, board)
+│   └── teacher/          # 講師ダッシュボード画面 (概要/タスク/生徒/日誌/設定)
+├── components/           # UIコンポーネント (teacher, student, ui, board, farm)
 ├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager, logger, apiResponse)
-├── test/                 # 自動テストスイート (Vitest: 16ファイル・全103項目)
+├── test/                 # 自動テストスイート (Vitest: 29ファイル・全208項目)
 ├── docs/                 # 仕様書・品質ダッシュボード・OpenAPI・ER図
 └── types/                # TypeScript型定義 (Database, Supabase)
 ```
@@ -258,7 +270,7 @@ nou-ato/
 | :------------------------------------- | :----------------------------------------------------------------------------- | :-------------------------------------------------------------------------- |
 | **オリアプレビュー項目DB (全101項目)** | [`docs/review-checklist-dashboard.html`](docs/review-checklist-dashboard.html) | 全101機能・非機能要件の検証ダッシュボード、合否判定、エビデンス集約         |
 | **API 仕様書 & Swagger UI**            | [`docs/api-docs.html`](docs/api-docs.html)                                     | OpenAPI 3.1 仕様に基づくブラウザ対話型 API ドキュメント・実行サンドボックス |
-| **ER図 & テーブル定義書**              | [`docs/database-design.html`](docs/database-design.html)                       | Mermaid ER図、全8テーブルのカラム型・制約・RLSポリシー設計書                |
+| **ER図 & テーブル定義書**              | [`docs/database-design.html`](docs/database-design.html)                       | Mermaid ER図、全15テーブル+VIEW+RPC関数のカラム型・制約・RLSポリシー設計書  |
 | **品質検査計画書 (QA Master Plan)**    | [`docs/test-plan.html`](docs/test-plan.html)                                   | 全テスト項目と完全同期したテスト計画、自動テスト実行・カバレッジ検証        |
 | **アーキテクチャ & データフロー**      | [`docs/architecture-map.html`](docs/architecture-map.html)                     | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図                   |
 | **エージェント & スキル活用ガイド**    | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html)         | AI開発エージェントチームの役割分担と自律修正プロトコル解説                  |

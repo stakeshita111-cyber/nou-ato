@@ -47,7 +47,7 @@
           </div>
         </div>
         <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span>テーブル数: 8 テーブル</span>
+          <span>テーブル数: 全15テーブル + 1複合VIEW + 17 RPC関数</span>
           <span>•</span>
           <span>RLS ポリシー完備</span>
         </div>
@@ -176,11 +176,19 @@ erDiagram
     users ||--o{ farm_beds : "assigned_to"
     users ||--o{ student_tasks : "assigned_to"
     users ||--o{ journals : "authors"
+    users ||--o{ ai_tickets : "owns"
+    users ||--o{ announcements : "creates"
     farms ||--o{ farm_plots : "contains"
     farms ||--o{ tasks : "owns"
+    farms ||--o{ ai_tickets : "manages"
+    farms ||--o{ announcements : "publishes"
     farm_plots ||--o{ farm_beds : "contains"
+    farm_plots ||--o{ crop_records : "shared_logs"
+    farm_beds ||--o{ crop_records : "logs"
     tasks ||--o{ student_tasks : "templates"
     student_tasks ||--o{ journals : "reports"
+    ai_tickets ||--o{ ai_usage_events : "tracks"
+    events ||--o{ reservations : "contains"
 
     users {
         uuid id PK
@@ -196,6 +204,9 @@ erDiagram
         uuid id PK
         varchar name
         uuid owner_id FK
+        boolean show_student_talk_tab
+        jsonb preset_faqs
+        varchar invite_code
     }
 
     farm_plots {
@@ -203,6 +214,7 @@ erDiagram
         uuid farm_id FK
         varchar name
         varchar code
+        jsonb position
         uuid student_id FK
     }
 
@@ -214,6 +226,19 @@ erDiagram
         varchar crop_name
         integer progress_percent
         varchar status "active|harvested"
+        integer sort_order
+    }
+
+    crop_records {
+        uuid id PK
+        varchar bed_id
+        varchar plot_id
+        varchar date
+        varchar crop_name
+        numeric height_cm
+        jsonb work_types
+        text notes
+        varchar image_url
     }
 
     tasks {
@@ -239,9 +264,36 @@ erDiagram
         uuid id PK
         uuid student_id FK
         uuid student_task_id FK
+        varchar role
         text content
         text reply
         boolean is_approved
+        boolean is_shared_with_farm
+    }
+
+    ai_tickets {
+        uuid id PK
+        uuid user_id FK
+        uuid farm_id FK
+        integer granted_tickets
+        date last_daily_reset_date
+    }
+
+    ai_usage_events {
+        uuid id PK
+        uuid ticket_id FK
+        uuid user_id FK
+        varchar status "reserved|finalized"
+        text query_preview
+    }
+
+    announcements {
+        uuid id PK
+        uuid farm_id FK
+        uuid author_id FK
+        varchar title
+        text content
+        varchar priority "normal|urgent"
     }
 
     events {
@@ -250,6 +302,20 @@ erDiagram
         date date
         varchar location
         integer capacity
+    }
+
+    reservations {
+        uuid id PK
+        uuid event_id FK
+        uuid student_id FK
+    }
+
+    payments {
+        uuid id PK
+        uuid student_id FK
+        integer amount
+        varchar fee_type
+        varchar status
     }
         </pre>
         </div>
@@ -262,7 +328,7 @@ erDiagram
             📑 詳細テーブル定義書 (Table Definitions)
           </h2>
           <p class="text-xs text-slate-500 mt-0.5">
-            全8テーブルのカラム名、データ型、NULL制約、外部キー、詳細説明
+            全15テーブル+VIEW+RPC関数のカラム名、データ型、NULL制約、外部キー、詳細説明
           </p>
         </div>
 

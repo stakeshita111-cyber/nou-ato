@@ -47,47 +47,106 @@
           </div>
         </div>
         <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span>テーブル数: 8 テーブル</span>
+          <span>テーブル数: 全15テーブル + 1複合VIEW + 17 RPC関数</span>
           <span>•</span>
           <span>RLS ポリシー完備</span>
         </div>
       </div>
 
       <!-- 📚 関連ドキュメント・ナビゲーションタブ 📚 -->
-      <div
-        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-3 pt-1 border-t border-slate-100 flex flex-wrap items-center gap-2 text-xs font-bold"
-      >
-        <span class="text-slate-400 font-semibold mr-1">📑 関連資料:</span>
-        <a
-          href="review-checklist-dashboard.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          ✅ オリアプレビュー項目一覧 (101項目)
-        </a>
-        <a
-          href="database-design.html"
-          class="px-3 py-1.5 rounded-xl bg-emerald-700 text-white shadow-xs"
-        >
-          🗄️ ER図 & テーブル定義書
-        </a>
-        <a
-          href="api-docs.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          ⚡ API仕様書 (Swagger UI)
-        </a>
-        <a
-          href="test-plan.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          🧪 完全品質検査計画書 (QA Master Plan)
-        </a>
-        <a
-          href="architecture-map.html"
-          class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition"
-        >
-          🗺️ システム & データフロー
-        </a>
+      <div class="border-t border-slate-200/80 bg-slate-50/70 px-4 sm:px-6 lg:px-8 py-2.5">
+        <div class="max-w-7xl mx-auto flex flex-col gap-2">
+          <!-- グループ1: HTML検証・設計ダッシュボード -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+            <span class="text-slate-400 font-semibold px-1 flex items-center gap-1">
+              <span>📊</span><span class="hidden sm:inline">検証・設計:</span>
+            </span>
+            <a
+              href="review-checklist-dashboard.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              ✅ オリアプレビュー (101項目)
+            </a>
+            <a
+              href="api-docs.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              ⚡ API仕様 (Swagger UI)
+            </a>
+            <a
+              href="database-design.html"
+              class="px-2.5 py-1 rounded-lg bg-emerald-700 text-white shadow-xs"
+            >
+              🗄️ ER図・DB定義書
+            </a>
+            <a
+              href="test-plan.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🧪 品質検査計画 (QA)
+            </a>
+            <a
+              href="architecture-map.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🗺️ システム構成マップ
+            </a>
+            <a
+              href="agent-and-skills-guide.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🤖 エージェント設計
+            </a>
+            <a
+              href="../public/screen_flow.html"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📱 画面遷移図
+            </a>
+          </div>
+          <!-- グループ2: Markdown要件・仕様書 -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+            <span class="text-emerald-700 font-semibold px-1 flex items-center gap-1">
+              <span>📑</span><span class="hidden sm:inline">仕様・要件書:</span>
+            </span>
+            <a
+              href="markdown-viewer.html?doc=prd"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📋 要件定義書 (PRD)
+            </a>
+            <a
+              href="markdown-viewer.html?doc=nfr"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🛡️ 非機能要件書
+            </a>
+            <a
+              href="markdown-viewer.html?doc=log"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🪵 ログ設計書
+            </a>
+            <a
+              href="markdown-viewer.html?doc=erd"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📑 DB仕様書 (ERD)
+            </a>
+            <a
+              href="markdown-viewer.html?doc=curl"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              🔌 cURLサンプル集
+            </a>
+            <a
+              href="markdown-viewer.html?doc=readme"
+              class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
+            >
+              📖 プロジェクトREADME
+            </a>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -117,11 +176,19 @@ erDiagram
     users ||--o{ farm_beds : "assigned_to"
     users ||--o{ student_tasks : "assigned_to"
     users ||--o{ journals : "authors"
+    users ||--o{ ai_tickets : "owns"
+    users ||--o{ announcements : "creates"
     farms ||--o{ farm_plots : "contains"
     farms ||--o{ tasks : "owns"
+    farms ||--o{ ai_tickets : "manages"
+    farms ||--o{ announcements : "publishes"
     farm_plots ||--o{ farm_beds : "contains"
+    farm_plots ||--o{ crop_records : "shared_logs"
+    farm_beds ||--o{ crop_records : "logs"
     tasks ||--o{ student_tasks : "templates"
     student_tasks ||--o{ journals : "reports"
+    ai_tickets ||--o{ ai_usage_events : "tracks"
+    events ||--o{ reservations : "contains"
 
     users {
         uuid id PK
@@ -137,6 +204,9 @@ erDiagram
         uuid id PK
         varchar name
         uuid owner_id FK
+        boolean show_student_talk_tab
+        jsonb preset_faqs
+        varchar invite_code
     }
 
     farm_plots {
@@ -144,6 +214,7 @@ erDiagram
         uuid farm_id FK
         varchar name
         varchar code
+        jsonb position
         uuid student_id FK
     }
 
@@ -155,6 +226,19 @@ erDiagram
         varchar crop_name
         integer progress_percent
         varchar status "active|harvested"
+        integer sort_order
+    }
+
+    crop_records {
+        uuid id PK
+        varchar bed_id
+        varchar plot_id
+        varchar date
+        varchar crop_name
+        numeric height_cm
+        jsonb work_types
+        text notes
+        varchar image_url
     }
 
     tasks {
@@ -180,9 +264,36 @@ erDiagram
         uuid id PK
         uuid student_id FK
         uuid student_task_id FK
+        varchar role
         text content
         text reply
         boolean is_approved
+        boolean is_shared_with_farm
+    }
+
+    ai_tickets {
+        uuid id PK
+        uuid user_id FK
+        uuid farm_id FK
+        integer granted_tickets
+        date last_daily_reset_date
+    }
+
+    ai_usage_events {
+        uuid id PK
+        uuid ticket_id FK
+        uuid user_id FK
+        varchar status "reserved|finalized"
+        text query_preview
+    }
+
+    announcements {
+        uuid id PK
+        uuid farm_id FK
+        uuid author_id FK
+        varchar title
+        text content
+        varchar priority "normal|urgent"
     }
 
     events {
@@ -191,6 +302,20 @@ erDiagram
         date date
         varchar location
         integer capacity
+    }
+
+    reservations {
+        uuid id PK
+        uuid event_id FK
+        uuid student_id FK
+    }
+
+    payments {
+        uuid id PK
+        uuid student_id FK
+        integer amount
+        varchar fee_type
+        varchar status
     }
         </pre>
         </div>
@@ -203,7 +328,7 @@ erDiagram
             📑 詳細テーブル定義書 (Table Definitions)
           </h2>
           <p class="text-xs text-slate-500 mt-0.5">
-            全8テーブルのカラム名、データ型、NULL制約、外部キー、詳細説明
+            全15テーブル+VIEW+RPC関数のカラム名、データ型、NULL制約、外部キー、詳細説明
           </p>
         </div>
 
@@ -402,7 +527,7 @@ erDiagram
           </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div class="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-2">
             <p class="font-black text-emerald-900">👨‍🎓 受講生 (student) 認可ルール</p>
             <ul class="list-disc list-inside text-slate-700 space-y-1">
@@ -421,6 +546,20 @@ erDiagram
               </li>
               <li>受講生の日誌に対する承認 (<code>is_approved = true</code>) および返信権限</li>
               <li>タスクテンプレートの作成・割当・編集権限</li>
+            </ul>
+          </div>
+          <div class="p-4 bg-purple-50/50 border border-purple-200 rounded-2xl space-y-2">
+            <p class="font-black text-purple-900">🔐 Supabase Security Advisor 適合規準</p>
+            <ul class="list-disc list-inside text-slate-700 space-y-1">
+              <li>
+                全ビュー (<code>farm_beds_with_students</code>等) に
+                <code>security_invoker = true</code> 適用
+              </li>
+              <li>全リレーショナルテーブルに <code>ENABLE ROW LEVEL SECURITY</code> を完全適用</li>
+              <li>
+                全 <code>SECURITY DEFINER</code> 関数に
+                <code>SET search_path = public</code> を明示適用
+              </li>
             </ul>
           </div>
         </div>

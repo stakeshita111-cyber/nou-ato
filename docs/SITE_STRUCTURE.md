@@ -16,18 +16,24 @@ graph TD
     Root --> SignupT["/auth/signup/teacher (講師アカウント開設)"]
     Root --> Forgot["/auth/forgot-password (PWリセット申請)"]
     Root --> Reset["/auth/reset-password (新PW設定)"]
+    Root --> Merge["/auth/merge (LINE重複アカウント統合)"]
+    Root --> AuthErr["/auth/auth-code-error (認証エラー表示)"]
 
     %% 講師領域 (Teacher Domain)
-    Root --> TeacherDash["/teacher/dashboard (講師用ポータル・PC/タブレット最適化)"]
+    TeacherDash["/teacher/dashboard (講師用ポータル・PC/タブレット最適化)"]
+    Root --> TeacherDash
     TeacherDash --> TView1["📊 1. 概要ビュー (Overview: 農園統計・招待QR・未対応日誌)"]
     TeacherDash --> TView2["📋 2. タスク管理・看板ビュー (Tasks: D&D教材プール・公開中管理)"]
-    TeacherDash --> TView3["👥 3. 受講生一覧ビュー (Students: 進捗率・畝割り当て・個別タスク)"]
+    TeacherDash --> TView3["👥 3. 受講生一覧ビュー (Students: 進捗率・畝割り当て・個別タスク・チケット付与)"]
     TeacherDash --> TView4["📝 4. 相談・日誌確認ビュー (Journals: 返信・AIナレッジ化承認)"]
     TeacherDash --> TView5["🗺️ 5. 農地キャンバスビュー (Canvas: 畝配置D&D・スリム畝カード)"]
-    TeacherDash --> TView6["⚙️ 6. 農園設定ビュー (Settings: AI相談タブON/OFF・LINE連携)"]
+    TeacherDash --> TView6["⚙️ 6. 農園設定ビュー (Settings: AI相談タブON/OFF・FAQプリセット・メニュー表示切替)"]
+    TeacherDash -.-> TView7["💰 7. 集金管理ビュー (Payments: 月謝/区画料/教材費 ※設定で表示切替)"]
+    TeacherDash -.-> TView8["📅 8. イベント管理ビュー (Events: 講習会/収穫祭 ※設定で表示切替)"]
 
     %% 生徒領域 (Student Domain)
-    Invite --> StudentPortal["/student (生徒用ポータル・スマホファースト)"]
+    StudentPortal["/student (生徒用ポータル・スマホファースト)"]
+    Invite --> StudentPortal
     Root --> StudentPortal
     StudentPortal --> STab1["🌱 畑 タブ (myfarm: カードスタックタスク・写真報告・スリム畝日誌)"]
     StudentPortal --> STab2["⛅ 天気 タブ (weather: 24hピンポイント気象予報・一括アナウンス)"]
@@ -80,11 +86,24 @@ graph TD
 | **`/auth/signup/teacher`**  | 講師用アカウント新規開設         | ・農園名・講師名・認証情報登録                                                                                                |
 | **`/auth/forgot-password`** | パスワード再設定メール申請       | ・Supabase Auth リセットメール送信                                                                                            |
 | **`/auth/reset-password`**  | パスワード再設定実行画面         | ・トークン検証・新パスワード更新                                                                                              |
+| **`/auth/merge`**           | LINE アカウント重複統合画面      | ・既存アカウントと新アカウントの統合・選択確認                                                                                |
+| **`/auth/auth-code-error`** | 認証コードエラー画面             | ・OAuth エラー時のリトライ案内                                                                                                |
 | **`/auth/callback`**        | OAuth / メール認証コールバック   | ・セッション確立・リダイレクト制御                                                                                            |
 
 ---
 
-## 🧹 5. 整理・最適化完了したルーティング一覧
+## ⚡ 5. バックエンド API Route Handlers 一覧
+
+| エンドポイント                  |  メソッド  | 用途                                                              | 認証/認可                      |
+| :------------------------------ | :--------: | :---------------------------------------------------------------- | :----------------------------- |
+| **`/api/chat/rag`**             |    POST    | AIしるべぇ相談（Gemini RAG・PII自動防衛・チケット消費・対話保存） | 受講生・講師（要ログイン）     |
+| **`/api/chat/check-knowledge`** |    POST    | 質問入力時の類似Q&A・農園ナレッジ事前サジェスト照会               | 要ログイン                     |
+| **`/api/settings`**             | GET / POST | 農園全体設定（相談タブON/OFF、プリセットFAQ管理）の取得・更新     | GET: 閲覧可能 / POST: 講師のみ |
+| **`/api/tickets/grant`**        |    POST    | 講師から同農園の受講生へのAI相談チケット追加付与                  | 講師のみ（厳格認可）           |
+
+---
+
+## 🧹 6. 整理・最適化完了したルーティング一覧
 
 機能集約・リファクタリングに伴い、以下の旧画面は単一ポータルへ統合・整理されました：
 

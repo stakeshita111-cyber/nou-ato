@@ -1,4 +1,4 @@
-﻿# NOU-ATO (のうあと) データベース CRUD 操作 ＆ API 仕様監査レポート
+# NOU-ATO (のうあと) データベース CRUD 操作 ＆ API 仕様監査レポート
 
 本ドキュメントは、体験農業経営支援アプリ「NOU-ATO」における **REST API仕様書（`openapi.yaml`）と、実際のデータベース（Supabase PostgreSQL）に対する CRUD 操作の実態** を完全スキャン・照合した監査結果です。
 
@@ -6,14 +6,17 @@
 
 ## 1. 監査サマリー
 
-1. **API仕様書（4件）のDB登録の実態**:
-   - `docs/openapi.yaml` に定義されている 4件 のエンドポイントのうち、**データベースへの登録（INSERT）を行っているのは `POST /api/chat/rag` の 1件のみ** です。
-   - `POST /api/chat/check-knowledge` は参照（SELECT）のみで、登録・変更は行いません。
-   - `GET /api/settings` および `POST /api/settings` はメモリ内変数（`globalServerSettings`）を操作するのみで、DBには接続していません。
-2. **API仕様書に未記載のDB登録・更新ルート**:
-   - **`GET /auth/callback` (`app/auth/callback/route.ts`)** が存在し、OAuth認証時に `users` テーブルへの **参照（SELECT）および新規登録・更新（UPSERT）** を実行しています（仕様書未記載）。
+1. **API仕様書のDB登録・更新の実態**:
+   - `POST /api/chat/rag`: `journals` テーブルへの対話登録（INSERT）およびチケット消費台帳記録。
+   - `POST /api/chat/check-knowledge`: `journals` テーブルのナレッジ参照（SELECTのみ）。
+   - `GET /api/settings`: 認証ユーザーの農園、または指定 `farm_id` の `farms` レコードを参照（SELECT）。
+   - `POST /api/settings`: 講師が所属する農園の `farms` テーブル（`show_student_talk_tab`, `preset_faqs`）を安全に更新（UPDATE）。
+   - `POST /api/tickets/grant`: 講師権限検証の上、対象受講生の `ai_tickets` に追加チケットを付与（UPDATE / RPC `grant_ai_tickets`）。
+2. **仕様書に未記載だった登録・更新ルート**:
+   - **`GET /auth/callback` (`app/auth/callback/route.ts`)**: OAuth認証時に `users` テーブルへの **参照（SELECT）および新規登録・更新（UPSERT）** を実行。
+   - **`POST /api/tickets/grant` (`app/api/tickets/grant/route.ts`)**: 講師から受講生へのチケット付与ルート。
 3. **システム全体のDB CRUD操作の構造（Supabase直結アーキテクチャ）**:
-   - 当アプリは Next.js ＋ Supabase（PostgREST + RLS）アーキテクチャを採用しており、**タスク、畝・畑区画、日誌、受講生、イベント、集金などの主要なCRUD操作（計137箇所）は、カスタムAPI（`/api/...`）を通さず、各画面・カスタムフックから Supabase Client SDK 経由で直接実行** されています。
+   - 当アプリは Next.js ＋ Supabase（PostgREST + RLS）アーキテクチャを採用しており、主要なCRUD操作は各画面・カスタムフックから Supabase Client SDK および SSOT 保護 RPC 経由で実行されています。
 
 ---
 
@@ -21,13 +24,14 @@
 
 Next.js の Route Handler（`route.ts`）として実装されている全エンドポイントと、API仕様書（`openapi.yaml`）の対比です。
 
-| エンドポイント                  | メソッド |  仕様書記載   | 対象テーブル | 実行されるDB操作                                                         |
-| :------------------------------ | :------: | :-----------: | :----------- | :----------------------------------------------------------------------- |
-| **`/api/chat/rag`**             |  `POST`  |  ✅ 記載あり  | `journals`   | **INSERT**（対話履歴・質問メモを登録）                                   |
-| **`/api/chat/check-knowledge`** |  `POST`  |  ✅ 記載あり  | `journals`   | **SELECT**（ナレッジ検索・参照のみ）                                     |
-| **`/api/settings`**             |  `GET`   |  ✅ 記載あり  | なし         | DB非接続（メモリ変数取得）                                               |
-| **`/api/settings`**             |  `POST`  |  ✅ 記載あり  | なし         | DB非接続（メモリ変数更新）                                               |
-| **`/auth/callback`**            |  `GET`   | ❌ **未記載** | `users`      | **SELECT & UPSERT**（OAuth認証時のユーザー情報照会および新規登録・更新） |
+| エンドポイント                  | メソッド |  仕様書記載   | 対象テーブル             | 実行されるDB操作                                                         |
+| :------------------------------ | :------: | :-----------: | :----------------------- | :----------------------------------------------------------------------- |
+| **`/api/chat/rag`**             |  `POST`  |  ✅ 記載あり  | `journals`, `ai_tickets` | **INSERT & UPDATE**（対話履歴・質問メモ登録、2フェーズ原帳チケット消費） |
+| **`/api/chat/check-knowledge`** |  `POST`  |  ✅ 記載あり  | `journals`               | **SELECT**（ナレッジ検索・参照のみ）                                     |
+| **`/api/settings`**             |  `GET`   |  ✅ 記載あり  | `farms`                  | **SELECT**（農園の相談タブ設定・プリセットFAQ取得）                      |
+| **`/api/settings`**             |  `POST`  |  ✅ 記載あり  | `farms`                  | **UPDATE**（農園設定・プリセットFAQをDBへ安全永続化）                    |
+| **`/api/tickets/grant`**        |  `POST`  |  ✅ 追加完了  | `ai_tickets`             | **UPDATE / RPC**（同農園受講生への追加相談チケット付与）                 |
+| **`/auth/callback`**            |  `GET`   | ❌ **内部用** | `users`                  | **SELECT & UPSERT**（OAuth認証時のユーザー情報照会および新規登録・更新） |
 
 ---
 
