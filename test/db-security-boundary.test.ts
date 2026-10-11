@@ -87,4 +87,27 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql).toContain('FUNCTION public.journals_set_farm_id()');
     expect(sql).toContain('CREATE TRIGGER trg_journals_farm');
   });
+
+  it('6. データ境界強化マイグレーション (20261011020000_security_and_data_boundary_hardening.sql) が定義されていること', () => {
+    const hardeningMigration = path.join(
+      migrationsDir,
+      '20261011020000_security_and_data_boundary_hardening.sql'
+    );
+    expect(fs.existsSync(hardeningMigration)).toBe(true);
+    const sql = fs.readFileSync(hardeningMigration, 'utf-8');
+
+    // 1. tasks_modify_policy の自農園限定化
+    expect(sql).toContain('CREATE POLICY "tasks_modify_policy" ON public.tasks');
+    expect(sql).toContain('farm_id = public.current_user_farm_id()');
+
+    // 2. 講師タスクの farm_id 自動補完・越境防止トリガー
+    expect(sql).toContain('FUNCTION public.enforce_teacher_task_farm_id()');
+    expect(sql).toContain('CREATE TRIGGER trg_enforce_teacher_task_farm_id');
+
+    // 3. delete_farm_bed 内で crop_records のサルベージアーカイブ (DELETE 廃止 ＆ UPDATE bed_id = NULL)
+    expect(sql).toContain('FUNCTION public.delete_farm_bed');
+    expect(sql).toContain('UPDATE public.crop_records');
+    expect(sql).toContain('bed_id = NULL');
+    expect(sql).not.toContain('DELETE FROM public.crop_records');
+  });
 });

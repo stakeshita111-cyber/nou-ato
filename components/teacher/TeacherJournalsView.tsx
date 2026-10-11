@@ -287,9 +287,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
           const isPrivate =
             Boolean(j.is_private) ||
-            cleanContent.includes('【非公開相談】') ||
-            cleanContent.includes('【非公開】') ||
-            cleanContent.includes('非公開希望') ||
+            cleanContent.includes('【非公開メモ】') ||
+            cleanContent.includes('【個人メモ】') ||
             cleanContent.includes('完全個別相談');
 
           return {
@@ -424,6 +423,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       setShowToast(true);
       return;
     }
+    if (journal.content.includes('【全体共有不可】')) {
+      setToastMessage('🔒 生徒が全体共有不可に指定しているため、ナレッジ承認はできません。');
+      setShowToast(true);
+      return;
+    }
 
     // 生徒質問から個人情報・挨拶を除去＆一般化
     const rawQuestion = journal.content || '';
@@ -542,6 +546,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
     if (targetJournal.is_private) {
       setToastMessage('🔒 この相談は生徒が非公開に指定しているため、ナレッジ承認はできません。');
+      setShowToast(true);
+      return;
+    }
+    if (targetJournal.content.includes('【全体共有不可】')) {
+      setToastMessage('🔒 生徒が全体共有不可に指定しているため、ナレッジ承認はできません。');
       setShowToast(true);
       return;
     }
@@ -1483,9 +1492,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         {currentJournal.is_private && (
                           <span className="text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
                             <span>🔒</span>
-                            <span>完全個別相談（非公開希望）</span>
+                            <span>完全個別メモ（非公開希望）</span>
                           </span>
                         )}
+                        {/* 🔒 全体共有不可バッジ */}
+                        {!currentJournal.is_private &&
+                          currentJournal.content.includes('【全体共有不可】') && (
+                            <span className="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                              <span>🔒</span>
+                              <span>全体共有不可 (講師のみ閲覧可)</span>
+                            </span>
+                          )}
                         {/* 🚨 緊急度・要注意キーワードバッジ */}
                         {isUrgentJournal(currentJournal.content) && (
                           <span className="text-[10px] font-black bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
@@ -1505,14 +1522,20 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                       onClick={() =>
                         handleToggleApprove(currentJournal.id, currentJournal.is_approved)
                       }
-                      disabled={currentJournal.is_private}
+                      disabled={
+                        currentJournal.is_private ||
+                        currentJournal.content.includes('【全体共有不可】')
+                      }
                       title={
                         currentJournal.is_private
                           ? '非公開相談のためナレッジ承認はできません'
-                          : undefined
+                          : currentJournal.content.includes('【全体共有不可】')
+                            ? '生徒が全体共有不可に指定しているためナレッジ承認はできません'
+                            : undefined
                       }
                       className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition ${
-                        currentJournal.is_private
+                        currentJournal.is_private ||
+                        currentJournal.content.includes('【全体共有不可】')
                           ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border border-gray-200'
                           : currentJournal.is_approved
                             ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer'
@@ -1613,16 +1636,21 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         {/* ★ 返信と同時にAIナレッジとして承認するチェックボックス */}
                         <label
                           className={`flex items-center space-x-2 text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                            currentJournal.is_private
+                            currentJournal.is_private ||
+                            currentJournal.content.includes('【全体共有不可】')
                               ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200'
                               : 'text-amber-900 bg-amber-50 border-amber-200 cursor-pointer'
                           }`}
                         >
                           <input
                             type="checkbox"
-                            disabled={currentJournal.is_private}
+                            disabled={
+                              currentJournal.is_private ||
+                              currentJournal.content.includes('【全体共有不可】')
+                            }
                             checked={
                               !currentJournal.is_private &&
+                              !currentJournal.content.includes('【全体共有不可】') &&
                               (approveOnReply[currentJournal.id] || false)
                             }
                             onChange={(e) =>
@@ -1635,8 +1663,10 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                           />
                           <span>
                             {currentJournal.is_private
-                              ? '🔒 完全個別相談（非公開）のためナレッジ登録不可'
-                              : '🌟 この回答を農園AIナレッジとしても登録（承認）する'}
+                              ? '🔒 完全個別メモ（非公開）のためナレッジ登録不可'
+                              : currentJournal.content.includes('【全体共有不可】')
+                                ? '🔒 生徒指定の全体共有不可のためナレッジ登録不可'
+                                : '🌟 この回答を農園AIナレッジとしても登録（承認）する'}
                           </span>
                         </label>
 

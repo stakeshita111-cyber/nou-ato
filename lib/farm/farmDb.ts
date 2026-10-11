@@ -329,7 +329,22 @@ export async function insertBedDb(payload: Database['public']['Tables']['farm_be
 
 export async function deleteBedDb(bedId: string) {
   try {
-    await supabase.from('crop_records').delete().eq('bed_id', bedId);
+    // 生徒の学習・成長記録を保護するため、crop_records の plot_id を補完確保して bed_id を null へ補完（サルベージアーカイブ）
+    const { data: bedData } = await supabase
+      .from('farm_beds')
+      .select('plot_id')
+      .eq('id', bedId)
+      .maybeSingle();
+
+    if (bedData?.plot_id) {
+      await supabase
+        .from('crop_records')
+        .update({ plot_id: bedData.plot_id, bed_id: null })
+        .eq('bed_id', bedId);
+    } else {
+      await supabase.from('crop_records').update({ bed_id: null }).eq('bed_id', bedId);
+    }
+
     await supabase.from('farm_beds').delete().eq('id', bedId);
   } catch (e) {
     console.error('deleteBedDb error:', e);

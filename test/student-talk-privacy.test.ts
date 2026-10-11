@@ -167,22 +167,23 @@ describe('StudentTalkView Privacy Features', () => {
     expect(messageToSend.startsWith('【非公開相談】')).toBe(false);
   });
 
-  it('correctly adds 【非公開相談】 tag when opt-out toggle is OFF (false)', () => {
+  it('correctly adds 【全体共有不可】 tag (is_private = false for teacher viewing) when opt-out toggle is OFF (false)', () => {
     const allowKnowledgeShare = false;
     const rawInput = '個人的な質問です';
     const messageToSend = prepareMessageForSend(rawInput, allowKnowledgeShare);
 
-    expect(messageToSend).toBe('【非公開相談】個人的な質問です');
-    expect(messageToSend.startsWith('【非公開相談】')).toBe(true);
+    expect(messageToSend).toBe('【全体共有不可】個人的な質問です');
+    expect(messageToSend.startsWith('【全体共有不可】')).toBe(true);
+    expect(messageToSend.startsWith('【非公開メモ】')).toBe(false);
   });
 
-  it('does not duplicate 【非公開相談】 tag if input text already starts with it', () => {
+  it('does not duplicate 【全体共有不可】 tag if input text already starts with it', () => {
     const allowKnowledgeShare = false;
-    const rawInput = '【非公開相談】すでにタグが含まれる相談文';
+    const rawInput = '【全体共有不可】すでにタグが含まれる相談文';
     const messageToSend = prepareMessageForSend(rawInput, allowKnowledgeShare);
 
-    expect(messageToSend).toBe('【非公開相談】すでにタグが含まれる相談文');
-    expect(messageToSend).not.toBe('【非公開相談】【非公開相談】すでにタグが含まれる相談文');
+    expect(messageToSend).toBe('【全体共有不可】すでにタグが含まれる相談文');
+    expect(messageToSend).not.toBe('【全体共有不可】【全体共有不可】すでにタグが含まれる相談文');
   });
 
   it('synchronizes allowKnowledgeShare state across form toggle and modals', () => {
@@ -197,7 +198,7 @@ describe('StudentTalkView Privacy Features', () => {
       'トマトの連作障害について',
       state.allowKnowledgeShare
     );
-    expect(patternAMessage).toBe('【非公開相談】トマトの連作障害について');
+    expect(patternAMessage).toBe('【全体共有不可】トマトの連作障害について');
 
     // 3. パターンB (チケット確認モーダル) 内で ON に切り替え
     state.allowKnowledgeShare = true;
@@ -209,6 +210,6 @@ describe('StudentTalkView Privacy Features', () => {
       state.allowKnowledgeShare
     );
     expect(patternBMessage).toBe('トマトの連作障害について');
-    expect(patternBMessage.startsWith('【非公開相談】')).toBe(false);
+    expect(patternBMessage.startsWith('【全体共有不可】')).toBe(false);
   });
 });
