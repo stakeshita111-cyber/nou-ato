@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { z } from 'zod';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -15,6 +16,8 @@ import {
 } from '@/lib/ticketManager';
 import { formatQuestionTopic } from '@/lib/utils/journalHelper';
 import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
+import { PresetFaqItem } from '@/types/farm';
+import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
 
 interface MessageItem {
   id: string;
@@ -33,8 +36,40 @@ interface MatchedKnowledgeItem {
   answer: string;
   matchedKeywords: string[];
 }
-import { PresetFaqItem } from '@/types/farm';
-import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
+
+const PresetFaqItemSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  answer: z.string(),
+  chipLabel: z.string(),
+});
+
+const SettingsResponseSchema = z.object({
+  presetFaqs: z.array(PresetFaqItemSchema).optional(),
+});
+
+const MatchedKnowledgeItemSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  answer: z.string(),
+  matchedKeywords: z.array(z.string()),
+});
+
+const CheckKnowledgeResponseSchema = z.object({
+  matches: z.array(MatchedKnowledgeItemSchema).optional(),
+});
+
+const ReferencedQaSchema = z.object({
+  question: z.string(),
+  answer: z.string(),
+});
+
+const ChatRagResponseSchema = z.object({
+  reply: z.string().optional(),
+  referencedQa: z.array(ReferencedQaSchema).optional(),
+  saved: z.boolean().optional(),
+  detail: z.string().optional(),
+});
 
 export interface JournalItem {
   id?: string;
@@ -102,9 +137,10 @@ export default function StudentTalkView({
           : '/api/settings';
         const res = await fetch(url);
         if (res.ok) {
-          const data = await res.json();
-          if (data.presetFaqs && Array.isArray(data.presetFaqs) && data.presetFaqs.length > 0) {
-            setCurrentFaqs(data.presetFaqs);
+          const rawData: unknown = await res.json();
+          const parsed = SettingsResponseSchema.safeParse(rawData);
+          if (parsed.success && parsed.data.presetFaqs && parsed.data.presetFaqs.length > 0) {
+            setCurrentFaqs(parsed.data.presetFaqs);
           }
         }
       } catch {
@@ -364,9 +400,10 @@ export default function StudentTalkView({
         body: JSON.stringify({ question: text }),
       });
       if (res.ok) {
-        const data = await res.json();
-        if (data.matches && Array.isArray(data.matches)) {
-          setMatchedKnowledgeList(data.matches);
+        const rawData: unknown = await res.json();
+        const parsed = CheckKnowledgeResponseSchema.safeParse(rawData);
+        if (parsed.success && parsed.data.matches) {
+          setMatchedKnowledgeList(parsed.data.matches);
         }
       }
     } catch (err) {
@@ -479,8 +516,13 @@ export default function StudentTalkView({
       });
 
       if (res.status === 429) {
-        const data = await res.json().catch(() => ({}));
-        setToastMessage(data.detail || '本日のAI相談チケットの上限に達しました');
+        const rawErr: unknown = await res.json().catch(() => ({}));
+        const parsedErr = ChatRagResponseSchema.safeParse(rawErr);
+        const detailMsg =
+          parsedErr.success && parsedErr.data.detail
+            ? parsedErr.data.detail
+            : '本日のAI相談チケットの上限に達しました';
+        setToastMessage(detailMsg);
         setShowToast(true);
         const limitMsg: MessageItem = {
           id: 'bot_limit_' + Date.now(),
@@ -495,13 +537,21 @@ export default function StudentTalkView({
 
       if (!res.ok) throw new Error('チャットサーバーの応答に失敗しました');
 
-      const data = await res.json();
+      const rawData: unknown = await res.json();
+      const parsedData = ChatRagResponseSchema.safeParse(rawData);
+      const replyText =
+        parsedData.success && parsedData.data.reply
+          ? parsedData.data.reply
+          : 'メッセージを受け付けました。';
+      const referencedQa = parsedData.success ? parsedData.data.referencedQa : undefined;
+      const isSaved = parsedData.success ? parsedData.data.saved : undefined;
+
       const aiMsg: MessageItem = {
         id: 'ai_' + Date.now(),
         sender: 'teacher',
-        text: data.reply || 'メッセージを受け付けました。',
+        text: replyText,
         timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-        referencedQa: data.referencedQa,
+        referencedQa: referencedQa,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -509,7 +559,7 @@ export default function StudentTalkView({
 
       // 成功後に最新の残数を DB から再取得して表示
       const latest = await refreshTicketState();
-      if (data.saved === false) {
+      if (isSaved === false) {
         setToastMessage(
           '⚠️ 回答は表示しましたが、相談履歴の保存に失敗しました。講師には届いていません'
         );
@@ -958,7 +1008,7 @@ export default function StudentTalkView({
               ) {
                 e.preventDefault();
                 if (inputText.trim() && !isSending && !isCheckingKnowledge) {
-                  handleOpenConfirm(e);
+                  void handleOpenConfirm(e);
                 }
               }
             }}
@@ -1112,7 +1162,9 @@ export default function StudentTalkView({
 
                   <button
                     type="button"
-                    onClick={() => executeSendMessage()}
+                    onClick={() => {
+                      void executeSendMessage();
+                    }}
                     className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl transition cursor-pointer text-center"
                   >
                     新しくAIに相談 (残{ticketState.count}回)
@@ -1183,7 +1235,9 @@ export default function StudentTalkView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => executeSendMessage()}
+                    onClick={() => {
+                      void executeSendMessage();
+                    }}
                     className={
                       'flex-1 py-2.5 font-bold text-xs rounded-xl shadow-md transition cursor-pointer text-center text-white ' +
                       (ticketState.isUnlimited || ticketState.count > 0
