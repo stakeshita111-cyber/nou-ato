@@ -119,7 +119,9 @@ export function useKanbanBoard(columns: ColumnType[]) {
         window.removeEventListener('nouato_sync_event', handleTaskUpdated);
         window.removeEventListener('nouato_active_farm_changed', handleTaskUpdated);
       }
-      supabase.removeChannel(realtimeChannel);
+      supabase.removeChannel(realtimeChannel).catch((e: unknown) => {
+        console.error('Failed to remove realtimeChannel:', e);
+      });
     };
   }, [fetchTasks]);
 
