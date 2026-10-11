@@ -18,10 +18,19 @@ const DEFAULT_SETTINGS: ServerSettings = {
 };
 
 const presetFaqItemSchema = z.object({
-  id: z.string(),
-  chipLabel: z.string().min(1, 'ラベルを入力してください'),
-  question: z.string().min(1, '質問文を入力してください'),
-  answer: z.string().min(1, '回答文を入力してください'),
+  id: z.string().max(100, 'IDは100文字以内で入力してください'),
+  chipLabel: z
+    .string()
+    .min(1, 'ラベルを入力してください')
+    .max(50, 'ラベルは50文字以内で入力してください'),
+  question: z
+    .string()
+    .min(1, '質問文を入力してください')
+    .max(500, '質問文は500文字以内で入力してください'),
+  answer: z
+    .string()
+    .min(1, '回答文を入力してください')
+    .max(2000, '回答文は2000文字以内で入力してください'),
 });
 
 const settingsRequestBodySchema = z
@@ -31,7 +40,10 @@ const settingsRequestBodySchema = z
         message: 'showStudentTalkTab は真偽値である必要があります',
       })
       .optional(),
-    presetFaqs: z.array(presetFaqItemSchema).optional(),
+    presetFaqs: z
+      .array(presetFaqItemSchema)
+      .max(50, 'プリセットFAQは50件以内で設定してください')
+      .optional(),
   })
   .passthrough();
 
@@ -215,10 +227,24 @@ export async function POST(request: Request) {
     }
 
     if (targetFarmId) {
-      await supabase.from('farms').update(updateFields).eq('id', targetFarmId);
+      const { error: updateErr } = await supabase
+        .from('farms')
+        .update(updateFields)
+        .eq('id', targetFarmId);
+      if (updateErr) {
+        logger.error('Failed to update farm settings', 'api/settings', undefined, updateErr);
+        return ApiResponse.internalError('設定の保存に失敗しました: ' + updateErr.message);
+      }
     } else if (ownedFarms && ownedFarms.length > 0) {
       const farmIds = ownedFarms.map((f) => f.id);
-      await supabase.from('farms').update(updateFields).in('id', farmIds);
+      const { error: updateErr } = await supabase
+        .from('farms')
+        .update(updateFields)
+        .in('id', farmIds);
+      if (updateErr) {
+        logger.error('Failed to update farms settings', 'api/settings', undefined, updateErr);
+        return ApiResponse.internalError('設定の保存に失敗しました: ' + updateErr.message);
+      }
     }
 
     const settings: ServerSettings = {

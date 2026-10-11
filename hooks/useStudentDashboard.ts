@@ -37,6 +37,7 @@ export function useStudentDashboard() {
   const [selectedTask, setSelectedTask] = useState<StudentTaskItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeactivated, setIsDeactivated] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let isInitial = true;
@@ -63,13 +64,24 @@ export function useStudentDashboard() {
 
           const displayName = oauthName || '受講生';
 
-          const { data: userData } = await supabase
+          const { data: userData, error: userError } = await supabase
             .from('users')
             .select('*')
             .eq('id', authUser.id)
             .maybeSingle();
 
-          if (userData) {
+          if (userError) {
+            console.error('users fetch error:', userError);
+            setError(new Error(userError.message));
+            studentUserObj = {
+              id: authUser.id,
+              name: displayName,
+              email: authUser.email,
+              farm_id: null,
+            };
+            setUser(studentUserObj);
+            // 通信障害・一時エラー時は誤って退会扱いにしない
+          } else if (userData) {
             studentUserObj = {
               ...userData,
               name: userData.display_name || displayName,
@@ -121,10 +133,15 @@ export function useStudentDashboard() {
         setMyBeds(bedData);
 
         // 2. 講師が公開中のタスク (tasks: status = "todo", deleted_at is null) 及び 個別割当 (student_tasks) のみ取得
-        const { data: stData } = await supabase
+        const { data: stData, error: stError } = await supabase
           .from('student_tasks')
           .select('*')
           .eq('student_id', currentStudentId);
+
+        if (stError) {
+          console.error('student_tasks fetch error:', stError);
+          setError(new Error(stError.message));
+        }
 
         // 🌟 講師がカンバンで「生徒へ公開中 (status = 'todo')」に配置した教材タスクを取得 (自農園または共通教材) 🌟
         let ptQuery = supabase
@@ -355,6 +372,7 @@ export function useStudentDashboard() {
         setBroadcasts(uniqueBroadcasts);
       } catch (e) {
         console.error('useStudentDashboard fetchData error:', e);
+        setError(e instanceof Error ? e : new Error(String(e)));
         setTasks([]);
       } finally {
         if (minDisplayTime > 0) {
@@ -675,5 +693,6 @@ export function useStudentDashboard() {
     addJournal,
     isLoading,
     isDeactivated,
+    error,
   };
 }

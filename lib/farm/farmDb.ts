@@ -351,6 +351,20 @@ export async function deleteBedDb(bedId: string) {
   }
 }
 
+export function parseHarvestAmount(val: string | number | null | undefined): number | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') {
+    return Number.isFinite(val) && val >= 0 ? val : null;
+  }
+  const trimmed = String(val).trim();
+  if (!trimmed) return null;
+  if (trimmed.includes('-')) return null;
+  const clean = trimmed.replace(/[^0-9.]/g, '');
+  if (!clean) return null;
+  const num = parseFloat(clean);
+  return !Number.isNaN(num) && num >= 0 ? num : null;
+}
+
 export async function insertCropRecordDb(record: {
   id: string;
   bed_id?: string | null;
@@ -363,28 +377,24 @@ export async function insertCropRecordDb(record: {
   harvest_amount?: string | number;
   work_types?: string[];
 }) {
-  try {
-    const parsedAmount =
-      typeof record.harvest_amount === 'number'
-        ? record.harvest_amount
-        : record.harvest_amount
-          ? parseFloat(String(record.harvest_amount).replace(/[^0-9.]/g, '')) || null
-          : null;
+  const parsedAmount = parseHarvestAmount(record.harvest_amount);
 
-    const payload = {
-      ...record,
-      harvest_amount: parsedAmount,
-    };
+  const payload = {
+    ...record,
+    harvest_amount: parsedAmount,
+  };
 
-    await supabase.from('crop_records').insert(payload);
-    if (record.bed_id && record.bed_id !== 'shared' && !record.bed_id.endsWith('_shared')) {
-      await supabase.from('farm_beds').upsert({
-        id: record.bed_id,
-        progress_percent: 100,
-      });
-    }
-  } catch (e) {
-    console.error('insertCropRecordDb error:', e);
+  const { error } = await supabase.from('crop_records').insert(payload);
+  if (error) {
+    console.error('insertCropRecordDb error:', error);
+    throw error;
+  }
+
+  if (record.bed_id && record.bed_id !== 'shared' && !record.bed_id.endsWith('_shared')) {
+    await supabase.from('farm_beds').upsert({
+      id: record.bed_id,
+      progress_percent: 100,
+    });
   }
 }
 
@@ -401,25 +411,20 @@ export async function updateCropRecordDb(
     harvest_amount?: string | number;
   }
 ) {
-  try {
-    const parsedAmount =
-      typeof payload.harvest_amount === 'number'
-        ? payload.harvest_amount
-        : payload.harvest_amount
-          ? parseFloat(String(payload.harvest_amount).replace(/[^0-9.]/g, '')) || null
-          : null;
+  const parsedAmount = parseHarvestAmount(payload.harvest_amount);
 
-    const { harvest_amount: _, ...restPayload } = payload;
-    void _;
-    type CropRecordUpdate = Database['public']['Tables']['crop_records']['Update'];
-    const dbPayload: CropRecordUpdate = {
-      ...restPayload,
-      ...(payload.harvest_amount !== undefined ? { harvest_amount: parsedAmount } : {}),
-    };
+  const { harvest_amount: _, ...restPayload } = payload;
+  void _;
+  type CropRecordUpdate = Database['public']['Tables']['crop_records']['Update'];
+  const dbPayload: CropRecordUpdate = {
+    ...restPayload,
+    ...(payload.harvest_amount !== undefined ? { harvest_amount: parsedAmount } : {}),
+  };
 
-    await supabase.from('crop_records').update(dbPayload).eq('id', recordId);
-  } catch (e) {
-    console.error('updateCropRecordDb error:', e);
+  const { error } = await supabase.from('crop_records').update(dbPayload).eq('id', recordId);
+  if (error) {
+    console.error('updateCropRecordDb error:', error);
+    throw error;
   }
 }
 

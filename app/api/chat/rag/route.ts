@@ -9,7 +9,10 @@ const chatRequestBodySchema = z.object({
     .string()
     .trim()
     .min(1, 'メッセージが空です')
-    .max(1000, 'メッセージは1000文字以内で入力してください'),
+    .max(1000, 'メッセージは1000文字以内で入力してください')
+    .refine((val) => !val.includes('\u0000'), {
+      message: 'メッセージに無効な文字が含まれています',
+    }),
   studentName: z.string().optional(),
   isMemoOnly: z.boolean().optional(),
   isPrivate: z.boolean().optional(),

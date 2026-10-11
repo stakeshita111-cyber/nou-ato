@@ -88,10 +88,10 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql).toContain('CREATE TRIGGER trg_journals_farm');
   });
 
-  it('6. データ境界強化マイグレーション (20261011020000_security_and_data_boundary_hardening.sql) が定義されていること', () => {
+  it('6. データ境界強化マイグレーション (20261011025000_security_and_data_boundary_hardening.sql) が定義されていること', () => {
     const hardeningMigration = path.join(
       migrationsDir,
-      '20261011020000_security_and_data_boundary_hardening.sql'
+      '20261011025000_security_and_data_boundary_hardening.sql'
     );
     expect(fs.existsSync(hardeningMigration)).toBe(true);
     const sql = fs.readFileSync(hardeningMigration, 'utf-8');

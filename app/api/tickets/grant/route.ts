@@ -14,6 +14,7 @@ const grantTicketRequestBodySchema = z.object({
     .number({ message: '付与枚数 (amount) は1以上の数値を指定してください' })
     .int('付与枚数 (amount) は1以上の数値を指定してください')
     .positive('付与枚数 (amount) は1以上の数値を指定してください')
+    .max(10, '一度に付与できるチケットは10枚までです')
     .default(1),
 });
 

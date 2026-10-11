@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { uploadImageToStorage } from '@/lib/storage';
@@ -113,6 +113,8 @@ export default function TaskDetailModal({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [reportMemo, setReportMemo] = useState<string>('');
   const [checkedSteps, setCheckedSteps] = useState<{ [key: number]: boolean }>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const isSubmittingRef = useRef<boolean>(false);
 
   if (!task) return null;
 
@@ -204,55 +206,75 @@ export default function TaskDetailModal({
   };
 
   const handleReportComplete = async () => {
-    let finalPhotoUrl = photoPreview;
-    if (photoPreview && photoPreview.startsWith('data:')) {
-      finalPhotoUrl = await uploadImageToStorage(photoPreview, 'tasks');
-      if (!finalPhotoUrl) {
-        alert('画像のアップロードに失敗しました。通信環境を確認して再度お試しください。');
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      let finalPhotoUrl = photoPreview;
+      if (photoPreview && photoPreview.startsWith('data:')) {
+        finalPhotoUrl = await uploadImageToStorage(photoPreview, 'tasks');
+        if (!finalPhotoUrl) {
+          if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+            try {
+              window.alert(
+                '画像のアップロードに失敗しました。通信環境を確認して再度お試しください。'
+              );
+            } catch {}
+          }
+          return;
+        }
+      }
+
+      const isShared = selectedBedId === 'shared' || !selectedBedId;
+      const targetBed = isShared ? null : myBeds.find((b) => b.id === selectedBedId);
+
+      // 全体共有または対象の畝ベッドへ作業記録・現場写真を送信保存
+      try {
+        await addCropRecord(targetBed ? targetBed.id : 'shared', {
+          bed_id: targetBed ? targetBed.id : null,
+          plot_id: myPlot?.id || null,
+          date: new Date().toLocaleDateString('ja-JP'),
+          growth_stage:
+            t.phase === '準備・植付'
+              ? '播種・苗植え'
+              : t.phase === '収穫・片付け'
+                ? '収穫期'
+                : '本葉展開・つる伸び',
+          height_cm: targetBed ? 75 : undefined,
+          crop_name: targetBed
+            ? targetBed.crop_name || t.target_crop || '未確定'
+            : t.target_crop || '全体共有',
+          work_types: [t.title || '手入れ'] as WorkType[],
+          notes: finalPhotoUrl
+            ? `${reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`} [📷 現場写真あり]`
+            : reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
+          harvest_amount: undefined,
+          image_url: finalPhotoUrl || undefined,
+          photo_url: finalPhotoUrl || undefined,
+        });
+      } catch (error) {
+        console.error('Failed to add crop record:', error);
+        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+          try {
+            window.alert('作業記録の保存に失敗しました。通信状況を確認して再度お試しください。');
+          } catch {}
+        }
         return;
       }
-    }
 
-    const isShared = selectedBedId === 'shared' || !selectedBedId;
-    const targetBed = isShared ? null : myBeds.find((b) => b.id === selectedBedId);
-
-    // 全体共有または対象の畝ベッドへ作業記録・現場写真を送信保存
-    try {
-      await addCropRecord(targetBed ? targetBed.id : 'shared', {
-        bed_id: targetBed ? targetBed.id : null,
-        plot_id: myPlot?.id || null,
-        date: new Date().toLocaleDateString('ja-JP'),
-        growth_stage:
-          t.phase === '準備・植付'
-            ? '播種・苗植え'
-            : t.phase === '収穫・片付け'
-              ? '収穫期'
-              : '本葉展開・つる伸び',
-        height_cm: targetBed ? 75 : undefined,
-        crop_name: targetBed
-          ? targetBed.crop_name || t.target_crop || '未確定'
-          : t.target_crop || '全体共有',
-        work_types: [t.title || '手入れ'] as WorkType[],
-        notes: finalPhotoUrl
-          ? `${reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`} [📷 現場写真あり]`
-          : reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
-        harvest_amount: undefined,
-        image_url: finalPhotoUrl || undefined,
-        photo_url: finalPhotoUrl || undefined,
-      });
-    } catch (error) {
-      console.error('Failed to add crop record:', error);
+      if (onComplete) {
+        onComplete(
+          task.id || task.task_id || '',
+          selectedBedId,
+          finalPhotoUrl || undefined,
+          reportMemo
+        );
+      }
+      onClose();
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
-
-    if (onComplete) {
-      onComplete(
-        task.id || task.task_id || '',
-        selectedBedId,
-        finalPhotoUrl || undefined,
-        reportMemo
-      );
-    }
-    onClose();
   };
 
   const isAlreadyCompleted = task.status === 'completed';
@@ -564,14 +586,21 @@ export default function TaskDetailModal({
                 <button
                   type="button"
                   onClick={handleReportComplete}
-                  className="w-full py-3 bg-[#1d5c23] hover:bg-[#16471a] text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer mt-1"
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-[#1d5c23] hover:bg-[#16471a] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer mt-1"
                 >
-                  <span>✓</span>
-                  <span>
-                    {selectedBedId === 'shared'
-                      ? '共通に記録して作業完了を報告する'
-                      : '畝に記録して作業完了を報告する'}
-                  </span>
+                  {isSubmitting ? (
+                    <span>送信中...</span>
+                  ) : (
+                    <>
+                      <span>✓</span>
+                      <span>
+                        {selectedBedId === 'shared'
+                          ? '共通に記録して作業完了を報告する'
+                          : '畝に記録して作業完了を報告する'}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
             )}

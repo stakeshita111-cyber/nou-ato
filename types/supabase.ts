@@ -151,6 +151,7 @@ export interface Database {
           completion_notes: string | null;
           total_harvest: string | null;
           completion_image_url: string | null;
+          updated_at: string;
         };
         Insert: {
           id: string;
@@ -170,6 +171,7 @@ export interface Database {
           completion_notes?: string | null;
           total_harvest?: string | null;
           completion_image_url?: string | null;
+          updated_at?: string;
         };
         Update: {
           id?: string;
@@ -189,6 +191,7 @@ export interface Database {
           completion_notes?: string | null;
           total_harvest?: string | null;
           completion_image_url?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
