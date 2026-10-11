@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { MASTER_TASKS } from '@/lib/taskMaster';
@@ -15,6 +16,11 @@ import { formatDate } from '@/lib/utils/formatHelper';
 type UserRow = Database['public']['Tables']['users']['Row'];
 type TaskRow = Database['public']['Tables']['tasks']['Row'];
 type StudentTaskRow = Database['public']['Tables']['student_tasks']['Row'];
+
+const TicketGrantErrorSchema = z.object({
+  detail: z.string().optional(),
+  message: z.string().optional(),
+});
 
 export interface StudentData {
   id: string;
@@ -413,35 +419,60 @@ export default function TeacherStudentsView() {
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
-      await Promise.resolve();
-      if (isMounted) {
-        await fetchStudents();
-      }
+      await fetchStudents();
     };
-    void load();
+    if (isMounted) {
+      load().catch((err: unknown) => {
+        console.error('Failed to fetch students:', err);
+      });
+    }
 
     // 🌟 Supabase Realtime で生徒のタスク完了・畝変更・日誌提出を検知し即時自動反映 🌟
     const channel = supabase
       .channel('teacher_students_realtime_channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'student_tasks' }, () => {
-        if (isMounted) void fetchStudents();
+        if (isMounted) {
+          fetchStudents().catch((err: unknown) => {
+            console.error('Failed to fetch students:', err);
+          });
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        if (isMounted) void fetchStudents();
+        if (isMounted) {
+          fetchStudents().catch((err: unknown) => {
+            console.error('Failed to fetch students:', err);
+          });
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_beds' }, () => {
-        if (isMounted) void fetchStudents();
+        if (isMounted) {
+          fetchStudents().catch((err: unknown) => {
+            console.error('Failed to fetch students:', err);
+          });
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () => {
-        if (isMounted) void fetchStudents();
+        if (isMounted) {
+          fetchStudents().catch((err: unknown) => {
+            console.error('Failed to fetch students:', err);
+          });
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        if (isMounted) void fetchStudents();
+        if (isMounted) {
+          fetchStudents().catch((err: unknown) => {
+            console.error('Failed to fetch students:', err);
+          });
+        }
       })
       .subscribe();
 
     const handleSync = () => {
-      if (isMounted) void fetchStudents();
+      if (isMounted) {
+        fetchStudents().catch((err: unknown) => {
+          console.error('Failed to fetch students:', err);
+        });
+      }
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('nouato_tasks_updated', handleSync);
@@ -452,7 +483,9 @@ export default function TeacherStudentsView() {
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel).catch((err: unknown) => {
+        console.error('Failed to remove channel:', err);
+      });
       if (typeof window !== 'undefined') {
         window.removeEventListener('nouato_tasks_updated', handleSync);
         window.removeEventListener('nouato_task_completed', handleSync);
@@ -470,7 +503,9 @@ export default function TeacherStudentsView() {
       if (newFarmId) {
         setFarmId(newFarmId);
         if (newFarmName) setFarmName(newFarmName);
-        void fetchStudents(newFarmId);
+        fetchStudents(newFarmId).catch((err: unknown) => {
+          console.error('Failed to fetch students for farm:', err);
+        });
       }
     };
     window.addEventListener('nouato_active_farm_changed', handleFarmChanged);
@@ -508,12 +543,10 @@ export default function TeacherStudentsView() {
       });
 
       if (!res.ok) {
-        const errBody: { detail?: string; message?: string } | null = await res
-          .json()
-          .catch(() => null);
-        setToastMessage(
-          `チケットを付与できませんでした: ${errBody?.detail || errBody?.message || `HTTP ${res.status}`}`
-        );
+        const json: unknown = await res.json().catch(() => null);
+        const parsed = TicketGrantErrorSchema.safeParse(json);
+        const errDetail = parsed.success ? parsed.data.detail || parsed.data.message : null;
+        setToastMessage(`チケットを付与できませんでした: ${errDetail || `HTTP ${res.status}`}`);
         setShowToast(true);
         return;
       }
@@ -1287,7 +1320,9 @@ export default function TeacherStudentsView() {
             setAssignModalStudent(null);
           }}
           onAssigned={() => {
-            fetchStudents();
+            fetchStudents().catch((err: unknown) => {
+              console.error('Failed to fetch students:', err);
+            });
           }}
         />
       )}

@@ -328,7 +328,7 @@ export default function StudentFarmRecordView({
           : selectedBedId && selectedBedId !== 'shared'
             ? selectedBedId
             : currentBed?.id || null;
-        updateCropRecord(editingRecord.id, {
+        await updateCropRecord(editingRecord.id, {
           bed_id: targetBedId,
           plot_id: myPlot?.id || null,
           crop_name: finalCrop,
@@ -342,7 +342,7 @@ export default function StudentFarmRecordView({
         setToastMessage('✏️ 過去の観察記録を更新しました！');
       } else {
         const todayStr = new Date().toLocaleDateString('ja-JP');
-        addCropRecord(isTargetShared ? 'shared' : currentBed!.id, {
+        await addCropRecord(isTargetShared ? 'shared' : currentBed!.id, {
           bed_id: isTargetShared ? null : currentBed!.id,
           plot_id: myPlot?.id || null,
           date: todayStr,
@@ -445,9 +445,9 @@ export default function StudentFarmRecordView({
   };
 
   // 🌟【要件3】過去の記録の削除 🗑️ 🌟
-  const handleDeleteRecord = (recId: string) => {
+  const handleDeleteRecord = async (recId: string) => {
     if (confirm('この過去の観察記録を削除してもよろしいですか？')) {
-      deleteCropRecord(recId);
+      await deleteCropRecord(recId);
       setToastMessage('🗑️ 過去の観察記録を削除しました');
       setShowToast(true);
     }
@@ -479,18 +479,24 @@ export default function StudentFarmRecordView({
     const load = async () => {
       await fetchStudentJournals();
     };
-    void load();
+    load().catch((err: unknown) => {
+      console.error('Failed to fetch student journals:', err);
+    });
 
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = () => {
-        fetchStudentJournals();
+        fetchStudentJournals().catch((err: unknown) => {
+          console.error('Failed to fetch student journals:', err);
+        });
       };
     } catch {}
 
     const handleSync = () => {
-      fetchStudentJournals();
+      fetchStudentJournals().catch((err: unknown) => {
+        console.error('Failed to fetch student journals:', err);
+      });
     };
 
     if (typeof window !== 'undefined') {
@@ -684,13 +690,19 @@ export default function StudentFarmRecordView({
     const combinedCrops = currentBedCrops.join('、');
     if (currentBed.crop_name !== combinedCrops) {
       if (updateBedCrop) {
-        updateBedCrop(currentBed.id, combinedCrops);
+        Promise.resolve(updateBedCrop(currentBed.id, combinedCrops)).catch((err: unknown) => {
+          console.error('Failed to update bed crop:', err);
+        });
       } else {
-        supabase
-          .from('farm_beds')
-          .update({ crop_name: combinedCrops })
-          .eq('id', currentBed.id)
-          .then();
+        const updateDb = async () => {
+          await supabase
+            .from('farm_beds')
+            .update({ crop_name: combinedCrops })
+            .eq('id', currentBed.id);
+        };
+        updateDb().catch((err: unknown) => {
+          console.error('Failed to update farm_beds:', err);
+        });
       }
     }
   }, [currentBed, currentBedCrops, updateBedCrop]);
