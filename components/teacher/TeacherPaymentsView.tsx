@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/utils/formatHelper';
 
 interface PaymentRecord {
   id: string;
+  studentId: string;
   studentName: string;
   plot: string;
   itemTitle: string; // 請求項目
@@ -35,56 +36,152 @@ export default function TeacherPaymentsView() {
   useEffect(() => {
     const fetchStudentCount = async () => {
       try {
-        let fid =
-          useFarmStore.getState().activeFarmId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-        if (!fid) {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (user) {
-            const { data: userData } = await supabase
-              .from('users')
-              .select('farm_id')
-              .eq('id', user.id)
-              .maybeSingle();
-            if (userData?.farm_id) fid = userData.farm_id;
+        // 1. マルチテナント保護: 認証ユーザー自身の farm_id を最優先で確実に参照
+        let fid: string | null = null;
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('farm_id')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (userData?.farm_id) {
+            fid = userData.farm_id;
           }
         }
 
-        let query = supabase.from('users').select('*', { count: 'exact' }).eq('role', 'student');
-
-        if (fid) {
-          query = query.eq('farm_id', fid);
+        // ユーザーから取得できない場合のみ store や localStorage をフォールバック
+        if (!fid) {
+          fid =
+            useFarmStore.getState().activeFarmId ||
+            (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
         }
 
-        const { count } = await query;
+        // 【Fail-Closed化】fid が存在しない場合は他農園データの全件検索を物理防止し、0件として中断
+        if (!fid) {
+          setStudentCount(0);
+          setPayments([]);
+          return;
+        }
+
+        // 自農園の生徒数のみを厳格に集計
+        const { count } = await supabase
+          .from('users')
+          .select('*', { count: 'exact' })
+          .eq('role', 'student')
+          .eq('farm_id', fid)
+          .is('deleted_at', null);
+
         setStudentCount(count || 0);
 
-        // 自農園の受講生データをもとに請求リストを構築
-        if (fid) {
-          const { data: farmStudents } = await supabase
-            .from('users')
-            .select('id, display_name')
-            .eq('role', 'student')
-            .eq('farm_id', fid);
+        // 自農園の受講生データを取得
+        const { data: farmStudents } = await supabase
+          .from('users')
+          .select('id, display_name')
+          .eq('role', 'student')
+          .eq('farm_id', fid)
+          .is('deleted_at', null);
 
-          if (farmStudents && farmStudents.length > 0) {
-            const dynamicPayments: PaymentRecord[] = farmStudents.map((s, idx) => ({
-              id: `p_${s.id}`,
-              studentName: s.display_name || `受講生 ${idx + 1}`,
-              plot: `区画 ${idx + 1}`,
-              itemTitle: '月額農園利用料 (今月分)',
-              amount: 9800,
-              dueDate: new Date().toISOString().split('T')[0],
-              status: 'paid' as const,
-              method: 'credit_card' as const,
-            }));
-            setPayments(dynamicPayments);
-          } else {
-            setPayments([]);
+        if (!farmStudents || farmStudents.length === 0) {
+          setPayments([]);
+          return;
+        }
+
+        const studentIds = farmStudents.map((s) => s.id);
+
+        // 2. 区画情報のマッピング取得
+        const plotMap: Record<string, string> = {};
+        try {
+          const { data: dbPlots } = await supabase
+            .from('farm_plots')
+            .select('id, code, student_id, name');
+          if (dbPlots && dbPlots.length > 0) {
+            dbPlots.forEach((p) => {
+              if (p.student_id) {
+                const code = String(p.code || '').toUpperCase();
+                plotMap[p.student_id] = code ? `区画 ${code}` : String(p.name || '区画');
+              }
+            });
+          }
+        } catch (plotErr) {
+          console.warn('farm_plots lookup error:', plotErr);
+        }
+
+        // 3. payments テーブルから実レコードを SELECT
+        const { data: existingPayments, error: payError } = await supabase
+          .from('payments')
+          .select('id, student_id, amount, fee_type, status, due_date, paid_at')
+          .in('student_id', studentIds);
+
+        if (payError) {
+          console.error('payments select error:', payError);
+        }
+
+        const studentMap = new Map(
+          farmStudents.map((s, idx) => [s.id, { name: s.display_name || `受講生 ${idx + 1}`, idx }])
+        );
+        const formattedRecords: PaymentRecord[] = [];
+        const studentsWithPayment = new Set<string>();
+
+        if (existingPayments && existingPayments.length > 0) {
+          existingPayments.forEach((ep) => {
+            studentsWithPayment.add(ep.student_id);
+            const sInfo = studentMap.get(ep.student_id);
+            const statusVal: 'paid' | 'unpaid' | 'reminded' =
+              ep.status === 'paid' ? 'paid' : ep.status === 'reminded' ? 'reminded' : 'unpaid';
+
+            formattedRecords.push({
+              id: ep.id,
+              studentId: ep.student_id,
+              studentName: sInfo?.name || '受講生',
+              plot: plotMap[ep.student_id] || `区画 ${(sInfo?.idx ?? 0) + 1}`,
+              itemTitle: ep.fee_type || '月額農園利用料 (今月分)',
+              amount: ep.amount || 9800,
+              dueDate: ep.due_date || new Date().toISOString().split('T')[0],
+              status: statusVal,
+              method: 'credit_card',
+            });
+          });
+        }
+
+        // payments テーブルに未作成の生徒があれば初期未払いレコードをDB作成
+        const unrecordedStudents = farmStudents.filter((s) => !studentsWithPayment.has(s.id));
+        if (unrecordedStudents.length > 0) {
+          const newRows = unrecordedStudents.map((s) => ({
+            student_id: s.id,
+            amount: 9800,
+            fee_type: '月額農園利用料 (今月分)',
+            status: 'unpaid',
+            due_date: new Date().toISOString().split('T')[0],
+          }));
+
+          const { data: insertedRows, error: insertErr } = await supabase
+            .from('payments')
+            .insert(newRows)
+            .select('id, student_id, amount, fee_type, status, due_date');
+
+          if (!insertErr && insertedRows) {
+            insertedRows.forEach((ir) => {
+              const sInfo = studentMap.get(ir.student_id);
+              formattedRecords.push({
+                id: ir.id,
+                studentId: ir.student_id,
+                studentName: sInfo?.name || '受講生',
+                plot: plotMap[ir.student_id] || `区画 ${(sInfo?.idx ?? 0) + 1}`,
+                itemTitle: ir.fee_type || '月額農園利用料 (今月分)',
+                amount: ir.amount || 9800,
+                dueDate: ir.due_date || new Date().toISOString().split('T')[0],
+                status: 'unpaid',
+                method: 'credit_card',
+              });
+            });
           }
         }
+
+        setPayments(formattedRecords);
       } catch (err) {
         console.error('fetchStudentCount error:', err);
       }
@@ -105,17 +202,49 @@ export default function TeacherPaymentsView() {
   const unpaidRevenue = totalRevenue - paidRevenue;
   const collectionRate = totalRevenue > 0 ? Math.round((paidRevenue / totalRevenue) * 100) : 0;
 
-  // 支払い催促LINE送信
-  const handleSendRemind = (id: string, studentName: string) => {
-    setPayments(payments.map((p) => (p.id === id ? { ...p, status: 'reminded' } : p)));
-    setToastMessage(`📱 ${studentName} さんへLINEで未払い利用料の催促メッセージを送信しました`);
+  // 支払い催促LINE送信 (DBステータス永続化 + LINE Webhook準備中フィードバック)
+  const handleSendRemind = async (id: string, studentName: string) => {
+    try {
+      const { error } = await supabase.from('payments').update({ status: 'reminded' }).eq('id', id);
+
+      if (error) {
+        console.error('handleSendRemind update error:', error);
+        setToastMessage(`⚠️ ステータス更新に失敗しました: ${error.message}`);
+      } else {
+        setPayments((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'reminded' } : p)));
+        setToastMessage(
+          `📱 ${studentName} さんへLINE催促記録を保存しました（※LINE自動配信は準備中）`
+        );
+      }
+    } catch (e) {
+      console.error('handleSendRemind exception:', e);
+      setToastMessage('⚠️ エラーが発生しました');
+    }
     setShowToast(true);
   };
 
-  // 手動で支払済みに変更
-  const handleMarkAsPaid = (id: string, studentName: string) => {
-    setPayments(payments.map((p) => (p.id === id ? { ...p, status: 'paid' } : p)));
-    setToastMessage(`✅ ${studentName} さんの支払いを「支払済み」に更新しました`);
+  // 手動で支払済みに変更 (payments テーブルへの UPDATE 永続化)
+  const handleMarkAsPaid = async (id: string, studentName: string) => {
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          status: 'paid',
+          paid_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('handleMarkAsPaid update error:', error);
+        setToastMessage(`⚠️ 支払済みへの更新に失敗しました: ${error.message}`);
+      } else {
+        setPayments((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'paid' } : p)));
+        setToastMessage(`✅ ${studentName} さんの支払いを「支払済み」に更新・DB保存しました`);
+      }
+    } catch (e) {
+      console.error('handleMarkAsPaid exception:', e);
+      setToastMessage('⚠️ エラーが発生しました');
+    }
     setShowToast(true);
   };
 

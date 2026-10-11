@@ -29,7 +29,6 @@
   "context": "api/chat/rag",
   "data": {
     "studentId": "usr_student_01",
-    "isSpell": false,
     "hasHistory": true
   },
   "error": {

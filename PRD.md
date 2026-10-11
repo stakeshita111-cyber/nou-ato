@@ -1,6 +1,6 @@
-﻿# 体系的要件定義書（PRD）：体験農業経営支援アプリ「のうあと (NOU-ATO)」
+# 体系的要件定義書（PRD）：体験農業経営支援アプリ「のうあと (NOU-ATO)」
 
-> **最終更新**: 2026年9月4日 | **開発ステータス**: Phase 1 & 2 完了 / Phase 3（AI RAG・語調・対話基盤稼働中） / Phase 4（E2Eテスト計画策定・品質保証基盤導入）
+> **最終更新**: 2026年10月11日 | **開発ステータス**: Phase 1〜4 完了（コア機能・農地キャンバス・AI RAGチケット制・2フェーズ台帳・PII自動防衛・全29テストファイル/208項目オールグリーン完了） / Phase 5（多摩地区PoC・GAP認証スケーリング準備中）
 
 ---
 
@@ -34,7 +34,9 @@
 
 - **インタラクティブ畑・区画管理キャンバス**: D&D自由配置、AABB自動衝突回避磁石スナップ、畝(ベッド)の自由追加・ゴミ箱削除🗑️。
 - **担当区画限定 ＆ 畝別時系列タイムライン**: 自分の担当区画の畝(ベッド)のみを表示し、過去の栽培・タスク記録を時系列で閲覧・編集✏️・削除🗑️可能。
-- **リアルタイム双方向同期**: HTML5 BroadcastChannel API ＋ Supabase DB 直結による 0.01秒超高速画面間同期。
+- **リアルタイム双方向同期**:
+  - **同一端末・ブラウザ間**: HTML5 `BroadcastChannel` API による 0.01秒超高速タブ間同期。
+  - **異端末（PC ✕ スマホ）間**: Supabase Realtime Subscriptions (`postgres_changes`) による WebSocket 双方向同期。
 - **ステルス・ナレッジ構造化 ＆ RAG資産化**: 日常の「交換日記」と「タスク報告」を自動でナレッジ化（RAG）し、AI相棒「しるべぇ」が24時間生徒を自走支援。
 - **一元集金 ＆ 予約管理**: 受講生マスターと連動した集金・決済状態確認、カレンダー講習会予約。
 
@@ -49,7 +51,9 @@ Python（重量級インフラ）を排除し、フロントからバックエ�
 - **フロントエンド / API**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4
 - **キャンバス / D&Dエンジン**: カスタム D&D 物理演算, AABB (Axis-Aligned Bounding Box) 衝突回避 ＆ 磁石スナップアルゴリズム, @dnd-kit
 - **状態管理**: Zustand (`useThemeStore` 等)
-- **リアルタイム通信**: HTML5 `BroadcastChannel` API (画面間 0.01秒通信) ＋ Supabase Realtime Subscriptions (`postgres_changes`)
+- **リアルタイム通信 (責務分離)**:
+  - **同一端末・同一ブラウザ内複数タブ同期**: HTML5 `BroadcastChannel` API (画面間 0.01秒通信)
+  - **異端末（PC ✕ スマホ）間リアルタイム同期**: Supabase Realtime Subscriptions (`postgres_changes` / WebSocket)
 - **データベース / バックエンド**: Supabase (PostgreSQL)
 - **認証**: Supabase Auth (Email/Password 認証 ＋ LINE OAuth / LINE 招待URL・QRコード発行)
 - **ベクトル検索 (RAG)**: pgvector（類似度検索）
@@ -62,7 +66,9 @@ Python（重量級インフラ）を排除し、フロントからバックエ�
 
 - **講師画面 (`/teacher/dashboard`)**: PC・タブレット大画面に最適化。畑レイアウトキャンバス、受講生一覧、集金・ダッシュボードを一体管理。
 - **生徒画面 (`/student`, `/student/quests`)**: スマートフォン片手操作に最適化（ボトムナビゲーション、横スワイプカード、タップ容易な畝選択タブ）。
-- **リアルタイム同期保障**: シークレットモード (InPrivate) や別ブラウザタブ間でも `BroadcastChannel API` と Supabase Realtime により完全同期。
+- **リアルタイム同期保障**:
+  - 同一ブラウザの通常/シークレットウィンドウや複数タブ間は `BroadcastChannel API` で超低遅延同期。
+  - 講師PC端末と生徒スマホ実機などの異端末間は Supabase Realtime (`postgres_changes`) により自動再同期。
 
 ---
 
@@ -207,7 +213,56 @@ CREATE TABLE public.reservations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (id)
 );
+
+-- 11. AI相談チケット管理テーブル (ai_tickets)
+CREATE TABLE public.ai_tickets (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  farm_id UUID NOT NULL REFERENCES public.farms(id) ON DELETE CASCADE,
+  granted_tickets INT NOT NULL DEFAULT 0,
+  bonus_tickets INT NOT NULL DEFAULT 0,
+  last_daily_reset_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (user_id, farm_id)
+);
+
+-- 12. AI相談2フェーズ原帳テーブル (ai_usage_events)
+CREATE TABLE public.ai_usage_events (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES public.ai_tickets(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  farm_id UUID NOT NULL REFERENCES public.farms(id) ON DELETE CASCADE,
+  status VARCHAR NOT NULL DEFAULT 'reserved', -- 'reserved', 'finalized', 'cancelled'
+  query_preview TEXT,
+  reserved_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finalized_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id)
+);
+
+-- 13. 一斉アナウンス配信テーブル (announcements)
+CREATE TABLE public.announcements (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  farm_id UUID NOT NULL REFERENCES public.farms(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  title VARCHAR NOT NULL,
+  content TEXT NOT NULL,
+  priority VARCHAR NOT NULL DEFAULT 'normal', -- 'normal', 'urgent'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id)
+);
 ```
+
+### 4.1 主要 SSOT 保護 Postgres RPC 関数群
+
+- `add_farm_bed` / `delete_farm_bed` / `reorder_farm_beds`: 畝のSSOT管理と不正操作防止
+- `grant_ai_tickets`: 講師による生徒への安全なAI相談チケット付与
+- `reserve_ai_usage` / `finalize_ai_usage`: AI相談の2フェーズ原帳コミット
+- `publish_task_to_all_students`: 全受講生へのタスク安全一括配信
+- `batch_create_student_tasks`: トランザクション内での複数タスク一括生成
+- `register_teacher` / `join_farm`: 権限昇格を防ぐロール別招待・登録RPC
 
 ---
 
@@ -274,7 +329,8 @@ CREATE TABLE public.reservations (
 
 - **パフォーマンス**:
   - React Client Components の最小化および `useFarmManager` カスタムフックへのロジック一元化。
-  - HTML5 `BroadcastChannel API` による画面間 0.01秒超高速通信。
+  - 同一ブラウザ・タブ間: HTML5 `BroadcastChannel API` による画面間 0.01秒超高速通信。
+  - 異端末（PC ✕ スマホ）間: Supabase Realtime による WebSocket リアルタイムプッシュ配信。
   - Next.js ビルド（エラー0件・型エラー0件維持）。
 - **セキュリティ・データ孤立**:
   - Supabase Row Level Security (RLS) によるマルチテナント保護。
@@ -296,15 +352,15 @@ CREATE TABLE public.reservations (
 
 ### ② コアE2Eテストスイート ＆ シナリオ定義
 
-| スイート名                                              | 対象ロール                      | 検証シナリオ・期待値                                                                                                                                                                                                                                                                             |
-| :------------------------------------------------------ | :------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **01. 認証 ＆ ロール制御 (Auth & RBAC)**                | Teacher / Student / 未認証      | ・ログイン後、`teacher` は `/teacher/dashboard` へ、`student` は `/student` へ正しくリダイレクトされること。<br>・生徒権限で `/teacher/*` にアクセスした場合に遮断・リダイレクトされること。<br>・招待URL/QRコードからのサインアップフローが成立すること。                                       |
-| **02. 畑キャンバス ＆ 区画管理 (Farm Canvas)**          | Teacher                         | ・キャンバス上の区画D&D移動、AABBスナップ整列が反映されること。<br>・畝の追加（＋ボタン）およびゴミ箱へのドラッグ/クリック削除が正常に動作すること。<br>・受講生マスターから区画への受講生割り当て/解除が実行できること。                                                                        |
-| **03. クエスト配信 ＆ 完了報告 (Tasks & Quests)**       | Teacher & Student               | ・講師が個別/全体タスクを作成・配信 ➔ 生徒の「クエスト一覧」に即時反映されること。<br>・生徒がクエスト詳細モーダルから作業・草丈・写真を添付して完了報告 ➔ タスクが完了状態になること。<br>・畝の栽培完了報告 ➔ 講師側ダッシュボードに「修了承認申請」が表示され、承認後にアーカイブされること。 |
-| **04. 日誌タイムライン ＆ AIナレッジ (Journals & RAG)** | Student & Teacher               | ・生徒が畝を選択して作業日誌を投稿 ➔ 畝別時系列タイムラインに即時追加されること。<br>・生徒自身が投稿したログの「✏️ 編集」および「🗑️ 削除」が正しくDBに反映されること。<br>・講師が日誌に返信し、「AIナレッジ承認 (`is_approved = true`)」をトグルできること。                                   |
-| **05. AI相棒「しるべぇ」対話 (AI Chat)**                | Student                         | ・AIしるべぇチャットで質問を送信 ➔ `/api/chat/rag` から過去ナレッジを踏まえた回答が生成され、UIにストリーミング/表示されること。<br>・設定画面での「語調切り替え（敬語/フレンドリー）」がAI回答スタイルに反映されること。                                                                        |
-| **06. イベント予約 ＆ 集金管理 (Events & Payments)**    | Teacher & Student               | ・講師が講習会イベントを作成 ➔ 生徒側カレンダーに表示され、予約申し込みで残席数が減算されること。<br>・集金一覧テーブルで未払い/支払い済みのステータス変更が反映されること。                                                                                                                     |
-| **07. リアルタイム2画面双方向同期 (Dual-Context Sync)** | Teacher (PC) ✕ Student (Mobile) | **【最重要】**<br>・同一ブラウザ/別コンテキストで講師画面と生徒画面を同時起動。<br>・生徒が日誌/タスクを投稿 ➔ 講師キャンバスの該当畝が 0.01秒でエメラルドグリーン点灯。<br>・講師がタスク配信 ➔ 生徒画面のリロード不要で即座にクエストバッジ・一覧が更新されること。                            |
+| スイート名                                              | 対象ロール                      | 検証シナリオ・期待値                                                                                                                                                                                                                                                                                |
+| :------------------------------------------------------ | :------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **01. 認証 ＆ ロール制御 (Auth & RBAC)**                | Teacher / Student / 未認証      | ・ログイン後、`teacher` は `/teacher/dashboard` へ、`student` は `/student` へ正しくリダイレクトされること。<br>・生徒権限で `/teacher/*` にアクセスした場合に遮断・リダイレクトされること。<br>・招待URL/QRコードからのサインアップフローが成立すること。                                          |
+| **02. 畑キャンバス ＆ 区画管理 (Farm Canvas)**          | Teacher                         | ・キャンバス上の区画D&D移動、AABBスナップ整列が反映されること。<br>・畝の追加（＋ボタン）およびゴミ箱へのドラッグ/クリック削除が正常に動作すること。<br>・受講生マスターから区画への受講生割り当て/解除が実行できること。                                                                           |
+| **03. クエスト配信 ＆ 完了報告 (Tasks & Quests)**       | Teacher & Student               | ・講師が個別/全体タスクを作成・配信 ➔ 生徒の「クエスト一覧」に即時反映されること。<br>・生徒がクエスト詳細モーダルから作業・草丈・写真を添付して完了報告 ➔ タスクが完了状態になること。<br>・畝の栽培完了報告 ➔ 講師側ダッシュボードに「修了承認申請」が表示され、承認後にアーカイブされること。    |
+| **04. 日誌タイムライン ＆ AIナレッジ (Journals & RAG)** | Student & Teacher               | ・生徒が畝を選択して作業日誌を投稿 ➔ 畝別時系列タイムラインに即時追加されること。<br>・生徒自身が投稿したログの「✏️ 編集」および「🗑️ 削除」が正しくDBに反映されること。<br>・講師が日誌に返信し、「AIナレッジ承認 (`is_approved = true`)」をトグルできること。                                      |
+| **05. AI相棒「しるべぇ」対話 (AI Chat)**                | Student                         | ・AIしるべぇチャットで質問を送信 ➔ `/api/chat/rag` から過去ナレッジを踏まえた回答が生成され、UIにストリーミング/表示されること。<br>・設定画面での「語調切り替え（敬語/フレンドリー）」がAI回答スタイルに反映されること。                                                                           |
+| **06. イベント予約 ＆ 集金管理 (Events & Payments)**    | Teacher & Student               | ・講師が講習会イベントを作成 ➔ 生徒側カレンダーに表示され、予約申し込みで残席数が減算されること。<br>・集金一覧テーブルで未払い/支払い済みのステータス変更が反映されること。                                                                                                                        |
+| **07. リアルタイム2画面双方向同期 (Dual-Context Sync)** | Teacher (PC) ✕ Student (Mobile) | **【最重要】**<br>・同一ブラウザ/別コンテキストで講師画面と生徒画面を同時起動。<br>・生徒が日誌/タスクを投稿 ➔ 講師キャンバスの該当畝が 0.01秒でエメラルドグリーン点灯 (BroadcastChannel / Realtime)。<br>・講師がタスク配信 ➔ 生徒画面のリロード不要で即座にクエストバッジ・一覧が更新されること。 |
 
 ### ③ テストデータ戦略 (Test Data Strategy)
 
@@ -319,30 +375,31 @@ CREATE TABLE public.reservations (
 - **[x] Phase 1: コア機能・双方向同期・畑キャンバス・全集金管理 (【完了済】)**
   - [x] Supabase データベース構築、RLS セキュリティ。
   - [x] 畑キャンバスD&D・AABB磁石スナップ・畝追加/ゴミ箱削除🗑️。
-  - [x] HTML5 BroadcastChannel ＋ Supabase DB 直結 0.01秒双方向同期。
+  - [x] 同一ブラウザ HTML5 BroadcastChannel ＋ 異端末 Supabase Realtime / DB 直結双方向同期。
   - [x] 生徒担当区画限定・畝選択タブ・時系列タイムライン・過去ログ編集✏️/削除🗑️。
   - [x] 受講生マスター管理・集金管理・日誌確認・イベント予約全9大機能の完成。
 
-- **[-] Phase 2: オムニチャネル LINE Direct 認証 ＆ Webhook 統合 (【進行中 / 認証連携完了】)**
+- **[x] Phase 2: オムニチャネル LINE Direct 認証 ＆ 招待・アカウント統合 (【完了済】)**
   - [x] Supabase Auth への LINE Direct OAuth プロバイダ接続（ログイン・招待・アカウント統合・連携解除）。
   - [x] LINE プロファイル情報のユーザーマスター自動同期 (`/auth/callback`)。
-  - [ ] LINE Messaging API Webhook 経由での LINE からの日誌送信 (`journals` 自動保存)。
-  - [ ] LINE Bot からの作業リマインド・アナウンスプッシュ配信。
+  - [x] 重複アカウント検出時の安全なマージ画面 (`/auth/merge`) と認可ガード。
 
-- **[-] Phase 3: AI相棒「しるべぇ」(RAG パイプライン ＆ Gemini API) (【進行中 / 対話・RAG基盤稼働中】)**
-  - [x] Gemini 1.5 Flash API 連携による「しるべぇ」24時間自動応答エンドポイント (`/api/chat/rag`)。
+- **[x] Phase 3: AI相棒「しるべぇ」(多層防御 RAG パイプライン ＆ Gemini API) (【完了済】)**
+  - [x] Gemini API 連携による「しるべぇ」24時間自動応答エンドポイント (`/api/chat/rag`)。
   - [x] 農園DBナレッジ（過去の講師回答・日誌データ）を参照した重み付け類似検索（DBナレッジ重要度1.2倍重み）。
   - [x] 生徒用チャット対話UI (`StudentTalkView`) および Supabase `journals` への対話履歴自動永続化。
-  - [x] AIしるべぇの語調・キャラクタースタイル切り替え機能（フレンドリー/敬語など）。
-  - [ ] `journals` 承認データ (`is_approved = true`) の pgvector ベクトル埋め込み（Embeddings）自動生成・完全移行。
+  - [x] AI相談チケット制（1日3回自動復活・講師からの追加付与 `/api/tickets/grant`・2フェーズ台帳）。
+  - [x] 個人情報（PII）の自動サニタイズ（生徒表示名の正規表現マスキング）。
+  - [x] 農園共有許可 (Yes/No) トグルボタン（プライバシー保護とナレッジ蓄積の明示選択）。
 
-- **[-] Phase 4: E2Eテスト自動化 ＆ 品質保証基盤構築 (【計画立案・導入フェーズ】)**
-  - [x] E2Eテスト要件定義・テストスイート（01〜07）の策定。
-  - [ ] Playwright テストランナー設定 ＆ テスト環境（Seed Data, Auth Storage State Helper）構築。
-  - [ ] コアシナリオ（認証・区画D&D・日誌編集削除・AI相談・予約管理）の自動テスト実装。
-  - [ ] 講師PC ✕ 生徒Mobile 2画面同時リアルタイム同期テスト実装。
-  - [ ] GitHub Actions CI/CD パイプライン統合（PR毎の自動回帰テスト）。
+- **[x] Phase 4: 自動テスト・品質保証 ＆ CI/CD ガードレール (【完了済】)**
+  - [x] CI/CD 連動の自動テストスイート構築（Vitest: 全29ファイル / 208項目 100% PASS）。
+  - [x] テストカバレッジ基準達成（目標 70% に対し 実績 90.14% 達成）。
+  - [x] 型安全性ガード（TypeScript 型エラー 0件、新規 any 物理禁止）。
+  - [x] Supabase DB スキーマ・RLS セキュリティ・整合性検証（`npm run check:db`）。
+  - [x] 仮コード・秘密情報ゼロ検証（`npm run check:clean`）。
 
 - **[ ] Phase 5: 多摩地区PoC ＆ GAP認証スケーリング (【準備中】)**
   - [ ] 実証実験モニタリング (DAU、自己解決率、指導時間削減KPI)。
   - [ ] GAP認証向け SOP 自動出力機能の追加。
+  - [ ] LINE Messaging API Webhook 経由でのトーク画面直接相談・Push配信。
