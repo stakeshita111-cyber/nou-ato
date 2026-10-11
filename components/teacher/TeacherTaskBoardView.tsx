@@ -116,7 +116,7 @@ export default function TeacherTaskBoardView({
         badge_name: template.badge_name,
         badge_icon: template.badge_icon,
       };
-      saveTaskDetails(updated);
+      await saveTaskDetails(updated);
     }
   };
 
@@ -188,7 +188,9 @@ export default function TeacherTaskBoardView({
         <div className="p-4 app-bg-card rounded-2xl shadow-sm border app-border">
           <TaskForm
             onAddTask={(title) => {
-              addTask(title);
+              addTask(title).catch((err: unknown) => {
+                console.error('Failed to add task:', err);
+              });
               setShowQuickForm(false);
             }}
           />
@@ -258,7 +260,9 @@ export default function TeacherTaskBoardView({
         <IndividualTaskAssignModal
           onClose={() => setShowAssignModal(false)}
           onAssigned={() => {
-            refetchTasks();
+            refetchTasks().catch((err: unknown) => {
+              console.error('Failed to refetch tasks:', err);
+            });
           }}
         />
       )}

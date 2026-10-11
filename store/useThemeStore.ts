@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { z } from 'zod';
 
 export interface ThemeSettings {
   // 1. カラー・文字サイズ
@@ -48,15 +49,43 @@ const defaultSettings: ThemeSettings = {
   showStudentTalkTab: true,
 };
 
+const ThemeSettingsSchema = z.object({
+  primaryColor: z.string(),
+  secondaryColor: z.string(),
+  fontSize: z.enum(['small', 'medium', 'large', 'xlarge']),
+  fontFamily: z.enum(['sans', 'serif', 'rounded']),
+  fontWeight: z.enum(['normal', 'medium', 'bold']),
+  lineHeight: z.enum(['normal', 'relaxed', 'loose']),
+  borderRadius: z.enum(['none', 'md', 'full']),
+  buttonPadding: z.enum(['normal', 'large']),
+  outdoorHighContrast: z.boolean(),
+  dateFormat: z.enum(['slash', 'japanese']),
+  numberFormat: z.enum(['raw', 'comma', 'unit']),
+  showPaymentsMenu: z.boolean(),
+  showStudentTalkTab: z.boolean(),
+});
+
+const BroadcastEventDataSchema = z.object({
+  type: z.literal('SETTINGS_UPDATED'),
+  settings: ThemeSettingsSchema,
+});
+
+const StorageStateSchema = z.object({
+  state: z.object({
+    settings: ThemeSettingsSchema,
+  }),
+});
+
 let syncChannel: BroadcastChannel | null = null;
 const getBroadcastChannel = () => {
   if (typeof window === 'undefined') return null;
   if (!syncChannel && typeof BroadcastChannel !== 'undefined') {
     try {
       syncChannel = new BroadcastChannel('nouato_settings_sync');
-      syncChannel.onmessage = (event) => {
-        if (event.data?.type === 'SETTINGS_UPDATED' && event.data?.settings) {
-          useThemeStore.setState({ settings: event.data.settings });
+      syncChannel.onmessage = (event: MessageEvent<unknown>) => {
+        const parsed = BroadcastEventDataSchema.safeParse(event.data);
+        if (parsed.success) {
+          useThemeStore.setState({ settings: parsed.data.settings });
         }
       };
     } catch (e) {
@@ -129,12 +158,13 @@ export const useThemeStore = create<ThemeState>()(
 // クライアント側でのクロスブラウザ・タブ間ストレージ変更監視
 if (typeof window !== 'undefined') {
   getBroadcastChannel();
-  window.addEventListener('storage', (e) => {
+  window.addEventListener('storage', (e: StorageEvent) => {
     if (e.key === 'nou-ato-theme-settings' && e.newValue) {
       try {
-        const parsed = JSON.parse(e.newValue);
-        if (parsed.state?.settings) {
-          useThemeStore.setState({ settings: parsed.state.settings });
+        const json: unknown = JSON.parse(e.newValue);
+        const parsed = StorageStateSchema.safeParse(json);
+        if (parsed.success) {
+          useThemeStore.setState({ settings: parsed.data.state.settings });
         }
       } catch {}
     }
