@@ -108,8 +108,6 @@ const eslintConfig = defineConfig([
     ignores: [
       'test/**',
       'app/student/page.tsx',
-      'components/student/StudentTalkView.tsx',
-      'components/teacher/TeacherFarmCanvasView.tsx',
       'components/ui/weather/useWeatherLive.ts',
       'hooks/useFarmManager.ts',
     ],

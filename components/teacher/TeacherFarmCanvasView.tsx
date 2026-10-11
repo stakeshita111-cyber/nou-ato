@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
+import { z } from 'zod';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { FarmBed, FarmPlot, CropRecord } from '@/types/farm';
 import Toast from '@/components/ui/Toast';
@@ -12,6 +13,22 @@ import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
+
+const FarmMetaDescriptionSchema = z.object({
+  farm_meta: z
+    .object({
+      address: z.string().optional(),
+    })
+    .optional(),
+});
+
+const UnassignedStudentDropSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  initials: z.string(),
+  grade: z.string(),
+  colorBg: z.string(),
+});
 
 interface UnassignedStudent {
   id: string;
@@ -710,12 +727,16 @@ export default function TeacherFarmCanvasView({
           for (const p of plots) {
             if (p.description) {
               try {
-                const meta =
-                  typeof p.description === 'string' ? JSON.parse(p.description) : p.description;
-                if (meta?.farm_meta?.address) {
-                  setFarmAddressInput(meta.farm_meta.address);
+                const rawMeta =
+                  typeof p.description === 'string'
+                    ? (JSON.parse(p.description) as unknown)
+                    : p.description;
+                const parsed = FarmMetaDescriptionSchema.safeParse(rawMeta);
+                if (parsed.success && parsed.data.farm_meta?.address) {
+                  const addr = parsed.data.farm_meta.address;
+                  setFarmAddressInput(addr);
                   if (typeof window !== 'undefined') {
-                    localStorage.setItem('nouato_farm_address', meta.farm_meta.address);
+                    localStorage.setItem('nouato_farm_address', addr);
                   }
                   break;
                 }
@@ -816,11 +837,13 @@ export default function TeacherFarmCanvasView({
       return;
     }
 
-    assignStudentToPlot(plot.id, studentToAssign.id, studentToAssign.name);
-    setDraggingStudent(null);
+    void (async () => {
+      await assignStudentToPlot(plot.id, studentToAssign.id, studentToAssign.name);
+      setDraggingStudent(null);
 
-    setToastMessage(`🎯 ${plot.code}区画に ${studentToAssign.name} さんを割り当てました！`);
-    setShowToast(true);
+      setToastMessage(`🎯 ${plot.code}区画に ${studentToAssign.name} さんを割り当てました！`);
+      setShowToast(true);
+    })();
   };
 
   const handleConfirmChangeStudent = () => {
@@ -828,15 +851,17 @@ export default function TeacherFarmCanvasView({
 
     const { plot, newStudent } = confirmChangeStudentModal;
 
-    assignStudentToPlot(plot.id, newStudent.id, newStudent.name);
+    void (async () => {
+      await assignStudentToPlot(plot.id, newStudent.id, newStudent.name);
 
-    setConfirmChangeStudentModal(null);
-    setDraggingStudent(null);
+      setConfirmChangeStudentModal(null);
+      setDraggingStudent(null);
 
-    setToastMessage(
-      `✨ ${plot.code}区画の担当者を ${newStudent.name} さんに変更しました！ (${plot.code} - ${newStudent.name})`
-    );
-    setShowToast(true);
+      setToastMessage(
+        `✨ ${plot.code}区画の担当者を ${newStudent.name} さんに変更しました！ (${plot.code} - ${newStudent.name})`
+      );
+      setShowToast(true);
+    })();
   };
 
   // 🌟 農園設定モーダルオープン (DBから実際の講師農園名を取得) 🌟
@@ -900,11 +925,13 @@ export default function TeacherFarmCanvasView({
               value={activeFarmId}
               onChange={(e) => {
                 const selectedId = e.target.value;
-                setActiveFarmId(selectedId);
-                useFarmStore.getState().setActiveFarmId(selectedId);
-                const f = farms.find((farm) => farm.id === selectedId);
-                setToastMessage(`農園「${f?.name || selectedId}」に切り替えました`);
-                setShowToast(true);
+                void (async () => {
+                  await setActiveFarmId(selectedId);
+                  useFarmStore.getState().setActiveFarmId(selectedId);
+                  const f = farms.find((farm) => farm.id === selectedId);
+                  setToastMessage(`農園「${f?.name || selectedId}」に切り替えました`);
+                  setShowToast(true);
+                })();
               }}
               className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-emerald-900 focus:outline-none cursor-pointer"
             >
@@ -916,7 +943,9 @@ export default function TeacherFarmCanvasView({
             </select>
             <button
               type="button"
-              onClick={openFarmSettingsModal}
+              onClick={() => {
+                void openFarmSettingsModal();
+              }}
               className="px-2 py-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
               title="農園設定・代表者情報を編集"
             >
@@ -968,11 +997,13 @@ export default function TeacherFarmCanvasView({
                 const count = Number(e.target.value);
                 if (count > 0) {
                   setUnassignedBedsCount(count);
-                  updateAllUnassignedBedsCount(count);
-                  setToastMessage(
-                    `✨ すべての未割り当て区画の畝数を一括で「${count} 畝」に変更しました！`
-                  );
-                  setShowToast(true);
+                  void (async () => {
+                    await updateAllUnassignedBedsCount(count);
+                    setToastMessage(
+                      `✨ すべての未割り当て区画の畝数を一括で「${count} 畝」に変更しました！`
+                    );
+                    setShowToast(true);
+                  })();
                 }
               }}
               className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-black text-amber-900"
@@ -1026,21 +1057,25 @@ export default function TeacherFarmCanvasView({
             {unassignedList.length > 0 && (
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   if (
                     !confirm(
                       `未割り当ての受講生（${unassignedList.length}名）を空いている区画へ一括割り当てしますか？`
                     )
                   )
                     return;
-                  const res = await assignAllUnassignedStudents(unassignedList);
-                  if (res && res.count > 0) {
-                    setToastMessage(`⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`);
-                    setShowToast(true);
-                  } else {
-                    setToastMessage('⚠️ 割り当て可能な空き区画がありませんでした');
-                    setShowToast(true);
-                  }
+                  void (async () => {
+                    const res = await assignAllUnassignedStudents(unassignedList);
+                    if (res && res.count > 0) {
+                      setToastMessage(
+                        `⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`
+                      );
+                      setShowToast(true);
+                    } else {
+                      setToastMessage('⚠️ 割り当て可能な空き区画がありませんでした');
+                      setShowToast(true);
+                    }
+                  })();
                 }}
                 className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
               >
@@ -1163,7 +1198,12 @@ export default function TeacherFarmCanvasView({
                     let droppedStudentData: UnassignedStudent | undefined = undefined;
                     try {
                       const dataStr = e.dataTransfer.getData('application/json');
-                      if (dataStr) droppedStudentData = JSON.parse(dataStr);
+                      if (dataStr) {
+                        const parsed = UnassignedStudentDropSchema.safeParse(JSON.parse(dataStr));
+                        if (parsed.success) {
+                          droppedStudentData = parsed.data;
+                        }
+                      }
                     } catch {}
                     if (plot) {
                       handleDropStudentOnPlot(plot, droppedStudentData);
@@ -1556,7 +1596,7 @@ export default function TeacherFarmCanvasView({
                                   setSelectedBedForRecords(null);
                                 } else {
                                   setSelectedBedForRecords(bed);
-                                  fetchBedRecords(
+                                  void fetchBedRecords(
                                     detailPlot.code,
                                     displayNum,
                                     bed.id,
@@ -1746,9 +1786,11 @@ export default function TeacherFarmCanvasView({
         onUnarchive={(bedId) => {
           const targetPlot = plots.find((p) => (p.beds || []).some((b) => b.id === bedId));
           if (targetPlot) {
-            unarchiveBed(targetPlot.id, bedId);
-            setToastMessage('↺ アーカイブから畝を通常状態に復帰しました');
-            setShowToast(true);
+            void (async () => {
+              await unarchiveBed(targetPlot.id, bedId);
+              setToastMessage('↺ アーカイブから畝を通常状態に復帰しました');
+              setShowToast(true);
+            })();
           }
         }}
       />
@@ -1864,7 +1906,12 @@ export default function TeacherFarmCanvasView({
               </button>
             </div>
 
-            <form onSubmit={handleSaveFarmSettings} className="space-y-3">
+            <form
+              onSubmit={(e) => {
+                void handleSaveFarmSettings(e);
+              }}
+              className="space-y-3"
+            >
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   農園名 <span className="text-red-500">*</span>
