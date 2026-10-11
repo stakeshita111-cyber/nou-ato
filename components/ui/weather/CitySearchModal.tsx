@@ -1,8 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import type { GeocodingResultItem, LeafletMapInstance } from './types';
+import { z } from 'zod';
+import type { LeafletMapInstance } from './types';
 import { WeatherMapView } from './WeatherMapView';
+
+const GeocodingItemSchema = z.object({
+  name: z.string(),
+  admin1: z.string().optional(),
+  latitude: z.number(),
+  longitude: z.number(),
+});
+
+const GeocodingResponseSchema = z.object({
+  results: z.array(GeocodingItemSchema).optional(),
+});
 
 interface CitySearchModalProps {
   isOpen: boolean;
@@ -54,9 +66,14 @@ export function CitySearchModal({
       const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery.trim())}&language=ja&count=5`;
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          const formatted = (data.results as GeocodingResultItem[]).map((item) => ({
+        const rawData: unknown = await res.json();
+        const parseResult = GeocodingResponseSchema.safeParse(rawData);
+        if (
+          parseResult.success &&
+          parseResult.data.results &&
+          parseResult.data.results.length > 0
+        ) {
+          const formatted = parseResult.data.results.map((item) => ({
             name: `${item.admin1 || ''} ${item.name}`.trim(),
             lat: Math.round(item.latitude * 10000) / 10000,
             lon: Math.round(item.longitude * 10000) / 10000,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import {
   VEGETABLE_TASK_TEMPLATES,
   TaskTemplate,
@@ -9,6 +10,34 @@ import {
   TaskPhase,
 } from '@/lib/taskTemplates';
 import { supabase } from '@/lib/supabase';
+
+const TaskCategorySchema = z.enum(['果菜', '根菜', '葉菜', '共通', '土作り']);
+const TaskSeasonSchema = z.enum(['春夏', '秋冬', '通年']);
+const TaskPhaseSchema = z.enum(['準備・植付', '育成・管理', '収穫・片付け']);
+
+const CustomTemplateSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  target_crop: z.string(),
+  variety: z.string().optional(),
+  estimated_time: z.string(),
+  tools_needed: z.string(),
+  description: z.string(),
+  memo: z.string(),
+  exp: z.number(),
+  difficulty: z.number(),
+  require_photo: z.boolean(),
+  badge_name: z.string(),
+  badge_icon: z.string(),
+  category: TaskCategorySchema,
+  timing: z.string().optional(),
+  reference_links: z.string().optional(),
+  source: z.string().optional(),
+  season: TaskSeasonSchema.optional(),
+  phase: TaskPhaseSchema.optional(),
+});
+
+const CustomTemplateListSchema = z.array(CustomTemplateSchema);
 
 interface TaskTemplateModalProps {
   onClose: () => void;
@@ -67,13 +96,16 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
         const saved = localStorage.getItem('nouato_custom_templates');
         if (saved) {
           try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              parsed.forEach((lt) => {
+            const parsed: unknown = JSON.parse(saved);
+            const parseResult = CustomTemplateListSchema.safeParse(parsed);
+            if (parseResult.success) {
+              parseResult.data.forEach((lt) => {
                 if (!customTemplates.some((ct) => ct.id === lt.id)) {
                   customTemplates.push(lt);
                 }
               });
+            } else {
+              console.error('Failed to parse custom templates with schema:', parseResult.error);
             }
           } catch (e) {
             console.error(e);
@@ -87,7 +119,9 @@ export default function TaskTemplateModal({ onClose, onSelectTemplate }: TaskTem
       setAllTemplates(Array.from(map.values()));
     };
 
-    loadAllTemplates();
+    loadAllTemplates().catch((err) => {
+      console.error('Failed to load templates:', err);
+    });
   }, []);
 
   const categories = [
