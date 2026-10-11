@@ -17,7 +17,7 @@ const chatRequestBodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const rawBody = await request.json().catch(() => ({}));
+    const rawBody: unknown = await request.json().catch(() => ({}));
     const parseResult = chatRequestBodySchema.safeParse(rawBody);
 
     if (!parseResult.success) {
@@ -41,11 +41,11 @@ export async function POST(request: Request) {
     }
 
     const studentId = sessionUser.id;
+    const userMeta = sessionUser.user_metadata;
+    const metaFullName = typeof userMeta?.full_name === 'string' ? userMeta.full_name : null;
+    const metaName = typeof userMeta?.name === 'string' ? userMeta.name : null;
     const effectiveStudentName =
-      sessionUser.user_metadata?.full_name ||
-      sessionUser.user_metadata?.name ||
-      sessionUser.email?.split('@')[0] ||
-      studentName;
+      metaFullName || metaName || sessionUser.email?.split('@')[0] || studentName;
 
     // 2. 多層防御②: 2フェーズ台帳によるアトミックな予約 (1日3回 + 講師付与チケット分)
     let reservationId: string | null = null;

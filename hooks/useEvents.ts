@@ -27,7 +27,10 @@ export function useEvents(farmId?: string) {
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem(eventKey) : null;
       if (saved) {
-        setEvents(JSON.parse(saved));
+        const parsed: unknown = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setEvents(parsed as EventItem[]);
+        }
       }
 
       const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
@@ -87,12 +90,16 @@ export function useEvents(farmId?: string) {
       return () => {
         window.removeEventListener('nouato_events_updated', handleSync);
         window.removeEventListener('nouato_sync_event', handleSync);
-        supabase.removeChannel(channel);
+        supabase.removeChannel(channel).catch((e: unknown) => {
+          console.error('Failed to remove channel:', e);
+        });
       };
     }
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel).catch((e: unknown) => {
+        console.error('Failed to remove channel:', e);
+      });
     };
   }, [farmId, fetchEvents]);
 

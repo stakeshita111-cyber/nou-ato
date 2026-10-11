@@ -107,18 +107,14 @@ const eslintConfig = defineConfig([
     ],
     ignores: [
       'test/**',
-      'app/api/chat/rag/route.ts',
       'app/student/page.tsx',
       'components/student/StudentTalkView.tsx',
       'components/teacher/TeacherFarmCanvasView.tsx',
       'components/teacher/TeacherJournalsView.tsx',
       'components/teacher/TeacherSettingsView.tsx',
       'components/ui/weather/useWeatherLive.ts',
-      'hooks/useEvents.ts',
       'hooks/useFarmManager.ts',
-      'hooks/useKanbanBoard.ts',
       'hooks/useStudentDashboard.ts',
-      'lib/ticketManager.ts',
     ],
     languageOptions: {
       parserOptions: {

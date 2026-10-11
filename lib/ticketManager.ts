@@ -96,7 +96,12 @@ export function getQuestionStock(userId: string = 'default'): string[] {
   const storageKey = `nouato_question_stock_${userId}`;
   try {
     const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string');
+    }
+    return [];
   } catch {
     return [];
   }
