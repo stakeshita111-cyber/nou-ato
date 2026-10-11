@@ -170,7 +170,7 @@ export default function TeacherDashboardPage() {
         }
 
         setIsAuthorized(true);
-        fetchTeacherFarms();
+        await fetchTeacherFarms();
       } catch (err) {
         console.error('Auth role check error:', err);
         setToastMessage('🚫 認証エラーが発生しました。生徒ダッシュボードへ移動します。');
@@ -182,7 +182,9 @@ export default function TeacherDashboardPage() {
       }
     };
 
-    checkTeacherRole();
+    checkTeacherRole().catch((err) => {
+      console.error('checkTeacherRole unhandled error:', err);
+    });
   }, [router, fetchTeacherFarms]);
 
   const handleAddNewTask = () => {

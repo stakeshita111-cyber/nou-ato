@@ -81,26 +81,35 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
 
     setLoading(true);
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const latitude = Math.round(pos.coords.latitude * 10000) / 10000;
-        const longitude = Math.round(pos.coords.longitude * 10000) / 10000;
+      (pos) => {
+        const processPosition = async () => {
+          const latitude = Math.round(pos.coords.latitude * 10000) / 10000;
+          const longitude = Math.round(pos.coords.longitude * 10000) / 10000;
 
-        const cityName = await fetchMunicipalityNameFromCoords(latitude, longitude);
+          const cityName = await fetchMunicipalityNameFromCoords(latitude, longitude);
 
-        setMunicipalityName(cityName);
-        setLat(latitude);
-        setLon(longitude);
+          setMunicipalityName(cityName);
+          setLat(latitude);
+          setLon(longitude);
 
-        setSelectedMapCityName(cityName);
-        setSelectedMapLat(latitude);
-        setSelectedMapLon(longitude);
+          setSelectedMapCityName(cityName);
+          setSelectedMapLat(latitude);
+          setSelectedMapLon(longitude);
 
-        await saveLocationToDBAndStorage(cityName, latitude, longitude);
-        await fetchLiveWeather(cityName, latitude, longitude);
-        setIsLocationModalOpen(false);
+          await saveLocationToDBAndStorage(cityName, latitude, longitude);
+          await fetchLiveWeather(cityName, latitude, longitude);
+          setIsLocationModalOpen(false);
 
-        setToastMessage(`✨ GPS現在地「${cityName}」の天気を取得し保存しました！`);
-        setShowToast(true);
+          setToastMessage(`✨ GPS現在地「${cityName}」の天気を取得し保存しました！`);
+          setShowToast(true);
+        };
+
+        processPosition().catch((err) => {
+          console.error('Error processing GPS position:', err);
+          setLoading(false);
+          setToastMessage('⚠️ GPS位置情報の処理中にエラーが発生しました。');
+          setShowToast(true);
+        });
       },
       (err) => {
         console.error('GPS error:', err);

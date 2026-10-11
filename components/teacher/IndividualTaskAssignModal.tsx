@@ -80,7 +80,9 @@ export default function IndividualTaskAssignModal({
       }
     };
 
-    loadOptions();
+    loadOptions().catch((err) => {
+      console.error('loadOptions unhandled error:', err);
+    });
   }, [selectedStudentId]);
 
   // 作物タグ一覧の抽出
