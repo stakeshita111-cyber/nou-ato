@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
 
-const inviteSignUpSchema = z.object({
+export const inviteSignUpSchema = z.object({
   name: z.string().trim().min(1, 'ユーザー名（お名前）を入力してください'),
   email: z
     .string()

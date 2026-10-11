@@ -63,6 +63,7 @@ export default function StudentPage() {
     addJournal,
     isLoading,
     isDeactivated,
+    error,
   } = useStudentDashboard();
 
   const { events, reserveEvent } = useEvents();
@@ -541,6 +542,28 @@ export default function StudentPage() {
       <main
         className={`w-full max-w-md ${activeTab === 'talk' ? 'p-0 pb-[62px] flex-1 flex flex-col min-h-0 overflow-hidden' : 'p-4 space-y-5 flex-1 pb-28'}`}
       >
+        {/* 通信エラー警告バナー */}
+        {error && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 shadow-xs flex items-center justify-between gap-3 text-amber-900 animate-fade-in">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-lg shrink-0">⚠️</span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-snug">最新情報の取得に失敗しました</p>
+                <p className="text-[10px] text-amber-700 font-medium truncate">
+                  電波状況をご確認ください（{error.message}）
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shrink-0 transition cursor-pointer"
+            >
+              再読み込み
+            </button>
+          </div>
+        )}
+
         {/* 🌟 1. 畑 タブ (担当区画の畝管理 ＆ 観察ノート ＆ 気づきメモ ＆ タスクスライダー) 🌟 */}
         {activeTab === 'myfarm' && (
           <div className="space-y-4">

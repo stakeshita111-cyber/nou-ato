@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
 
-const teacherSignUpSchema = z.object({
+export const teacherSignUpSchema = z.object({
   farmName: z.string().trim().min(1, '農場名を入力してください'),
   teacherName: z.string().trim().min(1, '講師名を入力してください'),
   email: z
