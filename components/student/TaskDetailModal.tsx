@@ -217,28 +217,32 @@ export default function TaskDetailModal({
     const targetBed = isShared ? null : myBeds.find((b) => b.id === selectedBedId);
 
     // 全体共有または対象の畝ベッドへ作業記録・現場写真を送信保存
-    addCropRecord(targetBed ? targetBed.id : 'shared', {
-      bed_id: targetBed ? targetBed.id : null,
-      plot_id: myPlot?.id || null,
-      date: new Date().toLocaleDateString('ja-JP'),
-      growth_stage:
-        t.phase === '準備・植付'
-          ? '播種・苗植え'
-          : t.phase === '収穫・片付け'
-            ? '収穫期'
-            : '本葉展開・つる伸び',
-      height_cm: targetBed ? 75 : undefined,
-      crop_name: targetBed
-        ? targetBed.crop_name || t.target_crop || '未確定'
-        : t.target_crop || '全体共有',
-      work_types: [t.title || '手入れ'] as WorkType[],
-      notes: finalPhotoUrl
-        ? `${reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`} [📷 現場写真あり]`
-        : reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
-      harvest_amount: undefined,
-      image_url: finalPhotoUrl || undefined,
-      photo_url: finalPhotoUrl || undefined,
-    });
+    try {
+      await addCropRecord(targetBed ? targetBed.id : 'shared', {
+        bed_id: targetBed ? targetBed.id : null,
+        plot_id: myPlot?.id || null,
+        date: new Date().toLocaleDateString('ja-JP'),
+        growth_stage:
+          t.phase === '準備・植付'
+            ? '播種・苗植え'
+            : t.phase === '収穫・片付け'
+              ? '収穫期'
+              : '本葉展開・つる伸び',
+        height_cm: targetBed ? 75 : undefined,
+        crop_name: targetBed
+          ? targetBed.crop_name || t.target_crop || '未確定'
+          : t.target_crop || '全体共有',
+        work_types: [t.title || '手入れ'] as WorkType[],
+        notes: finalPhotoUrl
+          ? `${reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`} [📷 現場写真あり]`
+          : reportMemo.trim() || `${t.title || '作業'}の作業を完了しました。`,
+        harvest_amount: undefined,
+        image_url: finalPhotoUrl || undefined,
+        photo_url: finalPhotoUrl || undefined,
+      });
+    } catch (error) {
+      console.error('Failed to add crop record:', error);
+    }
 
     if (onComplete) {
       onComplete(
