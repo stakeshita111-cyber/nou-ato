@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
+
+const userMetadataSchema = z.object({
+  full_name: z.string().optional(),
+  name: z.string().optional(),
+  preferred_username: z.string().optional(),
+  nickname: z.string().optional(),
+});
 
 /**
  * next パラメータを相対パス（/ 開始）のみ許可するようサニタイズ（オープンリダイレクト防止）
@@ -62,7 +70,8 @@ export async function GET(request: Request) {
       let targetNext = safeNext;
 
       if (user) {
-        const meta = user.user_metadata || {};
+        const parsedMeta = userMetadataSchema.safeParse(user.user_metadata);
+        const meta = parsedMeta.success ? parsedMeta.data : {};
         const lineName =
           meta.full_name ||
           meta.name ||

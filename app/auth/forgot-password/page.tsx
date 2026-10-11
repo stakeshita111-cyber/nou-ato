@@ -2,8 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
+
+const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'メールアドレスを入力してください')
+    .email('有効なメールアドレスを入力してください'),
+});
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -15,8 +24,11 @@ export default function ForgotPasswordPage() {
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim()) {
-      setToastMessage('メールアドレスを入力してください');
+    const validation = forgotPasswordSchema.safeParse({ email });
+    if (!validation.success) {
+      const firstError =
+        validation.error.issues[0]?.message || 'メールアドレスを正しく入力してください';
+      setToastMessage(firstError);
       setShowToast(true);
       return;
     }
@@ -24,7 +36,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     try {
       const origin = window.location.origin;
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      const { error } = await supabase.auth.resetPasswordForEmail(validation.data.email, {
         redirectTo: `${origin}/auth/reset-password`,
       });
 

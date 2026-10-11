@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import type { Provider } from '@supabase/supabase-js';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'メールアドレスを入力してください')
+    .email('有効なメールアドレスを入力してください'),
+  password: z.string().min(1, 'パスワードを入力してください'),
+});
 
 export default function UnifiedLoginPage() {
   const router = useRouter();
@@ -24,8 +33,11 @@ export default function UnifiedLoginPage() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim() || !password) {
-      setToastMessage('メールアドレスとパスワードを入力してください');
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const firstError =
+        validation.error.issues[0]?.message || 'メールアドレスとパスワードを入力してください';
+      setToastMessage(firstError);
       setShowToast(true);
       return;
     }
@@ -35,8 +47,8 @@ export default function UnifiedLoginPage() {
     try {
       // 1. Supabase Auth ログイン
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+        email: validation.data.email,
+        password: validation.data.password,
       });
 
       if (authError) {
@@ -108,7 +120,7 @@ export default function UnifiedLoginPage() {
     try {
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'custom:line' as unknown as Provider,
+        provider: 'custom:line',
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback`,

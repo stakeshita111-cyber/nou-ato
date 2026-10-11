@@ -2,10 +2,19 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
-import type { Provider } from '@supabase/supabase-js';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
+
+const mergeAccountSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'メールアドレスを入力してください')
+    .email('有効なメールアドレスを入力してください'),
+  password: z.string().min(1, 'パスワードを入力してください'),
+});
 
 function AccountMergeForm() {
   const router = useRouter();
@@ -27,8 +36,11 @@ function AccountMergeForm() {
 
   const handleMergeAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setToastMessage('メールアドレスとパスワードを入力してください');
+
+    const validation = mergeAccountSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const firstError = validation.error.issues[0]?.message || '入力内容をご確認ください';
+      setToastMessage(firstError);
       setShowToast(true);
       return;
     }
@@ -37,8 +49,8 @@ function AccountMergeForm() {
     try {
       // 1. 既存のメール・パスワードで認証
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+        email: validation.data.email,
+        password: validation.data.password,
       });
 
       if (signInError) {
@@ -51,7 +63,7 @@ function AccountMergeForm() {
       // 2. 認証完了後、LINE Identityを統合リンク
       const origin = window.location.origin;
       const { error: linkError } = await supabase.auth.linkIdentity({
-        provider: 'custom:line' as unknown as Provider,
+        provider: 'custom:line',
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student`,
