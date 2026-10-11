@@ -34,7 +34,7 @@
 
 - **インタラクティブ畑・区画管理キャンバス**: D&D自由配置、AABB自動衝突回避磁石スナップ、畝(ベッド)の自由追加・ゴミ箱削除🗑️。
 - **担当区画限定 ＆ 畝別時系列タイムライン**: 自分の担当区画の畝(ベッド)のみを表示し、過去の栽培・タスク記録を時系列で閲覧・編集✏️・削除🗑️可能。
-- **リアルタイム双方向同期**: HTML5 BroadcastChannel API ＋ Supabase DB 直結による 0.01秒超高速画面間同期。
+- **リアルタイム双方向同期**: HTML5 BroadcastChannel API (同一ブラウザ内タブ間同期) ＋ Supabase Realtime Subscriptions (別端末・異デバイス間同期) による画面間同期。
 - **ステルス・ナレッジ構造化 ＆ RAG資産化**: 日常の「交換日記」と「タスク報告」を自動でナレッジ化（RAG）し、AI相棒「しるべぇ」が24時間生徒を自走支援。
 - **一元集金 ＆ 予約管理**: 受講生マスターと連動した集金・決済状態確認、カレンダー講習会予約。
 
@@ -49,7 +49,7 @@ Python（重量級インフラ）を排除し、フロントからバックエ�
 - **フロントエンド / API**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4
 - **キャンバス / D&Dエンジン**: カスタム D&D 物理演算, AABB (Axis-Aligned Bounding Box) 衝突回避 ＆ 磁石スナップアルゴリズム, @dnd-kit
 - **状態管理**: Zustand (`useThemeStore` 等)
-- **リアルタイム通信**: HTML5 `BroadcastChannel` API (画面間 0.01秒通信) ＋ Supabase Realtime Subscriptions (`postgres_changes`)
+- **リアルタイム通信**: HTML5 `BroadcastChannel` API (同一ブラウザ内タブ間 0.01秒通信) ＋ Supabase Realtime Subscriptions (`postgres_changes` 別端末間同期)
 - **データベース / バックエンド**: Supabase (PostgreSQL)
 - **認証**: Supabase Auth (Email/Password 認証 ＋ LINE OAuth / LINE 招待URL・QRコード発行)
 - **ベクトル検索 (RAG)**: pgvector（類似度検索）
@@ -62,7 +62,7 @@ Python（重量級インフラ）を排除し、フロントからバックエ�
 
 - **講師画面 (`/teacher/dashboard`)**: PC・タブレット大画面に最適化。畑レイアウトキャンバス、受講生一覧、集金・ダッシュボードを一体管理。
 - **生徒画面 (`/student`, `/student/quests`)**: スマートフォン片手操作に最適化（ボトムナビゲーション、横スワイプカード、タップ容易な畝選択タブ）。
-- **リアルタイム同期保障**: シークレットモード (InPrivate) や別ブラウザタブ間でも `BroadcastChannel API` と Supabase Realtime により完全同期。
+- **リアルタイム同期保障**: 同一ブラウザタブ間は `BroadcastChannel API`、別端末（PC ✕ スマホ）間は `Supabase Realtime` により完全同期。
 
 ---
 
@@ -274,7 +274,7 @@ CREATE TABLE public.reservations (
 
 - **パフォーマンス**:
   - React Client Components の最小化および `useFarmManager` カスタムフックへのロジック一元化。
-  - HTML5 `BroadcastChannel API` による画面間 0.01秒超高速通信。
+  - HTML5 `BroadcastChannel API`（同一ブラウザ内タブ間通信）および Supabase Realtime（別端末間同期）によるリアルタイム通信。
   - Next.js ビルド（エラー0件・型エラー0件維持）。
 - **セキュリティ・データ孤立**:
   - Supabase Row Level Security (RLS) によるマルチテナント保護。
@@ -319,7 +319,7 @@ CREATE TABLE public.reservations (
 - **[x] Phase 1: コア機能・双方向同期・畑キャンバス・全集金管理 (【完了済】)**
   - [x] Supabase データベース構築、RLS セキュリティ。
   - [x] 畑キャンバスD&D・AABB磁石スナップ・畝追加/ゴミ箱削除🗑️。
-  - [x] HTML5 BroadcastChannel ＋ Supabase DB 直結 0.01秒双方向同期。
+  - [x] HTML5 BroadcastChannel（同一ブラウザ内）＋ Supabase Realtime（別端末間）双方向同期。
   - [x] 生徒担当区画限定・畝選択タブ・時系列タイムライン・過去ログ編集✏️/削除🗑️。
   - [x] 受講生マスター管理・集金管理・日誌確認・イベント予約全9大機能の完成。
 
