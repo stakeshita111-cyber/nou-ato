@@ -3,8 +3,19 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
+
+const resetPasswordSchema = z
+  .object({
+    password: z.string().min(6, 'パスワードは6文字以上で入力してください'),
+    confirmPassword: z.string().min(1, '確認用パスワードを入力してください'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'パスワードが一致しません',
+    path: ['confirmPassword'],
+  });
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -17,44 +28,49 @@ function ResetPasswordForm() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const checkRecoverySession = async () => {
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        if (!session) {
-          // ハッシュフラグメントに recovery token があるか、セッション変更イベントを待機
-          supabase.auth.onAuthStateChange(() => {
+        if (!session && active) {
+          const { data: authListener } = supabase.auth.onAuthStateChange(() => {
             // recovery event listener
           });
+          return () => {
+            authListener.subscription.unsubscribe();
+          };
         }
       } catch (e) {
         console.warn('Recovery session check warn:', e);
       } finally {
-        setCheckingSession(false);
+        if (active) {
+          setCheckingSession(false);
+        }
       }
     };
 
-    checkRecoverySession();
+    const cleanupPromise = checkRecoverySession();
+    return () => {
+      active = false;
+      cleanupPromise
+        .then((cleanup) => {
+          if (cleanup) cleanup();
+        })
+        .catch((e: unknown) => {
+          console.warn('Cleanup error in checkRecoverySession:', e);
+        });
+    };
   }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!password || !confirmPassword) {
-      setToastMessage('新しいパスワードを入力してください');
-      setShowToast(true);
-      return;
-    }
-
-    if (password.length < 6) {
-      setToastMessage('パスワードは6文字以上で入力してください');
-      setShowToast(true);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setToastMessage('パスワードが一致しません');
+    const validation = resetPasswordSchema.safeParse({ password, confirmPassword });
+    if (!validation.success) {
+      const firstError = validation.error.issues[0]?.message || '入力内容をご確認ください';
+      setToastMessage(firstError);
       setShowToast(true);
       return;
     }
@@ -62,7 +78,7 @@ function ResetPasswordForm() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({
-        password,
+        password: validation.data.password,
       });
 
       if (error) {

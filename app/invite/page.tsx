@@ -2,10 +2,22 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import type { Provider } from '@supabase/supabase-js';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
+
+const inviteSignUpSchema = z.object({
+  name: z.string().trim().min(1, 'ユーザー名（お名前）を入力してください'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'メールアドレスを入力してください')
+    .email('有効なメールアドレスを入力してください'),
+  password: z.string().min(6, 'パスワードは6文字以上で入力してください'),
+});
+
+type JoinFarmResult = { success?: boolean; error?: string } | null;
 
 function InviteContent() {
   const router = useRouter();
@@ -31,6 +43,7 @@ function InviteContent() {
 
   // 招待コードから農園情報を安全に取得 (RLS anonバイパス不要のSECURITY DEFINER RPCを使用)
   useEffect(() => {
+    let active = true;
     const fetchCurrentFarm = async () => {
       try {
         if (inviteCodeParam) {
@@ -38,7 +51,7 @@ function InviteContent() {
             target_invite_code: inviteCodeParam,
           });
 
-          if (!error && data && data.length > 0) {
+          if (!error && data && data.length > 0 && active) {
             const farmInfo = data[0];
             setFarmName(farmInfo.farm_name || '自然農園');
             setTeacherName(farmInfo.teacher_name || '講師');
@@ -49,16 +62,24 @@ function InviteContent() {
           }
         }
 
-        // URLに招待コード指定がない、または該当なしの場合はデモ設定
-        setFarmName('たなか自然農園 (体験デモ)');
-        setTeacherName('田中 太郎');
-        setIsDemo(true);
+        if (active) {
+          // URLに招待コード指定がない、または該当なしの場合はデモ設定
+          setFarmName('たなか自然農園 (体験デモ)');
+          setTeacherName('田中 太郎');
+          setIsDemo(true);
+        }
       } catch (err) {
         console.error('fetchCurrentFarm error:', err);
       }
     };
 
-    fetchCurrentFarm();
+    fetchCurrentFarm().catch((err: unknown) => {
+      console.error('Unhandled error in fetchCurrentFarm:', err);
+    });
+
+    return () => {
+      active = false;
+    };
   }, [inviteCodeParam]);
 
   const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED !== 'true';
@@ -82,7 +103,7 @@ function InviteContent() {
         document.cookie = `nouato_invite_code=${inviteCode}; path=/; max-age=3600`;
       }
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'custom:line' as unknown as Provider,
+        provider: 'custom:line',
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/student&code=${encodeURIComponent(inviteCode)}`,
@@ -110,29 +131,23 @@ function InviteContent() {
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim()) {
-      setToastMessage('ユーザー名（お名前）を入力してください');
+    const validation = inviteSignUpSchema.safeParse({ name, email, password });
+    if (!validation.success) {
+      const firstError = validation.error.issues[0]?.message || '入力内容をご確認ください';
+      setToastMessage(firstError);
       setShowToast(true);
       return;
     }
-    if (!email.trim() || !password) {
-      setToastMessage('メールアドレスとパスワードを入力してください');
-      setShowToast(true);
-      return;
-    }
-    if (password.length < 6) {
-      setToastMessage('パスワードは6文字以上で入力してください');
-      setShowToast(true);
-      return;
-    }
+
+    const validData = validation.data;
 
     setLoading(true);
 
     try {
       // 1. まずログインを試行
       const { data: signInData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+        email: validData.email,
+        password: validData.password,
       });
 
       let userId = signInData?.user?.id;
@@ -140,8 +155,8 @@ function InviteContent() {
       if (loginError || !userId) {
         // 未登録（または初回）の場合は新規アカウント登録
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
+          email: validData.email,
+          password: validData.password,
         });
 
         if (signUpError) {
@@ -165,13 +180,13 @@ function InviteContent() {
 
       if (userId) {
         // 表示名の更新
-        if (name.trim()) {
-          await supabase.from('users').update({ display_name: name.trim() }).eq('id', userId);
+        if (validData.name) {
+          await supabase.from('users').update({ display_name: validData.name }).eq('id', userId);
         }
 
         // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を呼び出し)
         if (inviteCode) {
-          const { data: joinRes, error: joinErr } = await supabase.rpc('join_farm', {
+          const { data: joinResRaw, error: joinErr } = await supabase.rpc('join_farm', {
             invite_code: inviteCode,
           });
           if (joinErr) {
@@ -181,7 +196,7 @@ function InviteContent() {
             setLoading(false);
             return;
           }
-          const joinResult = joinRes as { success?: boolean; error?: string } | null;
+          const joinResult = joinResRaw as JoinFarmResult;
           if (joinResult && joinResult.success === false) {
             console.error('join_farm returned failure:', joinResult.error);
             setToastMessage(

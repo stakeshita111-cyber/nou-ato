@@ -2,9 +2,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
+
+const teacherSignUpSchema = z.object({
+  farmName: z.string().trim().min(1, '農場名を入力してください'),
+  teacherName: z.string().trim().min(1, '講師名を入力してください'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'メールアドレスを入力してください')
+    .email('有効なメールアドレスを入力してください'),
+  password: z.string().min(6, 'パスワードは6文字以上で入力してください'),
+});
+
+type RpcResult = { farm_id?: string } | null;
 
 export default function TeacherSignUpPage() {
   const router = useRouter();
@@ -24,17 +38,22 @@ export default function TeacherSignUpPage() {
   const handleTeacherSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!farmName.trim() || !teacherName.trim() || !email.trim() || !password) {
-      setToastMessage('すべての必須項目を入力してください');
+    const validation = teacherSignUpSchema.safeParse({
+      farmName,
+      teacherName,
+      email,
+      password,
+    });
+
+    if (!validation.success) {
+      const firstError =
+        validation.error.issues[0]?.message || 'すべての必須項目を入力してください';
+      setToastMessage(firstError);
       setShowToast(true);
       return;
     }
 
-    if (password.length < 6) {
-      setToastMessage('パスワードは6文字以上で入力してください');
-      setShowToast(true);
-      return;
-    }
+    const validData = validation.data;
 
     setLoading(true);
 
@@ -42,15 +61,15 @@ export default function TeacherSignUpPage() {
       // 1. Supabase Auth 登録 または ログイン
       let userId: string | null = null;
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
+        email: validData.email,
+        password: validData.password,
       });
 
       if (authError) {
         // すでに登録済みの場合はログイン試行
         const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
+          email: validData.email,
+          password: validData.password,
         });
 
         if (loginError) {
@@ -65,8 +84,8 @@ export default function TeacherSignUpPage() {
         // セッションが確立していない場合は自動ログインを試行
         if (!authData?.session) {
           const { data: signInData } = await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
+            email: validData.email,
+            password: validData.password,
           });
           if (signInData?.user) {
             userId = signInData.user.id;
@@ -87,11 +106,11 @@ export default function TeacherSignUpPage() {
       }
 
       // 2. 表示名の更新
-      await supabase.from('users').update({ display_name: teacherName.trim() }).eq('id', userId);
+      await supabase.from('users').update({ display_name: validData.teacherName }).eq('id', userId);
 
       // 3. Postgres 関数 register_teacher (SECURITY DEFINER) を呼び出して講師昇格 & 農園開設
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('register_teacher', {
-        farm_name: farmName.trim(),
+      const { data: rpcResultRaw, error: rpcError } = await supabase.rpc('register_teacher', {
+        farm_name: validData.farmName,
       });
 
       if (rpcError) {
@@ -102,11 +121,12 @@ export default function TeacherSignUpPage() {
         return;
       }
 
-      const createdFarmId = (rpcResult as { farm_id?: string } | null)?.farm_id;
+      const rpcResult = rpcResultRaw as RpcResult;
+      const createdFarmId = rpcResult?.farm_id;
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('nouato_owner_name', teacherName.trim());
-        localStorage.setItem('nouato_current_farm_name', farmName.trim());
+        localStorage.setItem('nouato_owner_name', validData.teacherName);
+        localStorage.setItem('nouato_current_farm_name', validData.farmName);
         if (createdFarmId) {
           localStorage.setItem('nouato_active_farm_id', createdFarmId);
         }
@@ -140,7 +160,7 @@ export default function TeacherSignUpPage() {
     try {
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'custom:line' as unknown as 'github',
+        provider: 'custom:line',
         options: {
           scopes: 'openid profile email',
           redirectTo: `${origin}/auth/callback?next=/teacher/dashboard`,
