@@ -105,12 +105,7 @@ const eslintConfig = defineConfig([
       'utils/**/*.{ts,tsx}',
       'context/**/*.{ts,tsx}',
     ],
-    ignores: [
-      'test/**',
-      'app/student/page.tsx',
-      'components/ui/weather/useWeatherLive.ts',
-      'hooks/useFarmManager.ts',
-    ],
+    ignores: ['test/**'],
     languageOptions: {
       parserOptions: {
         projectService: true,

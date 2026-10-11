@@ -15,9 +15,37 @@ import Toast from '@/components/ui/Toast';
 import WeatherWidget from '@/components/ui/WeatherWidget';
 import EventCalendar from '@/components/ui/EventCalendar';
 import { SproutLoader } from '@/components/SproutLoader';
+import { z } from 'zod';
 import { formatDate } from '@/lib/utils/formatHelper';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
+
+const ThemeSettingsStoreSchema = z.object({
+  state: z
+    .object({
+      settings: z
+        .object({
+          showStudentTalkTab: z.boolean().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+const SettingsApiResponseSchema = z.object({
+  showStudentTalkTab: z.boolean().optional(),
+  presetFaqs: z.array(z.custom<PresetFaqItem>()).optional(),
+});
+
+const SettingsMessageSchema = z.object({
+  type: z.string().optional(),
+  show: z.boolean().optional(),
+  settings: z
+    .object({
+      showStudentTalkTab: z.boolean().optional(),
+    })
+    .optional(),
+});
 
 export default function StudentPage() {
   const router = useRouter();
@@ -85,7 +113,10 @@ export default function StudentPage() {
       const saved = localStorage.getItem('nouato_read_broadcast_ids');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed: unknown = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
+            return parsed;
+          }
         } catch {
           return [];
         }
@@ -131,9 +162,13 @@ export default function StudentPage() {
       const themeStore = localStorage.getItem('nou-ato-theme-settings');
       if (themeStore) {
         try {
-          const parsed = JSON.parse(themeStore);
-          if (parsed.state?.settings?.showStudentTalkTab !== undefined) {
-            return parsed.state.settings.showStudentTalkTab !== false;
+          const parsed: unknown = JSON.parse(themeStore);
+          const parsedResult = ThemeSettingsStoreSchema.safeParse(parsed);
+          if (
+            parsedResult.success &&
+            parsedResult.data.state?.settings?.showStudentTalkTab !== undefined
+          ) {
+            return parsedResult.data.state.settings.showStudentTalkTab !== false;
           }
         } catch {
           // ignore parsing error
@@ -156,9 +191,13 @@ export default function StudentPage() {
       const themeStore = localStorage.getItem('nou-ato-theme-settings');
       if (themeStore) {
         try {
-          const parsed = JSON.parse(themeStore);
-          if (parsed.state?.settings?.showStudentTalkTab !== undefined) {
-            setTalkTabEnabled(parsed.state.settings.showStudentTalkTab !== false);
+          const parsed: unknown = JSON.parse(themeStore);
+          const parsedResult = ThemeSettingsStoreSchema.safeParse(parsed);
+          if (
+            parsedResult.success &&
+            parsedResult.data.state?.settings?.showStudentTalkTab !== undefined
+          ) {
+            setTalkTabEnabled(parsedResult.data.state.settings.showStudentTalkTab !== false);
             return;
           }
         } catch {
@@ -181,16 +220,20 @@ export default function StudentPage() {
           : '/api/settings';
         const res = await fetch(url);
         if (res.ok) {
-          const data = await res.json();
-          if (data.showStudentTalkTab !== undefined) {
-            const isEnabled = data.showStudentTalkTab !== false;
-            setTalkTabEnabled(isEnabled);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('nouato_show_student_talk_tab', String(isEnabled));
+          const rawData: unknown = await res.json();
+          const parsedResult = SettingsApiResponseSchema.safeParse(rawData);
+          if (parsedResult.success) {
+            const data = parsedResult.data;
+            if (data.showStudentTalkTab !== undefined) {
+              const isEnabled = data.showStudentTalkTab !== false;
+              setTalkTabEnabled(isEnabled);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('nouato_show_student_talk_tab', String(isEnabled));
+              }
             }
-          }
-          if (data.presetFaqs && Array.isArray(data.presetFaqs) && data.presetFaqs.length > 0) {
-            setPresetFaqs(data.presetFaqs);
+            if (data.presetFaqs && data.presetFaqs.length > 0) {
+              setPresetFaqs(data.presetFaqs);
+            }
           }
         }
       } catch {
@@ -198,11 +241,15 @@ export default function StudentPage() {
       }
     };
 
-    fetchServerSettings();
+    fetchServerSettings().catch((err) => {
+      console.error('fetchServerSettings error:', err);
+    });
 
     // タブに復帰した時のみ最新状態を取得 (高頻度ポーリングによるVercel実行枠消費を防止)
     const handleFocusSync = () => {
-      fetchServerSettings();
+      fetchServerSettings().catch((err) => {
+        console.error('handleFocusSync error:', err);
+      });
     };
     window.addEventListener('focus', handleFocusSync);
 
@@ -210,12 +257,20 @@ export default function StudentPage() {
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         bc = new BroadcastChannel('nouato_settings_sync');
-        bc.onmessage = (msg) => {
-          if (msg.data?.type === 'TALK_TAB_TOGGLE' && msg.data?.show !== undefined) {
-            setTalkTabEnabled(msg.data.show !== false);
-          } else if (msg.data?.settings?.showStudentTalkTab !== undefined) {
-            useThemeStore.setState({ settings: msg.data.settings });
-            setTalkTabEnabled(msg.data.settings.showStudentTalkTab !== false);
+        bc.onmessage = (msg: MessageEvent<unknown>) => {
+          const parsed = SettingsMessageSchema.safeParse(msg.data);
+          if (parsed.success) {
+            if (parsed.data.type === 'TALK_TAB_TOGGLE' && parsed.data.show !== undefined) {
+              setTalkTabEnabled(parsed.data.show !== false);
+            } else if (parsed.data.settings?.showStudentTalkTab !== undefined) {
+              useThemeStore.setState({
+                settings: {
+                  ...useThemeStore.getState().settings,
+                  showStudentTalkTab: parsed.data.settings.showStudentTalkTab,
+                },
+              });
+              setTalkTabEnabled(parsed.data.settings.showStudentTalkTab !== false);
+            }
           }
         };
       } catch (e) {
@@ -224,15 +279,21 @@ export default function StudentPage() {
     }
 
     const handleCustom = (e: Event) => {
-      const customEvent = e as CustomEvent;
+      const customEvent = e as CustomEvent<{ showStudentTalkTab?: boolean }>;
       if (customEvent.detail?.showStudentTalkTab !== undefined) {
-        useThemeStore.setState({ settings: customEvent.detail });
-        setTalkTabEnabled(customEvent.detail.showStudentTalkTab !== false);
+        const isShow = customEvent.detail.showStudentTalkTab;
+        useThemeStore.setState({
+          settings: {
+            ...useThemeStore.getState().settings,
+            showStudentTalkTab: isShow,
+          },
+        });
+        setTalkTabEnabled(isShow !== false);
       }
     };
 
     const handleTalkToggle = (e: Event) => {
-      const customEvent = e as CustomEvent;
+      const customEvent = e as CustomEvent<{ show?: boolean }>;
       if (customEvent.detail && customEvent.detail.show !== undefined) {
         setTalkTabEnabled(customEvent.detail.show !== false);
       }
@@ -246,10 +307,13 @@ export default function StudentPage() {
 
     // 親ウィンドウやiframeからのpostMessage受信
     const handleWindowMessage = (e: MessageEvent) => {
-      if (e.data?.type === 'TALK_TAB_TOGGLE' && e.data?.show !== undefined) {
-        setTalkTabEnabled(e.data.show !== false);
-      } else if (e.data?.settings?.showStudentTalkTab !== undefined) {
-        setTalkTabEnabled(e.data.settings.showStudentTalkTab !== false);
+      const parsed = SettingsMessageSchema.safeParse(e.data);
+      if (parsed.success) {
+        if (parsed.data.type === 'TALK_TAB_TOGGLE' && parsed.data.show !== undefined) {
+          setTalkTabEnabled(parsed.data.show !== false);
+        } else if (parsed.data.settings?.showStudentTalkTab !== undefined) {
+          setTalkTabEnabled(parsed.data.settings.showStudentTalkTab !== false);
+        }
       }
     };
 
@@ -376,7 +440,11 @@ export default function StudentPage() {
 
           <div className="pt-2 space-y-2">
             <button
-              onClick={handleLogout}
+              onClick={() => {
+                handleLogout().catch((err) => {
+                  console.error('Logout error:', err);
+                });
+              }}
               className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-md transition"
             >
               ログアウトして別アカウントで入る
@@ -456,7 +524,9 @@ export default function StudentPage() {
               <button
                 onClick={() => {
                   setShowAccountMenu(false);
-                  handleLogout();
+                  handleLogout().catch((err) => {
+                    console.error('Logout error:', err);
+                  });
                 }}
                 className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 rounded-xl font-bold flex items-center space-x-1 transition cursor-pointer"
               >

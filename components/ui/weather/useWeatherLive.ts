@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import type {
   HourlyPoint,
@@ -45,6 +46,45 @@ export function createInitialHourlyData(): HourlyPoint[] {
   return list;
 }
 
+const NominatimResponseSchema = z.object({
+  address: z
+    .object({
+      province: z.string().optional(),
+      state: z.string().optional(),
+      city: z.string().optional(),
+      town: z.string().optional(),
+      village: z.string().optional(),
+      county: z.string().optional(),
+      suburb: z.string().optional(),
+    })
+    .optional(),
+});
+
+const OpenMeteoResponseSchema = z.object({
+  current_weather: z
+    .object({
+      windspeed: z.number().optional(),
+      weathercode: z.number().optional(),
+    })
+    .optional(),
+  hourly: z.object({
+    temperature_2m: z.array(z.number()),
+    precipitation_probability: z.array(z.number()),
+    precipitation: z.array(z.number()),
+    weathercode: z.array(z.number()),
+    windspeed_10m: z.array(z.number()),
+  }),
+  daily: z.object({
+    time: z.array(z.string()),
+    weathercode: z.array(z.number()),
+    temperature_2m_max: z.array(z.number()),
+    temperature_2m_min: z.array(z.number()),
+    precipitation_sum: z.array(z.number()),
+    precipitation_probability_max: z.array(z.number()),
+    uv_index_max: z.array(z.number()),
+  }),
+});
+
 export function fetchMunicipalityNameFromCoords(
   latitude: number,
   longitude: number
@@ -52,18 +92,19 @@ export function fetchMunicipalityNameFromCoords(
   return fetch(
     `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=ja`
   )
-    .then((res) => {
+    .then(async (res) => {
       if (res.ok) {
-        return res.json().then((data) => {
-          const addr = data.address;
+        const data: unknown = await res.json();
+        const parseResult = NominatimResponseSchema.safeParse(data);
+        if (parseResult.success) {
+          const addr = parseResult.data.address;
           if (addr) {
             const province = addr.province || addr.state || '';
             const city = addr.city || addr.town || addr.village || addr.county || addr.suburb || '';
             const resultName = `${province}${city}`.trim();
             if (resultName) return resultName;
           }
-          return '指定地域の農園';
-        });
+        }
       }
       return '指定地域の農園';
     })
@@ -187,9 +228,12 @@ export function useWeatherLive() {
 
         const response = await fetch(url);
         if (!response.ok) throw new Error('Weather API request failed');
-        const data = await response.json();
+        const rawData: unknown = await response.json();
 
-        if (data && data.daily && data.hourly) {
+        const parseResult = OpenMeteoResponseSchema.safeParse(rawData);
+
+        if (parseResult.success) {
+          const data = parseResult.data;
           const daily = data.daily;
           const hourly = data.hourly;
           const current = data.current_weather;
@@ -462,14 +506,16 @@ export function useWeatherLive() {
     setLat(currentLat);
     setLon(currentLon);
 
-    fetchLiveWeather(currentName, currentLat, currentLon);
+    await fetchLiveWeather(currentName, currentLat, currentLon);
   }, [fetchLiveWeather]);
 
   useEffect(() => {
     const load = async () => {
       await loadSavedLocation();
     };
-    void load();
+    load().catch((err) => {
+      console.error('loadSavedLocation error:', err);
+    });
   }, [loadSavedLocation]);
 
   return {

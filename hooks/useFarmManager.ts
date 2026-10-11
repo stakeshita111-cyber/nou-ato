@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { z } from 'zod';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 import { FarmPlot, FarmBed, CropRecord, Farm, BedStatus } from '@/types/farm';
@@ -171,10 +172,15 @@ export function useFarmManager() {
             isVac = true;
           } else if (dp.description) {
             try {
-              const meta =
+              const rawMeta: unknown =
                 typeof dp.description === 'string' ? JSON.parse(dp.description) : dp.description;
-              if (typeof meta?.is_vacant === 'boolean') {
-                isVac = meta.is_vacant;
+              if (
+                typeof rawMeta === 'object' &&
+                rawMeta !== null &&
+                'is_vacant' in rawMeta &&
+                typeof (rawMeta as { is_vacant: unknown }).is_vacant === 'boolean'
+              ) {
+                isVac = (rawMeta as { is_vacant: boolean }).is_vacant;
               }
             } catch {}
           }
@@ -202,39 +208,79 @@ export function useFarmManager() {
       let detectedDefaultBeds = 7;
       let hasExplicitSavedDims = !!(targetFarm?.grid_cols && targetFarm?.grid_rows);
 
+      const PlotDescriptionMetaSchema = z.object({
+        grid_dimensions: z
+          .object({
+            cols: z.union([z.number(), z.string()]).optional(),
+            rows: z.union([z.number(), z.string()]).optional(),
+            unassigned_beds: z.union([z.number(), z.string()]).optional(),
+            farm_id: z.string().optional(),
+          })
+          .optional(),
+        farm_meta: z
+          .object({
+            address: z.string().optional(),
+            weather_location: z
+              .object({
+                name: z.string().optional(),
+                lat: z.union([z.number(), z.string()]).optional(),
+                lon: z.union([z.number(), z.string()]).optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        address: z.string().optional(),
+        weather_location: z
+          .object({
+            name: z.string().optional(),
+            lat: z.union([z.number(), z.string()]).optional(),
+            lon: z.union([z.number(), z.string()]).optional(),
+          })
+          .optional(),
+      });
+
       if (dbPlots && dbPlots.length > 0) {
         for (const dp of dbPlots) {
           if (dp.description) {
             try {
-              const meta =
+              const rawMeta: unknown =
                 typeof dp.description === 'string' ? JSON.parse(dp.description) : dp.description;
-              if (meta?.grid_dimensions?.cols && meta?.grid_dimensions?.rows) {
-                if (
-                  !meta.grid_dimensions.farm_id ||
-                  meta.grid_dimensions.farm_id === effectiveActiveId
-                ) {
-                  if (!hasExplicitSavedDims) {
-                    detectedCols = Number(meta.grid_dimensions.cols);
-                    detectedRows = Number(meta.grid_dimensions.rows);
-                    hasExplicitSavedDims = true;
+              const parseResult = PlotDescriptionMetaSchema.safeParse(rawMeta);
+              if (parseResult.success) {
+                const meta = parseResult.data;
+                if (meta.grid_dimensions?.cols && meta.grid_dimensions?.rows) {
+                  if (
+                    !meta.grid_dimensions.farm_id ||
+                    meta.grid_dimensions.farm_id === effectiveActiveId
+                  ) {
+                    if (!hasExplicitSavedDims) {
+                      detectedCols = Number(meta.grid_dimensions.cols);
+                      detectedRows = Number(meta.grid_dimensions.rows);
+                      hasExplicitSavedDims = true;
+                    }
+                    if (meta.grid_dimensions.unassigned_beds) {
+                      detectedDefaultBeds = Number(meta.grid_dimensions.unassigned_beds);
+                    }
                   }
-                  if (meta.grid_dimensions.unassigned_beds) {
-                    detectedDefaultBeds = Number(meta.grid_dimensions.unassigned_beds);
+
+                  const farmMeta = meta.farm_meta || meta;
+                  if (farmMeta.address && typeof window !== 'undefined') {
+                    localStorage.setItem('nouato_farm_address', farmMeta.address);
                   }
-                }
+                  const wLoc = farmMeta.weather_location || meta.weather_location;
+                  if (
+                    wLoc?.name &&
+                    wLoc.lat !== undefined &&
+                    wLoc.lon !== undefined &&
+                    typeof window !== 'undefined'
+                  ) {
+                    localStorage.setItem('nouato_weather_city_name', wLoc.name);
+                    localStorage.setItem('nouato_weather_lat', String(wLoc.lat));
+                    localStorage.setItem('nouato_weather_lon', String(wLoc.lon));
+                  }
 
-                const farmMeta = meta.farm_meta || meta;
-                if (farmMeta.address && typeof window !== 'undefined') {
-                  localStorage.setItem('nouato_farm_address', farmMeta.address);
+                  if (hasExplicitSavedDims) break;
                 }
-                const wLoc = farmMeta.weather_location || meta.weather_location;
-                if (wLoc?.name && wLoc?.lat && wLoc?.lon && typeof window !== 'undefined') {
-                  localStorage.setItem('nouato_weather_city_name', wLoc.name);
-                  localStorage.setItem('nouato_weather_lat', String(wLoc.lat));
-                  localStorage.setItem('nouato_weather_lon', String(wLoc.lon));
-                }
-
-                if (hasExplicitSavedDims) break;
               }
             } catch {}
           }
@@ -528,14 +574,18 @@ export function useFarmManager() {
     const load = async () => {
       await reloadAllFromSupabase();
     };
-    void load();
+    load().catch((err) => {
+      console.error('load reloadAllFromSupabase error:', err);
+    });
 
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const channel = new BroadcastChannel('nouato_farm_sync_channel');
       broadcastRef.current = channel;
       channel.onmessage = () => {
         setTimeout(() => {
-          reloadAllFromSupabase();
+          reloadAllFromSupabase().catch((err) => {
+            console.error('reloadAllFromSupabase channel error:', err);
+          });
         }, 300);
       };
     }
@@ -551,23 +601,43 @@ export function useFarmManager() {
       realtimeChannel = supabase
         .channel(channelName)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'crop_records' }, () => {
-          if (!shouldSkipSync()) reloadAllFromSupabase();
+          if (!shouldSkipSync()) {
+            reloadAllFromSupabase().catch((err) => {
+              console.error('Realtime crop_records sync error:', err);
+            });
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_beds' }, () => {
-          if (!shouldSkipSync()) reloadAllFromSupabase();
+          if (!shouldSkipSync()) {
+            reloadAllFromSupabase().catch((err) => {
+              console.error('Realtime farm_beds sync error:', err);
+            });
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_plots' }, () => {
-          if (!shouldSkipSync()) reloadAllFromSupabase();
+          if (!shouldSkipSync()) {
+            reloadAllFromSupabase().catch((err) => {
+              console.error('Realtime farm_plots sync error:', err);
+            });
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () => {
-          if (!shouldSkipSync()) reloadAllFromSupabase();
+          if (!shouldSkipSync()) {
+            reloadAllFromSupabase().catch((err) => {
+              console.error('Realtime journals sync error:', err);
+            });
+          }
         })
         .subscribe();
     } catch (realtimeErr) {
       console.warn('Realtime subscription notice:', realtimeErr);
     }
 
-    const handleCustomSync = () => reloadAllFromSupabase();
+    const handleCustomSync = () => {
+      reloadAllFromSupabase().catch((err) => {
+        console.error('handleCustomSync reload error:', err);
+      });
+    };
     window.addEventListener('nouato_sync_event', handleCustomSync);
 
     const handleFarmChanged = (e: Event) => {
@@ -576,7 +646,9 @@ export function useFarmManager() {
       if (newFarmId) {
         setActiveFarmId(newFarmId);
       }
-      reloadAllFromSupabase();
+      reloadAllFromSupabase().catch((err) => {
+        console.error('handleFarmChanged reload error:', err);
+      });
     };
     window.addEventListener('nouato_active_farm_changed', handleFarmChanged);
 
@@ -587,7 +659,9 @@ export function useFarmManager() {
       if (Date.now() - lastReloadTimeRef.current < 30000) {
         return;
       }
-      reloadAllFromSupabase();
+      reloadAllFromSupabase().catch((err) => {
+        console.error('handleTabRevisit reload error:', err);
+      });
     };
 
     window.addEventListener('focus', handleTabRevisit);
@@ -600,9 +674,9 @@ export function useFarmManager() {
         } catch {}
       }
       if (realtimeChannel) {
-        try {
-          supabase.removeChannel(realtimeChannel);
-        } catch {}
+        supabase.removeChannel(realtimeChannel).catch((err) => {
+          console.warn('removeChannel error:', err);
+        });
       }
       window.removeEventListener('nouato_sync_event', handleCustomSync);
       window.removeEventListener('nouato_active_farm_changed', handleFarmChanged);
@@ -1619,7 +1693,9 @@ export function useFarmManager() {
         .from('journals')
         .update({ is_approved: true })
         .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
-    } catch {}
+    } catch (e) {
+      console.warn('approveAndAddNewBed journals update notice:', e);
+    }
 
     await savePlotsGridIndicesToSupabase(finalPlots);
     notifyBroadcast();
