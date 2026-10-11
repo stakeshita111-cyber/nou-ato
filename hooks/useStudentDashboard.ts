@@ -54,10 +54,11 @@ export function useStudentDashboard() {
           setUser(null);
           setIsDeactivated(true);
         } else {
+          const meta = authUser.user_metadata as Record<string, unknown> | undefined;
           const oauthName =
-            authUser.user_metadata?.full_name ||
-            authUser.user_metadata?.name ||
-            authUser.user_metadata?.preferred_username ||
+            (typeof meta?.full_name === 'string' && meta.full_name) ||
+            (typeof meta?.name === 'string' && meta.name) ||
+            (typeof meta?.preferred_username === 'string' && meta.preferred_username) ||
             (authUser.email ? authUser.email.split('@')[0] : '');
 
           const displayName = oauthName || '受講生';
@@ -168,14 +169,11 @@ export function useStudentDashboard() {
               // 旧データで base_task_id が欠落していた場合はバックグラウンドで自己修復
               const targetStId = stMatchTyped?.id;
               if (targetStId && !stMatchTyped.base_task_id) {
-                void (async () => {
-                  try {
-                    await supabase
-                      .from('student_tasks')
-                      .update({ base_task_id: ptId })
-                      .eq('id', targetStId);
-                  } catch {}
-                })();
+                Promise.resolve(
+                  supabase.from('student_tasks').update({ base_task_id: ptId }).eq('id', targetStId)
+                ).catch((err: unknown) => {
+                  console.error('Failed to auto-repair base_task_id:', err);
+                });
               }
 
               const cl = (pt.checklist as Record<string, unknown>) || {};
@@ -370,34 +368,36 @@ export function useStudentDashboard() {
       }
     };
 
-    fetchData();
+    fetchData().catch((err) => {
+      console.error('fetchData failed in useEffect:', err);
+    });
 
     // 🌟 1. BroadcastChannel 経由の 0.01秒超高速同一ブラウザ同期 🌟
     let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       bc = new BroadcastChannel('nouato_farm_sync_channel');
       bc.onmessage = () => {
-        fetchData();
+        fetchData().catch((err) => console.error('bc fetchData error:', err));
       };
     }
 
     // 🌟 2. カスタム DOM イベント同期 (同一タブ内) 🌟
     const handleCustomSync = () => {
-      fetchData();
+      fetchData().catch((err) => console.error('handleCustomSync fetchData error:', err));
     };
     window.addEventListener('nouato_sync_event', handleCustomSync);
 
     // 🌟 3. localStorage 同期 (別ウィンドウ・タブ間) 🌟
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'nouato_farm_plots' || e.key === 'nouato_sync_event') {
-        fetchData();
+        fetchData().catch((err) => console.error('handleStorage fetchData error:', err));
       }
     };
     window.addEventListener('storage', handleStorage);
 
     // 🌟 4. タブ切り替え/復帰時の自動再同期 🌟
     const handleFocus = () => {
-      fetchData();
+      fetchData().catch((err) => console.error('handleFocus fetchData error:', err));
     };
     window.addEventListener('focus', handleFocus);
 
@@ -405,19 +405,21 @@ export function useStudentDashboard() {
     const channelName = `student_sync_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const realtimeChannel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_beds' }, () =>
-        fetchData()
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_plots' }, () =>
-        fetchData()
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_tasks' }, () =>
-        fetchData()
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () =>
-        fetchData()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_beds' }, () => {
+        fetchData().catch((err) => console.error('realtime farm_beds error:', err));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'farm_plots' }, () => {
+        fetchData().catch((err) => console.error('realtime farm_plots error:', err));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        fetchData().catch((err) => console.error('realtime tasks error:', err));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_tasks' }, () => {
+        fetchData().catch((err) => console.error('realtime student_tasks error:', err));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () => {
+        fetchData().catch((err) => console.error('realtime journals error:', err));
+      })
       .subscribe();
 
     return () => {
@@ -425,7 +427,9 @@ export function useStudentDashboard() {
       window.removeEventListener('nouato_sync_event', handleCustomSync);
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('focus', handleFocus);
-      supabase.removeChannel(realtimeChannel);
+      supabase.removeChannel(realtimeChannel).catch((err) => {
+        console.error('removeChannel error:', err);
+      });
     };
   }, []);
 

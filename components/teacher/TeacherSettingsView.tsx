@@ -1,11 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import Toast from '@/components/ui/Toast';
 import { useThemeStore, ThemeSettings } from '@/store/useThemeStore';
 import { formatDate, formatNumber } from '@/lib/utils/formatHelper';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
+
+const presetFaqSchema = z.object({
+  id: z.string(),
+  chipLabel: z.string(),
+  question: z.string(),
+  answer: z.string(),
+});
+
+const settingsApiResponseSchema = z.object({
+  showStudentTalkTab: z.boolean().optional(),
+  presetFaqs: z.array(presetFaqSchema).optional(),
+});
 
 export default function TeacherSettingsView() {
   const { settings, updateSettings, resetSettings } = useThemeStore();
@@ -24,19 +37,24 @@ export default function TeacherSettingsView() {
       try {
         const res = await fetch('/api/settings');
         if (res.ok) {
-          const data = await res.json();
-          if (data.showStudentTalkTab !== undefined) {
-            updateSettings({ showStudentTalkTab: data.showStudentTalkTab !== false });
-          }
-          if (data.presetFaqs && Array.isArray(data.presetFaqs) && data.presetFaqs.length > 0) {
-            setPresetFaqs(data.presetFaqs);
+          const rawData: unknown = await res.json();
+          const parsed = settingsApiResponseSchema.safeParse(rawData);
+          if (parsed.success) {
+            if (parsed.data.showStudentTalkTab !== undefined) {
+              updateSettings({ showStudentTalkTab: parsed.data.showStudentTalkTab });
+            }
+            if (parsed.data.presetFaqs && parsed.data.presetFaqs.length > 0) {
+              setPresetFaqs(parsed.data.presetFaqs);
+            }
           }
         }
       } catch (err) {
         console.error('Failed to fetch settings:', err);
       }
     };
-    fetchSettings();
+    fetchSettings().catch((err) => {
+      console.error('Failed to fetch settings in effect:', err);
+    });
   }, [updateSettings]);
 
   const handleSaveFaqsToDb = async (updatedList: PresetFaqItem[]) => {
