@@ -117,7 +117,6 @@ const eslintConfig = defineConfig([
       'app/auth/signup/teacher/page.tsx',
       'app/invite/page.tsx',
       'app/login/page.tsx',
-      'app/page.tsx',
       'app/student/page.tsx',
       'app/teacher/dashboard/page.tsx',
       'components/board/TaskEditModal.tsx',
