@@ -1,11 +1,40 @@
 'use client';
 
 import { useState } from 'react';
+import { z } from 'zod';
 import { Task } from '@/types/task';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
 import { TaskTemplate, TaskCategory } from '@/lib/taskTemplates';
+
+const TaskCategorySchema = z.enum(['果菜', '根菜', '葉菜', '共通', '土作り']);
+const TaskSeasonSchema = z.enum(['春夏', '秋冬', '通年']);
+const TaskPhaseSchema = z.enum(['準備・植付', '育成・管理', '収穫・片付け']);
+
+const CustomTemplateSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  target_crop: z.string(),
+  variety: z.string().optional(),
+  estimated_time: z.string(),
+  tools_needed: z.string(),
+  description: z.string(),
+  memo: z.string(),
+  exp: z.number(),
+  difficulty: z.number(),
+  require_photo: z.boolean(),
+  badge_name: z.string(),
+  badge_icon: z.string(),
+  category: TaskCategorySchema,
+  timing: z.string().optional(),
+  reference_links: z.string().optional(),
+  source: z.string().optional(),
+  season: TaskSeasonSchema.optional(),
+  phase: TaskPhaseSchema.optional(),
+});
+
+const CustomTemplateListSchema = z.array(CustomTemplateSchema);
 
 type TaskEditModalProps = {
   task: Task;
@@ -57,7 +86,13 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
         const saved = localStorage.getItem('nouato_custom_templates');
         if (saved) {
           try {
-            currentList = JSON.parse(saved);
+            const parsed: unknown = JSON.parse(saved);
+            const parseResult = CustomTemplateListSchema.safeParse(parsed);
+            if (parseResult.success) {
+              currentList = parseResult.data;
+            } else {
+              console.error('Failed to parse custom templates with schema:', parseResult.error);
+            }
           } catch (e) {
             console.error('Failed to parse custom templates:', e);
           }

@@ -87,7 +87,9 @@ export default function TeacherSidebar({
       }
     };
 
-    fetchUserAndFarm();
+    fetchUserAndFarm().catch((err) => {
+      console.error('fetchUserAndFarm unhandled error:', err);
+    });
   }, []);
 
   // ポップアップメニュー外クリック検知閉じる
