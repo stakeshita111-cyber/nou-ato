@@ -192,45 +192,72 @@ export default function UnifiedLoginPage() {
           </div>
         </div>
 
-        {/* 🌟 ポートフォリオ確認用・簡単デモログイン 🌟 */}
-        <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-emerald-900 flex items-center gap-1">
-              <span>⚡</span> ポートフォリオ確認用デモ
-            </span>
-            <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded-full border border-emerald-200">
-              PW自動入力
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('test01@example.com');
-                setPassword('test01');
-              }}
-              className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group"
-            >
-              <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
-                <span>👨‍🌾</span> 講師
+        {/* 🌟 ポートフォリオ確認用・簡単デモログイン 🌟 (NEXT_PUBLIC_SHOW_DEMO=false または本設定削除で非表示化可能) */}
+        {process.env.NEXT_PUBLIC_SHOW_DEMO !== 'false' && (
+          <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black text-emerald-900 flex items-center gap-1">
+                <span>⚡</span> ポートフォリオ確認用デモ
+              </span>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href="/docs/markdown-viewer.html?doc=readme"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-emerald-800 hover:text-emerald-950 font-bold bg-white/90 hover:bg-white px-2 py-0.5 rounded-full border border-emerald-200 transition flex items-center gap-1 shadow-2xs"
+                  title="プロジェクトREADME（機能概要・設計）を開く"
+                >
+                  <span>📖</span> README
+                </Link>
+                <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+                  PW自動入力
+                </span>
               </div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5">test01@example.com</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('test11@example.com');
-                setPassword('test11');
-              }}
-              className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group"
-            >
-              <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
-                <span>👨‍🎓</span> 受講生
-              </div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5">test11@example.com</div>
-            </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('test01@example.com');
+                  setPassword('test01');
+                }}
+                className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer"
+              >
+                <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
+                  <span>👨‍🌾</span> 講師
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                  test01@example.com
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('test11@example.com');
+                  setPassword('test11');
+                }}
+                className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer"
+              >
+                <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
+                  <span>👨‍🎓</span> 受講生
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                  test11@example.com
+                </div>
+              </button>
+            </div>
+            <div className="text-right">
+              <Link
+                href="/docs/review-checklist-dashboard.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[9px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-0.5 hover:underline"
+              >
+                <span>📊</span> 審査・レビュー用全101項目検証シート ↗
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 2. メールアドレス & パスワード フォーム */}
         <form onSubmit={handleEmailLogin} className="space-y-4">
