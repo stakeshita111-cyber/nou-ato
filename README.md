@@ -277,7 +277,7 @@ nou-ato/
 | **品質検査計画書 (QA Master Plan)**    | [`docs/test-plan.html`](docs/test-plan.html)                                   | 全テスト項目と完全同期したテスト計画、自動テスト実行・カバレッジ検証        |
 | **アーキテクチャ & データフロー**      | [`docs/architecture-map.html`](docs/architecture-map.html)                     | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図                   |
 | **エージェント & スキル活用ガイド**    | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html)         | AI開発エージェントチームの役割分担と自律修正プロトコル解説                  |
-| **全画面フロー & 仕様マップ**          | [`public/screen_flow.html`](public/screen_flow.html)                           | 講師・受講生の全画面遷移、機能、データ連携使い方完全マップ                  |
+| **全画面フロー & 仕様マップ**          | [`docs/screen_flow.html`](docs/screen_flow.html)                               | 講師・受講生の全画面遷移、機能、データ連携使い方完全マップ                  |
 | **実践解説Webテキスト (Tutorial)**     | [`docs/tutorial/index.html`](docs/tutorial/index.html)                         | AI駆動開発の光と影・泥臭い手戻り史と実コード解剖・教育用完全解説テキスト    |
 
 ### 2. 📑 要件定義＆設計仕様書 (Markdown / ブラウザ統合ビューア)
