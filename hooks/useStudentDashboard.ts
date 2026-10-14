@@ -481,54 +481,25 @@ export function useStudentDashboard() {
       })
     );
 
-    // 2. Supabase DB (student_tasks) の status を 'completed' に更新 (base_task_id で厳密更新)
+    // 2. Supabase DB (student_tasks) の status を 'completed' に更新 (専用RPC complete_student_task 経由)
     try {
-      const { data: userSts, error: fetchErr } = await supabase
-        .from('student_tasks')
-        .select('id, base_task_id')
-        .eq('student_id', currentStudentId);
+      const { error: rpcErr } = await supabase.rpc('complete_student_task', {
+        p_base_task_id: baseTaskId || targetTask.id || '',
+        p_task_title: taskTitle,
+      });
 
-      if (fetchErr) throw fetchErr;
-
-      let updated = false;
-      if (userSts && userSts.length > 0) {
-        for (const st of userSts) {
-          if (
-            st.base_task_id === baseTaskId ||
-            st.id === targetTask.id ||
-            (!st.base_task_id && st.id && targetTask.title && st.id === targetTask.id) ||
-            (!st.base_task_id && targetTask.title)
-          ) {
-            // 対象タスクの特定: base_task_id一致、ID一致、または未紐付け同名
-            const isMatch = st.base_task_id === baseTaskId || st.id === targetTask.id;
-            if (isMatch) {
-              updated = true;
-              const { error: updateErr } = await supabase
-                .from('student_tasks')
-                .update({
-                  base_task_id: baseTaskId,
-                  status: 'completed',
-                  completed_at: new Date().toISOString(),
-                })
-                .eq('id', st.id);
-              if (updateErr) throw updateErr;
-            }
-          }
-        }
-      }
-
-      if (!updated && currentStudentId && currentStudentId !== 'student_default') {
-        const { error: upsertErr } = await supabase.from('student_tasks').upsert(
-          {
-            student_id: currentStudentId,
-            base_task_id: baseTaskId,
-            title: taskTitle,
+      if (rpcErr) {
+        console.warn('complete_student_task RPC warning, fallback to direct update:', rpcErr);
+        // フォールバック: 既存レコードの直接 UPDATE を試行
+        const { error: updateErr } = await supabase
+          .from('student_tasks')
+          .update({
             status: 'completed',
             completed_at: new Date().toISOString(),
-          },
-          { onConflict: 'student_id,base_task_id' }
-        );
-        if (upsertErr) throw upsertErr;
+          })
+          .eq('student_id', currentStudentId)
+          .eq('base_task_id', baseTaskId);
+        if (updateErr) throw rpcErr;
       }
     } catch (e) {
       console.error('completeTask DB update failed, rolling back:', e);
@@ -553,8 +524,6 @@ export function useStudentDashboard() {
     );
     if (!targetTask) return;
 
-    const taskTitle =
-      (targetTask.tasks as { title?: string })?.title || targetTask.title || '完了タスク';
     const baseTaskId = String(
       (targetTask.tasks as { id?: string })?.id || targetTask.task_id || targetTask.id || ''
     ).replace(/^task_/, '');
@@ -576,45 +545,23 @@ export function useStudentDashboard() {
       })
     );
 
-    // 2. Supabase DB (student_tasks) の status を 'pending' に更新 (base_task_id で厳密更新)
+    // 2. Supabase DB (student_tasks) の status を未完了に更新 (専用RPC uncomplete_student_task 経由)
     try {
-      const { data: userSts, error: fetchErr } = await supabase
-        .from('student_tasks')
-        .select('id, base_task_id')
-        .eq('student_id', currentStudentId);
+      const { error: rpcErr } = await supabase.rpc('uncomplete_student_task', {
+        p_base_task_id: baseTaskId || targetTask.id || '',
+      });
 
-      if (fetchErr) throw fetchErr;
-
-      let updated = false;
-      if (userSts && userSts.length > 0) {
-        for (const st of userSts) {
-          if (st.base_task_id === baseTaskId || st.id === targetTask.id) {
-            updated = true;
-            const { error: updateErr } = await supabase
-              .from('student_tasks')
-              .update({
-                base_task_id: baseTaskId,
-                status: 'pending',
-                completed_at: null,
-              })
-              .eq('id', st.id);
-            if (updateErr) throw updateErr;
-          }
-        }
-      }
-
-      if (!updated && currentStudentId && currentStudentId !== 'student_default') {
-        const { error: upsertErr } = await supabase.from('student_tasks').upsert(
-          {
-            student_id: currentStudentId,
-            base_task_id: baseTaskId,
-            title: taskTitle,
-            status: 'pending',
+      if (rpcErr) {
+        console.warn('uncomplete_student_task RPC warning, fallback to direct update:', rpcErr);
+        const { error: updateErr } = await supabase
+          .from('student_tasks')
+          .update({
+            status: 'not_started',
             completed_at: null,
-          },
-          { onConflict: 'student_id,base_task_id' }
-        );
-        if (upsertErr) throw upsertErr;
+          })
+          .eq('student_id', currentStudentId)
+          .eq('base_task_id', baseTaskId);
+        if (updateErr) throw rpcErr;
       }
     } catch (e) {
       console.error('uncompleteTask DB update failed, rolling back:', e);

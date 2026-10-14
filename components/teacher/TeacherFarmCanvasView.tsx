@@ -100,6 +100,7 @@ export default function TeacherFarmCanvasView({
   const [approvalModalBed, setApprovalModalBed] = useState<FarmBed | null>(null);
   const [bedRecords, setBedRecords] = useState<BedTimelineRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
+  const [isAddingBed, setIsAddingBed] = useState<boolean>(false);
 
   const fetchBedRecords = useCallback(
     async (
@@ -1543,24 +1544,33 @@ export default function TeacherFarmCanvasView({
                 </span>
                 <button
                   type="button"
+                  disabled={isAddingBed}
                   onClick={async () => {
-                    const newBed = await addBedToPlot(detailPlot.id);
-                    if (newBed) {
-                      setDetailPlot((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              beds: [...(prev.beds || []), newBed],
-                            }
-                          : prev
-                      );
+                    if (isAddingBed) return;
+                    setIsAddingBed(true);
+                    try {
+                      const newBed = await addBedToPlot(detailPlot.id);
+                      if (newBed) {
+                        setDetailPlot((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                beds: [...(prev.beds || []), newBed],
+                              }
+                            : prev
+                        );
+                        setToastMessage('✨ 新しい畝を追加しました！');
+                        setShowToast(true);
+                      }
+                    } finally {
+                      setIsAddingBed(false);
                     }
-                    setToastMessage('✨ 新しい畝を追加しました！');
-                    setShowToast(true);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-md transition transform active:scale-95 flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-400/40"
+                  className={`px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-md transition transform active:scale-95 flex items-center gap-1.5 ring-2 ring-emerald-400/40 ${
+                    isAddingBed ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
                 >
-                  <span>＋ 畝を追加</span>
+                  <span>{isAddingBed ? '追加中...' : '＋ 畝を追加'}</span>
                 </button>
               </div>
 

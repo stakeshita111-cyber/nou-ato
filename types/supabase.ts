@@ -807,6 +807,10 @@ export type Database = {
         Args: { p_crop_name?: string; p_plot_id: string; p_season?: string };
         Returns: Json;
       };
+      complete_student_task: {
+        Args: { p_base_task_id: string; p_task_title?: string };
+        Returns: Json;
+      };
       current_user_farm_id: { Args: never; Returns: string };
       current_user_role: { Args: never; Returns: string };
       delete_farm_bed: {
@@ -858,6 +862,10 @@ export type Database = {
           id: string;
           reply: string;
         }[];
+      };
+      uncomplete_student_task: {
+        Args: { p_base_task_id: string };
+        Returns: Json;
       };
       withdraw_student: { Args: { p_student_id: string }; Returns: Json };
     };

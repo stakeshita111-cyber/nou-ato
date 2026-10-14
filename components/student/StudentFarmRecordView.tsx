@@ -270,6 +270,13 @@ export default function StudentFarmRecordView({
     const isTargetShared = selectedBedId === 'shared';
     if ((!currentBed && !isTargetShared) || isSubmittingRecord) return;
 
+    // 空白のみの記録送信を防止
+    if (!notes.trim() && selectedWorks.length === 0 && !imageUrl && !harvestAmount.trim()) {
+      setToastMessage('⚠️ 作業内容、メモ、写真、または収穫量のいずれかを入力してください');
+      setShowToast(true);
+      return;
+    }
+
     setIsSubmittingRecord(true);
     try {
       let finalImageUrl = imageUrl;
