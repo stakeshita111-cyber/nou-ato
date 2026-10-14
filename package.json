@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:changed": "vitest run --changed",
     "test:coverage": "vitest run --coverage",
+    "test:db-live": "node scripts/verify-live-db.mjs",
     "check:clean": "node scripts/check-clean-code.mjs",
     "check:db": "node scripts/check-database.mjs",
     "prepare": "husky",

@@ -26,6 +26,10 @@ const FORBIDDEN_PATTERNS = [
     regex: /AIzaSy[a-zA-Z0-9_-]{33}/,
     description: 'Google AI / Firebase API キーとおぼしき秘密情報が直書きされています',
   },
+  {
+    regex: /たなか自然農園/,
+    description: 'デモ用固定農園名（たなか自然農園）がハードコードされています',
+  },
 ];
 
 function getAllFiles(dirPath, arrayOfFiles = []) {

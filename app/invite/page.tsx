@@ -27,9 +27,8 @@ function InviteContent() {
   // 農園選択・情報
   const [inviteCode, setInviteCode] = useState<string>(inviteCodeParam || '');
   const [selectedFarmId, setSelectedFarmId] = useState<string>('');
-  const [farmName, setFarmName] = useState('たなか自然農園 (体験デモ)');
-  const [teacherName, setTeacherName] = useState('田中 太郎');
-  const [isDemo, setIsDemo] = useState(!inviteCodeParam);
+  const [farmName, setFarmName] = useState('農園を確認中...');
+  const [teacherName, setTeacherName] = useState('');
 
   // 入力フォームステート
   const [name, setName] = useState('');
@@ -57,16 +56,14 @@ function InviteContent() {
             setTeacherName(farmInfo.teacher_name || '講師');
             setSelectedFarmId(farmInfo.farm_id);
             setInviteCode(inviteCodeParam);
-            setIsDemo(false);
             return;
           }
         }
 
         if (active) {
-          // URLに招待コード指定がない、または該当なしの場合はデモ設定
-          setFarmName('たなか自然農園 (体験デモ)');
-          setTeacherName('田中 太郎');
-          setIsDemo(true);
+          // URLに招待コード指定がない、または該当なし
+          setFarmName('農園情報が見つかりません');
+          setTeacherName('');
         }
       } catch (err) {
         console.error('fetchCurrentFarm error:', err);
@@ -243,7 +240,7 @@ function InviteContent() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent flex flex-col justify-end p-5 text-white">
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="bg-emerald-700/90 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                {isDemo ? '体験デモ農園' : '招待された農園'}
+                {selectedFarmId ? '招待された農園' : '農園招待'}
               </span>
             </div>
             <h2 className="text-xl font-black leading-snug drop-shadow-md">

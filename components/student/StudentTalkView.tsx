@@ -103,6 +103,7 @@ export default function StudentTalkView({
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const isSendingRef = useRef(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -111,6 +112,7 @@ export default function StudentTalkView({
   // 🌟【新機能】送信前確認モーダル ＆ 複数ナレッジ一致 State 🌟
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isCheckingKnowledge, setIsCheckingKnowledge] = useState(false);
+  const isCheckingKnowledgeRef = useRef(false);
   const [matchedKnowledgeList, setMatchedKnowledgeList] = useState<MatchedKnowledgeItem[]>([]);
 
   // 💡 ナレッジ共有許可 (オプトアウト) State (デフォルト: ON)
@@ -394,8 +396,16 @@ export default function StudentTalkView({
   const handleOpenConfirm = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const text = inputText.trim();
-    if (!text || isSending) return;
+    if (
+      !text ||
+      isSending ||
+      isSendingRef.current ||
+      isCheckingKnowledge ||
+      isCheckingKnowledgeRef.current
+    )
+      return;
 
+    isCheckingKnowledgeRef.current = true;
     setIsCheckingKnowledge(true);
     setMatchedKnowledgeList([]);
 
@@ -415,6 +425,7 @@ export default function StudentTalkView({
     } catch (err) {
       console.warn('Knowledge pre-check error:', err);
     } finally {
+      isCheckingKnowledgeRef.current = false;
       setIsCheckingKnowledge(false);
       setShowConfirmModal(true);
     }
@@ -460,54 +471,58 @@ export default function StudentTalkView({
   const executeSendMessage = async () => {
     setShowConfirmModal(false);
     const rawInput = inputText.trim();
-    if (!rawInput || isSending) return;
+    if (!rawInput || isSending || isSendingRef.current) return;
 
-    const text = prepareMessageForSend(rawInput, allowKnowledgeShare);
-
-    const timeStr = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    const userMsgId = 'user_' + Date.now();
-
-    // 残数は DB が正。取得できない場合は送信せず失敗を表示（残数を偽らない）
-    const currentTicket = await refreshTicketState();
-    if (!currentTicket) {
-      setToastMessage('チケット残数を確認できませんでした。通信状況を確認して再度お試しください');
-      setShowToast(true);
-      return;
-    }
-    const hasTicket = currentTicket.isUnlimited || currentTicket.count > 0;
-    const isMemoOnly = !hasTicket;
-
-    const newStudentMsg: MessageItem = {
-      id: userMsgId,
-      sender: 'student',
-      text: text,
-      timestamp: timeStr,
-    };
-    setMessages((prev) => [...prev, newStudentMsg]);
-    setInputText('');
+    isSendingRef.current = true;
     setIsSending(true);
 
-    if (isMemoOnly) {
-      const updatedStock = addQuestionStock(studentId || 'default', text);
-      const memoReplyText =
-        '📝【質問メモをストック（追記）しました】🌱\n\n本日のAI相談チケットはお休みですが、思いついた質問をメモとして書き足してまとめておきました！\n\n明日チケットが復活した際などに、下の【入力欄にセット】ボタンを押してまとめてAIに相談してくださいね✨';
-
-      const memoSystemMsg: MessageItem = {
-        id: 'stock_' + Date.now(),
-        sender: 'teacher',
-        text: memoReplyText,
-        timestamp: timeStr,
-        stockItems: updatedStock,
-      };
-
-      setMessages((prev) => [...prev, memoSystemMsg]);
-      setToastMessage('📝 質問メモをストックしました（追記・まとめ保存）');
-      setShowToast(true);
-      setIsSending(false);
-      return;
-    }
-
     try {
+      const text = prepareMessageForSend(rawInput, allowKnowledgeShare);
+
+      const timeStr = new Date().toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const userMsgId = 'user_' + Date.now();
+
+      // 残数は DB が正。取得できない場合は送信せず失敗を表示（残数を偽らない）
+      const currentTicket = await refreshTicketState();
+      if (!currentTicket) {
+        setToastMessage('チケット残数を確認できませんでした。通信状況を確認して再度お試しください');
+        setShowToast(true);
+        return;
+      }
+      const hasTicket = currentTicket.isUnlimited || currentTicket.count > 0;
+      const isMemoOnly = !hasTicket;
+
+      const newStudentMsg: MessageItem = {
+        id: userMsgId,
+        sender: 'student',
+        text: text,
+        timestamp: timeStr,
+      };
+      setMessages((prev) => [...prev, newStudentMsg]);
+      setInputText('');
+
+      if (isMemoOnly) {
+        const updatedStock = addQuestionStock(studentId || 'default', text);
+        const memoReplyText =
+          '📝【質問メモをストック（追記）しました】🌱\n\n本日のAI相談チケットはお休みですが、思いついた質問をメモとして書き足してまとめておきました！\n\n明日チケットが復活した際などに、下の【入力欄にセット】ボタンを押してまとめてAIに相談してくださいね✨';
+
+        const memoSystemMsg: MessageItem = {
+          id: 'stock_' + Date.now(),
+          sender: 'teacher',
+          text: memoReplyText,
+          timestamp: timeStr,
+          stockItems: updatedStock,
+        };
+
+        setMessages((prev) => [...prev, memoSystemMsg]);
+        setToastMessage('📝 質問メモをストックしました（追記・まとめ保存）');
+        setShowToast(true);
+        return;
+      }
+
       const res = await fetch('/api/chat/rag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -584,6 +599,7 @@ export default function StudentTalkView({
       };
       setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
+      isSendingRef.current = false;
       setIsSending(false);
     }
   };

@@ -101,6 +101,7 @@ export default function TeacherFarmCanvasView({
   const [bedRecords, setBedRecords] = useState<BedTimelineRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
   const [isAddingBed, setIsAddingBed] = useState<boolean>(false);
+  const isAddingBedRef = useRef<boolean>(false);
 
   const fetchBedRecords = useCallback(
     async (
@@ -1546,7 +1547,8 @@ export default function TeacherFarmCanvasView({
                   type="button"
                   disabled={isAddingBed}
                   onClick={async () => {
-                    if (isAddingBed) return;
+                    if (isAddingBed || isAddingBedRef.current) return;
+                    isAddingBedRef.current = true;
                     setIsAddingBed(true);
                     try {
                       const newBed = await addBedToPlot(detailPlot.id);
@@ -1563,6 +1565,7 @@ export default function TeacherFarmCanvasView({
                         setShowToast(true);
                       }
                     } finally {
+                      isAddingBedRef.current = false;
                       setIsAddingBed(false);
                     }
                   }}

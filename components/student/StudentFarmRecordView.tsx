@@ -164,6 +164,7 @@ export default function StudentFarmRecordView({
   const [customCropName, setCustomCropName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isSubmittingRecord, setIsSubmittingRecord] = useState(false);
+  const isSubmittingRecordRef = useRef(false);
 
   const [selectedStage, setSelectedStage] = useState<GrowthStage>('果実肥大');
   const [heightCm, setHeightCm] = useState<number>(75);
@@ -268,7 +269,8 @@ export default function StudentFarmRecordView({
   const handleSubmitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     const isTargetShared = selectedBedId === 'shared';
-    if ((!currentBed && !isTargetShared) || isSubmittingRecord) return;
+    if ((!currentBed && !isTargetShared) || isSubmittingRecord || isSubmittingRecordRef.current)
+      return;
 
     // 空白のみの記録送信を防止
     if (!notes.trim() && selectedWorks.length === 0 && !imageUrl && !harvestAmount.trim()) {
@@ -277,6 +279,7 @@ export default function StudentFarmRecordView({
       return;
     }
 
+    isSubmittingRecordRef.current = true;
     setIsSubmittingRecord(true);
     try {
       let finalImageUrl = imageUrl;
@@ -422,6 +425,7 @@ export default function StudentFarmRecordView({
       setToastMessage(`❌ 記録の登録に失敗しました: ${msg}`);
       setShowToast(true);
     } finally {
+      isSubmittingRecordRef.current = false;
       setIsSubmittingRecord(false);
     }
   };
@@ -1530,13 +1534,20 @@ export default function StudentFarmRecordView({
 
               <div>
                 <label className="block text-gray-700 mb-1">収穫量 (収穫を行った場合)</label>
-                <input
-                  type="text"
-                  placeholder="例: トマト 5個 / 300g"
-                  value={harvestAmount}
-                  onChange={(e) => setHarvestAmount(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-xs"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="例: 350"
+                    value={harvestAmount}
+                    onChange={(e) => setHarvestAmount(e.target.value)}
+                    className="flex-1 p-3 rounded-xl border border-gray-300 bg-gray-50 font-bold text-xs"
+                  />
+                  <span className="font-bold text-xs text-gray-600 bg-gray-100 px-3 py-3 rounded-xl border border-gray-200 shrink-0">
+                    g (グラム)
+                  </span>
+                </div>
               </div>
 
               <div>
