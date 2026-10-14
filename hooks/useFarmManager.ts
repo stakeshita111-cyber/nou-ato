@@ -336,7 +336,7 @@ export function useFarmManager() {
               id: b.id,
               plot_id: plot.id,
               bed_number: parseInt(b.bed_number) || 1,
-              crop_name: b.crop_name || '過去の作物',
+              crop_name: b.crop_name || '未設定',
               status: 'archived',
               season: b.season || '2026年 春夏',
               harvested_at: b.harvested_at ?? undefined,
@@ -415,9 +415,9 @@ export function useFarmManager() {
                   break;
                 } else if (
                   rec.crop_name &&
-                  rec.crop_name !== 'トマト' &&
                   rec.crop_name !== '未定 🌱' &&
-                  rec.crop_name !== '未確定 🌱'
+                  rec.crop_name !== '未確定 🌱' &&
+                  rec.crop_name !== '未設定'
                 ) {
                   extractedCrop = rec.crop_name;
                   break;
@@ -426,14 +426,7 @@ export function useFarmManager() {
             }
           }
 
-          let finalCropName = extractedCrop || dbB?.crop_name || '未確定 🌱';
-          if (
-            finalCropName === 'トマト' &&
-            !extractedCrop &&
-            (!dbB?.crop_name || dbB.crop_name === 'トマト')
-          ) {
-            finalCropName = '未確定 🌱';
-          }
+          const finalCropName = extractedCrop || dbB?.crop_name || '未確定 🌱';
 
           bedList.push({
             id: bedId,
@@ -1351,7 +1344,7 @@ export function useFarmManager() {
     const finalNotes = (recordData.notes || '') + (imgToSave ? `\n[IMG:${imgToSave}]` : '');
 
     const extractedCropName =
-      recordData.notes?.match(/【(.*?)】/)?.[1] || recordData.crop_name || '未確定';
+      recordData.notes?.match(/【(.*?)】/)?.[1] || recordData.crop_name || '未設定';
     await insertCropRecordDb({
       id: newRecordId,
       bed_id: safeBedId,
@@ -1556,7 +1549,7 @@ export function useFarmManager() {
             bed.bed_number === Number(bedId)
           ) {
             targetBedNumber = bed.bed_number;
-            oldCropName = bed.crop_name || '野菜';
+            oldCropName = bed.crop_name || '未設定';
             oldHarvest = bed.total_harvest || '';
             oldNotes = bed.completion_notes || '';
             oldImg = bed.completion_image_url || '';

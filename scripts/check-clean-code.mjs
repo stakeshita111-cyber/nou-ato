@@ -30,6 +30,14 @@ const FORBIDDEN_PATTERNS = [
     regex: /たなか自然農園/,
     description: 'デモ用固定農園名（たなか自然農園）がハードコードされています',
   },
+  {
+    regex: /(\|\||\?\?)\s*['"`](ミニトマト|きゅうり|キュウリ|トマト|ナス)['"`]/,
+    description: '暗黙の野菜名フォールバック構文（|| や ?? で固定野菜名を指定）が残存しています',
+  },
+  {
+    regex: /田中\s*太郎/,
+    description: 'デモ用固定人物名（田中 太郎）がハードコードされています',
+  },
 ];
 
 function getAllFiles(dirPath, arrayOfFiles = []) {

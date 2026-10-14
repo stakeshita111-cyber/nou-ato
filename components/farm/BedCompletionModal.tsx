@@ -54,6 +54,7 @@ export default function BedCompletionModal({
   const [season, setSeason] = useState(() => getDefaultSeason());
   const [imageUrl, setImageUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -193,27 +194,32 @@ export default function BedCompletionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
-    let finalImageUrl = imageUrl;
-    if (imageUrl && imageUrl.startsWith('data:')) {
-      finalImageUrl = await uploadImageToStorage(imageUrl, 'beds');
-      if (!finalImageUrl) {
-        alert('画像のアップロードに失敗しました。通信環境を確認して再度お試しください。');
-        setIsSubmitting(false);
-        return;
+    try {
+      let finalImageUrl = imageUrl;
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        finalImageUrl = await uploadImageToStorage(imageUrl, 'beds');
+        if (!finalImageUrl) {
+          alert('画像のアップロードに失敗しました。通信環境を確認して再度お試しください。');
+          return;
+        }
       }
-    }
-    const detailsPayload = {
-      totalHarvest: totalHarvest.trim() || undefined,
-      completionNotes: completionNotes.trim() || undefined,
-      imageUrl: finalImageUrl || undefined,
-      season: season,
-    };
-    const validated = bedCompletionDetailsSchema.safeParse(detailsPayload);
+      const detailsPayload = {
+        totalHarvest: totalHarvest.trim() || undefined,
+        completionNotes: completionNotes.trim() || undefined,
+        imageUrl: finalImageUrl || undefined,
+        season: season,
+      };
+      const validated = bedCompletionDetailsSchema.safeParse(detailsPayload);
 
-    onComplete(validated.success ? validated.data : detailsPayload);
-    setIsSubmitting(false);
-    onClose();
+      onComplete(validated.success ? validated.data : detailsPayload);
+      onClose();
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -233,7 +239,7 @@ export default function BedCompletionModal({
               <h3 className="font-black text-gray-900 text-base">
                 {bed.status === 'rejected'
                   ? '⚠️ 収穫完了報告の修正・再提出'
-                  : `畝 ${bed.bed_number} (${bed.crop_name || '作物'}) の収穫完了報告`}
+                  : `畝 ${bed.bed_number} (${bed.crop_name || '未設定'}) の収穫完了報告`}
               </h3>
               <p className="text-xs text-gray-500 font-bold">
                 収穫のまとめを記録して講師へ完了報告を送ります
@@ -274,7 +280,7 @@ export default function BedCompletionModal({
               type="text"
               value={totalHarvest}
               onChange={(e) => setTotalHarvest(e.target.value)}
-              placeholder="例: トマト約45個、大玉3個など"
+              placeholder="例: 約45個、大玉3個など"
               className="w-full text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 transition"
             />
           </div>

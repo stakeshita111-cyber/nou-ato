@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { FarmPlot, FarmBed } from '@/types/farm';
 
 interface BedApprovalModalProps {
@@ -21,28 +21,35 @@ export default function BedApprovalModal({
   onReject,
 }: BedApprovalModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
   if (!isOpen || !plot || !bed) return null;
 
   const handleApprove = async () => {
+    if (isSubmitting || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       await onApprove(plot.id, bed.id);
       onClose();
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleReject = async () => {
     if (!onReject) return;
+    if (isSubmitting || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       await onReject(plot.id, bed.id, rejectReason || '内容の再確認をお願いします');
       onClose();
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

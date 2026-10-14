@@ -1950,7 +1950,7 @@ export default function TeacherFarmCanvasView({
                   type="text"
                   value={ownerNameInput}
                   onChange={(e) => setOwnerNameInput(e.target.value)}
-                  placeholder="例: 田中 太郎"
+                  placeholder="例: 山田 太郎"
                   required
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />

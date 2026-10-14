@@ -867,6 +867,7 @@ export type Database = {
         Args: { p_base_task_id: string };
         Returns: Json;
       };
+      verify_security_and_constraints: { Args: never; Returns: Json };
       withdraw_student: { Args: { p_student_id: string }; Returns: Json };
     };
     Enums: {
