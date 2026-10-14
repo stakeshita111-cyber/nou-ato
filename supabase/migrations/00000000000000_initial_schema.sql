@@ -191,6 +191,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 -- 1.10 イベント講習会テーブル (events)
 CREATE TABLE IF NOT EXISTS public.events (
     id TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+    farm_id UUID,
     title TEXT NOT NULL,
     date TEXT NOT NULL,
     date_display TEXT,
