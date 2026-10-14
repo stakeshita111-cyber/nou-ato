@@ -183,7 +183,10 @@ export default function TeacherFarmCanvasView({
                     (j.image_url as string | null) ||
                     (jRecord.photo_url as string | null) ||
                     undefined,
-                  growth_stage: j.task_title || '💡 質問・相談日誌',
+                  growth_stage:
+                    typeof jRecord.task_title === 'string'
+                      ? jRecord.task_title
+                      : '💡 質問・相談日誌',
                   created_at: j.created_at,
                 });
               }

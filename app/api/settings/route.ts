@@ -106,12 +106,11 @@ export async function GET(request?: Request) {
       ) {
         showStudentTalkTab = farmData.show_student_talk_tab !== false;
       }
-      if (
-        farmData?.preset_faqs &&
-        Array.isArray(farmData.preset_faqs) &&
-        farmData.preset_faqs.length > 0
-      ) {
-        presetFaqs = farmData.preset_faqs as unknown as PresetFaqItem[];
+      if (farmData?.preset_faqs) {
+        const parsed = z.array(presetFaqItemSchema).safeParse(farmData.preset_faqs);
+        if (parsed.success && parsed.data.length > 0) {
+          presetFaqs = parsed.data;
+        }
       }
     } else {
       // フォールバック: DB全体の先頭農園の設定を取得
@@ -128,12 +127,11 @@ export async function GET(request?: Request) {
       ) {
         showStudentTalkTab = defaultFarm.show_student_talk_tab !== false;
       }
-      if (
-        defaultFarm?.preset_faqs &&
-        Array.isArray(defaultFarm.preset_faqs) &&
-        defaultFarm.preset_faqs.length > 0
-      ) {
-        presetFaqs = defaultFarm.preset_faqs as unknown as PresetFaqItem[];
+      if (defaultFarm?.preset_faqs) {
+        const parsed = z.array(presetFaqItemSchema).safeParse(defaultFarm.preset_faqs);
+        if (parsed.success && parsed.data.length > 0) {
+          presetFaqs = parsed.data;
+        }
       }
     }
 

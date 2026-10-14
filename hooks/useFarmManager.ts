@@ -196,7 +196,7 @@ export function useFarmManager() {
             student_id: isVac ? undefined : sId,
             student_name: isVac ? undefined : sName,
             is_vacant: isVac,
-            position: (dp.position as { x: number; y: number } | null) || { x: 0, y: 0 },
+            position: { x: 0, y: 0 },
             beds: [],
           };
         });

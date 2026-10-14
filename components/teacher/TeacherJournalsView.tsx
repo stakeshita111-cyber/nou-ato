@@ -302,9 +302,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   minute: '2-digit',
                 })}`
               : '最近',
-            taskTitle:
-              j.task_title ||
-              (isRegularRecord(cleanContent) ? '🌱 畝の観察記録' : '💡 気づきメモ・質問相談'),
+            taskTitle: isRegularRecord(cleanContent)
+              ? '🌱 畝の観察記録'
+              : '💡 気づきメモ・質問相談',
             content: cleanContent,
             imageUrl: imgUrl,
             reply: j.reply || '',
@@ -464,7 +464,6 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       const { error } = await supabase
         .from('journals')
         .update({
-          task_title: publicTitle.trim(),
           reply: finalReply,
           is_approved: true,
         })
@@ -943,7 +942,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             const studentName = (j.student_id && userMap[j.student_id]) || '受講生';
 
             let cleanContent = j.content || '';
-            let imgUrl = j.image_url || j.photo_url || undefined;
+            let imgUrl = j.image_url || undefined;
             const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
             if (imgMatch) {
               imgUrl = imgMatch[1];
@@ -951,7 +950,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             }
 
             const studentMapped = j.student_id ? studentPlotMap[j.student_id] : null;
-            const derivedPlotCode = j.plot_code || studentMapped?.plotCode;
+            const derivedPlotCode = studentMapped?.plotCode;
             const derivedFarmId = j.farm_id || studentMapped?.farmId || farmId || undefined;
 
             if (!allRecords.some((r) => r.content === cleanContent)) {
@@ -960,7 +959,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                 id: j.id || `j_${idx}`,
                 studentName,
                 studentAvatar: studentName.slice(0, 1),
-                title: j.task_title || '💡 質問・相談日誌',
+                title: '💡 質問・相談日誌',
                 content: cleanContent,
                 imageUrl: imgUrl,
                 dateStr: formatDate(rawDate),

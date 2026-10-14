@@ -204,7 +204,13 @@ export default function StudentTalkView({
           .order('created_at', { ascending: true });
 
         // 自分のデータのみを使用（0件なら0件のまま。他人の会話には絶対にフォールバックしない）
-        targetList = (dbJournals || []) as unknown as JournalItem[];
+        targetList = (dbJournals || []).map((j) => ({
+          id: j.id,
+          content: j.content ?? undefined,
+          reply: j.reply ?? undefined,
+          created_at: j.created_at,
+          student_id: j.student_id ?? undefined,
+        }));
       } else if (journals && journals.length > 0) {
         // studentId 未設定の場合でも、他人のデータ混入を防止
         targetList = journals.filter(

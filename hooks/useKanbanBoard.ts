@@ -5,6 +5,41 @@ import { supabase } from '../lib/supabase';
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { Task, ColumnType } from '../types/task';
 import { useFarmStore } from '../store/useFarmStore';
+import type { Database } from '../types/supabase';
+
+type TaskRow = Database['public']['Tables']['tasks']['Row'];
+
+function mapRowToTask(
+  row: TaskRow,
+  fallbackBadgeName?: string | null,
+  fallbackBadgeIcon?: string | null
+): Task {
+  const cl =
+    row.checklist && typeof row.checklist === 'object' && !Array.isArray(row.checklist)
+      ? (row.checklist as Record<string, unknown>)
+      : {};
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    category: row.category ?? undefined,
+    created_by: row.created_by ?? undefined,
+    farm_id: row.farm_id ?? undefined,
+    deleted_at: row.deleted_at,
+    description: row.description,
+    estimated_time: row.estimated_time,
+    tools_needed: row.tools_needed,
+    reference_links: row.reference_links,
+    memo: row.memo,
+    target_crop: row.target_crop,
+    require_photo: row.require_photo,
+    exp: row.exp,
+    difficulty: row.difficulty,
+    badge_name: (typeof cl.badge_name === 'string' ? cl.badge_name : fallbackBadgeName) || null,
+    badge_icon: (typeof cl.badge_icon === 'string' ? cl.badge_icon : fallbackBadgeIcon) || null,
+    checklist: cl,
+  };
+}
 
 export function useKanbanBoard(columns: ColumnType[]) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -53,14 +88,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       const { data: tasksData } = await tasksQuery.order('created_at', { ascending: false });
       if (tasksData) {
-        const mappedTasks: Task[] = (tasksData as unknown as Task[]).map((t) => {
-          const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
-          return {
-            ...t,
-            badge_name: t.badge_name || (cl.badge_name as string) || null,
-            badge_icon: t.badge_icon || (cl.badge_icon as string) || null,
-          };
-        });
+        const mappedTasks: Task[] = tasksData.map((t) => mapRowToTask(t));
         setTasks(mappedTasks);
       }
 
@@ -73,14 +101,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       const { data: trashData } = await trashQuery.order('deleted_at', { ascending: false });
       if (trashData) {
-        const mappedTrash: Task[] = (trashData as unknown as Task[]).map((t) => {
-          const cl = t.checklist && typeof t.checklist === 'object' ? t.checklist : {};
-          return {
-            ...t,
-            badge_name: t.badge_name || (cl.badge_name as string) || null,
-            badge_icon: t.badge_icon || (cl.badge_icon as string) || null,
-          };
-        });
+        const mappedTrash: Task[] = trashData.map((t) => mapRowToTask(t));
         setTrashTasks(mappedTrash);
       }
     } catch (e) {
@@ -206,19 +227,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       }
 
       if (data) {
-        const cl =
-          data.checklist && typeof data.checklist === 'object' && !Array.isArray(data.checklist)
-            ? (data.checklist as Record<string, unknown>)
-            : {};
-        const createdTask = {
-          ...data,
-          category: data.category || '育苗・播種',
-          badge_name: (data.badge_name || cl.badge_name || options?.badge_name || null) as
-            string | null,
-          badge_icon: (data.badge_icon || cl.badge_icon || options?.badge_icon || null) as
-            string | null,
-          created_by: data.created_by ?? undefined,
-        } as unknown as Task;
+        const createdTask = mapRowToTask(data, options?.badge_name, options?.badge_icon);
         setTasks((prev) => [createdTask, ...prev]);
 
         // status === "todo" (公開中) で追加された場合は受講生へ一括配備

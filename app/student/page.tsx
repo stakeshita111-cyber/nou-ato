@@ -571,11 +571,10 @@ export default function StudentPage() {
               studentId={user?.id}
               studentName={userAccountName}
               tasks={tasks}
-              onSelectTask={(task) =>
-                setSelectedTask(
-                  task as unknown as import('@/hooks/useStudentDashboard').StudentTaskItem
-                )
-              }
+              onSelectTask={(task) => {
+                const found = tasks.find((t) => t.id === task.id);
+                if (found) setSelectedTask(found);
+              }}
               onCompleteTask={handleCompleteTask}
               onUncompleteTask={handleUncompleteTask}
               newJournal={newJournal}

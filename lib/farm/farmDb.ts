@@ -391,10 +391,12 @@ export async function insertCropRecordDb(record: {
   }
 
   if (record.bed_id && record.bed_id !== 'shared' && !record.bed_id.endsWith('_shared')) {
-    await supabase.from('farm_beds').upsert({
-      id: record.bed_id,
-      progress_percent: 100,
-    });
+    await supabase
+      .from('farm_beds')
+      .update({
+        progress_percent: 100,
+      })
+      .eq('id', record.bed_id);
   }
 }
 

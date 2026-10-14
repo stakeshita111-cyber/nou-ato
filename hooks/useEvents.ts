@@ -1,9 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
-import type { EventItem, Attendee } from '@/types/event';
+import type { EventItem } from '@/types/event';
+
+const AttendeeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  plot: z.string(),
+  status: z.enum(['confirmed', 'pending']),
+});
 
 export function useEvents(farmId?: string) {
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -50,7 +58,7 @@ export function useEvents(farmId?: string) {
           fee: d.fee || '無料',
           category: (d.category as EventItem['category']) || 'harvest',
           description: d.description || '',
-          attendees: Array.isArray(d.attendees) ? (d.attendees as unknown as Attendee[]) : [],
+          attendees: z.array(AttendeeSchema).safeParse(d.attendees).data || [],
         }));
         setEvents(formatted);
         try {
