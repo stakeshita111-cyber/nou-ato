@@ -95,7 +95,6 @@ export default function TeacherStudentsView() {
   // 🌟 受講生退会・削除確認モーダル用ステート 🌟
   const [deleteTargetStudent, setDeleteTargetStudent] = useState<StudentData | null>(null);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-  const [deleteMode, setDeleteMode] = useState<'deactivate' | 'purge'>('deactivate');
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { activeFarmId, activeFarmName } = useFarmStore();
@@ -787,14 +786,6 @@ export default function TeacherStudentsView() {
         setToastMessage(`❌ 退会処理に失敗しました: ${rpcErr.message}`);
         setShowToast(true);
         return;
-      }
-
-      if (deleteMode === 'purge') {
-        // 完全消去モード選択時は追加で users レコードを削除試行
-        const { error: delErr } = await supabase.from('users').delete().eq('id', studentId);
-        if (delErr) {
-          console.warn('Purge user warning (withdrawn successfully):', delErr);
-        }
       }
 
       // 画面とキャッシュの更新
@@ -1632,48 +1623,9 @@ export default function TeacherStudentsView() {
               </ul>
             </div>
 
-            {/* 処理モード選択 */}
-            <div className="space-y-2">
-              <label className="block text-xs font-black text-gray-700">処理オプション</label>
-              <div className="space-y-2">
-                <label className="flex items-start gap-2.5 p-3 rounded-xl border border-emerald-300 bg-emerald-50/40 cursor-pointer text-xs">
-                  <input
-                    type="radio"
-                    name="deleteMode"
-                    value="deactivate"
-                    checked={deleteMode === 'deactivate'}
-                    onChange={() => setDeleteMode('deactivate')}
-                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <span className="font-black text-emerald-950">
-                      農園から除名・アクセス遮断（推奨）
-                    </span>
-                    <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
-                      過去の提出写真や質問・収穫実績は農園の活動ナレッジとして保持されます。
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-2.5 p-3 rounded-xl border border-red-200 bg-red-50/30 cursor-pointer text-xs">
-                  <input
-                    type="radio"
-                    name="deleteMode"
-                    value="purge"
-                    checked={deleteMode === 'purge'}
-                    onChange={() => setDeleteMode('purge')}
-                    className="mt-0.5 text-red-600 focus:ring-red-500"
-                  />
-                  <div>
-                    <span className="font-black text-red-950">
-                      生徒データも完全消去（物理削除）
-                    </span>
-                    <p className="text-[11px] text-red-800 font-medium mt-0.5">
-                      生徒のアカウント情報・日誌・タスク履歴を含めて完全にデータベースから抹消します。
-                    </p>
-                  </div>
-                </label>
-              </div>
+            <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed font-medium">
+              💡
+              過去の提出写真や収穫記録・質問日誌などの農園活動実績は、ナレッジとして安全に保持されます。
             </div>
 
             <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
@@ -1698,8 +1650,8 @@ export default function TeacherStudentsView() {
                   <span>処理中...</span>
                 ) : (
                   <>
-                    <span>🗑️</span>
-                    <span>退会・削除を実行する</span>
+                    <span>👋</span>
+                    <span>退会処理を実行する</span>
                   </>
                 )}
               </button>

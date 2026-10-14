@@ -583,9 +583,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     }
 
     try {
-      const { error } = await supabase.from('journals').delete().eq('id', id);
+      const { data, error } = await supabase.from('journals').delete().eq('id', id).select('id');
       if (error) {
         setToastMessage('削除に失敗しました: ' + error.message);
+      } else if (!data || data.length === 0) {
+        setToastMessage('削除に失敗しました: 権限がないか、対象の日記が存在しません');
       } else {
         const nextList = journals.filter((j) => j.id !== id);
         setJournals(nextList);
