@@ -4,5 +4,5 @@
     "prettier --write"
   ],
   "supabase/migrations/*.sql": ["node scripts/check-database.mjs"],
-  "*.{json,css,md}": ["prettier --write"]
+  "*.{json,css,md,html}": ["prettier --write"]
 }

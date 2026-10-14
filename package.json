@@ -15,6 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "check:clean": "node scripts/check-clean-code.mjs",
     "check:db": "node scripts/check-database.mjs",
+    "prepare": "husky",
     "verify": "npm run check:clean && npm run check:db && npm run typecheck && npm run test && npm run format:check && npm run lint"
   },
   "dependencies": {
