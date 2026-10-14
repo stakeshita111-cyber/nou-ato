@@ -803,15 +803,10 @@ export type Database = {
       };
     };
     Functions: {
-      add_farm_bed:
-        | {
-            Args: { p_crop_name?: string; p_plot_id: string; p_season?: string };
-            Returns: Json;
-          }
-        | {
-            Args: { p_crop_name?: string; p_plot_id: string; p_season?: string };
-            Returns: Json;
-          };
+      add_farm_bed: {
+        Args: { p_crop_name?: string; p_plot_id: string; p_season?: string };
+        Returns: Json;
+      };
       current_user_farm_id: { Args: never; Returns: string };
       current_user_role: { Args: never; Returns: string };
       delete_farm_bed: {

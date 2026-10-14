@@ -53,11 +53,11 @@ export async function POST(request: Request) {
     }
 
     // 2. 講師権限チェック（農園に所属する teacher でなければ 403）
-    const userQuery = supabase.from('users').select('role, farm_id').eq('id', sessionUser.id);
-    const userResult =
-      typeof userQuery.maybeSingle === 'function'
-        ? await userQuery.maybeSingle()
-        : await userQuery.single();
+    const userResult = await supabase
+      .from('users')
+      .select('role, farm_id')
+      .eq('id', sessionUser.id)
+      .maybeSingle();
     const dbUser = userResult?.data;
 
     if (!dbUser || dbUser.role !== 'teacher' || !dbUser.farm_id) {
@@ -67,11 +67,11 @@ export async function POST(request: Request) {
     }
 
     // 3. 同一農園チェック（他農園の受講生には付与不可）
-    const studentQuery = supabase.from('users').select('farm_id, role').eq('id', studentId);
-    const studentResult =
-      typeof studentQuery.maybeSingle === 'function'
-        ? await studentQuery.maybeSingle()
-        : await studentQuery.single();
+    const studentResult = await supabase
+      .from('users')
+      .select('farm_id, role')
+      .eq('id', studentId)
+      .maybeSingle();
     const targetStudent = studentResult?.data;
 
     if (!targetStudent) {
