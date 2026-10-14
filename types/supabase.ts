@@ -852,6 +852,10 @@ export type Database = {
         Returns: undefined;
       };
       reserve_ai_usage: { Args: never; Returns: string };
+      save_ai_journal: {
+        Args: { p_content: string; p_is_private?: boolean; p_reply?: string };
+        Returns: Json;
+      };
       search_knowledge_candidates: {
         Args: { p_limit?: number };
         Returns: {

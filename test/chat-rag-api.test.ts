@@ -135,7 +135,7 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       return Promise.resolve({ data: null, error: null });
     });
 
-    // journals DB クエリおよび insert のモック
+    // journals DB クエリのモック
     const mockJournalsSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         order: vi.fn().mockReturnValue({
@@ -147,13 +147,10 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       }),
     });
 
-    const mockJournalsInsert = vi.fn().mockResolvedValue({ error: null });
-
     mockFrom.mockImplementation((tableName: string) => {
       if (tableName === 'journals') {
         return {
           select: mockJournalsSelect,
-          insert: mockJournalsInsert,
         };
       }
       return {};
@@ -178,16 +175,12 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       p_commit: true,
     });
 
-    // journals への保存で reply が保存され、is_private: false であること
-    expect(mockJournalsInsert).toHaveBeenCalledWith([
-      expect.objectContaining({
-        student_id: 'user_test_123',
-        content: 'キュウリのうどんこ病対策を教えて',
-        reply: expect.stringContaining('水やりは朝の時間帯'),
-        is_private: false,
-        is_approved: false,
-      }),
-    ]);
+    // 専用RPC save_ai_journal への保存で reply が保存され、is_private: false であること
+    expect(mockRpc).toHaveBeenCalledWith('save_ai_journal', {
+      p_content: 'キュウリのうどんこ病対策を教えて',
+      p_reply: expect.stringContaining('水やりは朝の時間帯'),
+      p_is_private: false,
+    });
   });
 
   it('5. AI生成がdegraded(フォールバック)時はチケットを解放し、DBのreplyをnullとして保存すること', async () => {
@@ -218,7 +211,6 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       status: 'degraded',
     });
 
-    const mockJournalsInsert = vi.fn().mockResolvedValue({ error: null });
     mockFrom.mockImplementation((tableName: string) => {
       if (tableName === 'journals') {
         return {
@@ -229,7 +221,6 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
               }),
             }),
           }),
-          insert: mockJournalsInsert,
         };
       }
       return {};
@@ -250,14 +241,11 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       p_commit: false,
     });
 
-    // journals には reply: null (ナレッジ汚染防止) & is_private: true で保存されること
-    expect(mockJournalsInsert).toHaveBeenCalledWith([
-      expect.objectContaining({
-        student_id: 'user_test_123',
-        content: '病気かもしれません',
-        reply: null,
-        is_private: true,
-      }),
-    ]);
+    // 専用RPC save_ai_journal には reply: undefined (フォールバック時) & is_private: true で保存されること
+    expect(mockRpc).toHaveBeenCalledWith('save_ai_journal', {
+      p_content: '病気かもしれません',
+      p_reply: undefined,
+      p_is_private: true,
+    });
   });
 });

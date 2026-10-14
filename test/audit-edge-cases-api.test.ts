@@ -25,7 +25,16 @@ const state = {
   journalInserts: [] as unknown[],
 };
 
-const rpcSpy = vi.fn((name: string, args?: Record<string, unknown>) => state.rpcImpl(name, args));
+const rpcSpy = vi.fn((name: string, args?: Record<string, unknown>) => {
+  if (name === 'save_ai_journal' && args) {
+    state.journalInserts.push({
+      content: args.p_content,
+      reply: args.p_reply,
+      is_private: args.p_is_private,
+    });
+  }
+  return state.rpcImpl(name, args);
+});
 const generateRagAnswerSpy = vi.fn();
 
 vi.mock('@/utils/supabase/server', () => ({
@@ -180,6 +189,7 @@ describe('[境界値] POST /api/tickets/grant の amount バリデーション',
 describe('[境界値] POST /api/chat/rag のメッセージ検証', () => {
   beforeEach(() => {
     state.sessionUser = { id: 'student-A', email: 's@example.com', user_metadata: {} };
+    state.journalInserts = [];
   });
 
   it.each([

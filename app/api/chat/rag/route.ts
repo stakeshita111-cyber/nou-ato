@@ -130,36 +130,29 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Supabase の journals テーブルに対話履歴・質問メモを保存
+    // 4. Supabase の journals テーブルに対話履歴・質問メモを保存 (専用 RPC save_ai_journal 経由)
     //    フォールバック(degraded)時は reply を null (質問メモ) として保存し、ナレッジ汚染を物理防止
     const isPrivate =
       parseResult.data.isPrivate === true ||
       message.startsWith('【非公開メモ】') ||
       message.startsWith('【個人メモ】');
-    const journalReply = isMemoOnly || isDegraded ? null : reply;
+    const journalReply = isMemoOnly || isDegraded ? undefined : (reply ?? undefined);
     let saved = true;
 
     try {
-      const { error: insertErr } = await supabase.from('journals').insert([
-        {
-          student_id: studentId,
-          content: message,
-          reply: journalReply,
-          role: 'student',
-          is_private: isPrivate,
-          is_approved: false, // 承認不可制約により is_private が true の場合は承認不可を保障
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]);
+      const { error: insertErr } = await supabase.rpc('save_ai_journal', {
+        p_content: message,
+        p_reply: journalReply,
+        p_is_private: isPrivate,
+      });
 
       if (insertErr) {
         saved = false;
-        logger.error('journals insert error:', 'api/chat/rag', undefined, insertErr);
+        logger.error('save_ai_journal rpc error:', 'api/chat/rag', undefined, insertErr);
       }
     } catch (dbErr) {
       saved = false;
-      logger.warn('journals insert exception:', 'api/chat/rag', undefined, dbErr);
+      logger.warn('save_ai_journal rpc exception:', 'api/chat/rag', undefined, dbErr);
     }
 
     return ApiResponse.success({
