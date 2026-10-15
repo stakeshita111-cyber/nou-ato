@@ -26,6 +26,7 @@
 *.tsv
 scratch/
 supabase/.temp/
+repomix*
 
 # debug
 npm-debug.log*

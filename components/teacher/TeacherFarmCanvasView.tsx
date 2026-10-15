@@ -102,6 +102,7 @@ export default function TeacherFarmCanvasView({
   const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
   const [isAddingBed, setIsAddingBed] = useState<boolean>(false);
   const isAddingBedRef = useRef<boolean>(false);
+  const lastAddBedTimeRef = useRef<number>(0);
 
   const fetchBedRecords = useCallback(
     async (
@@ -326,6 +327,20 @@ export default function TeacherFarmCanvasView({
       }
     }
   }, [plots, detailPlot]);
+
+  // 🌟 区画詳細モーダル (detailPlot) の Escape キー閉鎖 🌟
+  useEffect(() => {
+    if (!detailPlot) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showArchivedModal) return;
+        setDetailPlot(null);
+        setSelectedBedForRecords(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [detailPlot, showArchivedModal]);
 
   // 🌟 開いている観察記録タイムラインを最新データとリアルタイム同期 (リロード不要) 🌟
   useEffect(() => {
@@ -1547,7 +1562,10 @@ export default function TeacherFarmCanvasView({
                   type="button"
                   disabled={isAddingBed}
                   onClick={async () => {
+                    const now = Date.now();
+                    if (now - lastAddBedTimeRef.current < 1000) return;
                     if (isAddingBed || isAddingBedRef.current) return;
+                    lastAddBedTimeRef.current = now;
                     isAddingBedRef.current = true;
                     setIsAddingBed(true);
                     try {
@@ -1565,8 +1583,10 @@ export default function TeacherFarmCanvasView({
                         setShowToast(true);
                       }
                     } finally {
-                      isAddingBedRef.current = false;
-                      setIsAddingBed(false);
+                      setTimeout(() => {
+                        isAddingBedRef.current = false;
+                        setIsAddingBed(false);
+                      }, 800);
                     }
                   }}
                   className={`px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-md transition transform active:scale-95 flex items-center gap-1.5 ring-2 ring-emerald-400/40 ${
