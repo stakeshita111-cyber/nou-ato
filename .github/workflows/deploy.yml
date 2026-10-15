@@ -25,7 +25,9 @@ jobs:
 
       - name: Full Test & Typecheck
         run: |
+          node scripts/check-database.mjs
           npx tsc --noEmit
+          npm run lint
           npm run test
 
       - name: Production Build for Vercel/Edge

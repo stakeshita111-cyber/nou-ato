@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Task } from '@/types/task';
 
 type TrashModalProps = {
@@ -16,8 +16,22 @@ export default function TrashModal({
   onRestore,
   onPermanentlyDelete,
 }: TrashModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 text-gray-800 animate-in fade-in duration-150">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 text-gray-800 animate-in fade-in duration-150"
+    >
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl flex flex-col">
         {/* ヘッダー */}
         <div className="p-6 border-b border-gray-100 sticky top-0 bg-white z-10 flex justify-between items-center rounded-t-3xl">

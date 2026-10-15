@@ -160,6 +160,22 @@ npx supabase db push
    - `20261011030000_announcements_and_farm_metadata.sql` (アナウンス・農園メタデータSSOT)
    - `20261011040000_multi_tenant_and_tampering_defense.sql` (マルチテナントRLS強化・改ざん防止トリガー・CHECK制約)
    - `20261011050000_unify_events_farm_id_to_uuid.sql` (events/reservations farm_id UUID型統一・型安全化)
+   - `20261014000000_db_integrity_hardening.sql` (DB整合性強化・旧テーブル安全破棄)
+   - `20261014010000_ensure_get_farm_by_invite_code.sql` (招待コードによる農園取得関数保証)
+   - `20261014020000_drop_untracked_farm_plots_student_name.sql` (farm_plots 未追跡 student_name カラム削除)
+   - `20261014030000_save_ai_journal_rpc.sql` (AI日誌保存アトミックRPC)
+   - `20261014040000_fix_add_farm_bed_signature_and_trigger.sql` (add_farm_bed 関数シグネチャ・トリガー修正)
+   - `20261014050000_harden_farms_rls_and_revoke_anon.sql` (farms RLS強化・anon権限剥奪)
+   - `20261014060000_fix_invite_and_student_tasks_rpc.sql` (招待・生徒タスクRPC修正)
+   - `20261014070000_harden_rls_boundaries_and_check_constraints.sql` (RLS境界防衛・CHECK制約強化)
+   - `20261014080000_verify_security_and_constraints_rpc.sql` (セキュリティ・制約自動検証RPC)
+   - `20261014083000_update_verify_security_rpc.sql` (verify_security RPC改定)
+   - `20261014084000_fix_verify_plots_columns.sql` (verify_security 区画カラム検証修正)
+   - `20261014085000_fix_farm_plots_name_column.sql` (farm_plots nameカラム検証修正)
+   - `20261014090000_fix_crop_records_columns.sql` (crop_records カラム検証修正)
+   - `20261014091000_fix_verify_crop_records_ids.sql` (crop_records ID検証修正)
+   - `20261014092000_lock_verify_security_and_constraints_rpc.sql` (verify_security_and_constraints RPC確定ロック)
+   - `20261015000000_unify_ticket_status_and_storage_update.sql` (チケット残数集計統一・退会時タスク削除・Storage UPDATEポリシー追加)
 
 ---
 
@@ -255,10 +271,16 @@ nou-ato/
 │   ├── student/          # 受講生ポータル画面 (畑/天気/予約/相談/成長)
 │   └── teacher/          # 講師ダッシュボード画面 (概要/タスク/生徒/日誌/設定)
 ├── components/           # UIコンポーネント (teacher, student, ui, board, farm)
-├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager, logger, apiResponse)
-├── test/                 # 自動テストスイート (Vitest: 32ファイル・全243項目)
+├── context/              # React Context プロバイダー (ThemeContext)
 ├── docs/                 # 仕様書・品質ダッシュボード・OpenAPI・ER図
-└── types/                # TypeScript型定義 (Database, Supabase)
+├── hooks/                # カスタムフック (useKanbanBoard, useDynamicTheme, useFarmManager等)
+├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager, logger, apiResponse)
+├── scripts/              # データベース監査・ビルド検証スクリプト
+├── store/                # Zustand グローバル状態ストア (useThemeStore等)
+├── supabase/             # Supabase マイグレーションSQL・設定
+├── test/                 # 自動テストスイート (Vitest: 32ファイル・全244項目)
+├── types/                # TypeScript型定義 (Database, Supabase)
+└── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```
 
 ---

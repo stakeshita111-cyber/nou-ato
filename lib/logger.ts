@@ -14,25 +14,51 @@ export interface LogEntry {
 }
 
 class Logger {
-  private sanitizeData(data?: Record<string, unknown>): Record<string, unknown> | undefined {
-    if (!data) return undefined;
-    const sanitized = { ...data };
+  private sanitizeValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+
+    if (seen.has(value)) {
+      return '[Circular]';
+    }
+
+    if (depth > 4) {
+      return Array.isArray(value) ? '[Array]' : '[Object]';
+    }
+
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeValue(item, depth + 1, seen));
+    }
+
     const sensitiveKeys = [
       'password',
       'token',
       'secret',
       'authorization',
       'apikey',
+      'api_key',
       'gemini_key',
-      'key',
+      'private_key',
+      'service_role',
     ];
 
-    for (const key of Object.keys(sanitized)) {
-      if (sensitiveKeys.some((s) => key.toLowerCase().includes(s))) {
-        sanitized[key] = '********';
+    const sanitized: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (sensitiveKeys.some((s) => k.toLowerCase().includes(s))) {
+        sanitized[k] = '********';
+      } else {
+        sanitized[k] = this.sanitizeValue(v, depth + 1, seen);
       }
     }
     return sanitized;
+  }
+
+  private sanitizeData(data?: Record<string, unknown>): Record<string, unknown> | undefined {
+    if (!data) return undefined;
+    return this.sanitizeValue(data, 0) as Record<string, unknown>;
   }
 
   private log(

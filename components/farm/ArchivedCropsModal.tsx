@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FarmBed, CropRecord } from '@/types/farm';
 
@@ -41,6 +41,17 @@ export default function ArchivedCropsModal({
   // 複数または個別に展開できる展開中ベッドIDの配列
   const [expandedBedIds, setExpandedBedIds] = useState<string[]>([]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   // 存在するシーズン一覧のユニーク抽出
@@ -66,7 +77,11 @@ export default function ArchivedCropsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs animate-fade-in text-gray-800">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs animate-fade-in text-gray-800"
+    >
       <div
         className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}

@@ -158,6 +158,36 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "不正なリクエスト (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未ログイン・認証エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "サーバー内部エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -183,6 +213,26 @@
                       "description": "生徒画面の相談タブを表示するか否か"
                     }
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未ログイン・認証エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "サーバー内部エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -233,6 +283,36 @@
           },
           "400": {
             "description": "不正な設定パラメータ",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未ログイン・認証エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "講師権限なし (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "サーバー内部エラー (RFC 7807)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -299,11 +379,45 @@
               }
             }
           },
+          "400": {
+            "description": "不正なリクエストパラメータ (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "401": {
-            "description": "未ログイン (RFC 7807)"
+            "description": "未ログイン・認証エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "403": {
-            "description": "講師権限なし または 他農園の受講生 (RFC 7807)"
+            "description": "講師権限なし または 他農園の受講生 (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "サーバー内部エラー (RFC 7807)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }

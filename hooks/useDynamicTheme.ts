@@ -41,7 +41,7 @@ export const useDynamicTheme = () => {
       sans: 'var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       serif: 'Georgia, Cambria, "Hiragino Mincho ProN", "Yu Mincho", "Times New Roman", serif',
       rounded:
-        '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif',
+        'var(--font-m-plus-rounded-1c), "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif',
     };
     const targetFontFamily = familyMap[settings.fontFamily] || familyMap.sans;
     root.style.setProperty('--font-family-base', targetFontFamily);
