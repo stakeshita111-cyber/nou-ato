@@ -89,3 +89,6 @@ jobs:
 
       - name: Verify migration reset from scratch
         run: supabase db reset
+
+      - name: Run pgTAP database tests
+        run: supabase test db
