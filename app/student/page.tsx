@@ -808,6 +808,9 @@ export default function StudentPage() {
           <span className="text-[10px] font-bold mt-0.5">成長</span>
         </button>
       </footer>
+
+      {/* 共通トースト通知 */}
+      <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
     </div>
   );
 }

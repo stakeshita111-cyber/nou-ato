@@ -1620,12 +1620,13 @@ export default function TeacherStudentsView() {
               <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800 font-semibold pl-1">
                 <li>この農園へのアクセスを即時遮断（生徒画面に入れなくなります）</li>
                 <li>担当している畑区画・畝の割り当てを自動解除（空き区画に解放）</li>
+                <li>受講生に割り当てられていた個別タスク（student_tasks）を自動消去</li>
               </ul>
             </div>
 
             <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed font-medium">
               💡
-              過去の提出写真や収穫記録・質問日誌などの農園活動実績は、ナレッジとして安全に保持されます。
+              過去の質問日誌などの農園ナレッジは保持されますが、受講生個人の作業タスクや割り当て情報は自動的にクリーンアップ（削除）されます。
             </div>
 
             <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">

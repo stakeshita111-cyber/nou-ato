@@ -68,16 +68,16 @@
 
 ## 🛠️ 技術スタック
 
-| レイヤー                 | 採用技術                                                                                              |
-| :----------------------- | :---------------------------------------------------------------------------------------------------- |
-| **フロントエンド**       | Next.js 16 (App Router), React 19, TypeScript                                                         |
-| **スタイリング**         | Tailwind CSS v4, Lucide Icons                                                                         |
-| **状態管理・D&D**        | Zustand, @dnd-kit (Core, Sortable, Modifiers)                                                         |
-| **バックエンド / DB**    | Supabase (PostgreSQL, Supabase Auth, SSR, Storage, RLS)                                               |
-| **AI / RAG**             | Google AI Studio (Gemini 1.5 Flash-Lite / `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
-| **API アーキテクチャ**   | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI                                                   |
-| **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build)                                               |
-| **テストフレームワーク** | Vitest, @vitest/coverage-v8 (閾値 70% 準拠)                                                           |
+| レイヤー                 | 採用技術                                                                                                     |
+| :----------------------- | :----------------------------------------------------------------------------------------------------------- |
+| **フロントエンド**       | Next.js 16 (App Router), React 19, TypeScript                                                                |
+| **スタイリング**         | Tailwind CSS v4                                                                                              |
+| **状態管理・D&D**        | Zustand, @dnd-kit (Core, Sortable, Utilities)                                                                |
+| **バックエンド / DB**    | Supabase (PostgreSQL, Supabase Auth, SSR, Storage, RLS)                                                      |
+| **AI / RAG**             | Google AI Studio (Gemini 2.5 Flash / Flash-Lite: `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
+| **API アーキテクチャ**   | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI                                                          |
+| **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build)                                                      |
+| **テストフレームワーク** | Vitest, @vitest/coverage-v8 (閾値 70% 準拠)                                                                  |
 
 ---
 

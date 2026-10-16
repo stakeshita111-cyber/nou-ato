@@ -17,7 +17,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Language: TypeScript
 - Styling: Tailwind CSS
 - Backend/DB: Supabase (PostgreSQL, Realtime, Auth, Storage)
-- AI/Vector: Google AI Studio (Gemini 1.5), pgvector
+- AI/Vector: Google AI Studio (Gemini 2.5 Flash / Flash-Lite: gemini-flash-lite-latest), pgvector
 
 ## 3. コーディング基本規約
 

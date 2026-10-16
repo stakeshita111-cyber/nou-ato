@@ -9,6 +9,7 @@ import {
   useSensors,
   PointerSensor,
   KeyboardSensor,
+  DragEndEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useKanbanBoard } from '@/hooks/useKanbanBoard';
@@ -19,6 +20,7 @@ import TaskEditModal from '@/components/board/TaskEditModal';
 import TaskTemplateModal from '@/components/board/TaskTemplateModal';
 import TrashModal from '@/components/board/TrashModal';
 import PageHeader from '@/components/ui/PageHeader';
+import Toast from '@/components/ui/Toast';
 import { ColumnType, Task } from '@/types/task';
 import { TaskTemplate } from '@/lib/taskTemplates';
 import { SproutLoader } from '@/components/SproutLoader';
@@ -83,6 +85,8 @@ export default function TeacherTaskBoardView({
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTrashModal, setShowTrashModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -117,6 +121,30 @@ export default function TeacherTaskBoardView({
         badge_icon: template.badge_icon,
       };
       await saveTaskDetails(updated);
+      setToastMessage(`📝 テンプレート「${template.title}」からタスクを作成しました！`);
+      setShowToast(true);
+    }
+  };
+
+  // ドラッグ終了時のトースト連動
+  const handleDragEndWithToast = async (event: DragEndEvent) => {
+    const overId = event.over?.id as string | undefined;
+    const currentTask = tasks.find((t) => t.id === event.active.id);
+    await handleDragEnd(event);
+    if (overId && currentTask) {
+      let targetStatus = overId;
+      const overTask = tasks.find((t) => t.id === overId);
+      if (overTask) targetStatus = overTask.status;
+      if (targetStatus === 'todo' && currentTask.status !== 'todo') {
+        setToastMessage('🚀 タスクを「生徒へ公開中」に配信しました！');
+        setShowToast(true);
+      } else if (
+        targetStatus !== currentTask.status &&
+        COLUMNS.some((c) => c.id === targetStatus)
+      ) {
+        setToastMessage('📋 タスクのステータスを更新しました');
+        setShowToast(true);
+      }
     }
   };
 
@@ -188,9 +216,16 @@ export default function TeacherTaskBoardView({
         <div className="p-4 app-bg-card rounded-2xl shadow-sm border app-border">
           <TaskForm
             onAddTask={(title) => {
-              addTask(title).catch((err: unknown) => {
-                console.error('Failed to add task:', err);
-              });
+              addTask(title)
+                .then((task) => {
+                  if (task) {
+                    setToastMessage(`✨ タスク「${title}」を追加しました！`);
+                    setShowToast(true);
+                  }
+                })
+                .catch((err: unknown) => {
+                  console.error('Failed to add task:', err);
+                });
               setShowQuickForm(false);
             }}
           />
@@ -202,7 +237,7 @@ export default function TeacherTaskBoardView({
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
+        onDragEnd={handleDragEndWithToast}
       >
         <div className="flex gap-6 items-start pb-6 overflow-x-auto">
           {COLUMNS.map((col) => (
@@ -241,7 +276,11 @@ export default function TeacherTaskBoardView({
         <TaskEditModal
           task={editingTask}
           onClose={() => setEditingTask(null)}
-          onSave={saveTaskDetails}
+          onSave={async (task) => {
+            await saveTaskDetails(task);
+            setToastMessage(`💾 タスク「${task.title}」の編集内容を保存しました！`);
+            setShowToast(true);
+          }}
         />
       )}
 
@@ -266,6 +305,9 @@ export default function TeacherTaskBoardView({
           }}
         />
       )}
+
+      {/* 共通トースト通知 */}
+      <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
     </div>
   );
 }

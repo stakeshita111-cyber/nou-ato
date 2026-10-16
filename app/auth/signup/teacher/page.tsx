@@ -33,10 +33,12 @@ export default function TeacherSignUpPage() {
   // トースト
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // 講師アカウント登録処理
   const handleTeacherSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
 
     const validation = teacherSignUpSchema.safeParse({
       farmName,
@@ -48,6 +50,7 @@ export default function TeacherSignUpPage() {
     if (!validation.success) {
       const firstError =
         validation.error.issues[0]?.message || 'すべての必須項目を入力してください';
+      setFormError(firstError);
       setToastMessage(firstError);
       setShowToast(true);
       return;
@@ -66,19 +69,41 @@ export default function TeacherSignUpPage() {
       });
 
       if (authError) {
-        // すでに登録済みの場合はログイン試行
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-          email: validData.email,
-          password: validData.password,
-        });
+        // すでに登録済みのアカウントの場合はログイン試行
+        if (
+          authError.message.includes('already registered') ||
+          authError.message.includes('User already registered')
+        ) {
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email: validData.email,
+            password: validData.password,
+          });
 
-        if (loginError) {
-          setToastMessage(`登録/ログインエラー: ${loginError.message || authError.message}`);
+          if (loginError) {
+            const msg =
+              'このメールアドレスは既に登録されています。パスワードをご確認の上ログインしてください。';
+            setFormError(msg);
+            setToastMessage(msg);
+            setShowToast(true);
+            setLoading(false);
+            return;
+          }
+          userId = loginData?.user?.id || null;
+        } else {
+          let userMsg = 'アカウントの作成に失敗しました。';
+          if (authError.message.includes('Password')) {
+            userMsg = 'パスワードは6文字以上で入力してください。';
+          } else if (authError.message.includes('email')) {
+            userMsg = '有効なメールアドレスを入力してください。';
+          } else {
+            userMsg = `登録エラー: ${authError.message}`;
+          }
+          setFormError(userMsg);
+          setToastMessage(userMsg);
           setShowToast(true);
           setLoading(false);
           return;
         }
-        userId = loginData?.user?.id || null;
       } else {
         userId = authData?.user?.id || null;
         // セッションが確立していない場合は自動ログインを試行
@@ -99,7 +124,9 @@ export default function TeacherSignUpPage() {
       }
 
       if (!userId) {
-        setToastMessage('ユーザーアカウントの認証に失敗しました。再度お試しください。');
+        const msg = 'ユーザーアカウントの認証に失敗しました。再度お試しください。';
+        setFormError(msg);
+        setToastMessage(msg);
         setShowToast(true);
         setLoading(false);
         return;
@@ -115,7 +142,14 @@ export default function TeacherSignUpPage() {
 
       if (rpcError) {
         console.error('register_teacher error:', rpcError);
-        setToastMessage(`講師登録に失敗しました: ${rpcError.message}`);
+        let rpcMsg = '農園の開設処理に失敗しました。';
+        if (rpcError.message.includes('Farm name')) {
+          rpcMsg = '農園名は2文字以上で入力してください。';
+        } else {
+          rpcMsg = `講師登録エラー: ${rpcError.message}`;
+        }
+        setFormError(rpcMsg);
+        setToastMessage(rpcMsg);
         setShowToast(true);
         setLoading(false);
         return;
@@ -140,6 +174,7 @@ export default function TeacherSignUpPage() {
       }, 800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      setFormError(`エラーが発生しました: ${msg}`);
       setToastMessage(`エラーが発生しました: ${msg}`);
       setShowToast(true);
     } finally {
@@ -221,6 +256,12 @@ export default function TeacherSignUpPage() {
 
         {/* 登録フォーム */}
         <form onSubmit={handleTeacherSignUp} className="space-y-4">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold animate-fade-in flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{formError}</span>
+            </div>
+          )}
           <div>
             <label className="block text-[11px] font-bold text-gray-600 mb-1">農場名</label>
             <input
