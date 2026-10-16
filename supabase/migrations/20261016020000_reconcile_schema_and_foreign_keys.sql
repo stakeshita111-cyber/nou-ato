@@ -38,7 +38,13 @@ BEGIN
         $func$;
 
         ALTER TABLE public.crop_records
+            ALTER COLUMN work_types DROP DEFAULT;
+
+        ALTER TABLE public.crop_records
             ALTER COLUMN work_types TYPE TEXT[] USING pg_temp.jsonb_array_to_text_array(work_types);
+
+        ALTER TABLE public.crop_records
+            ALTER COLUMN work_types SET DEFAULT '{}'::TEXT[];
 
         DROP FUNCTION IF EXISTS pg_temp.jsonb_array_to_text_array(jsonb);
     END IF;
