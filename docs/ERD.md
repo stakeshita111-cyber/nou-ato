@@ -275,8 +275,9 @@ erDiagram
 15. **`list_farm_member_names`**: PIIマスキング用受講生表示名リストのセキュア取得。
 16. **`search_knowledge_candidates`**: RAG用の承認済み日誌・Q&A類似ナレッジ抽出。
 17. **`save_ai_journal`**: AI相談対話履歴のサーバーサイド（service_role）専用安全保存（生徒権限剥奪・AI回答偽装の物理防止）。
-18. **`current_user_farm_id`**: ログインユーザーの所属農園UUIDを取得する認可ヘルパー関数。
-19. **`current_user_role`**: ログインユーザーのロール（teacher/student）を取得する認可ヘルパー関数。
+18. **`sync_student_published_tasks`**: 公開済みタスク（status = 'todo'）に対する受講生の student_tasks レコード先行配備・安全同期。
+19. **`current_user_farm_id`**: ログインユーザーの所属農園UUIDを取得する認可ヘルパー関数。
+20. **`current_user_role`**: ログインユーザーのロール（teacher/student）を取得する認可ヘルパー関数。
 
 ---
 

@@ -137,7 +137,7 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全41本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全42本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
    - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
@@ -179,6 +179,7 @@ npx supabase db push
    - `20261016000000_harden_crop_records_and_student_tasks_and_beds.sql` (作物記録RLS厳格化・タスク完了RPC防衛・畝改ざん防止トリガー)
    - `20261016010000_harden_save_ai_journal_server_only.sql` (save_ai_journal サーバーサイド service_role 専用化)
    - `20261016020000_reconcile_schema_and_foreign_keys.sql` (本番DBとマイグレーション間の列・外部キー完全整合化)
+   - `20261016030000_sync_student_published_tasks.sql` (公開済みタスクの受講生先行配備・同期RPC)
 
 ---
 
