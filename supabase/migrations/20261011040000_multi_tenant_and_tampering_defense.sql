@@ -38,7 +38,7 @@ DROP POLICY IF EXISTS "events_select_policy" ON public.events;
 CREATE POLICY "events_select_policy" ON public.events
     FOR SELECT USING (
         auth.role() = 'authenticated'
-        AND (farm_id IS NULL OR farm_id = public.current_user_farm_id()::text)
+        AND (farm_id IS NULL OR farm_id::text = public.current_user_farm_id()::text)
     );
 
 DROP POLICY IF EXISTS "events_modify_policy" ON public.events;
@@ -46,7 +46,7 @@ DROP POLICY IF EXISTS "events_modify_policy" ON public.events;
 CREATE POLICY "events_modify_policy" ON public.events
     FOR ALL USING (
         public.current_user_role() = 'teacher'
-        AND farm_id = public.current_user_farm_id()::text
+        AND farm_id::text = public.current_user_farm_id()::text
     );
 
 -- ------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ CREATE POLICY "reservations_select_policy" ON public.reservations
                     OR EXISTS (
                         SELECT 1 FROM public.events e
                         WHERE e.id = reservations.event_id
-                          AND e.farm_id = public.current_user_farm_id()::text
+                          AND e.farm_id::text = public.current_user_farm_id()::text
                     )
                 )
             )
@@ -95,7 +95,7 @@ CREATE POLICY "reservations_modify_policy" ON public.reservations
                     OR EXISTS (
                         SELECT 1 FROM public.events e
                         WHERE e.id = reservations.event_id
-                          AND e.farm_id = public.current_user_farm_id()::text
+                          AND e.farm_id::text = public.current_user_farm_id()::text
                     )
                 )
             )

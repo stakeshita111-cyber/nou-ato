@@ -775,8 +775,14 @@ export function useFarmManager() {
 
     try {
       const dbBed = await addFarmBedInDb(targetPlot.id, '未確定 🌱', '2026年 秋冬');
-      const resolvedBedId = (dbBed?.id as string) || `bed_${Date.now()}`;
-      const resolvedBedNum = Number(dbBed?.bed_number) || nextNum;
+      if (!dbBed) {
+        if (typeof window !== 'undefined') {
+          alert('畝の追加保存に失敗しました。通信環境を確認して再度お試しください。');
+        }
+        return null;
+      }
+      const resolvedBedId = typeof dbBed.id === 'string' ? dbBed.id : String(dbBed.id);
+      const resolvedBedNum = Number(dbBed.bed_number) || nextNum;
 
       const newBed: FarmBed = {
         id: resolvedBedId,

@@ -531,6 +531,7 @@ export default function StudentTalkView({
           studentName: studentName,
           isMemoOnly: false,
         }),
+        signal: AbortSignal.timeout(45000),
       });
 
       if (res.status === 429) {
@@ -591,6 +592,7 @@ export default function StudentTalkView({
       setShowToast(true);
     } catch (err) {
       console.error('Chat sending error:', err);
+      void refreshTicketState();
       const fallbackMsg: MessageItem = {
         id: 'bot_err_' + Date.now(),
         sender: 'teacher',

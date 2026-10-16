@@ -83,9 +83,49 @@ describe('[マルチテナント] 最終有効 RLS ポリシー', () => {
   it('student_tasks の生徒 UPDATE で exp / difficulty / deleted_at / base_task_id を改ざんできない', () => {
     expect(allSql).toMatch(/CREATE TRIGGER[^;]*BEFORE UPDATE[^;]*ON public\.student_tasks/i);
   });
+
+  it('crop_records_modify_policy が「自分の区画＋他人の畝」の不正登録・改ざんを物理禁止している', () => {
+    const p = effectivePolicy('crop_records', 'crop_records_modify_policy');
+    expect(p).not.toBeNull();
+    const text = p ?? '';
+    // bed_id があるときは畝が自分のもの かつ 畝の plot_id と一致することを要求
+    expect(text).toContain('b.student_id = auth.uid()');
+    expect(text).toContain('b.plot_id = crop_records.plot_id');
+    // bed_id が無いときのみ plot_id の区画が自分のもの
+    expect(text).toContain('crop_records.bed_id IS NULL');
+    expect(text).toContain('p.student_id = auth.uid()');
+  });
+
+  it('farm_beds に受講生による plot_id / bed_number / student_id / status 改ざん防止トリガーが定義されている', () => {
+    expect(allSql).toMatch(
+      /CREATE TRIGGER[^;]*trg_prevent_student_farm_bed_tampering[^;]*ON public\.farm_beds/i
+    );
+    const body = effectiveFunctionBody('prevent_student_farm_bed_tampering') ?? '';
+    expect(body).toContain('NEW.plot_id IS DISTINCT FROM OLD.plot_id');
+    expect(body).toContain('NEW.bed_number IS DISTINCT FROM OLD.bed_number');
+    expect(body).toContain('NEW.student_id IS DISTINCT FROM OLD.student_id');
+    expect(body).toContain('NEW.status IS DISTINCT FROM OLD.status');
+    expect(body).toContain('42501');
+  });
 });
 
 describe('[権限越境] SECURITY DEFINER RPC', () => {
+  it('complete_student_task は INSERT を行わず、自農園の公開中タスクのみ UPDATE して不在時は P0002 例外を送出する', () => {
+    const body = effectiveFunctionBody('complete_student_task');
+    expect(body).not.toBeNull();
+    const text = body ?? '';
+    // INSERT INTO student_tasks を一切行わないこと
+    expect(text).not.toMatch(/INSERT\s+INTO\s+public\.student_tasks/i);
+    // UPDATE のみ実行し、自農園・公開中・未削除・非テンプレートであることを検証
+    expect(text).toMatch(/UPDATE\s+public\.student_tasks/i);
+    expect(text).toContain('t.farm_id = v_farm_id');
+    expect(text).toContain("t.status = 'todo'");
+    expect(text).toContain('t.deleted_at IS NULL');
+    expect(text).toContain('t.is_template IS NOT TRUE');
+    // 対象タスクが見つからない場合に P0002 例外
+    expect(text).toContain('P0002');
+  });
+
   it('publish_task_to_all_students は PUBLIC/anon から REVOKE されている', () => {
     expect(allSql).toMatch(/REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.publish_task_to_all_students/i);
   });

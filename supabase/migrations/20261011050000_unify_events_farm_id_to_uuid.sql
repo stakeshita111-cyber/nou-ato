@@ -13,7 +13,7 @@ DROP POLICY IF EXISTS "reservations_modify_policy" ON public.reservations;
 ALTER TABLE public.events
     ALTER COLUMN farm_id TYPE UUID USING (
         CASE
-            WHEN farm_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            WHEN farm_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
             THEN farm_id::UUID
             ELSE NULL
         END
