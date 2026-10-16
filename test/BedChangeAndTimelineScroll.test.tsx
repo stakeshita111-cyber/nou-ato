@@ -280,4 +280,32 @@ describe('StudentFarmRecordView - 登録済みタスクのベッド変更機能 
     expect(screen.getByRole('button', { name: /きゅうり\s*\(1\)/ })).toBeDefined();
     expect(screen.getByRole('button', { name: /ミニトマト\s*\(1\)/ })).toBeDefined();
   });
+
+  it('最新の観察記録の生育ステージに応じて畝ボタンの色が正しく変化すること', async () => {
+    // 畝1: rec-1 (growth_stage: '果実肥大' -> 85% -> 濃い深緑 from-emerald-800)
+    // 畝2: 新規に「播種・苗植え」の記録を追加 -> 15% -> 最も薄い白緑 bg-emerald-50/90
+    mockRecords.push({
+      id: 'rec-lettuce-seed',
+      bed_id: 'bed-2',
+      plot_id: 'plot-A1',
+      crop_name: 'レタス',
+      date: '2026/10/16',
+      notes: '【レタス】種まき完了',
+      growth_stage: '播種・苗植え',
+      height_cm: 5,
+      work_types: ['水やり'],
+      created_at: '2026-10-16T10:00:00Z',
+    });
+
+    render(<StudentFarmRecordView studentId="student-1" studentName="生徒1" />);
+
+    const bed1Btn = screen.getByRole('button', { name: /畝 1/ });
+    const bed2Btn = screen.getByRole('button', { name: /畝 2/ });
+
+    // 畝1（最新: 開花・受粉 = 70%）は鮮やかな緑クラス (bg-emerald-600) を持つ
+    expect(bed1Btn.className).toContain('bg-emerald-600');
+
+    // 畝2（最新: 播種・苗植え = 15%）は最も薄い白緑クラス (bg-emerald-50/90) を持つ
+    expect(bed2Btn.className).toContain('bg-emerald-50/90');
+  });
 });

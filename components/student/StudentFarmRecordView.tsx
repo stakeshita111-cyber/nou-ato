@@ -18,6 +18,15 @@ import {
   getBedAllCrops,
 } from '@/lib/farm/companionCropsHelper';
 
+const STAGE_PROGRESS_MAP: Record<string, number> = {
+  '播種・苗植え': 15,
+  '発芽・活着': 30,
+  '本葉展開・つる伸び': 50,
+  '開花・受粉': 70,
+  果実肥大: 85,
+  収穫期: 100,
+};
+
 interface StudentFarmRecordViewProps {
   studentId?: string;
   studentName?: string;
@@ -864,7 +873,17 @@ export default function StudentFarmRecordView({
               const latestImg = bedRecs.find((r) => r.image_url || r.photo_url)?.image_url || null;
 
               // 成長段階・進捗率 (0〜100%) に応じた色の濃淡カラーマップ
-              const progress = (bed as { progress_percent?: number }).progress_percent || 0;
+              // 最新の観察記録の生育ステージを最優先で反映（未記録時は畝の progress_percent）
+              const latestRec = [...bedRecs].sort(
+                (a, b) =>
+                  new Date(b.created_at || b.date).getTime() -
+                  new Date(a.created_at || a.date).getTime()
+              )[0];
+              const stageProgress = latestRec?.growth_stage
+                ? STAGE_PROGRESS_MAP[latestRec.growth_stage]
+                : undefined;
+              const progress =
+                stageProgress ?? (bed as { progress_percent?: number }).progress_percent ?? 0;
               let colorClasses =
                 'bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100';
 
