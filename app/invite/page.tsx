@@ -372,8 +372,19 @@ function InviteContent() {
           </form>
 
           {/* フッター注意書き */}
-          <p className="text-[10px] text-center text-gray-400 leading-relaxed">
-            登録することで、利用規約およびプライバシーポリシーに同意したことになります。
+          <p className="text-[10px] text-center text-gray-500 leading-relaxed">
+            登録することで、
+            <Link href="/terms" className="text-[#1c4d21] font-bold underline hover:text-[#123915]">
+              利用規約
+            </Link>
+            および
+            <Link
+              href="/privacy"
+              className="text-[#1c4d21] font-bold underline hover:text-[#123915]"
+            >
+              プライバシーポリシー
+            </Link>
+            に同意したことになります。
           </p>
 
           <div className="pt-1 text-center">

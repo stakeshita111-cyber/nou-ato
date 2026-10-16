@@ -334,6 +334,22 @@ export default function TeacherSignUpPage() {
           >
             <span>{loading ? '登録中...' : '登録する'}</span>
           </button>
+
+          {/* 法務・コンプライアンス同意文 */}
+          <p className="text-[11px] text-center text-gray-500 leading-relaxed pt-1">
+            登録することで、
+            <Link href="/terms" className="text-[#1c4d21] font-bold underline hover:text-[#123915]">
+              利用規約
+            </Link>
+            および
+            <Link
+              href="/privacy"
+              className="text-[#1c4d21] font-bold underline hover:text-[#123915]"
+            >
+              プライバシーポリシー
+            </Link>
+            に同意したものとみなされます。
+          </p>
         </form>
 
         {/* フッターリンク */}
