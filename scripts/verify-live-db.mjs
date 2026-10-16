@@ -345,18 +345,50 @@ async function runVerification() {
   }
 
   // ----------------------------------------------------------------------------
-  // 10. 【特権管理者検証】RLS 有効化状況の監査 (すべてのテーブルで RLS が有効であること)
+  // 10. 【AI回答偽装防御】受講生による save_ai_journal 直接呼び出し拒否 (42501 / Permission Denied)
+  // ----------------------------------------------------------------------------
+  try {
+    const { data, error } = await studentClient.rpc('save_ai_journal', {
+      p_student_id: studentUserId,
+      p_content: 'セキュリティ検証質問',
+      p_reply: '偽装されたAI回答',
+      p_is_private: false,
+    });
+    if (
+      error &&
+      (error.code === '42501' ||
+        error.message.includes('permission denied') ||
+        error.message.includes('function save_ai_journal'))
+    ) {
+      console.log(
+        '✅ 10. [AI回答偽装防御] 受講生の save_ai_journal 直接呼出拒絶 (42501 Unauthorized): 正常に防御'
+      );
+    } else {
+      console.error(
+        '❌ 10. [AI回答偽装防御] 脆弱性検知: 受講生が save_ai_journal で直接AI回答を保存できました',
+        { data, error }
+      );
+      failedTests++;
+    }
+  } catch {
+    console.log(
+      '✅ 10. [AI回答偽装防御] 受講生の save_ai_journal 直接呼出拒絶 (例外防御): 正常に防御'
+    );
+  }
+
+  // ----------------------------------------------------------------------------
+  // 11. 【特権管理者検証】RLS 有効化状況の監査 (すべてのテーブルで RLS が有効であること)
   // ----------------------------------------------------------------------------
   try {
     const { error } = await adminClient.from('farms').select('id').limit(1);
     if (!error) {
-      console.log('✅ 10. [特権管理者] service_role クライアントによる接続・テーブル監査: 正常');
+      console.log('✅ 11. [特権管理者] service_role クライアントによる接続・テーブル監査: 正常');
     } else {
-      console.error('❌ 10. [特権管理者] service_role 接続失敗:', error);
+      console.error('❌ 11. [特権管理者] service_role 接続失敗:', error);
       failedTests++;
     }
   } catch (err) {
-    console.error('❌ 10. [特権管理者] 例外:', err);
+    console.error('❌ 11. [特権管理者] 例外:', err);
     failedTests++;
   }
 

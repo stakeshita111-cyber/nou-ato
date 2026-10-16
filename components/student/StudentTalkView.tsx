@@ -10,6 +10,7 @@ import {
   DEFAULT_DAILY_TICKETS,
   TicketPlanType,
   TicketState,
+  getQuestionStock,
   addQuestionStock,
   clearQuestionStock,
   formatStockText,
@@ -237,7 +238,23 @@ export default function StudentTalkView({
       };
 
       const historyMessages = processChatHistory(targetList);
-      setMessages([welcomeMsg, ...historyMessages]);
+
+      // localStorage に保持された質問ストックがあればメッセージ末尾に復元
+      const existingStock = getQuestionStock(studentId || 'default');
+      let stockMsg: MessageItem | null = null;
+      if (existingStock.length > 0) {
+        stockMsg = {
+          id: 'stock_restored_' + Date.now(),
+          sender: 'teacher',
+          text: '📝【以前ストックした質問メモがあります】🌱\nチケット復活時や来園時にまとめて質問できるよう、前回の質問メモを保持しています。\n下の【入力欄にセット】ボタンを押してまとめてAIに相談してくださいね✨',
+          timestamp: 'メモ',
+          stockItems: existingStock,
+        };
+      }
+
+      setMessages(
+        stockMsg ? [welcomeMsg, ...historyMessages, stockMsg] : [welcomeMsg, ...historyMessages]
+      );
     } catch (e) {
       console.error('loadChatHistory error:', e);
     }
@@ -581,6 +598,14 @@ export default function StudentTalkView({
     }
   };
 
+  // ストックメモをクリア
+  const handleClearStock = () => {
+    clearQuestionStock(studentId || 'default');
+    setMessages((prev) => prev.filter((m) => !m.stockItems));
+    setToastMessage('🗑️ 質問メモのストックをクリアしました');
+    setShowToast(true);
+  };
+
   // 検索ハイライト
   const renderHighlightedText = (text: string, keyword: string) => {
     if (!keyword.trim()) return text;
@@ -680,6 +705,14 @@ export default function StudentTalkView({
                             className="py-1.5 px-2.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-[11px] shadow-2xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
                           >
                             <span>📄 コピー</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearStock}
+                            className="py-1.5 px-2 bg-amber-100/70 hover:bg-amber-200 text-amber-900 border border-amber-300/80 rounded-xl font-bold text-[11px] shadow-2xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
+                            title="ストックをクリア"
+                          >
+                            <span>🗑️ クリア</span>
                           </button>
                         </div>
                       </div>

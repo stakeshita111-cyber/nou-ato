@@ -110,4 +110,47 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql).toContain('bed_id = NULL');
     expect(sql).not.toContain('DELETE FROM public.crop_records');
   });
+
+  it('7. 最新セキュリティ改定 (20261016000000 & 20261016010000) にて作物記録RLS・畝改ざん防止・save_ai_journalサーバー専用化が完全定義されていること', () => {
+    // 1. 20261016000000 (作物記録 RLS 厳格化 & 畝改ざん防止トリガー & complete_student_task 厳格化)
+    const hardenMigration1 = path.join(
+      migrationsDir,
+      '20261016000000_harden_crop_records_and_student_tasks_and_beds.sql'
+    );
+    expect(fs.existsSync(hardenMigration1)).toBe(true);
+    const sql1 = fs.readFileSync(hardenMigration1, 'utf-8');
+
+    // 作物記録の受講生所有権検証 (bed_id 指定時は畝所属と区画一致を強制)
+    expect(sql1).toContain('CREATE POLICY "crop_records_modify_policy" ON public.crop_records');
+    expect(sql1).toContain('b.student_id = auth.uid()');
+    expect(sql1).toContain('b.plot_id = crop_records.plot_id');
+
+    // 畝改ざん防止 BEFORE UPDATE トリガー
+    expect(sql1).toContain('FUNCTION public.prevent_student_farm_bed_tampering()');
+    expect(sql1).toContain('CREATE TRIGGER trg_prevent_student_farm_bed_tampering');
+    expect(sql1).toContain('BEFORE UPDATE ON public.farm_beds');
+
+    // complete_student_task での INSERT 廃止 ＆ 自農園公開中タスク検証
+    expect(sql1).toContain('FUNCTION public.complete_student_task');
+    expect(sql1).not.toContain('INSERT INTO public.student_tasks');
+    expect(sql1).toContain("t.status = 'todo'");
+
+    // 2. 20261016010000 (save_ai_journal サーバーサイド service_role 専用化)
+    const hardenMigration2 = path.join(
+      migrationsDir,
+      '20261016010000_harden_save_ai_journal_server_only.sql'
+    );
+    expect(fs.existsSync(hardenMigration2)).toBe(true);
+    const sql2 = fs.readFileSync(hardenMigration2, 'utf-8');
+
+    // save_ai_journal の引数 p_student_id UUID & service_role 限定権限
+    expect(sql2).toContain('FUNCTION public.save_ai_journal(');
+    expect(sql2).toContain('p_student_id UUID');
+    expect(sql2).toContain(
+      'REVOKE ALL ON FUNCTION public.save_ai_journal(UUID, TEXT, TEXT, BOOLEAN) FROM PUBLIC, anon, authenticated;'
+    );
+    expect(sql2).toContain(
+      'GRANT EXECUTE ON FUNCTION public.save_ai_journal(UUID, TEXT, TEXT, BOOLEAN) TO service_role;'
+    );
+  });
 });

@@ -137,7 +137,7 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全39本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全40本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
    - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
@@ -177,6 +177,7 @@ npx supabase db push
    - `20261014092000_lock_verify_security_and_constraints_rpc.sql` (verify_security_and_constraints RPC確定ロック)
    - `20261015000000_unify_ticket_status_and_storage_update.sql` (チケット残数集計統一・退会時タスク削除・Storage UPDATEポリシー追加)
    - `20261016000000_harden_crop_records_and_student_tasks_and_beds.sql` (作物記録RLS厳格化・タスク完了RPC防衛・畝改ざん防止トリガー)
+   - `20261016010000_harden_save_ai_journal_server_only.sql` (save_ai_journal サーバーサイド service_role 専用化)
 
 ---
 
@@ -222,10 +223,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全31テストファイル / 248項目全件PASS、カバレッジ90%以上）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全31テストファイル / 250項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全248件・100%通過)
+# 1. 自動テストの実行 (全250件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)

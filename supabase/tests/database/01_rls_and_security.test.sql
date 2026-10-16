@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(12);
+SELECT plan(13);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -174,6 +174,17 @@ SELECT throws_matching(
     $$ INSERT INTO public.journals (student_id, farm_id, content) VALUES ('00000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '') $$,
     'violates check constraint',
     '12. [CHECK制約] journals の content 空文字は 23514 (check_violation) で拒否される'
+);
+
+-- ==============================================================================
+-- 7. save_ai_journal RPC のサーバーサイド権限テスト
+-- ==============================================================================
+
+-- Test 13: 受講生ロールからの save_ai_journal 直接呼出は permission denied (42501) で拒絶される
+SELECT throws_matching(
+    $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000002', '不正な質問', '不正な回答', false) $$,
+    'permission denied',
+    '13. [student_a] 受講生ロールからの save_ai_journal 直接呼出は 42501 (permission denied) で拒絶される'
 );
 
 SELECT * FROM finish();

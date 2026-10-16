@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { generateRagAnswer, ChatHistoryItem, ReferencedQA } from '@/lib/rag/qaKnowledgeRetriever';
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 
@@ -140,7 +141,17 @@ export async function POST(request: Request) {
     let saved = true;
 
     try {
-      const { error: insertErr } = await supabase.rpc('save_ai_journal', {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const adminClient =
+        supabaseUrl && serviceRoleKey
+          ? createAdminClient(supabaseUrl, serviceRoleKey, {
+              auth: { persistSession: false },
+            })
+          : supabase;
+
+      const { error: insertErr } = await adminClient.rpc('save_ai_journal', {
+        p_student_id: studentId,
         p_content: message,
         p_reply: journalReply,
         p_is_private: isPrivate,

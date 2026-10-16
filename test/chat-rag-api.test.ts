@@ -177,6 +177,7 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
 
     // 専用RPC save_ai_journal への保存で reply が保存され、is_private: false であること
     expect(mockRpc).toHaveBeenCalledWith('save_ai_journal', {
+      p_student_id: 'user_test_123',
       p_content: 'キュウリのうどんこ病対策を教えて',
       p_reply: expect.stringContaining('水やりは朝の時間帯'),
       p_is_private: false,
@@ -243,6 +244,7 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
 
     // 専用RPC save_ai_journal には reply: undefined (フォールバック時) & is_private: true で保存されること
     expect(mockRpc).toHaveBeenCalledWith('save_ai_journal', {
+      p_student_id: 'user_test_123',
       p_content: '病気かもしれません',
       p_reply: undefined,
       p_is_private: true,

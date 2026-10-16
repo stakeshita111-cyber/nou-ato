@@ -1,4 +1,4 @@
-﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -877,7 +877,12 @@ export type Database = {
       };
       reserve_ai_usage: { Args: never; Returns: string };
       save_ai_journal: {
-        Args: { p_content: string; p_is_private?: boolean; p_reply?: string };
+        Args: {
+          p_content: string;
+          p_is_private?: boolean;
+          p_reply?: string;
+          p_student_id: string;
+        };
         Returns: Json;
       };
       search_knowledge_candidates: {
