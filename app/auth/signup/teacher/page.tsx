@@ -61,61 +61,67 @@ export default function TeacherSignUpPage() {
     setLoading(true);
 
     try {
-      // 1. Supabase Auth 登録 または ログイン
+      // 1. Supabase Auth 登録
       let userId: string | null = null;
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: validData.email,
         password: validData.password,
       });
 
-      if (authError) {
-        // すでに登録済みのアカウントの場合はログイン試行
-        if (
-          authError.message.includes('already registered') ||
-          authError.message.includes('User already registered')
-        ) {
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email: validData.email,
-            password: validData.password,
-          });
+      // 既存ユーザーの判定:
+      // ① authError に 'already registered' または 'already exists' が含まれる場合
+      // ② authData.user が返っているが identities が空配列（[]）の場合（Supabase Auth の既登録シグナル）
+      const isAlreadyRegistered = Boolean(
+        (authError &&
+          (authError.message.includes('already registered') ||
+            authError.message.includes('User already registered') ||
+            authError.message.includes('already exists'))) ||
+        (authData?.user &&
+          Array.isArray(authData.user.identities) &&
+          authData.user.identities.length === 0)
+      );
 
-          if (loginError) {
-            const msg =
-              'このメールアドレスは既に登録されています。パスワードをご確認の上ログインしてください。';
-            setFormError(msg);
-            setToastMessage(msg);
-            setShowToast(true);
-            setLoading(false);
-            return;
-          }
-          userId = loginData?.user?.id || null;
+      if (isAlreadyRegistered) {
+        const msg =
+          'このメールアドレスは既に登録されています。ログイン画面からログインしてください。';
+        setFormError(msg);
+        setToastMessage(msg);
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
+
+      if (authError) {
+        let userMsg = 'アカウントの作成に失敗しました。';
+        if (authError.message.includes('Password')) {
+          userMsg = 'パスワードは6文字以上で入力してください。';
+        } else if (authError.message.includes('email')) {
+          userMsg = '有効なメールアドレスを入力してください。';
         } else {
-          let userMsg = 'アカウントの作成に失敗しました。';
-          if (authError.message.includes('Password')) {
-            userMsg = 'パスワードは6文字以上で入力してください。';
-          } else if (authError.message.includes('email')) {
-            userMsg = '有効なメールアドレスを入力してください。';
-          } else {
-            userMsg = `登録エラー: ${authError.message}`;
-          }
-          setFormError(userMsg);
-          setToastMessage(userMsg);
+          userMsg = `登録エラー: ${authError.message}`;
+        }
+        setFormError(userMsg);
+        setToastMessage(userMsg);
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
+
+      userId = authData?.user?.id || null;
+      // セッションが確立していない場合は自動ログインを試行
+      if (!authData?.session) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: validData.email,
+          password: validData.password,
+        });
+        if (signInError || !signInData?.user) {
+          const msg = '確認メールを送信しました。メール内のリンクからログインを完了してください。';
+          setToastMessage(msg);
           setShowToast(true);
           setLoading(false);
           return;
         }
-      } else {
-        userId = authData?.user?.id || null;
-        // セッションが確立していない場合は自動ログインを試行
-        if (!authData?.session) {
-          const { data: signInData } = await supabase.auth.signInWithPassword({
-            email: validData.email,
-            password: validData.password,
-          });
-          if (signInData?.user) {
-            userId = signInData.user.id;
-          }
-        }
+        userId = signInData.user.id;
       }
 
       if (!userId) {

@@ -156,17 +156,26 @@ function InviteContent() {
           password: validData.password,
         });
 
+        const isAlreadyRegistered = Boolean(
+          (signUpError &&
+            (signUpError.message.includes('already registered') ||
+              signUpError.message.includes('already exists'))) ||
+          (authData?.user &&
+            Array.isArray(authData.user.identities) &&
+            authData.user.identities.length === 0)
+        );
+
+        if (isAlreadyRegistered) {
+          setToastMessage(
+            '💡 このメールアドレスは既に登録されています。パスワードが正しいかご確認のうえログインいただくか、別のメールアドレスをご入力ください。'
+          );
+          setShowToast(true);
+          setLoading(false);
+          return;
+        }
+
         if (signUpError) {
-          if (
-            signUpError.message.includes('already registered') ||
-            signUpError.message.includes('already exists')
-          ) {
-            setToastMessage(
-              '💡 このメールアドレスは既に登録されています。パスワードが正しいかご確認のうえログインいただくか、別のメールアドレスをご入力ください。'
-            );
-          } else {
-            setToastMessage(`登録エラー: ${signUpError.message}`);
-          }
+          setToastMessage(`登録エラー: ${signUpError.message}`);
           setShowToast(true);
           setLoading(false);
           return;
