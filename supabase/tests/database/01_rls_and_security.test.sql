@@ -14,6 +14,8 @@ DECLARE
     v_farm_id UUID := '11111111-1111-1111-1111-111111111111'::uuid;
     v_task_pub_id UUID := '22222222-2222-2222-2222-222222222221'::uuid;
     v_task_draft_id UUID := '22222222-2222-2222-2222-222222222222'::uuid;
+    v_st_pub_id UUID := '33333333-3333-3333-3333-333333333331'::uuid;
+    v_st_draft_id UUID := '33333333-3333-3333-3333-333333333332'::uuid;
 BEGIN
     -- auth.users 登録
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -57,8 +59,8 @@ BEGIN
     -- student_tasks 登録
     INSERT INTO public.student_tasks (id, student_id, base_task_id, title, status, exp)
     VALUES 
-        ('st-pub-1', v_student_a_id, v_task_pub_id, '公開中の水やりタスク', 'todo', 50),
-        ('st-draft-1', v_student_a_id, v_task_draft_id, '未公開の下書きタスク', 'todo', 50)
+        (v_st_pub_id, v_student_a_id, v_task_pub_id, '公開中の水やりタスク', 'todo', 50),
+        (v_st_draft_id, v_student_a_id, v_task_draft_id, '未公開の下書きタスク', 'todo', 50)
     ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status;
 END $$;
 
