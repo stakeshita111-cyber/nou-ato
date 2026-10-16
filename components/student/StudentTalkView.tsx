@@ -528,13 +528,25 @@ export default function StudentTalkView({
         );
       }
       setShowToast(true);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Chat sending error:', err);
       void refreshTicketState();
+      const isTimeout =
+        (err instanceof DOMException &&
+          (err.name === 'TimeoutError' || err.name === 'AbortError')) ||
+        (err instanceof Error && (err.name === 'TimeoutError' || err.message.includes('timeout')));
+
+      if (isTimeout) {
+        setToastMessage('⏳ 回答の生成に時間がかかっています。送信中を解除しました');
+        setShowToast(true);
+      }
+
       const fallbackMsg: MessageItem = {
         id: 'bot_err_' + Date.now(),
         sender: 'teacher',
-        text: '【しるべぇ】申し訳ありません。一時的な通信エラーが発生しました。電波の良い場所で再度お試しいただくか、次回来園時に講師にご相談くださいね🌱',
+        text: isTimeout
+          ? '【しるべぇ】AI回答の生成に時間がかかっています⏳ システムが混雑している可能性があるため、少し時間を置いてから再度お試しいただくか、質問メモとしてストックしてくださいね🌱'
+          : '【しるべぇ】申し訳ありません。一時的な通信エラーが発生しました。電波の良い場所で再度お試しいただくか、次回来園時に講師にご相談くださいね🌱',
         timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);

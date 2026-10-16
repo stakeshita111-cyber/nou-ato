@@ -137,7 +137,7 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全40本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全41本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
    - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
@@ -178,6 +178,7 @@ npx supabase db push
    - `20261015000000_unify_ticket_status_and_storage_update.sql` (チケット残数集計統一・退会時タスク削除・Storage UPDATEポリシー追加)
    - `20261016000000_harden_crop_records_and_student_tasks_and_beds.sql` (作物記録RLS厳格化・タスク完了RPC防衛・畝改ざん防止トリガー)
    - `20261016010000_harden_save_ai_journal_server_only.sql` (save_ai_journal サーバーサイド service_role 専用化)
+   - `20261016020000_reconcile_schema_and_foreign_keys.sql` (本番DBとマイグレーション間の列・外部キー完全整合化)
 
 ---
 
@@ -205,10 +206,11 @@ npx supabase db push
 # Supabase (Dashboard > Project Settings > API から取得)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key # サーバーサイド特権用 (AI相談履歴 save_ai_journal 等)
 
 # Google AI Studio (Gemini API Key)
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-flash-lite-latest # (任意: 自動カスケード gemini-flash-lite-latest / gemini-3.5-flash)
+GEMINI_MODEL=gemini-flash-lite-latest # (任意: 自動カスケード gemini-flash-lite-latest / gemini-2.5-flash)
 ```
 
 ### 5. 開発サーバーの起動
@@ -280,7 +282,7 @@ nou-ato/
 ├── scripts/              # データベース監査・ビルド検証スクリプト
 ├── store/                # Zustand グローバル状態ストア (useThemeStore等)
 ├── supabase/             # Supabase マイグレーションSQL・設定
-├── test/                 # 自動テストスイート (Vitest: 31ファイル・全248項目)
+├── test/                 # 自動テストスイート (Vitest: 31ファイル・全250項目)
 ├── types/                # TypeScript型定義 (Database, Supabase)
 └── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```

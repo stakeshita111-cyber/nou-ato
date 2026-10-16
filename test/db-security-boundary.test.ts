@@ -20,18 +20,15 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
   });
 
   it('2. student_tasks の RLS ポリシーで、他人生徒のタスク改ざん・未ログインアクセスが物理禁止されていること', () => {
-    const purgeMigration = path.join(
-      migrationsDir,
-      '20261010020000_purge_all_legacy_policies_and_enforce_strict_rls.sql'
-    );
+    const purgeMigration = path.join(migrationsDir, '20261014000000_db_integrity_hardening.sql');
     const sql = fs.readFileSync(purgeMigration, 'utf-8');
 
-    // student_tasks_update_policy にて auth.uid() = student_id または 自農園講師 のみが許可されていること
+    // student_tasks_insert_policy にて受講生による直接作成を禁止し、自農園講師のみに限定されていること
     expect(sql).toMatch(
-      /CREATE\s+POLICY\s+"student_tasks_update_policy"\s+ON\s+public\.student_tasks/i
+      /CREATE\s+POLICY\s+"student_tasks_insert_policy"\s+ON\s+public\.student_tasks/i
     );
-    expect(sql).toContain("auth.role() = 'authenticated'");
-    expect(sql).toContain('auth.uid() = student_id');
+    expect(sql).toContain("public.current_user_role() = 'teacher'");
+    expect(sql).toContain('u.farm_id = public.current_user_farm_id()');
   });
 
   it('3. student_tasks テーブルに description カラムが確実に定義されていること (スキーマドリフト防止)', () => {
@@ -47,7 +44,7 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
   it('4. journals テーブルの非公開相談 (is_private = true) が他生徒および講師から覗き見できない設計であること', () => {
     const purgeMigration = path.join(
       migrationsDir,
-      '20261010020000_purge_all_legacy_policies_and_enforce_strict_rls.sql'
+      '20261014070000_harden_rls_boundaries_and_check_constraints.sql'
     );
     const sql = fs.readFileSync(purgeMigration, 'utf-8');
 
