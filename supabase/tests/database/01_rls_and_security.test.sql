@@ -56,12 +56,12 @@ BEGIN
         (v_task_draft_id, v_farm_id, '未公開の下書きタスク', 'draft', false, now())
     ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status;
 
-    -- student_tasks 登録
-    INSERT INTO public.student_tasks (id, student_id, base_task_id, title, status, exp)
+    -- student_tasks 登録 (公開中タスクはトリガーで自動配信されるため、ON CONFLICT (student_id, base_task_id) で同期)
+    INSERT INTO public.student_tasks (student_id, base_task_id, title, status, exp)
     VALUES 
-        (v_st_pub_id, v_student_a_id, v_task_pub_id, '公開中の水やりタスク', 'todo', 50),
-        (v_st_draft_id, v_student_a_id, v_task_draft_id, '未公開の下書きタスク', 'todo', 50)
-    ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status;
+        (v_student_a_id, v_task_pub_id, '公開中の水やりタスク', 'todo', 50),
+        (v_student_a_id, v_task_draft_id, '未公開の下書きタスク', 'todo', 50)
+    ON CONFLICT (student_id, base_task_id) DO UPDATE SET status = 'todo';
 END $$;
 
 -- ==============================================================================
