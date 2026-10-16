@@ -29,10 +29,18 @@ BEGIN
           AND column_name = 'work_types'
           AND data_type = 'jsonb'
     ) THEN
+        CREATE OR REPLACE FUNCTION pg_temp.jsonb_array_to_text_array(arr jsonb)
+        RETURNS TEXT[]
+        LANGUAGE sql IMMUTABLE
+        AS $func$
+            SELECT COALESCE(array_agg(elem), ARRAY[]::TEXT[])
+            FROM jsonb_array_elements_text(COALESCE(arr, '[]'::jsonb)) AS elem;
+        $func$;
+
         ALTER TABLE public.crop_records
-            ALTER COLUMN work_types TYPE TEXT[] USING (
-                ARRAY(SELECT jsonb_array_elements_text(COALESCE(work_types, '[]'::jsonb)))
-            );
+            ALTER COLUMN work_types TYPE TEXT[] USING pg_temp.jsonb_array_to_text_array(work_types);
+
+        DROP FUNCTION IF EXISTS pg_temp.jsonb_array_to_text_array(jsonb);
     END IF;
 END $$;
 
