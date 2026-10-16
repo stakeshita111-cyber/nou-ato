@@ -14,7 +14,11 @@ import {
   clearQuestionStock,
   formatStockText,
 } from '@/lib/ticketManager';
-import { formatQuestionTopic, prepareMessageForSend } from '@/lib/utils/journalHelper';
+import {
+  formatQuestionTopic,
+  prepareMessageForSend,
+  processChatHistory,
+} from '@/lib/utils/journalHelper';
 import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
@@ -208,6 +212,8 @@ export default function StudentTalkView({
         // 自分のデータのみを使用（0件なら0件のまま。他人の会話には絶対にフォールバックしない）
         targetList = (dbJournals || []).map((j) => ({
           id: j.id,
+          role: j.role ?? undefined,
+          text: j.text ?? undefined,
           content: j.content ?? undefined,
           reply: j.reply ?? undefined,
           created_at: j.created_at,
@@ -220,9 +226,7 @@ export default function StudentTalkView({
         );
       }
 
-      const formatted: MessageItem[] = [];
-
-      formatted.push({
+      const welcomeMsg: MessageItem = {
         id: 'welcome_msg',
         sender: 'teacher',
         text:
@@ -230,93 +234,10 @@ export default function StudentTalkView({
           studentName +
           'さん！🌱\n農家のしるべぇ(農業AI)です。\n\n野菜の育て方や土作り、今日のお天気、日々のちょっとしたお話まで、何でも気軽にチャットしてくださいね🧑‍🌾',
         timestamp: '現在',
-      });
+      };
 
-      (targetList || []).forEach((j: JournalItem) => {
-        const c = String(j.content || '').trim();
-
-        if (
-          !c ||
-          c === 'テスト' ||
-          c === '○○困ってます' ||
-          c.startsWith('【畝') ||
-          c.includes('【畝 ') ||
-          c.includes('【畝') ||
-          c.startsWith('【収穫') ||
-          c.includes('【収穫完了報告】') ||
-          c.startsWith('【差し戻し') ||
-          c.startsWith('【承認') ||
-          c.startsWith('【全体お知らせ') ||
-          c.includes('を完了報告しました') ||
-          c.includes('タスク完了') ||
-          (j.task_title && !j.reply && (c.startsWith('【') || c.includes('完了')))
-        ) {
-          return;
-        }
-
-        const isTeacherRole =
-          j.role === 'broadcast' || j.role === 'teacher' || j.role === 'announcement';
-
-        // 🌟 講師返信時に自動作成される通知用重複レコード（例: role="broadcast", text="【返信】...", reply="講師からの返信"）は除外 🌟
-        // （返信本文は元の相談レコード j.reply に保持されており、そちらから講師吹き出しとしてレンダリングされるため）
-        if (
-          isTeacherRole &&
-          (j.text === '【返信】講師から相談への回答が届きました' ||
-            j.text?.startsWith('【返信】') ||
-            j.reply === '講師からの返信')
-        ) {
-          return;
-        }
-
-        const formattedTimestamp = j.created_at
-          ? new Date(j.created_at).toLocaleTimeString('ja-JP', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : j.date || '過去のメッセージ';
-
-        if (isTeacherRole) {
-          // 講師起点の配信・メッセージ（j.content が講師メッセージ本文）
-          if (j.content) {
-            formatted.push({
-              id: 't_' + j.id,
-              sender: 'teacher',
-              text: j.content,
-              timestamp: formattedTimestamp,
-            });
-          }
-        } else {
-          // 生徒起点の相談・質問日誌
-          if (j.content) {
-            formatted.push({
-              id: 'q_' + j.id,
-              sender: 'student',
-              text: j.content,
-              timestamp: formattedTimestamp,
-            });
-          }
-          if (
-            j.reply &&
-            j.reply !== '講師からの返信' &&
-            !j.reply.startsWith('講師配信') &&
-            !j.reply.startsWith('講師個別連絡')
-          ) {
-            formatted.push({
-              id: 'a_' + j.id,
-              sender: 'teacher',
-              text: j.reply,
-              timestamp: j.created_at
-                ? new Date(j.created_at).toLocaleTimeString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : j.date || '回答済み',
-            });
-          }
-        }
-      });
-
-      setMessages(formatted);
+      const historyMessages = processChatHistory(targetList);
+      setMessages([welcomeMsg, ...historyMessages]);
     } catch (e) {
       console.error('loadChatHistory error:', e);
     }
@@ -518,7 +439,7 @@ export default function StudentTalkView({
         };
 
         setMessages((prev) => [...prev, memoSystemMsg]);
-        setToastMessage('📝 質問メモをストックしました（追記・まとめ保存）');
+        setToastMessage('📝 質問メモをストックしました（毎晩0時にチケット復活）');
         setShowToast(true);
         return;
       }
@@ -546,7 +467,7 @@ export default function StudentTalkView({
         const limitMsg: MessageItem = {
           id: 'bot_limit_' + Date.now(),
           sender: 'teacher',
-          text: '【しるべぇ】本日のAI相談チケットの上限に達しました🙇 ご入力内容は質問メモとして大切にお預かりしましたので、次回来園時に講師にご相談くださいね🌱',
+          text: '【しるべぇ】本日のAI相談チケット（1日3回）の上限に達しました🙇 チケットは毎晩0時に復活します。思いついた質問は画面上の質問メモ機能をご利用いただくか、次回来園時に講師へ直接ご相談くださいね🌱',
           timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, limitMsg]);

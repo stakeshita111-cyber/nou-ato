@@ -207,7 +207,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 # Google AI Studio (Gemini API Key)
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-flash-latest # (任意: 自動カスケード gemini-flash-latest / gemini-3.5-flash)
+GEMINI_MODEL=gemini-flash-lite-latest # (任意: 自動カスケード gemini-flash-lite-latest / gemini-3.5-flash)
 ```
 
 ### 5. 開発サーバーの起動
@@ -222,10 +222,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全31テストファイル / 247項目全件PASS、カバレッジ90%以上）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全31テストファイル / 248項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全247件・100%通過)
+# 1. 自動テストの実行 (全248件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)
@@ -279,7 +279,7 @@ nou-ato/
 ├── scripts/              # データベース監査・ビルド検証スクリプト
 ├── store/                # Zustand グローバル状態ストア (useThemeStore等)
 ├── supabase/             # Supabase マイグレーションSQL・設定
-├── test/                 # 自動テストスイート (Vitest: 32ファイル・全244項目)
+├── test/                 # 自動テストスイート (Vitest: 31ファイル・全248項目)
 ├── types/                # TypeScript型定義 (Database, Supabase)
 └── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```
@@ -292,16 +292,16 @@ nou-ato/
 
 ### 1. 📊 インタラクティブ設計＆検証ダッシュボード (HTML)
 
-| ドキュメント                           | ファイルパス                                                                   | 内容・役割                                                                  |
-| :------------------------------------- | :----------------------------------------------------------------------------- | :-------------------------------------------------------------------------- |
-| **オリアプレビュー項目DB (全101項目)** | [`docs/review-checklist-dashboard.html`](docs/review-checklist-dashboard.html) | 全101機能・非機能要件の検証ダッシュボード、合否判定、エビデンス集約         |
-| **API 仕様書 & Swagger UI**            | [`docs/api-docs.html`](docs/api-docs.html)                                     | OpenAPI 3.1 仕様に基づくブラウザ対話型 API ドキュメント・実行サンドボックス |
-| **ER図 & テーブル定義書**              | [`docs/database-design.html`](docs/database-design.html)                       | Mermaid ER図、全15テーブル+VIEW+RPC関数のカラム型・制約・RLSポリシー設計書  |
-| **品質検査計画書 (QA Master Plan)**    | [`docs/test-plan.html`](docs/test-plan.html)                                   | 全テスト項目と完全同期したテスト計画、自動テスト実行・カバレッジ検証        |
-| **アーキテクチャ & データフロー**      | [`docs/architecture-map.html`](docs/architecture-map.html)                     | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図                   |
-| **エージェント & スキル活用ガイド**    | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html)         | AI開発エージェントチームの役割分担と自律修正プロトコル解説                  |
-| **全画面フロー & 仕様マップ**          | [`docs/screen_flow.html`](docs/screen_flow.html)                               | 講師・受講生の全画面遷移、機能、データ連携使い方完全マップ                  |
-| **実践解説Webテキスト (Tutorial)**     | [`docs/tutorial/index.html`](docs/tutorial/index.html)                         | AI駆動開発の光と影・泥臭い手戻り史と実コード解剖・教育用完全解説テキスト    |
+| ドキュメント                           | ファイルパス                                                                   | 内容・役割                                                                     |
+| :------------------------------------- | :----------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
+| **オリアプレビュー項目DB (全101項目)** | [`docs/review-checklist-dashboard.html`](docs/review-checklist-dashboard.html) | 全101機能・非機能要件の検証ダッシュボード、合否判定、エビデンス集約            |
+| **API 仕様書 & Swagger UI**            | [`docs/api-docs.html`](docs/api-docs.html)                                     | OpenAPI 3.1 仕様に基づくブラウザ対話型 API ドキュメント・実行サンドボックス    |
+| **ER図 & テーブル定義書**              | [`docs/database-design.html`](docs/database-design.html)                       | Mermaid ER図、全14テーブル+1VIEW+19 RPC関数のカラム型・制約・RLSポリシー設計書 |
+| **品質検査計画書 (QA Master Plan)**    | [`docs/test-plan.html`](docs/test-plan.html)                                   | 全テスト項目と完全同期したテスト計画、自動テスト実行・カバレッジ検証           |
+| **アーキテクチャ & データフロー**      | [`docs/architecture-map.html`](docs/architecture-map.html)                     | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図                      |
+| **エージェント & スキル活用ガイド**    | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html)         | AI開発エージェントチームの役割分担と自律修正プロトコル解説                     |
+| **全画面フロー & 仕様マップ**          | [`docs/screen_flow.html`](docs/screen_flow.html)                               | 講師・受講生の全画面遷移、機能、データ連携使い方完全マップ                     |
+| **実践解説Webテキスト (Tutorial)**     | [`docs/tutorial/index.html`](docs/tutorial/index.html)                         | AI駆動開発の光と影・泥臭い手戻り史と実コード解剖・教育用完全解説テキスト       |
 
 ### 2. 📑 要件定義＆設計仕様書 (Markdown / ブラウザ統合ビューア)
 

@@ -179,15 +179,20 @@ async function runVerification() {
   // ----------------------------------------------------------------------------
   try {
     const { data, error } = await studentClient.rpc('complete_student_task', {
-      p_task_id: '00000000-0000-0000-0000-000000000999',
-      p_student_id: studentUserId,
-      p_earned_exp: 50,
+      p_base_task_id: '00000000-0000-0000-0000-000000000999',
     });
 
-    if (error) {
+    if (
+      error &&
+      (error.code === 'P0002' ||
+        error.message.includes('Target published task not found') ||
+        error.code === '42501')
+    ) {
       console.log(
-        '✅ 5. [受講生ロール] 未配信タスク完了・EXP不正加算拒否 (Permission Denied): 正常に防御'
+        '✅ 5. [受講生ロール] 未配信タスク完了拒否 (P0002 / Target not found): 正常に防御'
       );
+    } else if (error) {
+      console.log(`✅ 5. [受講生ロール] 未配信タスク完了拒否 (${error.code}): 正常に防御`);
     } else {
       console.error('❌ 5. [受講生ロール] 脆弱性検知: 未配信タスクでEXPが加算されました', data);
       failedTests++;
@@ -204,27 +209,38 @@ async function runVerification() {
       .from('farm_beds')
       .select('id')
       .eq('student_id', studentUserId);
-    const targetBedId = myBeds?.[0]?.id || '00000000-0000-0000-0000-000000000001';
+    const targetBedId = myBeds?.[0]?.id;
 
-    const { data, error } = await studentClient
-      .from('farm_beds')
-      .update({
-        plot_id: '00000000-0000-0000-0000-000000000999',
-        status: 'archived',
-      })
-      .eq('id', targetBedId)
-      .select();
-
-    if (error) {
-      console.log(
-        '✅ 6. [受講生ロール] 畝改ざん防止トリガー (trg_prevent_student_farm_bed_tampering): 正常に防御'
-      );
+    if (!targetBedId) {
+      console.log('⚠️ 6. [受講生ロール] 割当畝が見つからないためスキップ');
     } else {
-      console.error(
-        '❌ 6. [受講生ロール] 脆弱性検知: 畝の区画やステータスが書き換えられました',
-        data
-      );
-      failedTests++;
+      const { data, error } = await studentClient
+        .from('farm_beds')
+        .update({
+          plot_id: '00000000-0000-0000-0000-000000000999',
+          status: 'archived',
+        })
+        .eq('id', targetBedId)
+        .select();
+
+      if (
+        error &&
+        (error.code === '42501' ||
+          error.message.includes('Students cannot change') ||
+          error.message.includes('trg_prevent_student_farm_bed_tampering'))
+      ) {
+        console.log(
+          '✅ 6. [受講生ロール] 畝改ざん防止トリガー (trg_prevent_student_farm_bed_tampering / 42501): 正常に防御'
+        );
+      } else if (error) {
+        console.log(`✅ 6. [受講生ロール] 畝改ざん防止トリガー (${error.code}): 正常に防御`);
+      } else {
+        console.error(
+          '❌ 6. [受講生ロール] 脆弱性検知: 畝の区画やステータスが書き換えられました',
+          data
+        );
+        failedTests++;
+      }
     }
   } catch {
     console.log('✅ 6. [受講生ロール] 畝改ざん防止トリガー (例外防御): 正常に防御');

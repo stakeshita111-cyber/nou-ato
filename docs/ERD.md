@@ -1,6 +1,6 @@
 # NOU-ATO (のうあと) データベース ER図 & スキーマ仕様
 
-体験農業経営支援アプリ「NOU-ATO」の PostgreSQL / Supabase リレーショナルデータベース完全設計仕様書です（全14テーブル + 1複合VIEW + 17 RPC関数）。
+体験農業経営支援アプリ「NOU-ATO」の PostgreSQL / Supabase リレーショナルデータベース完全設計仕様書です（全14テーブル + 1複合VIEW + 19 RPC関数）。
 
 ---
 
@@ -62,9 +62,10 @@ erDiagram
         varchar name "区画名 (例: A区画)"
         varchar code "区画コード"
         text description "土壌・日照等の備考"
-        jsonb position "キャンバス配置座標 {x, y}"
+        boolean is_vacant "空き区画フラグ"
         uuid student_id FK "割当受講生"
         timestamptz created_at
+        timestamptz updated_at
     }
 
     farm_beds {
@@ -100,7 +101,7 @@ erDiagram
         text notes "観察・作業メモ"
         numeric harvest_amount "収穫量 (kg)"
         varchar image_url "添付写真URL"
-        uuid student_id FK "記録者受講生ID"
+        varchar photo_url "旧添付写真URL (互換性維持)"
         timestamptz created_at
     }
 
@@ -149,14 +150,15 @@ erDiagram
     journals {
         uuid id PK
         uuid student_id FK "生徒 users.id"
+        uuid user_id FK "作成者 users.id"
         uuid student_task_id FK "関連作業タスク"
         uuid farm_id FK "農園ID"
         varchar role "student | teacher | ai"
-        varchar target_crop "対象作物名"
         text content "受講生日誌・相談内容"
+        text text "日誌本文 (contentと同期)"
         text reply "講師コメント または AIしるべぇ回答"
         boolean is_approved "講師承認フラグ (農園ナレッジ昇格)"
-        boolean is_shared_with_farm "農園共有トグル (Yes/No)"
+        boolean is_private "非公開相談フラグ"
         text image_url "添付写真URL"
         text audio_url "音声メモURL"
         timestamptz created_at
@@ -165,36 +167,32 @@ erDiagram
     }
 
     ai_tickets {
-        uuid id PK
-        uuid user_id FK "受講生 users.id"
-        uuid farm_id FK "所属 farms.id"
-        integer granted_tickets "付与追加チケット"
-        integer bonus_tickets "ボーナスチケット"
-        date last_daily_reset_date "最終日次リセット日"
+        uuid student_id PK "受講生 users.id 参照"
+        date date "利用日"
+        integer count "当日利用回数"
+        integer granted_count "付与追加チケット数"
         timestamptz created_at
         timestamptz updated_at
     }
 
     ai_usage_events {
         uuid id PK
-        uuid ticket_id FK "ai_tickets.id"
         uuid user_id FK "受講生 users.id"
-        uuid farm_id FK "所属 farms.id"
-        varchar status "reserved | finalized | cancelled"
-        text query_preview "質問内容プレビュー (PIIマスク済)"
+        date usage_date "利用日"
+        varchar status "reserved | finalized"
         timestamptz reserved_at "予約日時"
         timestamptz finalized_at "消費確定日時"
-        timestamptz created_at
     }
 
     announcements {
         uuid id PK
         uuid farm_id FK "配信対象 farms.id"
         uuid author_id FK "作成者 (teacher) users.id"
+        uuid target_student_id FK "個別配信対象受講生 (NULL時は全体配信)"
         varchar title "お知らせタイトル"
-        text content "お知らせ本文"
-        varchar priority "normal | urgent"
+        text body "お知らせ本文"
         timestamptz created_at
+        timestamptz updated_at
     }
 
     payments {
@@ -256,27 +254,29 @@ erDiagram
 
 ---
 
-## 3. 主要 SSOT 保護 Postgres RPC 関数一覧 (17本)
+## 3. 主要 SSOT 保護 Postgres RPC 関数一覧 (19本)
 
 直接のテーブル更新を物理的に遮断し、整合性と認可を保証するストアドプロシージャ群：
 
-1. **`add_farm_bed`**: 指定区画への畝の安全な追加（ソート順・番号の自動採番）。
-2. **`delete_farm_bed`**: 権限検証を伴う畝の安全な削除・後続畝の自動番号振り直し。
-3. **`reorder_beds` / `reorder_farm_beds`**: ドラッグ＆ドロップによる畝順序の原子的並べ替え。
+1. **`add_farm_bed`**: 指定区画への畝の安全な追加（FOR UPDATE 行ロックによる連番競合防止）。
+2. **`delete_farm_bed`**: 権限検証を伴う畝の安全な削除・観察記録の保護サルベージと後続畝の自動番号振り直し。
+3. **`reorder_beds`**: ドラッグ＆ドロップによる畝順序の原子的並べ替え。
 4. **`grant_ai_tickets`**: 講師による同農園受講生への追加相談チケット付与。
 5. **`reserve_ai_usage`**: 相談開始時のチケット消費枠事前確保（2フェーズ原帳）。
-6. **`finalize_ai_usage`**: 回答生成完了時のチケット消費本確定。
-7. **`check_and_increment_ai_usage`**: チケット残数のアトミック判定・即時消費。
-8. **`get_ai_ticket_status`**: 今日の基本チケット・付与チケット残数の一括照会。
-9. **`publish_task_to_all_students`**: 全受講生への教材タスク一括同時配信。
-10. **`batch_create_student_tasks`**: トランザクション内での複数タスク一括生成。
+6. **`finalize_ai_usage`**: 回答生成完了時のチケット消費本確定（2フェーズ原帳コミット）。
+7. **`get_ai_ticket_status`**: 今日の基本チケット・付与チケット残数の一括照会。
+8. **`publish_task_to_all_students`**: 全受講生への教材タスク一括同時配信。
+9. **`complete_student_task`**: 配信済み公開中タスクの安全な完了報告（非公開タスクや未配信タスクの偽装完了を防止）。
+10. **`uncomplete_student_task`**: 完了済みタスクを未完了ステータスへ安全に戻す。
 11. **`register_teacher`**: 講師新規開設時のアカウント・農園プロファイル原子的作成（冪等化対応）。
 12. **`join_farm`**: 招待コードによる受講生の農園安全参加。
-13. **`withdraw_student`**: 受講生の農園脱退処理・紐付け解除。
-14. **`get_farm_by_invite_code`**: 招待コード検証と農園情報取得。
+13. **`withdraw_student`**: 受講生の農園脱退処理・割り当て畝解放および孤立 student_tasks の自動完全削除。
+14. **`get_farm_by_invite_code`**: 招待コード検証と農園情報取得（未認証で安全に実行可能）。
 15. **`list_farm_member_names`**: PIIマスキング用受講生表示名リストのセキュア取得。
 16. **`search_knowledge_candidates`**: RAG用の承認済み日誌・Q&A類似ナレッジ抽出。
-17. **`complete_student_task`**: 受講生の配信タスク完了・ステータス更新・経験値加算の安全実行（配信タスクかつ公開中のみ実行許可）。
+17. **`save_ai_journal`**: AI相談対話履歴・質問メモの専用安全保存（生徒による is_approved 偽装を物理防止）。
+18. **`current_user_farm_id`**: ログインユーザーの所属農園UUIDを取得する認可ヘルパー関数。
+19. **`current_user_role`**: ログインユーザーのロール（teacher/student）を取得する認可ヘルパー関数。
 
 ---
 

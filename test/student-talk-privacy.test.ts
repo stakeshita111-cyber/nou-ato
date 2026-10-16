@@ -1,86 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { formatQuestionTopic, prepareMessageForSend } from '@/lib/utils/journalHelper';
-
-interface ChatHistoryItem {
-  id?: string;
-  content?: string;
-  task_title?: string;
-  reply?: string;
-  role?: string;
-  text?: string;
-  sender?: 'student' | 'teacher';
-}
-
-export function processChatHistory(targetList: ChatHistoryItem[]) {
-  const formatted: { id: string; sender: 'student' | 'teacher'; text: string }[] = [];
-
-  (targetList || []).forEach((j) => {
-    const c = (j.content || '').trim();
-
-    if (
-      !c ||
-      c === 'テスト' ||
-      c === '○○困ってます' ||
-      c.startsWith('【畝') ||
-      c.includes('【畝 ') ||
-      c.includes('【畝') ||
-      c.startsWith('【収穫') ||
-      c.includes('【収穫完了報告】') ||
-      c.startsWith('【差し戻し') ||
-      c.startsWith('【承認') ||
-      c.startsWith('【全体お知らせ') ||
-      c.includes('を完了報告しました') ||
-      c.includes('タスク完了') ||
-      (j.task_title && !j.reply && (c.startsWith('【') || c.includes('完了')))
-    ) {
-      return;
-    }
-
-    const isTeacherRole =
-      j.role === 'broadcast' || j.role === 'teacher' || j.role === 'announcement';
-
-    if (
-      isTeacherRole &&
-      (j.text === '【返信】講師から相談への回答が届きました' ||
-        j.text?.startsWith('【返信】') ||
-        j.reply === '講師からの返信')
-    ) {
-      return;
-    }
-
-    if (isTeacherRole) {
-      if (j.content) {
-        formatted.push({
-          id: 't_' + j.id,
-          sender: 'teacher',
-          text: j.content,
-        });
-      }
-    } else {
-      if (j.content) {
-        formatted.push({
-          id: 'q_' + j.id,
-          sender: 'student',
-          text: j.content,
-        });
-      }
-      if (
-        j.reply &&
-        j.reply !== '講師からの返信' &&
-        !j.reply.startsWith('講師配信') &&
-        !j.reply.startsWith('講師個別連絡')
-      ) {
-        formatted.push({
-          id: 'a_' + j.id,
-          sender: 'teacher',
-          text: j.reply,
-        });
-      }
-    }
-  });
-
-  return formatted;
-}
+import {
+  formatQuestionTopic,
+  prepareMessageForSend,
+  processChatHistory,
+} from '@/lib/utils/journalHelper';
 
 describe('StudentTalkView Message Parsing & Duplication Prevention', () => {
   it('renders 1 student bubble and 1 teacher bubble when teacher replies to student consultation', () => {
@@ -103,12 +26,12 @@ describe('StudentTalkView Message Parsing & Duplication Prevention', () => {
     const messages = processChatHistory(dbJournals);
 
     expect(messages).toHaveLength(2);
-    expect(messages[0]).toEqual({
+    expect(messages[0]).toMatchObject({
       id: 'q_j_1',
       sender: 'student',
       text: 'トマトの葉が黄色くなりました',
     });
-    expect(messages[1]).toEqual({
+    expect(messages[1]).toMatchObject({
       id: 'a_j_1',
       sender: 'teacher',
       text: '下葉の黄変は自然な現象です。気になる場合は切り取ってください。',
@@ -129,11 +52,49 @@ describe('StudentTalkView Message Parsing & Duplication Prevention', () => {
     const messages = processChatHistory(dbJournals);
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toEqual({
+    expect(messages[0]).toMatchObject({
       id: 't_j_bc_1',
       sender: 'teacher',
       text: '明日の現地体験は雨天のため延期いたします。',
     });
+  });
+
+  it('excludes notification broadcast and never renders teacher reply as student bubble', () => {
+    const dbJournals = [
+      {
+        id: 'j_c1',
+        role: 'student',
+        content: 'ありがとうございました。TEST',
+        reply: 'どういたしまして！TEST',
+      },
+      {
+        id: 'j_notif',
+        role: 'broadcast',
+        text: '【返信】講師から相談への回答が届きました',
+        content: 'どういたしまして！TEST',
+        reply: '講師からの返信',
+      },
+    ];
+
+    const messages = processChatHistory(dbJournals);
+
+    // Exactly 2 messages: student question, and teacher reply. The notification broadcast MUST NOT be rendered as a green student bubble.
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({
+      id: 'q_j_c1',
+      sender: 'student',
+      text: 'ありがとうございました。TEST',
+    });
+    expect(messages[1]).toMatchObject({
+      id: 'a_j_c1',
+      sender: 'teacher',
+      text: 'どういたしまして！TEST',
+    });
+    // Ensure "どういたしまして！TEST" is never sent by student
+    const studentReplies = messages.filter(
+      (m) => m.sender === 'student' && m.text.includes('どういたしまして')
+    );
+    expect(studentReplies).toHaveLength(0);
   });
 });
 

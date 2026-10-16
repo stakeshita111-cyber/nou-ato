@@ -184,6 +184,21 @@ export default function StudentFarmRecordView({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
+  // 🌟 講師返信タイムラインの質問全文トグル State 🌟
+  const [expandedQuestionIds, setExpandedQuestionIds] = useState<Set<string>>(new Set());
+
+  const toggleQuestionExpanded = useCallback((id: string) => {
+    setExpandedQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
   const STAGES: GrowthStage[] = [
     '播種・苗植え',
     '発芽・活着',
@@ -583,6 +598,16 @@ export default function StudentFarmRecordView({
     const seenReplyTexts = new Set<string>();
 
     studentJournals.forEach((j) => {
+      // 🌟 講師返信時に自動作成される通知用重複レコード（例: role="broadcast", text="【返信】...", reply="講師からの返信"）は除外 🌟
+      // （相談本体レコード j.reply に返信本文、j.content に生徒の相談質問が保持されているため）
+      if (
+        j.reply === '講師からの返信' ||
+        j.text === '【返信】講師から相談への回答が届きました' ||
+        String(j.text || '').startsWith('【返信】')
+      ) {
+        return;
+      }
+
       const content = String(j.content || j.text || '');
       const replyText = String(j.reply || '').trim();
 
@@ -675,12 +700,11 @@ export default function StudentFarmRecordView({
           });
         }
       } else if (
-        j.role === 'broadcast' &&
-        (j.text === '【返信】講師から相談への回答が届きました' || j.reply === '講師からの返信')
+        (j.role === 'broadcast' || j.role === 'announcement' || j.role === 'teacher') &&
+        content
       ) {
-        const bContent = String(j.content || '').trim();
-        if (bContent && !seenReplyTexts.has(bContent)) {
-          seenReplyTexts.add(bContent);
+        if (!seenReplyTexts.has(content)) {
+          seenReplyTexts.add(content);
           const dateObj = j.created_at ? new Date(String(j.created_at)) : new Date();
           const timeStr = dateObj.toLocaleTimeString('ja-JP', {
             hour: '2-digit',
@@ -691,8 +715,8 @@ export default function StudentFarmRecordView({
             type: 'teacher_reply',
             timestamp: dateObj.getTime(),
             dateStr: `${formatDate(dateObj.toISOString())} ${timeStr}`,
-            teacherName: '講師',
-            replyContent: bContent,
+            teacherName: '講師（全体お知らせ）',
+            replyContent: content,
           });
         }
       }
@@ -1189,15 +1213,35 @@ export default function StudentFarmRecordView({
                         </div>
 
                         {item.originalQuestion && (
-                          <div className="text-[11px] text-gray-600 bg-white/70 p-2.5 rounded-xl border border-amber-200/60 font-medium">
-                            <span className="text-[10px] text-amber-900 font-bold block mb-0.5">
-                              📌 対象の相談・質問:
-                            </span>
-                            <p className="line-clamp-2 leading-relaxed">{item.originalQuestion}</p>
+                          <div
+                            onClick={() => toggleQuestionExpanded(item.id)}
+                            className="text-[11px] text-gray-700 bg-white/90 p-3 rounded-xl border border-amber-200/80 font-medium cursor-pointer hover:bg-amber-100/40 transition group/q"
+                            title="クリックで質問の全文を表示/折りたたみ"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] text-amber-900 font-black flex items-center gap-1">
+                                <span>📌 対象の相談・質問:</span>
+                              </span>
+                              <span className="text-[10px] text-amber-700 font-bold group-hover/q:underline">
+                                {expandedQuestionIds.has(item.id) ? '▲ 折りたたむ' : '▼ 全文を見る'}
+                              </span>
+                            </div>
+                            <p
+                              className={`leading-relaxed ${
+                                expandedQuestionIds.has(item.id)
+                                  ? 'whitespace-pre-wrap'
+                                  : 'line-clamp-2'
+                              }`}
+                            >
+                              {item.originalQuestion}
+                            </p>
                           </div>
                         )}
 
                         <div className="bg-white p-3.5 rounded-xl border border-amber-200 text-gray-900 font-medium leading-relaxed whitespace-pre-wrap text-xs shadow-2xs">
+                          <span className="text-[10px] text-amber-800 font-bold block mb-1">
+                            💬 講師からのアドバイス:
+                          </span>
                           {item.replyContent}
                         </div>
                       </div>

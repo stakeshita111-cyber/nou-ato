@@ -22,7 +22,7 @@
     "/api/chat/rag": {
       "post": {
         "summary": "AI しるべぇ (農園特化型 RAG) チャット相談",
-        "description": "受講生の農業に関する質問を受け付け、Gemini (gemini-2.5-flash / gemini-flash-lite-latest) と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。\n1日3回のチケット制に対応し、サーバー側でのアトミック原帳管理やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。",
+        "description": "受講生の農業に関する質問を受け付け、Gemini (gemini-flash-lite-latest / gemini-3.5-flash) と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。\n1日3回のチケット制に対応し、サーバー側でのアトミック原帳管理やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。",
         "operationId": "postChatRag",
         "requestBody": {
           "required": true,

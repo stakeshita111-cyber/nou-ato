@@ -47,7 +47,7 @@
           </div>
         </div>
         <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span>テーブル数: 全14テーブル + 1複合VIEW + 17 RPC関数</span>
+          <span>テーブル数: 全14テーブル + 1複合VIEW + 19 RPC関数</span>
           <span>•</span>
           <span>RLS ポリシー完備</span>
         </div>
@@ -215,8 +215,11 @@ erDiagram
         uuid farm_id FK
         varchar name
         varchar code
-        jsonb position
+        text description
+        boolean is_vacant
         uuid student_id FK
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     farm_beds {
@@ -241,6 +244,7 @@ erDiagram
         text notes
         numeric harvest_amount
         varchar image_url
+        varchar photo_url
     }
 
     tasks {
@@ -265,37 +269,39 @@ erDiagram
     journals {
         uuid id PK
         uuid student_id FK
+        uuid user_id FK
         uuid student_task_id FK
         varchar role
         text content
+        text text
         text reply
         boolean is_approved
-        boolean is_shared_with_farm
+        boolean is_private
     }
 
     ai_tickets {
-        uuid id PK
-        uuid user_id FK
-        uuid farm_id FK
-        integer granted_tickets
-        date last_daily_reset_date
+        uuid student_id PK
+        date date
+        integer count
+        integer granted_count
     }
 
     ai_usage_events {
         uuid id PK
-        uuid ticket_id FK
         uuid user_id FK
+        date usage_date
         varchar status "reserved|finalized"
-        text query_preview
+        timestamptz reserved_at
+        timestamptz finalized_at
     }
 
     announcements {
         uuid id PK
         uuid farm_id FK
         uuid author_id FK
+        uuid target_student_id FK
         varchar title
-        text content
-        varchar priority "normal|urgent"
+        text body
     }
 
     events {
