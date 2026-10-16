@@ -78,10 +78,11 @@ SELECT throws_matching(
     '1. [anon] 未ログインユーザーは crop_records を INSERT できない'
 );
 
--- Test 2: anon は farms を UPDATE できない (RLS拒否)
-SELECT lives_ok(
+-- Test 2: anon は farms を UPDATE できない (権限拒否)
+SELECT throws_matching(
     $$ UPDATE public.farms SET name = '乗っ取り農園' WHERE id = '11111111-1111-1111-1111-111111111111' $$,
-    '2. [anon] farms の UPDATE は RLS により0行更新（直接エラーにならず更新不可）'
+    'permission denied',
+    '2. [anon] farms の UPDATE は権限拒否される'
 );
 
 -- ==============================================================================
@@ -127,16 +128,16 @@ SELECT throws_matching(
 -- ==============================================================================
 
 -- Test 7: 受講生が自分の畝の plot_id を変更しようとするとトリガー例外 (42501) で拒否される
-SELECT throws_ok(
+SELECT throws_matching(
     $$ UPDATE public.farm_beds SET plot_id = 'plot-b-1' WHERE id = 'bed-a-1' $$,
-    '42501',
+    'Students cannot change plot_id',
     '7. [student_a] 畝の plot_id を他人の区画へ移動しようとするとトリガー例外 42501 で拒否される'
 );
 
 -- Test 8: 受講生が自分の畝の status や bed_number を変更しようとするとトリガー例外 (42501) で拒否される
-SELECT throws_ok(
+SELECT throws_matching(
     $$ UPDATE public.farm_beds SET status = 'archived' WHERE id = 'bed-a-1' $$,
-    '42501',
+    'Students cannot change bed status',
     '8. [student_a] 畝の status を変更しようとするとトリガー例外 42501 で拒否される'
 );
 
@@ -151,16 +152,16 @@ SELECT lives_ok(
 );
 
 -- Test 10: 未公開の下書きタスク ID で完了を試みると例外 (P0002) が発生する
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT public.complete_student_task('22222222-2222-2222-2222-222222222222') $$,
-    'P0002',
+    'Target published task not found for this student',
     '10. [student_a] 未公開（下書き）タスクの完了呼び出しは P0002 例外で拒否される'
 );
 
 -- Test 11: 存在しないタスク ID で完了を試みると例外 (P0002) が発生する
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT public.complete_student_task('99999999-9999-9999-9999-999999999999') $$,
-    'P0002',
+    'Target published task not found for this student',
     '11. [student_a] 存在しないタスク ID の完了呼び出しは P0002 例外で拒否される'
 );
 
@@ -169,9 +170,9 @@ SELECT throws_ok(
 -- ==============================================================================
 
 -- Test 12: journals.content の空文字挿入は CHECK 制約 (23514) で拒否される
-SELECT throws_ok(
+SELECT throws_matching(
     $$ INSERT INTO public.journals (student_id, farm_id, content) VALUES ('00000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '') $$,
-    '23514',
+    'violates check constraint',
     '12. [CHECK制約] journals の content 空文字は 23514 (check_violation) で拒否される'
 );
 
