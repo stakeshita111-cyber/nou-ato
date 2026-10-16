@@ -132,6 +132,15 @@ export function useStudentDashboard() {
         bedData = (data as Record<string, unknown>[]) || [];
         setMyBeds(bedData);
 
+        // 🌟 自農園の公開タスクを受講生の student_tasks に安全に同期先行配備 🌟
+        if (studentFarmId && typeof supabase.rpc === 'function') {
+          try {
+            await supabase.rpc('sync_student_published_tasks');
+          } catch (syncErr) {
+            console.warn('sync_student_published_tasks notice:', syncErr);
+          }
+        }
+
         // 2. 講師が公開中のタスク (tasks: status = "todo", deleted_at is null) 及び 個別割当 (student_tasks) のみ取得
         const { data: stData, error: stError } = await supabase
           .from('student_tasks')
@@ -483,6 +492,13 @@ export function useStudentDashboard() {
 
     // 2. Supabase DB (student_tasks) の status を 'completed' に更新 (専用RPC complete_student_task 経由)
     try {
+      // 念のため未配備タスクの場合は同期を試行
+      if (typeof supabase.rpc === 'function') {
+        try {
+          await supabase.rpc('sync_student_published_tasks');
+        } catch {}
+      }
+
       const { error: rpcErr } = await supabase.rpc('complete_student_task', {
         p_base_task_id: baseTaskId || targetTask.id || '',
         p_task_title: taskTitle,

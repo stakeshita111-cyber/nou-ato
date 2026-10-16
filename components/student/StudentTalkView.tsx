@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { z } from 'zod';
 import Toast from '@/components/ui/Toast';
+import FormattedChatMessage from '@/components/ui/FormattedChatMessage';
 import { supabase } from '@/lib/supabase';
 import {
   getTicketState,
@@ -687,9 +688,11 @@ export default function StudentTalkView({
                         : 'bg-white text-gray-800 border border-gray-200/90 rounded-tl-none font-normal')
                     }
                   >
-                    <p className="whitespace-pre-wrap">
-                      {renderHighlightedText(msg.text, searchKeyword)}
-                    </p>
+                    <FormattedChatMessage
+                      text={msg.text}
+                      searchKeyword={searchKeyword}
+                      isMe={isMe}
+                    />
 
                     {/* 質問ストック・累積メモボックス */}
                     {!isMe && msg.stockItems && msg.stockItems.length > 0 && (

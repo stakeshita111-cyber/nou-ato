@@ -893,6 +893,10 @@ export type Database = {
           reply: string;
         }[];
       };
+      sync_student_published_tasks: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
       uncomplete_student_task: {
         Args: { p_base_task_id: string };
         Returns: Json;
