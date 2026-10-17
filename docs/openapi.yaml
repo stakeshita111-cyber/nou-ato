@@ -3,7 +3,7 @@ info:
   title: NOU-ATO (のうあと) API Specification
   description: |
     体験農業経営支援アプリ「NOU-ATO」のバックエンド API 仕様書です。
-    農園特化型 AI ナレッジ検索（RAG）、AI しるべぇ対話相談、システム設定などのエンドポイントを提供します。
+    農園特化型 AI ナレッジ検索（RAG）、AI しるべぇ対話相談、システム設定、チケット付与などのエンドポイントを提供します。
     エラーレスポンスは RFC 7807 (Problem Details for HTTP APIs) に準拠しています。
   version: 1.0.0
   contact:
@@ -20,7 +20,7 @@ paths:
       summary: AI しるべぇ (農園特化型 RAG) チャット相談
       description: |
         受講生の農業に関する質問を受け付け、Gemini (gemini-flash-lite-latest / gemini-2.5-flash) と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。
-        1日3回のチケット制に対応し、サーバー側でのアトミック原帳管理やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。
+        1日3回のチケット制に対応し、サーバー側でのアトミック台帳管理（consume_ai_ticket / refund_ai_ticket）やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。
       operationId: postChatRag
       requestBody:
         required: true
@@ -32,6 +32,7 @@ paths:
               message: 'ミニトマトの脇芽かきはいつ行うべきですか？'
               studentName: '受講生'
               isMemoOnly: false
+              isPrivate: false
       responses:
         '200':
           description: チャット回答生成成功
@@ -47,6 +48,8 @@ paths:
                     answer: '天気の良い日の午前中に手でぽきっと折るように摘み取ります。'
                     similarityScore: 8.5
                 timestamp: '2026-09-25T12:00:00.000Z'
+                saved: true
+                status: 'ok'
         '400':
           description: 不正なリクエスト (メッセージ未指定など)
           content:
@@ -59,14 +62,30 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: 'https://httpstatuses.com/401'
+                title: 'Unauthorized'
+                status: 401
+                detail: 'ログインが必要です。再度ログインしてください。'
         '429':
-          description: 本日のAI相談上限超過 (RFC 7807)
+          description: 1日の相談上限超過 (RFC 7807)
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: 'https://httpstatuses.com/429'
+                title: 'Too Many Requests'
+                status: 429
+                detail: '本日のAI相談チケットの上限に達しました。'
         '500':
           description: サーバー内部エラー (Gemini API 呼び出し失敗など)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '503':
+          description: データベース接続障害またはAIサービス一時利用不可 (RFC 7807)
           content:
             application/problem+json:
               schema:
@@ -74,9 +93,10 @@ paths:
 
   /api/chat/check-knowledge:
     post:
-      summary: 入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合
+      summary: 入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合および自己解決保存
       description: |
         受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。
+        また、`saveOnly: true` 指定時は自己解決したQ&Aをチケット消費なしで `journals` テーブルへ保存します。
       operationId: postCheckKnowledge
       requestBody:
         required: true
@@ -89,11 +109,25 @@ paths:
               properties:
                 question:
                   type: string
+                  minLength: 1
+                  maxLength: 1000
                   description: 照合対象の質問テキスト
                   example: 'きゅうりの葉っぱが黄色くなってきました'
+                saveOnly:
+                  type: boolean
+                  description: 自己解決したFAQを日誌として保存のみ行うモードフラグ
+                  default: false
+                answer:
+                  type: string
+                  maxLength: 5000
+                  description: saveOnly=true 時に保存する解決済み回答テキスト
+                isPrivate:
+                  type: boolean
+                  description: 個人メモ（非公開）として保存するフラグ
+                  default: false
       responses:
         '200':
-          description: 照合結果リストの返却
+          description: 照合結果リストまたは保存成否の返却
           content:
             application/json:
               schema:
@@ -103,6 +137,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/KnowledgeMatch'
+                  saved:
+                    type: boolean
+                    description: saveOnly=true 指定時の日誌保存成否
               example:
                 matches:
                   - id: 'faq_yellow_leaf'
@@ -110,13 +147,39 @@ paths:
                     answer: '【農園アドバイス：葉の黄変について】一番下の古い葉が黄色い場合は自然な老化ですので切り取って大丈夫です。'
                     matchedKeywords: ['黄色', '葉が黄色']
                     score: 20
+        '400':
+          description: 不正なリクエスト (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 未ログイン・認証エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: サーバー内部エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/settings:
     get:
       summary: システム・機能設定の取得
       description: |
-        講師および受講生画面の機能フラグ（生徒用AI相談タブの表示/非表示など）を取得します。
+        講師および受講生画面の機能フラグ（生徒用AI相談タブの表示/非表示）および農園別カスタムFAQプリセットを取得します。
       operationId: getSettings
+      parameters:
+        - name: farm_id
+          in: query
+          required: false
+          description: 取得対象の農園ID（省略時はログインユーザーの所属農園ID）
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: 設定情報の返却成功
@@ -131,14 +194,33 @@ paths:
                   showStudentTalkTab:
                     type: boolean
                     description: 生徒画面の相談タブを表示するか否か
+                  presetFaqs:
+                    type: array
+                    description: 農園別カスタムFAQプリセット一覧
+                    items:
+                      $ref: '#/components/schemas/PresetFaqItem'
               example:
                 settings:
                   showStudentTalkTab: true
+                  presetFaqs: []
                 showStudentTalkTab: true
+                presetFaqs: []
+        '401':
+          description: 未ログイン・認証エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: サーバー内部エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
     post:
       summary: システム・機能設定の更新
       description: |
-        講師による機能フラグ設定の動的更新を受け付けます。
+        講師による機能フラグ設定およびカスタムFAQプリセットの動的更新を受け付けます。
       operationId: updateSettings
       requestBody:
         required: true
@@ -150,6 +232,11 @@ paths:
                 showStudentTalkTab:
                   type: boolean
                   example: true
+                presetFaqs:
+                  type: array
+                  maxItems: 50
+                  items:
+                    $ref: '#/components/schemas/PresetFaqItem'
       responses:
         '200':
           description: 設定更新成功
@@ -164,8 +251,30 @@ paths:
                     type: object
                   showStudentTalkTab:
                     type: boolean
+                  presetFaqs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PresetFaqItem'
         '400':
-          description: 不正な設定パラメータ
+          description: 不正な設定パラメータ (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: 未ログイン・認証エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: 講師権限なし (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: サーバー内部エラー (RFC 7807)
           content:
             application/problem+json:
               schema:
@@ -209,14 +318,46 @@ paths:
                   studentId:
                     type: string
                     format: uuid
-                  grantedTickets:
+                  amount:
                     type: integer
-                  newTotal:
+                    description: 今回付与したチケット枚数
+                  newCount:
                     type: integer
+                    nullable: true
+                    description: 付与後の当日使用可能カウント（負数により残り相談可能回数が増加）
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          description: 不正なリクエストパラメータ (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
         '401':
-          description: 未ログイン (RFC 7807)
+          description: 未ログイン・認証エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
         '403':
           description: 講師権限なし または 他農園の受講生 (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: 対象受講生が存在しない (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: サーバー内部エラー (RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
 components:
   schemas:
@@ -228,14 +369,22 @@ components:
         message:
           type: string
           description: 受講生の質問・相談メッセージ本文（1〜1000文字）
+          example: 'ミニトマトの脇芽かきはいつ行うべきですか？'
         studentName:
           type: string
           description: 受講生氏名（パーソナライズ用）
           default: '受講生'
+          example: '受講生'
         isMemoOnly:
           type: boolean
-          description: チケット0枚時のメモ専用モードフラグ
+          description: チケット0枚時のメモ専用モードフラグ（チケット消費なし）
           default: false
+          example: false
+        isPrivate:
+          type: boolean
+          description: 個人メモ（非公開日誌）として保存するフラグ
+          default: false
+          example: false
 
     ChatRagResponse:
       type: object
@@ -256,6 +405,15 @@ components:
           type: string
           format: date-time
           description: 回答生成日時
+        saved:
+          type: boolean
+          description: journals テーブルへの日誌保存成否
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+          description: AI 回答生成ステータス（フォールバック時は degraded）
 
     ReferencedQaItem:
       type: object
@@ -294,6 +452,34 @@ components:
             type: string
         score:
           type: number
+
+    PresetFaqItem:
+      type: object
+      required:
+        - id
+        - category
+        - question
+        - answer
+        - keywords
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        category:
+          type: string
+          maxLength: 50
+        question:
+          type: string
+          maxLength: 300
+        answer:
+          type: string
+          maxLength: 2000
+        keywords:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 50
 
     ProblemDetails:
       type: object

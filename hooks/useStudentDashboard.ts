@@ -152,7 +152,7 @@ export function useStudentDashboard() {
           setError(new Error(stError.message));
         }
 
-        // 🌟 講師がカンバンで「生徒へ公開中 (status = 'todo')」に配置した教材タスクを取得 (自農園または共通教材) 🌟
+        // 🌟 講師がカンバンで「生徒へ公開中 (status = 'todo')」に配置した自農園の教材タスクを取得 🌟
         let ptQuery = supabase
           .from('tasks')
           .select('*')
@@ -160,7 +160,7 @@ export function useStudentDashboard() {
           .is('deleted_at', null);
 
         if (studentFarmId) {
-          ptQuery = ptQuery.or(`farm_id.eq.${studentFarmId},farm_id.is.null`);
+          ptQuery = ptQuery.eq('farm_id', studentFarmId);
         }
 
         const { data: publicTasks } = await ptQuery.order('created_at', { ascending: false });
@@ -168,9 +168,10 @@ export function useStudentDashboard() {
         const taskList: StudentTaskItem[] = [];
         const seenTaskIds = new Set<string>();
 
-        // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加
+        // ① 講師が新規作成して「生徒へ公開中 (status = 'todo')」にした教材タスクを追加（テンプレートは除外）
         if (publicTasks && publicTasks.length > 0) {
           publicTasks.forEach((pt: Record<string, unknown>) => {
+            if (pt.is_template === true) return;
             const ptId = String(pt.id || '');
             if (ptId && !seenTaskIds.has(ptId)) {
               seenTaskIds.add(ptId);
@@ -191,16 +192,6 @@ export function useStudentDashboard() {
               const stMatchTyped = stMatch as
                 { id?: string; status?: string; base_task_id?: string | null } | undefined;
               const isDone = stMatchTyped ? stMatchTyped.status === 'completed' : false;
-
-              // 旧データで base_task_id が欠落していた場合はバックグラウンドで自己修復
-              const targetStId = stMatchTyped?.id;
-              if (targetStId && !stMatchTyped.base_task_id) {
-                Promise.resolve(
-                  supabase.from('student_tasks').update({ base_task_id: ptId }).eq('id', targetStId)
-                ).catch((err: unknown) => {
-                  console.error('Failed to auto-repair base_task_id:', err);
-                });
-              }
 
               const cl = (pt.checklist as Record<string, unknown>) || {};
               const resolvedBadgeName =
@@ -471,7 +462,6 @@ export function useStudentDashboard() {
     const baseTaskId = String(
       (targetTask.tasks as { id?: string })?.id || targetTask.task_id || targetTask.id || ''
     ).replace(/^task_/, '');
-    const currentStudentId = user?.id || 'student_default';
 
     // ロールバック用に直前のタスク一覧を保持
     const previousTasks = [...tasks];
@@ -505,17 +495,7 @@ export function useStudentDashboard() {
       });
 
       if (rpcErr) {
-        console.warn('complete_student_task RPC warning, fallback to direct update:', rpcErr);
-        // フォールバック: 既存レコードの直接 UPDATE を試行
-        const { error: updateErr } = await supabase
-          .from('student_tasks')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-          })
-          .eq('student_id', currentStudentId)
-          .eq('base_task_id', baseTaskId);
-        if (updateErr) throw rpcErr;
+        throw rpcErr;
       }
     } catch (e) {
       console.error('completeTask DB update failed, rolling back:', e);

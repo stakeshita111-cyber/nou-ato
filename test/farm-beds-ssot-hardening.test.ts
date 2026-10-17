@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { reorderBedsInDb, addFarmBedInDb, deleteFarmBedInDb } from '@/lib/farm/farmDb';
+import {
+  reorderBedsInDb,
+  addFarmBedInDb,
+  deleteFarmBedInDb,
+  swapFarmPlotsInDb,
+} from '@/lib/farm/farmDb';
 import { supabase } from '@/lib/supabase';
 
 vi.mock('@/lib/supabase', () => ({
@@ -120,6 +125,46 @@ describe('Farm Beds SSOT & Hardened RPCs', () => {
 
       const success = await deleteFarmBedInDb('plot-123', 'bed-uuid-1');
       expect(success).toBe(false);
+    });
+  });
+
+  describe('swapFarmPlotsInDb', () => {
+    it('calls swap_farm_plots RPC with from and to plot IDs and returns true', async () => {
+      vi.mocked(supabase.rpc).mockImplementation((() =>
+        Promise.resolve({
+          data: { swapped: true },
+          error: null,
+          count: null,
+          status: 200,
+          statusText: 'OK',
+        })) as never);
+
+      const ok = await swapFarmPlotsInDb('plot_cell_A1', 'plot_cell_B2');
+
+      expect(supabase.rpc).toHaveBeenCalledWith('swap_farm_plots', {
+        p_from_plot_id: 'plot_cell_A1',
+        p_to_plot_id: 'plot_cell_B2',
+      });
+      expect(ok).toBe(true);
+    });
+
+    it('returns false when swap_farm_plots RPC fails', async () => {
+      vi.mocked(supabase.rpc).mockImplementation((() =>
+        Promise.resolve({
+          data: null,
+          error: {
+            message: 'Only teachers can swap farm plots',
+            details: '',
+            hint: '',
+            code: '42501',
+          },
+          count: null,
+          status: 403,
+          statusText: 'Forbidden',
+        })) as never);
+
+      const ok = await swapFarmPlotsInDb('plot_cell_A1', 'plot_cell_B2');
+      expect(ok).toBe(false);
     });
   });
 });

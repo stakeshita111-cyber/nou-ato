@@ -47,7 +47,7 @@
           </div>
         </div>
         <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <span>テーブル数: 全14テーブル + 1複合VIEW + 19 RPC関数</span>
+          <span>テーブル数: 全14テーブル + 1複合VIEW + 21 RPC関数</span>
           <span>•</span>
           <span>RLS ポリシー完備</span>
         </div>
@@ -230,7 +230,7 @@ erDiagram
         varchar crop_name
         integer progress_percent
         varchar status "active|harvested"
-        integer sort_order
+        timestamptz updated_at
     }
 
     crop_records {
@@ -240,7 +240,7 @@ erDiagram
         varchar date
         varchar crop_name
         numeric height_cm
-        jsonb work_types
+        text_array work_types
         text notes
         numeric harvest_amount
         varchar image_url

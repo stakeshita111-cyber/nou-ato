@@ -12,6 +12,7 @@ import BedApprovalModal from '@/components/farm/BedApprovalModal';
 import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { supabase } from '@/lib/supabase';
+import { swapFarmPlotsInDb } from '@/lib/farm/farmDb';
 import { useFarmStore } from '@/store/useFarmStore';
 
 const FarmMetaDescriptionSchema = z.object({
@@ -460,39 +461,18 @@ export default function TeacherFarmCanvasView({
       return p;
     });
 
+    const previousPlots = plots;
     setPlots(updatedPlots);
-    await savePlotsGridIndicesToSupabase(updatedPlots);
 
-    // 🌟 過去の crop_records の bed_id を一時退避経由で安全にスワップ書き換え (ID衝突ゼロ) 🌟
-    try {
-      // 1. fromBeds の crop_records を一時退避
-      for (let i = 0; i < (fromPlot.beds || []).length; i++) {
-        const oldB = fromPlot.beds[i];
-        if (oldB?.id) {
-          await supabase
-            .from('crop_records')
-            .update({ bed_id: `temp_swap_${toAddr}_${i + 1}` })
-            .eq('bed_id', oldB.id);
-        }
-      }
-      // 2. toBeds の crop_records を fromAddr の bed_id へ更新
-      for (let i = 0; i < (toPlot.beds || []).length; i++) {
-        const oldB = toPlot.beds[i];
-        const newBedId = toBedsForFrom[i]?.id;
-        if (oldB?.id && newBedId) {
-          await supabase.from('crop_records').update({ bed_id: newBedId }).eq('bed_id', oldB.id);
-        }
-      }
-      // 3. 一時退避していた fromBeds の crop_records を toAddr の bed_id へ更新
-      for (let i = 0; i < (fromPlot.beds || []).length; i++) {
-        const tempId = `temp_swap_${toAddr}_${i + 1}`;
-        const newBedId = fromBedsForTo[i]?.id;
-        if (newBedId) {
-          await supabase.from('crop_records').update({ bed_id: newBedId }).eq('bed_id', tempId);
-        }
-      }
-    } catch (e) {
-      console.warn('swap crop_records error:', e);
+    // 🌟 DB関数 swap_farm_plots により 1トランザクションで区画・畝・観察記録をアトミックに入れ替え 🌟
+    const swappedOk = await swapFarmPlotsInDb(fromPlot.id, toPlot.id);
+    if (!swappedOk) {
+      setPlots(previousPlots);
+      setToastMessage('⚠️ 区画の入れ替え保存に失敗しました。通信環境をご確認ください。');
+      setShowToast(true);
+      setDraggedPlotCode(null);
+      setDragOverPlotCode(null);
+      return;
     }
 
     setToastMessage(`🚚 マス「${fromAddr}」と「${toAddr}」の区画データを入れ替えました！`);

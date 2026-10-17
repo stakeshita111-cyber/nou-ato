@@ -319,6 +319,24 @@ export async function deleteFarmBedInDb(plotId: string, bedId: string) {
   }
 }
 
+export async function swapFarmPlotsInDb(fromPlotId: string, toPlotId: string): Promise<boolean> {
+  if (!fromPlotId || !toPlotId || fromPlotId === toPlotId) return false;
+  try {
+    const { error } = await supabase.rpc('swap_farm_plots', {
+      p_from_plot_id: fromPlotId,
+      p_to_plot_id: toPlotId,
+    });
+    if (error) {
+      console.error('swapFarmPlotsInDb error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('swapFarmPlotsInDb exception:', e);
+    return false;
+  }
+}
+
 export async function insertBedDb(payload: Database['public']['Tables']['farm_beds']['Insert']) {
   const { data, error } = await supabase.from('farm_beds').upsert(payload).select().single();
   if (error) {

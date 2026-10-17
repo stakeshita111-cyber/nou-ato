@@ -201,7 +201,7 @@ export default function UnifiedLoginPage() {
               </span>
               <div className="flex items-center gap-1.5">
                 <Link
-                  href="/docs/markdown-viewer.html?doc=readme"
+                  href="https://github.com/ShoTakeshita/nou-ato#readme"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[10px] text-emerald-800 hover:text-emerald-950 font-bold bg-white/90 hover:bg-white px-2 py-0.5 rounded-full border border-emerald-200 transition flex items-center gap-1 shadow-2xs"
@@ -245,16 +245,6 @@ export default function UnifiedLoginPage() {
                   test11@example.com
                 </div>
               </button>
-            </div>
-            <div className="text-right">
-              <Link
-                href="/docs/review-checklist-dashboard.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[9px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-0.5 hover:underline"
-              >
-                <span>📊</span> 審査・レビュー用全101項目検証シート ↗
-              </Link>
             </div>
           </div>
         )}

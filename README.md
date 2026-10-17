@@ -37,10 +37,10 @@
 
 ログイン画面（[/login](https://nou-ato.vercel.app/login)）の「⚡ ポートフォリオ確認用デモ」枠にあるボタンを押すと、**メールアドレスとパスワードがワンタップで自動入力**されます。手動で入力される場合は以下をご利用ください。
 
-| ロール        | メールアドレス       | パスワード | 初期リダイレクト     | 主な体験可能機能                                                                                                                                                                                                                               |
-| :------------ | :------------------- | :--------- | :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **👨‍🌾 講師**   | `test01@example.com` | `test01`   | `/teacher/dashboard` | ・受講生一覧・ステップ進捗率の把握<br>・農地キャンバス（D&D畝配置・スリム畝カード）<br>・一括アナウンス即時配信<br>・日誌返信 & AIナレッジ化（RAG）承認<br>・農園設定（相談タブON/OFF切り替え）                                                |
-| **👨‍🎓 受講生** | `test11@example.com` | `test11`   | `/student`           | ・マイファーム（ミニトマト栽培・進捗75%）<br>・マイタスク（立体カードスタック & 無限循環ループ）<br>・成長スキルボード（スロット内3Dコイン回転バッジ）<br>・AIしるべぇ相談（チケット制・Yes/No共有トグル）<br>・24時間お天気予報・農園交換日記 |
+| ロール        | メールアドレス       | パスワード | 初期リダイレクト     | 主な体験可能機能                                                                                                                                                                                                                                                                |
+| :------------ | :------------------- | :--------- | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **👨‍🌾 講師**   | `test01@example.com` | `test01`   | `/teacher/dashboard` | ・受講生一覧・ステップ進捗率の把握<br>・農地キャンバス（D&D畝配置・スリム畝カード）<br>・一括アナウンス即時配信<br>・日誌返信 & AIナレッジ化（RAG）承認<br>・農園設定（相談タブON/OFF切り替え）                                                                                 |
+| **👨‍🎓 受講生** | `test11@example.com` | `test11`   | `/student`           | ・マイファーム（担当区画 B3：畝1 ナス・収穫期 100%、畝2 レタス・播種 15%）<br>・マイタスク（立体カードスタック & 無限循環ループ）<br>・成長スキルボード（スロット内3Dコイン回転バッジ）<br>・AIしるべぇ相談（チケット制・Yes/No共有トグル）<br>・24時間お天気予報・農園交換日記 |
 
 ```text
 【クイックコピペ用】
@@ -76,8 +76,8 @@
 | **バックエンド / DB**    | Supabase (PostgreSQL, Supabase Auth, SSR, Storage, RLS)                                                      |
 | **AI / RAG**             | Google AI Studio (Gemini 2.5 Flash / Flash-Lite: `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
 | **API アーキテクチャ**   | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI                                                          |
-| **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build)                                                      |
-| **テストフレームワーク** | Vitest, @vitest/coverage-v8 (閾値 70% 準拠)                                                                  |
+| **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build, Supabase DB Reset & pgTAP)                           |
+| **テストフレームワーク** | Vitest (32ファイル・259項目), pgTAP (`supabase test db`: 16項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
 
 ---
 
@@ -107,7 +107,7 @@
 ### 2. リポジトリのクローンと依存関係インストール
 
 ```bash
-git clone https://github.com/stakeshita111-cyber/nou-ato.git
+git clone https://github.com/ShoTakeshita/nou-ato.git
 cd nou-ato
 npm install
 ```
@@ -137,7 +137,7 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全42本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全43本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
    - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
@@ -180,6 +180,7 @@ npx supabase db push
    - `20261016010000_harden_save_ai_journal_server_only.sql` (save_ai_journal サーバーサイド service_role 専用化)
    - `20261016020000_reconcile_schema_and_foreign_keys.sql` (本番DBとマイグレーション間の列・外部キー完全整合化)
    - `20261016030000_sync_student_published_tasks.sql` (公開済みタスクの受講生先行配備・同期RPC)
+   - `20261016040000_harden_student_tasks_rls_and_column_nullability.sql` (student_tasks直接UPDATEのRLS厳格化・NOT NULL制約完全同期)
 
 ---
 
@@ -226,10 +227,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全31テストファイル / 250項目全件PASS、カバレッジ90%以上）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全32テストファイル / 259項目 ＋ pgTAP 実DBテスト 1ファイル / 16項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全250件・100%通過)
+# 1. 自動テストの実行 (全259件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)
@@ -267,7 +268,7 @@ npm run lint
 ```text
 nou-ato/
 ├── .github/              # GitHub Actions CI/CD パイプライン
-│   └── workflows/        # ci.yml (品質ゲート), deploy.yml (ビルド検証)
+│   └── workflows/        # ci.yml (品質ゲート & pgTAP実DB検証), deploy.yml (ビルド検証)
 ├── app/                  # Next.js App Router (ルーティング & API)
 │   ├── api/              # API Route Handlers (chat, settings, tickets)
 │   ├── auth/             # 認証系画面・コールバック (callback, merge, reset-password等)
@@ -282,8 +283,8 @@ nou-ato/
 ├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager, logger, apiResponse)
 ├── scripts/              # データベース監査・ビルド検証スクリプト
 ├── store/                # Zustand グローバル状態ストア (useThemeStore等)
-├── supabase/             # Supabase マイグレーションSQL・設定
-├── test/                 # 自動テストスイート (Vitest: 31ファイル・全250項目)
+├── supabase/             # Supabase マイグレーションSQL (43本)・pgTAPテスト (16項目)
+├── test/                 # 自動テストスイート (Vitest: 32ファイル・全259項目)
 ├── types/                # TypeScript型定義 (Database, Supabase)
 └── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```
@@ -300,7 +301,7 @@ nou-ato/
 | :------------------------------------- | :----------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
 | **オリアプレビュー項目DB (全101項目)** | [`docs/review-checklist-dashboard.html`](docs/review-checklist-dashboard.html) | 全101機能・非機能要件の検証ダッシュボード、合否判定、エビデンス集約            |
 | **API 仕様書 & Swagger UI**            | [`docs/api-docs.html`](docs/api-docs.html)                                     | OpenAPI 3.1 仕様に基づくブラウザ対話型 API ドキュメント・実行サンドボックス    |
-| **ER図 & テーブル定義書**              | [`docs/database-design.html`](docs/database-design.html)                       | Mermaid ER図、全14テーブル+1VIEW+19 RPC関数のカラム型・制約・RLSポリシー設計書 |
+| **ER図 & テーブル定義書**              | [`docs/database-design.html`](docs/database-design.html)                       | Mermaid ER図、全14テーブル+1VIEW+21 RPC関数のカラム型・制約・RLSポリシー設計書 |
 | **品質検査計画書 (QA Master Plan)**    | [`docs/test-plan.html`](docs/test-plan.html)                                   | 全テスト項目と完全同期したテスト計画、自動テスト実行・カバレッジ検証           |
 | **アーキテクチャ & データフロー**      | [`docs/architecture-map.html`](docs/architecture-map.html)                     | Next.js 16 + Supabase + Gemini RAG + RLS 認可フロー構造図                      |
 | **エージェント & スキル活用ガイド**    | [`docs/agent-and-skills-guide.html`](docs/agent-and-skills-guide.html)         | AI開発エージェントチームの役割分担と自律修正プロトコル解説                     |

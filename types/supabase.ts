@@ -893,10 +893,11 @@ export type Database = {
           reply: string;
         }[];
       };
-      sync_student_published_tasks: {
-        Args: Record<string, never>;
+      swap_farm_plots: {
+        Args: { p_from_plot_id: string; p_to_plot_id: string };
         Returns: Json;
       };
+      sync_student_published_tasks: { Args: never; Returns: Json };
       uncomplete_student_task: {
         Args: { p_base_task_id: string };
         Returns: Json;

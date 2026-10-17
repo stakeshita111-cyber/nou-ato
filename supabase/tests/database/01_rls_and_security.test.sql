@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(13);
+SELECT plan(16);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -185,6 +185,38 @@ SELECT throws_matching(
     $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000002', '不正な質問', '不正な回答', false) $$,
     'permission denied',
     '13. [student_a] 受講生ロールからの save_ai_journal 直接呼出は 42501 (permission denied) で拒絶される'
+);
+
+-- Test 14: 受講生が complete_student_task を迂回して未公開(draft)タスクの student_tasks 行を直接 UPDATE しても RLS により更新されない
+UPDATE public.student_tasks
+SET status = 'completed'
+WHERE student_id = '00000000-0000-0000-0000-000000000002'::uuid
+  AND base_task_id = '22222222-2222-2222-2222-222222222222'::uuid;
+
+SELECT is(
+    (SELECT status FROM public.student_tasks WHERE student_id = '00000000-0000-0000-0000-000000000002'::uuid AND base_task_id = '22222222-2222-2222-2222-222222222222'::uuid),
+    'todo',
+    '14. [student_a] 未公開（下書き）タスクの student_tasks 直接 UPDATE は RLS で遮断され todo のまま維持される'
+);
+
+-- ==============================================================================
+-- 8. swap_farm_plots RPC のテスト (講師限定・アトミック入れ替え)
+-- ==============================================================================
+
+-- Test 15: 受講生は swap_farm_plots を実行できない (42501)
+SELECT throws_matching(
+    $$ SELECT public.swap_farm_plots('plot-a-1', 'plot-b-1') $$,
+    'Only teachers can swap farm plots',
+    '15. [student_a] 受講生による swap_farm_plots 呼び出しは 42501 で拒絶される'
+);
+
+-- Test 16: 講師は自農園の2区画を swap_farm_plots でアトミックに入れ替えられる
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT lives_ok(
+    $$ SELECT public.swap_farm_plots('plot-a-1', 'plot-b-1') $$,
+    '16. [teacher] 講師は swap_farm_plots により区画・畝・観察記録を1トランザクションで入れ替えられる'
 );
 
 SELECT * FROM finish();

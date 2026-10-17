@@ -149,5 +149,17 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql2).toContain(
       'GRANT EXECUTE ON FUNCTION public.save_ai_journal(UUID, TEXT, TEXT, BOOLEAN) TO service_role;'
     );
+
+    // 3. 20261016040000 (student_tasks_update_policy の直接UPDATEバイパス防止 & swap_farm_plots & NOT NULL 整合)
+    const hardenMigration4 = path.join(
+      migrationsDir,
+      '20261016040000_harden_student_tasks_rls_and_column_nullability.sql'
+    );
+    expect(fs.existsSync(hardenMigration4)).toBe(true);
+    const sql4 = fs.readFileSync(hardenMigration4, 'utf-8');
+    expect(sql4).toContain('CREATE POLICY "student_tasks_update_policy" ON public.student_tasks');
+    expect(sql4).toContain("t.status = 'todo'");
+    expect(sql4).toContain('t.is_template IS NOT TRUE');
+    expect(sql4).toContain('FUNCTION public.swap_farm_plots(');
   });
 });

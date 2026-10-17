@@ -50,4 +50,30 @@ describe('FormattedChatMessage', () => {
     render(<FormattedChatMessage text="質問です**テスト**" isMe={true} />);
     expect(screen.getByText('質問です**テスト**')).toBeDefined();
   });
+
+  it('Markdown テーブル (| 項目 | 内容 |) を <table> 要素として構造化描画し、生のパイプ記号や区切り行を表示しない', () => {
+    const tableText =
+      '| 作業項目 | 目安時期 |\n| :--- | :--- |\n| **定植** | 5月上旬 |\n| 追肥 | 5月下旬 |';
+    const { container } = render(<FormattedChatMessage text={tableText} />);
+
+    const tableEl = container.querySelector('table');
+    expect(tableEl).not.toBeNull();
+    expect(screen.getByText('作業項目').tagName).toBe('TH');
+    expect(screen.getByText('目安時期').tagName).toBe('TH');
+    expect(screen.getByText('定植').tagName).toBe('STRONG');
+    expect(screen.getByText('5月上旬').tagName).toBe('TD');
+    expect(screen.queryByText(/:---/)).toBeNull();
+  });
+
+  it('1行に繋がった番号付きリスト (1. 〇〇 2. △△) や1行テーブルを自動的に改行・分割して整形描画する', () => {
+    const inlineListText = '対処手順： 1. 病葉を摘み取る 2. 風通しを良くする 3. 殺菌剤を散布する';
+    render(<FormattedChatMessage text={inlineListText} />);
+
+    expect(screen.getByText('1.')).toBeDefined();
+    expect(screen.getByText('病葉を摘み取る')).toBeDefined();
+    expect(screen.getByText('2.')).toBeDefined();
+    expect(screen.getByText('風通しを良くする')).toBeDefined();
+    expect(screen.getByText('3.')).toBeDefined();
+    expect(screen.getByText('殺菌剤を散布する')).toBeDefined();
+  });
 });
