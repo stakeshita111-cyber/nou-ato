@@ -166,3 +166,136 @@ export function isRecordMatchingCrop(
 
   return false;
 }
+
+/**
+ * コンパニオンプランツ相性マッピング型定義
+ */
+export type CompanionStatus = 'good' | 'bad' | 'neutral';
+
+export interface CompanionAdvice {
+  status: CompanionStatus;
+  message: string;
+}
+
+/**
+ * 作物名のカテゴリ分類キーの取得
+ */
+function getCropCategory(cropName: string): string {
+  const clean = cropName.trim();
+  if (!clean) return '';
+
+  if (clean.includes('トマト')) return 'tomato';
+  if (clean.includes('バジル')) return 'basil';
+  if (clean.includes('ネギ') || clean.includes('ねぎ') || clean.includes('ニラ') || clean.includes('にら') || clean.includes('チャイブ')) return 'negi';
+  if (clean.includes('ナス') || clean.includes('なす')) return 'eggplant';
+  if (clean.includes('パセリ')) return 'parsley';
+  if (clean.includes('きゅうり') || clean.includes('キュウリ')) return 'cucumber';
+  if (clean.includes('マリーゴールド')) return 'marigold';
+  if (clean.includes('エダマメ') || clean.includes('えだまめ') || clean.includes('枝豆') || clean.includes('インゲン') || clean.includes('ソラマメ')) return 'edamame';
+  if (clean.includes('キャベツ') || clean.includes('きゃべつ')) return 'cabbage';
+  if (clean.includes('レタス')) return 'lettuce';
+  if (clean.includes('ジャガイモ') || clean.includes('じゃがいも')) return 'potato';
+
+  return clean;
+}
+
+/**
+ * ２つの作物品種の相性を判定
+ */
+function evaluateCropPair(cropA: string, cropB: string): CompanionAdvice | null {
+  const catA = getCropCategory(cropA);
+  const catB = getCropCategory(cropB);
+
+  if (!catA || !catB || catA === catB) {
+    return null;
+  }
+
+  const isPair = (c1: string, c2: string) =>
+    (catA === c1 && catB === c2) || (catA === c2 && catB === c1);
+
+  // 好相性 (good)
+  if (isPair('tomato', 'basil')) {
+    return { status: 'good', message: '◎ 相性良好: 害虫を遠ざけ風味を高めます' };
+  }
+  if (isPair('tomato', 'negi')) {
+    return { status: 'good', message: '◎ 相性良好: 病気を予防し生育を促進します' };
+  }
+  if (isPair('eggplant', 'parsley')) {
+    return { status: 'good', message: '◎ 相性良好: 害虫を遠ざけ株元の乾燥を防ぎます' };
+  }
+  if (isPair('eggplant', 'negi')) {
+    return { status: 'good', message: '◎ 相性良好: 青枯病などの土壌病害を予防します' };
+  }
+  if (isPair('cucumber', 'marigold')) {
+    return { status: 'good', message: '◎ 相性良好: センチュウ被害を防ぎ生育を助けます' };
+  }
+  if (isPair('cucumber', 'edamame')) {
+    return { status: 'good', message: '◎ 相性良好: 窒素分を補給し互いの生育を促します' };
+  }
+  if (isPair('cabbage', 'lettuce')) {
+    return { status: 'good', message: '◎ 相性良好: アオムシ等の害虫被害を軽減します' };
+  }
+
+  // 悪相性 (bad)
+  if (isPair('tomato', 'potato')) {
+    return { status: 'bad', message: '× 注意（悪相性）: 疫病などの病気が伝染しやすくなります' };
+  }
+  if (isPair('eggplant', 'potato')) {
+    return { status: 'bad', message: '× 注意（悪相性）: 同じナス科で病害虫が集中し生育を阻害します' };
+  }
+  if (isPair('negi', 'edamame')) {
+    return { status: 'bad', message: '× 注意（悪相性）: ネギ類とマメ科は根粒菌の働きが阻害され互いに生育が悪くなります' };
+  }
+
+  return null;
+}
+
+/**
+ * 畝の現在の作物群と、候補作物（新規追加/選択中）の相性アドバイスを取得
+ * @param currentCrops 畝に栽培中の品種（配列またはカンマ区切り文字列）
+ * @param candidateCrop 追加・選択しようとしている品種
+ */
+export function getCompanionAdvice(
+  currentCrops: string[] | string | undefined | null,
+  candidateCrop: string | undefined | null
+): CompanionAdvice {
+  if (!candidateCrop) {
+    return { status: 'neutral', message: '' };
+  }
+
+  const existingList = Array.isArray(currentCrops)
+    ? currentCrops.flatMap((c) => parseCrops(c))
+    : parseCrops(currentCrops);
+
+  const candidateList = parseCrops(candidateCrop);
+
+  if (existingList.length === 0 || candidateList.length === 0) {
+    return { status: 'neutral', message: '' };
+  }
+
+  const badAdvices: CompanionAdvice[] = [];
+  const goodAdvices: CompanionAdvice[] = [];
+
+  for (const existing of existingList) {
+    for (const candidate of candidateList) {
+      const advice = evaluateCropPair(existing, candidate);
+      if (advice) {
+        if (advice.status === 'bad') {
+          badAdvices.push(advice);
+        } else if (advice.status === 'good') {
+          goodAdvices.push(advice);
+        }
+      }
+    }
+  }
+
+  if (badAdvices.length > 0) {
+    return badAdvices[0];
+  }
+
+  if (goodAdvices.length > 0) {
+    return goodAdvices[0];
+  }
+
+  return { status: 'neutral', message: '' };
+}
