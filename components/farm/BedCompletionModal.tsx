@@ -232,26 +232,52 @@ export default function BedCompletionModal({
         onClick={(e) => e.stopPropagation()}
         onPaste={handlePaste}
       >
-        <div className="flex items-center justify-between border-b pb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🏆</span>
-            <div>
-              <h3 className="font-black text-gray-900 text-base">
-                {bed.status === 'rejected'
-                  ? '⚠️ 収穫完了報告の修正・再提出'
-                  : `畝 ${bed.bed_number} (${bed.crop_name || '未設定'}) の収穫完了報告`}
-              </h3>
-              <p className="text-xs text-gray-500 font-bold">
-                収穫のまとめを記録して講師へ完了報告を送ります
-              </p>
-            </div>
+        {/* 🎉 祝福マイクロインタラクション：収穫お祝いヘッダーバナー */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-4 text-white shadow-md">
+          {/* キラキラ星 & 野菜アイコンの浮遊バックグラウンド演出 */}
+          <div className="absolute -right-1 -top-1 text-2xl opacity-80 animate-bounce pointer-events-none select-none">
+            ✨
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold flex items-center justify-center transition cursor-pointer"
-          >
-            ✕
-          </button>
+          <div className="absolute right-12 bottom-1 text-xl opacity-75 animate-pulse pointer-events-none select-none">
+            🥦
+          </div>
+          <div className="absolute right-24 -top-1 text-lg opacity-75 animate-pulse pointer-events-none select-none">
+            🥕
+          </div>
+          <div className="absolute right-36 bottom-2 text-base opacity-75 animate-bounce pointer-events-none select-none">
+            🍅
+          </div>
+
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-2xl shadow-inner shrink-0 animate-bounce">
+                🏆
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-black tracking-wider uppercase bg-amber-300 text-amber-950 px-2 py-0.5 rounded-full shadow-xs animate-pulse">
+                    Harvest Complete 🎉
+                  </span>
+                </div>
+                <h3 className="font-black text-white text-base leading-tight mt-0.5">
+                  {bed.status === 'rejected'
+                    ? '⚠️ 収穫完了報告の修正・再提出'
+                    : `畝 ${bed.bed_number} (${bed.crop_name || '未設定'}) の収穫完了報告`}
+                </h3>
+                <p className="text-[11px] text-emerald-100 font-bold mt-0.5">
+                  収穫のまとめを記録して講師へ完了報告を送ります
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              type="button"
+              className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold flex items-center justify-center transition cursor-pointer shrink-0"
+              aria-label="閉じる"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -412,9 +438,11 @@ export default function BedCompletionModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-md transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-2 py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-md transition-all duration-200 transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 hover:shadow-emerald-500/30"
             >
-              <span>🎉 収穫完了を報告する</span>
+              <span className="animate-bounce">🎉</span>
+              <span>{isSubmitting ? '報告送信中...' : '収穫完了を報告する'}</span>
+              <span className="animate-pulse text-amber-300">✨</span>
             </button>
           </div>
         </form>
