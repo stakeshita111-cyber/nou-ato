@@ -240,6 +240,10 @@ SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
 
 UPDATE public.tasks SET title = '改ざんタイトル' WHERE id = '22222222-2222-2222-2222-222222222221';
 
+-- タイトルが改ざんされていないか農園A所属講師(Teacher 1)コンテキストで検証
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
 SELECT is(
     (SELECT title FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'),
     '公開中の水やりタスク',
@@ -273,18 +277,20 @@ SELECT is(
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
 
-DO $$
-DECLARE
-    v_r1 uuid; v_r2 uuid; v_r3 uuid; v_r4 uuid;
-    v_pass boolean;
-BEGIN
-    v_r1 := public.reserve_ai_usage();
-    v_r2 := public.reserve_ai_usage();
-    v_r3 := public.reserve_ai_usage();
-    v_r4 := public.reserve_ai_usage();
-    v_pass := (v_r1 IS NOT NULL AND v_r2 IS NOT NULL AND v_r3 IS NOT NULL AND v_r4 IS NULL);
-    PERFORM ok(v_pass, '20. [ai_limit] reserve_ai_usage は日次3回まで成功(UUID返却)し、4回目で上限到達(NULL返却)となる');
-END $$;
+SELECT is(
+    (
+        SELECT (v1 IS NOT NULL AND v2 IS NOT NULL AND v3 IS NOT NULL AND v4 IS NULL)
+        FROM (
+            SELECT
+                public.reserve_ai_usage() AS v1,
+                public.reserve_ai_usage() AS v2,
+                public.reserve_ai_usage() AS v3,
+                public.reserve_ai_usage() AS v4
+        ) sub
+    ),
+    true,
+    '20. [ai_limit] reserve_ai_usage は日次3回まで成功(UUID返却)し、4回目で上限到達(NULL返却)となる'
+);
 
 -- Test 21: 復元された外部キー制約: farm_plots.student_id に存在しない user_id を指定した INSERT は FK 違反(23503)で拒否される
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
@@ -298,8 +304,8 @@ SELECT throws_matching(
 );
 
 -- Test 22: 復元された外部キー制約: crop_records.bed_id に存在しない bed_id を指定した INSERT は FK 違反(23503)で拒否される
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 
 SELECT throws_matching(
     $$ INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, date)
