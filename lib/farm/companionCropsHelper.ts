@@ -186,12 +186,26 @@ function getCropCategory(cropName: string): string {
 
   if (clean.includes('トマト')) return 'tomato';
   if (clean.includes('バジル')) return 'basil';
-  if (clean.includes('ネギ') || clean.includes('ねぎ') || clean.includes('ニラ') || clean.includes('にら') || clean.includes('チャイブ')) return 'negi';
+  if (
+    clean.includes('ネギ') ||
+    clean.includes('ねぎ') ||
+    clean.includes('ニラ') ||
+    clean.includes('にら') ||
+    clean.includes('チャイブ')
+  )
+    return 'negi';
   if (clean.includes('ナス') || clean.includes('なす')) return 'eggplant';
   if (clean.includes('パセリ')) return 'parsley';
   if (clean.includes('きゅうり') || clean.includes('キュウリ')) return 'cucumber';
   if (clean.includes('マリーゴールド')) return 'marigold';
-  if (clean.includes('エダマメ') || clean.includes('えだまめ') || clean.includes('枝豆') || clean.includes('インゲン') || clean.includes('ソラマメ')) return 'edamame';
+  if (
+    clean.includes('エダマメ') ||
+    clean.includes('えだまめ') ||
+    clean.includes('枝豆') ||
+    clean.includes('インゲン') ||
+    clean.includes('ソラマメ')
+  )
+    return 'edamame';
   if (clean.includes('キャベツ') || clean.includes('きゃべつ')) return 'cabbage';
   if (clean.includes('レタス')) return 'lettuce';
   if (clean.includes('ジャガイモ') || clean.includes('じゃがいも')) return 'potato';
@@ -241,10 +255,16 @@ function evaluateCropPair(cropA: string, cropB: string): CompanionAdvice | null 
     return { status: 'bad', message: '× 注意（悪相性）: 疫病などの病気が伝染しやすくなります' };
   }
   if (isPair('eggplant', 'potato')) {
-    return { status: 'bad', message: '× 注意（悪相性）: 同じナス科で病害虫が集中し生育を阻害します' };
+    return {
+      status: 'bad',
+      message: '× 注意（悪相性）: 同じナス科で病害虫が集中し生育を阻害します',
+    };
   }
   if (isPair('negi', 'edamame')) {
-    return { status: 'bad', message: '× 注意（悪相性）: ネギ類とマメ科は根粒菌の働きが阻害され互いに生育が悪くなります' };
+    return {
+      status: 'bad',
+      message: '× 注意（悪相性）: ネギ類とマメ科は根粒菌の働きが阻害され互いに生育が悪くなります',
+    };
   }
 
   return null;
