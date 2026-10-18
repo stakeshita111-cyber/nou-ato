@@ -273,21 +273,18 @@ SELECT is(
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
 
-SELECT lives_ok(
-    $$ DO $$
-    DECLARE
-        v_r1 uuid; v_r2 uuid; v_r3 uuid; v_r4 uuid;
-    BEGIN
-        v_r1 := public.reserve_ai_usage();
-        v_r2 := public.reserve_ai_usage();
-        v_r3 := public.reserve_ai_usage();
-        v_r4 := public.reserve_ai_usage();
-        IF v_r1 IS NULL OR v_r2 IS NULL OR v_r3 IS NULL OR v_r4 IS NOT NULL THEN
-            RAISE EXCEPTION 'AI consultation daily limit check failed';
-        END IF;
-    END $$; $$,
-    '20. [ai_limit] reserve_ai_usage は日次3回まで成功(UUID返却)し、4回目で上限到達(NULL返却)となる'
-);
+DO $$
+DECLARE
+    v_r1 uuid; v_r2 uuid; v_r3 uuid; v_r4 uuid;
+    v_pass boolean;
+BEGIN
+    v_r1 := public.reserve_ai_usage();
+    v_r2 := public.reserve_ai_usage();
+    v_r3 := public.reserve_ai_usage();
+    v_r4 := public.reserve_ai_usage();
+    v_pass := (v_r1 IS NOT NULL AND v_r2 IS NOT NULL AND v_r3 IS NOT NULL AND v_r4 IS NULL);
+    PERFORM ok(v_pass, '20. [ai_limit] reserve_ai_usage は日次3回まで成功(UUID返却)し、4回目で上限到達(NULL返却)となる');
+END $$;
 
 -- Test 21: 復元された外部キー制約: farm_plots.student_id に存在しない user_id を指定した INSERT は FK 違反(23503)で拒否される
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
