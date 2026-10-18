@@ -1,6 +1,90 @@
 import { supabase } from '@/lib/supabase';
 
 /**
+ * クライアントサイド画像圧縮ヘルパー (Canvas API)
+ * ブラウザ環境において、アスペクト比を維持しつつ指定された最大解像度に収まるようにJPEG形式で圧縮・リサイズする。
+ * Node.js環境（Vitest実行時）やCanvas API未対応環境、または画像読み込みエラー時は、元の File/Blob をそのまま返却する（Fail-Safe）。
+ */
+export async function compressImage(
+  fileOrBlob: File | Blob,
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.8
+): Promise<Blob> {
+  if (
+    typeof window === 'undefined' ||
+    typeof Image === 'undefined' ||
+    typeof HTMLCanvasElement === 'undefined' ||
+    typeof URL === 'undefined' ||
+    typeof URL.createObjectURL !== 'function'
+  ) {
+    return fileOrBlob;
+  }
+
+  return new Promise((resolve) => {
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(fileOrBlob);
+    } catch {
+      return resolve(fileOrBlob);
+    }
+
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      try {
+        let width = img.width;
+        let height = img.height;
+
+        if (!width || !height) {
+          return resolve(fileOrBlob);
+        }
+
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return resolve(fileOrBlob);
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (compressedBlob) => {
+            if (compressedBlob) {
+              resolve(compressedBlob);
+            } else {
+              resolve(fileOrBlob);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      } catch {
+        resolve(fileOrBlob);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(fileOrBlob);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Base64 文字列 (data:image/...) または File / Blob を Supabase Storage にアップロードし、公開URLを返却する
  * @param fileOrBase64 - File, Blob, または Base64 文字列
  * @param folder - 保存先フォルダ名（例: "tasks", "records", "beds"）
@@ -53,6 +137,12 @@ export async function uploadImageToStorage(
       if (fileOrBase64 instanceof File) {
         extension = fileOrBase64.name.split('.').pop()?.toLowerCase() || 'jpg';
       }
+    }
+
+    // クライアントサイド自動圧縮（Canvas API）を通過させる
+    blob = await compressImage(blob);
+    if (blob.type === 'image/jpeg') {
+      extension = 'jpg';
     }
 
     // ユーザーIDを含むパス形式: <user_id>/<timestamp>_<filename> または <folder>/<user_id>/<timestamp>_<filename>
