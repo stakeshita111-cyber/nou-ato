@@ -16,6 +16,7 @@ import {
   isRecordMatchingCrop,
   mergeCrops,
   getBedAllCrops,
+  getCompanionAdvice,
 } from '@/lib/farm/companionCropsHelper';
 
 const STAGE_PROGRESS_MAP: Record<string, number> = {
@@ -1489,6 +1490,29 @@ export default function StudentFarmRecordView({
                         onChange={(e) => setCustomCropName(e.target.value)}
                         className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 font-bold text-sm"
                       />
+
+                      {/* 🌟 コンパニオンプランツ視覚サジェストバッジ・ヒント 🌟 */}
+                      {(() => {
+                        const advice = getCompanionAdvice(modalTargetCrops, customCropName);
+                        if (advice.status === 'good') {
+                          return (
+                            <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2 text-emerald-900 text-xs font-black shadow-2xs animate-fade-in">
+                              <span className="text-base shrink-0">🌿</span>
+                              <span>{advice.message}</span>
+                            </div>
+                          );
+                        }
+                        if (advice.status === 'bad') {
+                          return (
+                            <div className="mt-2 p-2.5 bg-rose-50 border border-rose-300 rounded-xl flex items-center gap-2 text-rose-900 text-xs font-black shadow-2xs animate-fade-in">
+                              <span className="text-base shrink-0">⚠️</span>
+                              <span>{advice.message}</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       <p className="text-[10px] text-gray-400 font-medium mt-1">
                         💡
                         複数の野菜を一緒に育てる（混植）場合は、「きゅうり、ミニトマト」のようにカンマで区切って入力すると同じ畝にまとめて登録できます。

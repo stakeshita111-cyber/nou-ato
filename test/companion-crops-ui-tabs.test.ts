@@ -5,6 +5,7 @@ import {
   isRecordMatchingCrop,
   mergeCrops,
   getBedAllCrops,
+  getCompanionAdvice,
 } from '@/lib/farm/companionCropsHelper';
 import { CropRecord } from '@/types/farm';
 
@@ -216,6 +217,74 @@ describe('混植（コンパニオンプランツ）UI・タブ絞り込み機�
 
       // 無関係なきゃべつタブでは除外されること
       expect(isRecordMatchingCrop(multiCropName, multiRecordNotes, 'きゃべつ')).toBe(false);
+    });
+  });
+
+  describe('#7 コンパニオンプランツ相性判定ロジック (getCompanionAdvice)', () => {
+    it('トマトとバジル/ネギの好相性を判定できること', () => {
+      const advice1 = getCompanionAdvice(['ミニトマト'], 'バジル');
+      expect(advice1.status).toBe('good');
+      expect(advice1.message).toContain('◎ 相性良好');
+      expect(advice1.message).toContain('害虫を遠ざけ風味を高めます');
+
+      const advice2 = getCompanionAdvice('大玉トマト', '長ネギ');
+      expect(advice2.status).toBe('good');
+      expect(advice2.message).toContain('◎ 相性良好');
+      expect(advice2.message).toContain('病気を予防し生育を促進します');
+    });
+
+    it('ナスとパセリ/ネギの好相性を判定できること', () => {
+      const advice1 = getCompanionAdvice('ナス', 'パセリ');
+      expect(advice1.status).toBe('good');
+      expect(advice1.message).toContain('◎ 相性良好');
+
+      const advice2 = getCompanionAdvice('千両ナス', '青ネギ');
+      expect(advice2.status).toBe('good');
+      expect(advice2.message).toContain('◎ 相性良好');
+    });
+
+    it('きゅうりとマリーゴールド/エダマメの好相性を判定できること', () => {
+      const advice1 = getCompanionAdvice('きゅうり', 'マリーゴールド');
+      expect(advice1.status).toBe('good');
+      expect(advice1.message).toContain('センチュウ被害を防ぎ生育を助けます');
+
+      const advice2 = getCompanionAdvice('キュウリ', '枝豆');
+      expect(advice2.status).toBe('good');
+      expect(advice2.message).toContain('窒素分を補給し互いの生育を促します');
+    });
+
+    it('キャベツとレタスの好相性を判定できること', () => {
+      const advice = getCompanionAdvice('キャベツ', 'レタス');
+      expect(advice.status).toBe('good');
+      expect(advice.message).toContain('アオムシ等の害虫被害を軽減します');
+    });
+
+    it('トマトとジャガイモの悪相性を判定できること', () => {
+      const advice = getCompanionAdvice('ミニトマト', 'ジャガイモ');
+      expect(advice.status).toBe('bad');
+      expect(advice.message).toContain('× 注意（悪相性）');
+      expect(advice.message).toContain('疫病などの病気が伝染しやすくなります');
+    });
+
+    it('ナスとジャガイモの悪相性を判定できること', () => {
+      const advice = getCompanionAdvice('ナス', 'じゃがいも');
+      expect(advice.status).toBe('bad');
+      expect(advice.message).toContain('× 注意（悪相性）');
+      expect(advice.message).toContain('同じナス科で病害虫が集中');
+    });
+
+    it('ネギ類とマメ科の悪相性を判定できること', () => {
+      const advice = getCompanionAdvice('長ネギ', 'エダマメ');
+      expect(advice.status).toBe('bad');
+      expect(advice.message).toContain('× 注意（悪相性）');
+      expect(advice.message).toContain('ネギ類とマメ科は根粒菌の働きが阻害され');
+    });
+
+    it('既存作物がない・相性情報がない場合は neutral を返すこと', () => {
+      expect(getCompanionAdvice([], 'バジル')).toEqual({ status: 'neutral', message: '' });
+      expect(getCompanionAdvice(['イチゴ'], 'バジル')).toEqual({ status: 'neutral', message: '' });
+      expect(getCompanionAdvice('ミニトマト', '')).toEqual({ status: 'neutral', message: '' });
+      expect(getCompanionAdvice(null, 'バジル')).toEqual({ status: 'neutral', message: '' });
     });
   });
 });
