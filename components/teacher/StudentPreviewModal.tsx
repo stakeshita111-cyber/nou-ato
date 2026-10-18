@@ -9,12 +9,14 @@ interface StudentPreviewModalProps {
   student: StudentPreviewData;
   onClose: () => void;
   onDeleteStudent?: (student: StudentPreviewData) => void;
+  onAssignTask?: (student: StudentPreviewData) => void;
 }
 
 export default function StudentPreviewModal({
   student,
   onClose,
   onDeleteStudent,
+  onAssignTask,
 }: StudentPreviewModalProps) {
   if (!student) return null;
 
@@ -128,6 +130,16 @@ export default function StudentPreviewModal({
         </div>
 
         <div className="space-y-2">
+          {onAssignTask && (
+            <button
+              onClick={() => onAssignTask(student)}
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.98]"
+            >
+              <span>📝</span>
+              <span>この生徒に個別タスクを配信</span>
+            </button>
+          )}
+
           {onDeleteStudent && (
             <button
               onClick={() => onDeleteStudent(student)}
