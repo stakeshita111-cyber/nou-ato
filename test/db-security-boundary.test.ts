@@ -162,4 +162,27 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql4).toContain('t.is_template IS NOT TRUE');
     expect(sql4).toContain('FUNCTION public.swap_farm_plots(');
   });
+
+  it('8. 外部キー7本復元および handle_task_changes() 条件修復マイグレーション (20261018000000_restore_foreign_keys_and_fix_task_trigger.sql) が正しく定義されていること', () => {
+    const fkMigration = path.join(
+      migrationsDir,
+      '20261018000000_restore_foreign_keys_and_fix_task_trigger.sql'
+    );
+    expect(fs.existsSync(fkMigration)).toBe(true);
+    const sql = fs.readFileSync(fkMigration, 'utf-8');
+
+    // 7本の外部キー復元の存在検証
+    expect(sql).toContain('farm_plots_student_id_fkey');
+    expect(sql).toContain('farm_beds_student_id_fkey');
+    expect(sql).toContain('journals_user_id_fkey');
+    expect(sql).toContain('journals_student_id_fkey');
+    expect(sql).toContain('student_tasks_student_id_fkey');
+    expect(sql).toContain('tasks_created_by_fkey');
+    expect(sql).toContain('crop_records_bed_id_fkey');
+
+    // handle_task_changes() 内の TG_OP = 'UPDATE' 条件修正の検証
+    expect(sql).toContain(
+      "ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'todo' AND NEW.status <> 'todo') THEN"
+    );
+  });
 });

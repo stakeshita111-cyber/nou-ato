@@ -1166,6 +1166,12 @@ export function useFarmManager() {
         return p;
       });
 
+      // crop_records.bed_id 外部キー制約違反(farm_beds 非存在エラー)を防ぐため、
+      // 最初に新しい farm_beds を Supabase DB へ永続化する
+      setPlots(nextPlots);
+      plotsRef.current = nextPlots;
+      await savePlotsGridIndicesToSupabase(nextPlots);
+
       try {
         for (let i = 0; i < oldBeds.length; i++) {
           const oldB = oldBeds[i];
@@ -1177,6 +1183,7 @@ export function useFarmManager() {
       } catch (err) {
         console.warn('crop_records migration notice:', err);
       }
+      return;
     } else {
       nextPlots = currentList.map((p) => {
         if (p.id === realPlotId || p.code === targetCode) {

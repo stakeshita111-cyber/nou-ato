@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(16);
+SELECT plan(22);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -11,7 +11,10 @@ DECLARE
     v_teacher_id UUID := '00000000-0000-0000-0000-000000000001'::uuid;
     v_student_a_id UUID := '00000000-0000-0000-0000-000000000002'::uuid;
     v_student_b_id UUID := '00000000-0000-0000-0000-000000000003'::uuid;
+    v_teacher_b_id UUID := '00000000-0000-0000-0000-000000000004'::uuid;
+    v_student_c_id UUID := '00000000-0000-0000-0000-000000000005'::uuid;
     v_farm_id UUID := '11111111-1111-1111-1111-111111111111'::uuid;
+    v_farm_b_id UUID := '11111111-1111-1111-1111-111111111112'::uuid;
     v_task_pub_id UUID := '22222222-2222-2222-2222-222222222221'::uuid;
     v_task_draft_id UUID := '22222222-2222-2222-2222-222222222222'::uuid;
     v_st_pub_id UUID := '33333333-3333-3333-3333-333333333331'::uuid;
@@ -22,31 +25,39 @@ BEGIN
     VALUES 
         (v_teacher_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'teacher@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
         (v_student_a_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_a@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
-        (v_student_b_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_b@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+        (v_student_b_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_b@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
+        (v_teacher_b_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'teacher_b@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
+        (v_student_c_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_c@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
     ON CONFLICT (id) DO NOTHING;
 
     -- farms 登録
     INSERT INTO public.farms (id, name, owner_id, invite_code)
-    VALUES (v_farm_id, 'テスト農園', v_teacher_id, 'TEST-INVITE-001')
-    ON CONFLICT (id) DO UPDATE SET owner_id = v_teacher_id;
+    VALUES
+        (v_farm_id, 'テスト農園', v_teacher_id, 'TEST-INVITE-001'),
+        (v_farm_b_id, 'テスト農園B', v_teacher_b_id, 'TEST-INVITE-002')
+    ON CONFLICT (id) DO UPDATE SET owner_id = EXCLUDED.owner_id;
 
     -- public.users 設定 (handle_new_auth_user で作られたものを更新)
     UPDATE public.users SET role = 'teacher', farm_id = v_farm_id, display_name = '講師1' WHERE id = v_teacher_id;
     UPDATE public.users SET role = 'student', farm_id = v_farm_id, display_name = '生徒A' WHERE id = v_student_a_id;
     UPDATE public.users SET role = 'student', farm_id = v_farm_id, display_name = '生徒B' WHERE id = v_student_b_id;
+    UPDATE public.users SET role = 'teacher', farm_id = v_farm_b_id, display_name = '講師B' WHERE id = v_teacher_b_id;
+    UPDATE public.users SET role = 'student', farm_id = v_farm_b_id, display_name = '生徒C' WHERE id = v_student_c_id;
 
     -- farm_plots 登録
     INSERT INTO public.farm_plots (id, farm_id, name, code, student_id)
     VALUES 
         ('plot-a-1', v_farm_id, '区画A', 'A1', v_student_a_id),
-        ('plot-b-1', v_farm_id, '区画B', 'B1', v_student_b_id)
+        ('plot-b-1', v_farm_id, '区画B', 'B1', v_student_b_id),
+        ('plot-c-1', v_farm_b_id, '区画C', 'C1', v_student_c_id)
     ON CONFLICT (id) DO UPDATE SET student_id = EXCLUDED.student_id;
 
     -- farm_beds 登録
     INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, student_id, student_name, status, season)
     VALUES 
         ('bed-a-1', 'plot-a-1', 1, 'ミニトマト', v_student_a_id, '生徒A', 'active', '2026年 秋冬'),
-        ('bed-b-1', 'plot-b-1', 1, 'きゅうり', v_student_b_id, '生徒B', 'active', '2026年 秋冬')
+        ('bed-b-1', 'plot-b-1', 1, 'きゅうり', v_student_b_id, '生徒B', 'active', '2026年 秋冬'),
+        ('bed-c-1', 'plot-c-1', 1, 'ナス', v_student_c_id, '生徒C', 'active', '2026年 秋冬')
     ON CONFLICT (id) DO UPDATE SET student_id = EXCLUDED.student_id, plot_id = EXCLUDED.plot_id;
 
     -- tasks 登録 (公開中・下書き)
@@ -217,6 +228,87 @@ SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 SELECT lives_ok(
     $$ SELECT public.swap_farm_plots('plot-a-1', 'plot-b-1') $$,
     '16. [teacher] 講師は swap_farm_plots により区画・畝・観察記録を1トランザクションで入れ替えられる'
+);
+
+-- ==============================================================================
+-- 9. 他農園分離（マルチテナント）・タスク同期・AI上限・FK制約の拡充テスト
+-- ==============================================================================
+
+-- Test 17: 他農園講師(Teacher B)による農園Aのタスク改ざん(UPDATE)は RLS により遮断され変更されない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+
+UPDATE public.tasks SET title = '改ざんタイトル' WHERE id = '22222222-2222-2222-2222-222222222221';
+
+SELECT is(
+    (SELECT title FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'),
+    '公開中の水やりタスク',
+    '17. [teacher_b] 他農園講師による他農園タスク改ざんUPDATEはRLSにより遮断され変更されない'
+);
+
+-- Test 18: 他農園生徒(Student C)による農園Aのタスク完了(complete_student_task)は P0002 例外で拒否される
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000005", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000005';
+
+SELECT throws_matching(
+    $$ SELECT public.complete_student_task('22222222-2222-2222-2222-222222222221') $$,
+    'Target published task not found for this student',
+    '18. [student_c] 他農園生徒による他農園タスク完了呼び出しは P0002 例外で拒否される'
+);
+
+-- Test 19: 自農園タスク同期: 講師1が農園Aで新規公開タスクを作成すると、農園Aの生徒A/Bにのみ自動割当される
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+INSERT INTO public.tasks (id, farm_id, title, status, is_template)
+VALUES ('22222222-2222-2222-2222-222222222223', '11111111-1111-1111-1111-111111111111', '農園A新公開タスク', 'todo', false);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.student_tasks WHERE base_task_id = '22222222-2222-2222-2222-222222222223' AND student_id IN ('00000000-0000-0000-0000-000000000002'::uuid, '00000000-0000-0000-0000-000000000003'::uuid)),
+    2,
+    '19. [task_sync] 農園Aでタスク公開時、農園Aの受講生(Student A/B)に自動割り当てされ、他農園生徒Cには割り当てられない'
+);
+
+-- Test 20: AI相談上限: reserve_ai_usage は日次3回まで成功(UUID返却)し、4回目で上限到達(NULL返却)となる
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+
+SELECT lives_ok(
+    $$ DO $$
+    DECLARE
+        v_r1 uuid; v_r2 uuid; v_r3 uuid; v_r4 uuid;
+    BEGIN
+        v_r1 := public.reserve_ai_usage();
+        v_r2 := public.reserve_ai_usage();
+        v_r3 := public.reserve_ai_usage();
+        v_r4 := public.reserve_ai_usage();
+        IF v_r1 IS NULL OR v_r2 IS NULL OR v_r3 IS NULL OR v_r4 IS NOT NULL THEN
+            RAISE EXCEPTION 'AI consultation daily limit check failed';
+        END IF;
+    END $$; $$,
+    '20. [ai_limit] reserve_ai_usage は日次3回まで成功(UUID返却)し、4回目で上限到達(NULL返却)となる'
+);
+
+-- Test 21: 復元された外部キー制約: farm_plots.student_id に存在しない user_id を指定した INSERT は FK 違反(23503)で拒否される
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT throws_matching(
+    $$ INSERT INTO public.farm_plots (id, farm_id, name, code, student_id)
+       VALUES ('plot-invalid-fk', '11111111-1111-1111-1111-111111111111', '不正区画', 'X9', '99999999-9999-9999-9999-999999999999') $$,
+    'violates foreign key constraint|23503',
+    '21. [FK制約] 存在しない user_id を farm_plots.student_id に指定した INSERT は FK 違反 (23503) で拒否される'
+);
+
+-- Test 22: 復元された外部キー制約: crop_records.bed_id に存在しない bed_id を指定した INSERT は FK 違反(23503)で拒否される
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+
+SELECT throws_matching(
+    $$ INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, date)
+       VALUES ('rec-invalid-fk', 'bed-nonexistent', 'plot-a-1', 'ミニトマト', '2026-10-18') $$,
+    'violates foreign key constraint|23503',
+    '22. [FK制約] 存在しない bed_id を crop_records.bed_id に指定した INSERT は FK 違反 (23503) で拒否される'
 );
 
 SELECT * FROM finish();

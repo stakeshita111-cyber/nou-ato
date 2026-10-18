@@ -206,6 +206,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: 'crop_records_bed_id_fkey';
+            columns: ['bed_id'];
+            isOneToOne: false;
+            referencedRelation: 'farm_beds';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'crop_records_plot_id_fkey';
             columns: ['plot_id'];
             isOneToOne: false;
@@ -328,6 +335,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: 'farm_beds_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'fk_farm_beds_plot_id';
             columns: ['plot_id'];
             isOneToOne: false;
@@ -376,6 +390,13 @@ export type Database = {
             columns: ['farm_id'];
             isOneToOne: false;
             referencedRelation: 'farms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'farm_plots_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
             referencedColumns: ['id'];
           },
         ];
@@ -503,10 +524,24 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
+            foreignKeyName: 'journals_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'journals_student_task_id_fkey';
             columns: ['student_task_id'];
             isOneToOne: false;
             referencedRelation: 'student_tasks';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'journals_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
             referencedColumns: ['id'];
           },
         ];
@@ -663,6 +698,13 @@ export type Database = {
             referencedRelation: 'tasks';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'student_tasks_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
         ];
       };
       tasks: {
@@ -709,7 +751,7 @@ export type Database = {
           status?: string;
           tags?: string[] | null;
           target_crop?: string | null;
-          title: string;
+          title?: string;
           tools_needed?: string | null;
           updated_at?: string | null;
           video_url?: string | null;
@@ -739,6 +781,13 @@ export type Database = {
           video_url?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'tasks_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'tasks_farm_id_fkey';
             columns: ['farm_id'];
