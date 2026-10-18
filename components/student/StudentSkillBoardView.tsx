@@ -150,38 +150,46 @@ export default function StudentSkillBoardView({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* 1. レベル & EXPカード */}
-      <div className="bg-gradient-to-br from-[#1d5c23] to-[#2e7d32] rounded-3xl p-6 text-white shadow-lg space-y-4 relative overflow-hidden">
-        <div className="flex items-center justify-between">
+      {/* 1. レベル & EXPカード (ホバー・タップの祝福マイクロインタラクション付与) */}
+      <div className="bg-gradient-to-br from-[#1d5c23] via-[#246b2b] to-[#2e7d32] rounded-3xl p-6 text-white shadow-lg space-y-4 relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+        {/* 背景光り輝くライトエフェクト */}
+        <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
+
+        <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 font-black text-2xl flex items-center justify-center shadow-inner">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 font-black text-2xl flex items-center justify-center shadow-inner group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
               Lv.{level}
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-green-200">
-                農業スキル等級
+              <span className="text-[10px] font-bold uppercase tracking-wider text-green-200 flex items-center gap-1">
+                <span>⭐ 農業スキル等級</span>
               </span>
-              <h3 className="text-xl font-black">見習い農家</h3>
+              <h3 className="text-xl font-black flex items-center gap-1.5">
+                <span>見習い農家</span>
+              </h3>
             </div>
           </div>
 
           <div className="text-right">
-            <span className="text-2xl font-black">{totalExp}</span>
+            <span className="text-2xl font-black text-amber-300 drop-shadow-xs">{totalExp}</span>
             <span className="text-xs font-bold text-green-200"> EXP</span>
           </div>
         </div>
 
         {/* 経験値プログレスバー */}
-        <div className="space-y-1">
+        <div className="relative z-10 space-y-1">
           <div className="flex justify-between text-[11px] font-bold text-green-100">
             <span>次のレベルまで</span>
-            <span>{100 - expProgress} EXP</span>
+            <span className="text-amber-200">{100 - expProgress} EXP</span>
           </div>
-          <div className="w-full h-3 bg-black/20 rounded-full overflow-hidden p-0.5 border border-white/10">
+          <div className="w-full h-3 bg-black/25 rounded-full overflow-hidden p-0.5 border border-white/20 shadow-inner relative">
             <div
-              className="h-full bg-amber-400 rounded-full transition-all duration-700 shadow-sm"
+              className="h-full bg-gradient-to-r from-amber-400 to-yellow-300 rounded-full transition-all duration-700 shadow-sm relative overflow-hidden"
               style={{ width: `${Math.max(expProgress, 8)}%` }}
-            />
+            >
+              {/* プログレスバー内のキラキラハイライト光沢 */}
+              <div className="absolute inset-0 bg-white/30 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+            </div>
           </div>
         </div>
       </div>
@@ -226,20 +234,25 @@ export default function StudentSkillBoardView({
                       aria-label={badge.title}
                       title={badge.title}
                       onClick={() => setSelectedBadge(isSelected ? null : badge)}
-                      className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer select-none outline-none ${
+                      className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-300 cursor-pointer select-none outline-none group/badge ${
                         badge.unlocked
-                          ? 'bg-gradient-to-br from-emerald-50 via-green-100/90 to-teal-50 border border-emerald-300/80 shadow-xs hover:border-emerald-500 hover:shadow-md hover:scale-[1.03] active:scale-95'
-                          : 'bg-gray-100/80 border border-gray-200/90 opacity-55 grayscale hover:opacity-80'
+                          ? 'bg-gradient-to-br from-emerald-50 via-green-100/90 to-teal-50 border border-emerald-300/80 shadow-xs hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/20 hover:-translate-y-0.5 hover:scale-105 active:scale-95'
+                          : 'bg-gray-100/80 border border-gray-200/90 opacity-55 grayscale hover:opacity-85 hover:scale-[1.02] hover:grayscale-0'
                       } ${
                         isSelected
-                          ? 'ring-3 ring-emerald-500 ring-offset-2 border-emerald-500 bg-emerald-100 shadow-md scale-[1.03]'
+                          ? 'ring-3 ring-emerald-500 ring-offset-2 border-emerald-500 bg-emerald-100 shadow-md scale-105 -translate-y-0.5'
                           : ''
                       }`}
                     >
+                      {/* 獲得済みバッジの背景ホバーキラキラ演出 */}
+                      {badge.unlocked && (
+                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-amber-200/0 via-amber-300/20 to-emerald-300/30 opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                      )}
+
                       {/* バッジアイコン本体 (余分な入れ子・外枠なし、大きく堂々と表示) */}
-                      <div className="flex items-center justify-center text-3xl sm:text-4xl">
+                      <div className="flex items-center justify-center text-3xl sm:text-4xl relative z-10">
                         <span
-                          className={`inline-flex items-center justify-center transition-transform [transform-style:preserve-3d] ${
+                          className={`inline-flex items-center justify-center transition-transform duration-300 group-hover/badge:scale-110 [transform-style:preserve-3d] ${
                             badge.unlocked ? 'animate-spin-3d-slow' : ''
                           }`}
                         >
@@ -247,16 +260,16 @@ export default function StudentSkillBoardView({
                         </span>
                       </div>
 
-                      {/* 獲得済みチェックマーク (右上) */}
+                      {/* 獲得済みチェックマーク (右上 & キラキラバッジ) */}
                       {badge.unlocked && (
-                        <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-0.5 text-[9px] w-4 h-4 flex items-center justify-center shadow-xs font-bold leading-none">
+                        <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-0.5 text-[9px] w-4 h-4 flex items-center justify-center shadow-xs font-bold leading-none z-10 group-hover/badge:scale-110 transition-transform">
                           ✓
                         </div>
                       )}
 
                       {/* 未獲得ロックバッジマーク (右上) */}
                       {!badge.unlocked && (
-                        <div className="absolute top-2 right-2 bg-gray-400/80 text-white rounded-full p-0.5 text-[10px] w-4 h-4 flex items-center justify-center shadow-xs leading-none">
+                        <div className="absolute top-2 right-2 bg-gray-400/80 text-white rounded-full p-0.5 text-[10px] w-4 h-4 flex items-center justify-center shadow-xs leading-none z-10">
                           🔒
                         </div>
                       )}
