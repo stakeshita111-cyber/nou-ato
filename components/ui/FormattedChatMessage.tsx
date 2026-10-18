@@ -27,10 +27,20 @@ function renderKeywordHighlight(text: string, keyword?: string, keyPrefix = 'h')
 }
 
 function renderInlineText(text: string, keyword?: string): React.ReactNode[] {
-  // **太字** を検出して分割
-  const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
+  // ***太字イタリック***, **太字**, *イタリック/強調* を順番に検出して分割
+  const parts = text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g);
 
-  return boldParts.map((part, bIdx) => {
+  return parts.map((part, bIdx) => {
+    // 1. ***太字イタリック***
+    if (part.startsWith('***') && part.endsWith('***') && part.length >= 6) {
+      const innerText = part.slice(3, -3);
+      return (
+        <strong key={`bi-${bIdx}`} className="font-black text-emerald-950">
+          {renderKeywordHighlight(innerText, keyword, `bi-${bIdx}`)}
+        </strong>
+      );
+    }
+    // 2. **太字**
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
       const innerText = part.slice(2, -2);
       return (
@@ -39,20 +49,34 @@ function renderInlineText(text: string, keyword?: string): React.ReactNode[] {
         </strong>
       );
     }
+    // 3. *イタリック/強調*
+    if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+      const innerText = part.slice(1, -1);
+      return (
+        <strong key={`i-${bIdx}`} className="font-bold text-emerald-950">
+          {renderKeywordHighlight(innerText, keyword, `i-${bIdx}`)}
+        </strong>
+      );
+    }
+
+    // 単独で残った生のアスタリスク記号（例: "* " や " *"）をサニタイズ
+    const cleanedPart = part.replace(/(?:^|\s)\*(?:\s|$)/g, ' ').replace(/\*+/g, '');
+
     return (
       <React.Fragment key={`t-${bIdx}`}>
-        {renderKeywordHighlight(part, keyword, `t-${bIdx}`)}
+        {renderKeywordHighlight(cleanedPart, keyword, `t-${bIdx}`)}
       </React.Fragment>
     );
   });
 }
 
 function normalizeStructuredLines(rawText: string): string[] {
-  // 1行に繋がった Markdown 表の行 (| A | B | | --- | --- |) や番号付きリスト (1. xxx 2. yyy) を改行分割
+  // 1行に繋がった Markdown 表の行 (| A | B | | --- | --- |) や箇条書き (* xxx * yyy)、番号付きリスト (1. xxx 2. yyy) を改行分割
   const normalized = rawText
     .replace(/\|\s+\|/g, '|\n|')
     .replace(/([。！？：:；;])\s*(?=\d+\.\s+)/g, '$1\n')
-    .replace(/(\S)\s+(?=[2-9]\d*\.\s+)/g, '$1\n');
+    .replace(/(\S)\s+(?=[2-9]\d*\.\s+)/g, '$1\n')
+    .replace(/([。！？：:；;])\s*(?=[*\-・]\s+)/g, '$1\n');
 
   return normalized.split('\n');
 }
@@ -174,9 +198,10 @@ export default function FormattedChatMessage({
       continue;
     }
 
-    // 箇条書き (* や - や ・)
-    if (line.startsWith('* ') || line.startsWith('- ') || line.startsWith('・')) {
-      const bulletContent = line.replace(/^(?:[*\-]\s+|・\s*)/, '');
+    // 箇条書き (* や - や ・、スペース有無両対応)
+    const bulletMatch = line.match(/^(?:[*\-]\s+|・\s*|[*\-](?!\*)\s*)(.*)$/);
+    if (bulletMatch) {
+      const bulletContent = bulletMatch[1];
       elements.push(
         <div key={`li-${idx}`} className="flex items-start gap-1.5 pl-1">
           <span className="text-emerald-700 font-bold shrink-0 leading-relaxed">•</span>

@@ -76,4 +76,14 @@ describe('FormattedChatMessage', () => {
     expect(screen.getByText('3.')).toBeDefined();
     expect(screen.getByText('殺菌剤を散布する')).toBeDefined();
   });
+
+  it('単一アスタリスクのイタリック (*テキスト*) や太字イタリック (***テキスト***)、孤立アスタリスクを整形し、アスタリスク文字を残さない', () => {
+    const text = 'アドバイス: *水やりの頻度* と ***日当たり*** に注意してください。 * ';
+    render(<FormattedChatMessage text={text} />);
+
+    expect(screen.queryByText(/\*水やりの頻度\*/)).toBeNull();
+    expect(screen.queryByText(/\*\*\*日当たり\*\*\*/)).toBeNull();
+    expect(screen.getByText('水やりの頻度').tagName).toBe('STRONG');
+    expect(screen.getByText('日当たり').tagName).toBe('STRONG');
+  });
 });

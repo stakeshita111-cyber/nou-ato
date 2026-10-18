@@ -910,20 +910,20 @@ export default function StudentFarmRecordView({
               const progress =
                 stageProgress ?? (bed as { progress_percent?: number }).progress_percent ?? 0;
               let colorClasses =
-                'bg-emerald-50/90 text-emerald-900 border-emerald-200 hover:bg-emerald-100';
+                'bg-gradient-to-br from-emerald-50/95 via-green-50/90 to-emerald-100/80 text-emerald-900 border-emerald-200 hover:bg-emerald-100 bg-emerald-50/90';
 
               if (isPending) {
                 colorClasses =
                   'bg-gradient-to-br from-amber-100 to-orange-100 text-amber-950 border-amber-400 ring-2 ring-amber-400 shadow-xs';
               } else if (progress >= 80) {
                 colorClasses =
-                  'bg-gradient-to-br from-emerald-800 to-teal-950 text-amber-300 border-emerald-900 shadow-sm';
+                  'bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-800 text-amber-200 border-emerald-700 shadow-sm';
               } else if (progress >= 50) {
                 colorClasses =
-                  'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-xs';
+                  'bg-gradient-to-br from-emerald-500 to-teal-600 bg-emerald-600 text-white border-emerald-700 hover:brightness-105 shadow-xs';
               } else if (progress >= 25) {
                 colorClasses =
-                  'bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200';
+                  'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200';
               }
 
               return (
