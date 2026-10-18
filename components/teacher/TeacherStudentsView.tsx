@@ -1327,6 +1327,11 @@ export default function TeacherStudentsView() {
             setDeleteTargetStudent(s);
             setShowDeleteConfirmModal(true);
           }}
+          onAssignTask={(s) => {
+            setSelectedStudent(null);
+            setAssignModalStudent(s);
+            setShowAssignModal(true);
+          }}
         />
       )}
 
