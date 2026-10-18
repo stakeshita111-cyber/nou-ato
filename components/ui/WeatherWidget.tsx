@@ -12,6 +12,7 @@ import { WeatherForecastCards } from './weather/WeatherForecastCards';
 import {
   getWeatherIcon,
   getWeatherText,
+  getAgriAdvice,
   type SprayingStatus,
   type IrrigationStatus,
   type SunlightStatus,
@@ -64,6 +65,8 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   const [selectedMapLat, setSelectedMapLat] = useState<number>(lat);
   const [selectedMapLon, setSelectedMapLon] = useState<number>(lon);
   const [selectedMapCityName, setSelectedMapCityName] = useState<string>(municipalityName);
+
+  const advice = getAgriAdvice(weather);
 
   const handleOpenLocationModal = () => {
     setSelectedMapLat(lat);
@@ -199,6 +202,30 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
           >
             <span className={loading ? 'animate-spin inline-block' : ''}>🔄</span>
           </button>
+        </div>
+      </div>
+
+      {/* 農作業コンテキストアドバイス（マイクロコピー）バナー */}
+      <div
+        className={`p-3 rounded-2xl border shadow-xs transition-all flex items-start sm:items-center gap-2.5 ${advice.bgClass} ${advice.borderClass}`}
+      >
+        <span className="text-xl sm:text-2xl shrink-0 leading-none pt-0.5 sm:pt-0">
+          {advice.icon}
+        </span>
+        <div className="flex-1 min-w-0 space-y-1 sm:space-y-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+              今日の農作業アドバイス
+            </span>
+            <span
+              className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${advice.badgeClass}`}
+            >
+              {advice.badge}
+            </span>
+          </div>
+          <p className={`text-xs sm:text-sm font-bold leading-snug ${advice.textClass}`}>
+            {advice.message}
+          </p>
         </div>
       </div>
 
