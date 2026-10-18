@@ -57,7 +57,7 @@ erDiagram
     }
 
     farm_plots {
-        uuid id PK
+        text id PK "TEXT型カスタムID"
         uuid farm_id FK
         varchar name "区画名 (例: A区画)"
         varchar code "区画コード"
@@ -69,8 +69,8 @@ erDiagram
     }
 
     farm_beds {
-        uuid id PK
-        uuid plot_id FK "所属区画ID"
+        text id PK "TEXT型カスタムID"
+        text plot_id FK "TEXT型所属区画ID"
         varchar bed_number "畝番号 (例: A-1, B-3)"
         varchar dimensions "寸法・サイズ (例: 1.2m x 5m)"
         uuid student_id FK "割当受講生ID"
@@ -90,9 +90,9 @@ erDiagram
     }
 
     crop_records {
-        uuid id PK
-        varchar bed_id "対象畝ID (または plot_id)"
-        varchar plot_id "対象区画ID (共有区画対応)"
+        text id PK "TEXT型カスタムID"
+        text bed_id FK "TEXT型対象畝ID"
+        text plot_id FK "TEXT型対象区画ID (共有区画対応)"
         varchar date "作業日"
         varchar crop_name "栽培作物名"
         varchar growth_stage "生育ステージ"
@@ -207,7 +207,7 @@ erDiagram
     }
 
     events {
-        uuid id PK
+        text id PK "TEXT型カスタムID (UUID文字列)"
         uuid farm_id FK "農園ID"
         varchar title "イベント名 (例: 夏野菜収穫祭)"
         date date "開催日"
@@ -224,7 +224,7 @@ erDiagram
 
     reservations {
         uuid id PK
-        uuid event_id FK "events.id"
+        text event_id FK "TEXT型 events.id"
         uuid student_id FK "受講生 users.id"
         timestamptz created_at
     }

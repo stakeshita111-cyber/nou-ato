@@ -211,7 +211,7 @@ erDiagram
     }
 
     farm_plots {
-        uuid id PK
+        text id PK
         uuid farm_id FK
         varchar name
         varchar code
@@ -223,8 +223,8 @@ erDiagram
     }
 
     farm_beds {
-        uuid id PK
-        uuid plot_id FK
+        text id PK
+        text plot_id FK
         varchar bed_number
         uuid student_id FK
         varchar crop_name
@@ -234,9 +234,9 @@ erDiagram
     }
 
     crop_records {
-        uuid id PK
-        varchar bed_id
-        varchar plot_id
+        text id PK
+        text bed_id FK
+        text plot_id FK
         varchar date
         varchar crop_name
         numeric height_cm
@@ -305,7 +305,7 @@ erDiagram
     }
 
     events {
-        uuid id PK
+        text id PK
         uuid farm_id FK
         varchar title
         date date
@@ -315,7 +315,7 @@ erDiagram
 
     reservations {
         uuid id PK
-        uuid event_id FK
+        text event_id FK
         uuid student_id FK
     }
 
@@ -415,11 +415,11 @@ erDiagram
           </div>
         </div>
 
-        <!-- farm_beds -->
+        <!-- farm_plots -->
         <div class="space-y-2 pt-4">
           <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-            2. farm_beds (農園区画・畝データ)
+            2. farm_plots (農園区画データ)
           </h3>
           <div class="overflow-x-auto">
             <table
@@ -437,17 +437,84 @@ erDiagram
               <tbody class="divide-y divide-slate-100">
                 <tr>
                   <td class="p-2.5 font-mono font-bold text-emerald-900">id</td>
-                  <td class="p-2.5 font-mono">uuid</td>
+                  <td class="p-2.5 font-mono">text</td>
                   <td class="p-2.5 text-center font-bold text-blue-600">PK</td>
                   <td class="p-2.5 text-center">No</td>
-                  <td class="p-2.5 text-slate-600">畝固有の一意ID</td>
+                  <td class="p-2.5 text-slate-600">区画固有の一意ID (TEXT型カスタムID)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">farm_id</td>
+                  <td class="p-2.5 font-mono">uuid</td>
+                  <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">farms(id) への参照</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">name</td>
+                  <td class="p-2.5 font-mono">varchar(100)</td>
+                  <td class="p-2.5 text-center">-</td>
+                  <td class="p-2.5 text-center">No</td>
+                  <td class="p-2.5 text-slate-600">区画名 (例: A区画)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">code</td>
+                  <td class="p-2.5 font-mono">varchar(50)</td>
+                  <td class="p-2.5 text-center">-</td>
+                  <td class="p-2.5 text-center">No</td>
+                  <td class="p-2.5 text-slate-600">区画コード</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">description</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center">-</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">土壌・日照等の備考</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">student_id</td>
+                  <td class="p-2.5 font-mono">uuid</td>
+                  <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">割当受講生 users(id)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- farm_beds -->
+        <div class="space-y-2 pt-4">
+          <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+            3. farm_beds (農園区画・畝データ)
+          </h3>
+          <div class="overflow-x-auto">
+            <table
+              class="w-full text-xs text-left border-collapse border border-slate-200 rounded-xl overflow-hidden"
+            >
+              <thead class="bg-slate-100 text-slate-700 font-bold">
+                <tr>
+                  <th class="p-2.5 border-b border-slate-200">カラム名</th>
+                  <th class="p-2.5 border-b border-slate-200">型</th>
+                  <th class="p-2.5 border-b border-slate-200 text-center">PK/FK</th>
+                  <th class="p-2.5 border-b border-slate-200 text-center">Nullable</th>
+                  <th class="p-2.5 border-b border-slate-200">説明</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">id</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center font-bold text-blue-600">PK</td>
+                  <td class="p-2.5 text-center">No</td>
+                  <td class="p-2.5 text-slate-600">畝固有の一意ID (TEXT型カスタムID)</td>
                 </tr>
                 <tr>
                   <td class="p-2.5 font-mono font-bold text-emerald-900">plot_id</td>
-                  <td class="p-2.5 font-mono">uuid</td>
+                  <td class="p-2.5 font-mono">text</td>
                   <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
                   <td class="p-2.5 text-center">No</td>
-                  <td class="p-2.5 text-slate-600">farm_plots(id) への参照</td>
+                  <td class="p-2.5 text-slate-600">farm_plots(id) への参照 (TEXT型外部キー)</td>
                 </tr>
                 <tr>
                   <td class="p-2.5 font-mono font-bold text-emerald-900">bed_number</td>
@@ -490,6 +557,112 @@ erDiagram
                   <td class="p-2.5 text-center">-</td>
                   <td class="p-2.5 text-center">No</td>
                   <td class="p-2.5 text-slate-600">'active' | 'harvested' | 'archived'</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- crop_records -->
+        <div class="space-y-2 pt-4">
+          <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+            4. crop_records (観察記録・作業ログ)
+          </h3>
+          <div class="overflow-x-auto">
+            <table
+              class="w-full text-xs text-left border-collapse border border-slate-200 rounded-xl overflow-hidden"
+            >
+              <thead class="bg-slate-100 text-slate-700 font-bold">
+                <tr>
+                  <th class="p-2.5 border-b border-slate-200">カラム名</th>
+                  <th class="p-2.5 border-b border-slate-200">型</th>
+                  <th class="p-2.5 border-b border-slate-200 text-center">PK/FK</th>
+                  <th class="p-2.5 border-b border-slate-200 text-center">Nullable</th>
+                  <th class="p-2.5 border-b border-slate-200">説明</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">id</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center font-bold text-blue-600">PK</td>
+                  <td class="p-2.5 text-center">No</td>
+                  <td class="p-2.5 text-slate-600">観察記録固有の一意ID (TEXT型カスタムID)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">bed_id</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">farm_beds(id) への参照 (TEXT型外部キー)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">plot_id</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">farm_plots(id) への参照 (TEXT型外部キー)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">date</td>
+                  <td class="p-2.5 font-mono">varchar(20)</td>
+                  <td class="p-2.5 text-center">-</td>
+                  <td class="p-2.5 text-center">No</td>
+                  <td class="p-2.5 text-slate-600">作業日 (YYYY-MM-DD)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">crop_name</td>
+                  <td class="p-2.5 font-mono">varchar(100)</td>
+                  <td class="p-2.5 text-center">-</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">栽培作物名</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- events & reservations -->
+        <div class="space-y-2 pt-4">
+          <h3 class="text-sm font-black text-slate-800 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+            5. events & reservations (体験講習会・イベント管理)
+          </h3>
+          <div class="overflow-x-auto">
+            <table
+              class="w-full text-xs text-left border-collapse border border-slate-200 rounded-xl overflow-hidden"
+            >
+              <thead class="bg-slate-100 text-slate-700 font-bold">
+                <tr>
+                  <th class="p-2.5 border-b border-slate-200">テーブル/カラム</th>
+                  <th class="p-2.5 border-b border-slate-200">型</th>
+                  <th class="p-2.5 border-b border-slate-200 text-center">PK/FK</th>
+                  <th class="p-2.5 border-b border-slate-200 text-center">Nullable</th>
+                  <th class="p-2.5 border-b border-slate-200">説明</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">events.id</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center font-bold text-blue-600">PK</td>
+                  <td class="p-2.5 text-center">No</td>
+                  <td class="p-2.5 text-slate-600">イベント固有ID (TEXT型 UUID文字列)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">events.farm_id</td>
+                  <td class="p-2.5 font-mono">uuid</td>
+                  <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">farms(id) への参照 (UUID型)</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-mono font-bold text-emerald-900">reservations.event_id</td>
+                  <td class="p-2.5 font-mono">text</td>
+                  <td class="p-2.5 text-center font-bold text-amber-600">FK</td>
+                  <td class="p-2.5 text-center">Yes</td>
+                  <td class="p-2.5 text-slate-600">events(id) への参照 (TEXT型外部キー)</td>
                 </tr>
               </tbody>
             </table>

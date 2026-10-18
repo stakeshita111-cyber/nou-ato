@@ -213,6 +213,13 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key # サーバーサイド特権用
 # Google AI Studio (Gemini API Key)
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-flash-lite-latest # (任意: 自動カスケード gemini-flash-lite-latest / gemini-2.5-flash)
+
+# アプリケーション基本URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# 機能フラグ
+NEXT_PUBLIC_LINE_ENABLED=false
+NEXT_PUBLIC_SHOW_DEMO=true # 本番公開時にレビュー用デモボタン枠を非表示にする場合は false に設定
 ```
 
 ### 5. 開発サーバーの起動
