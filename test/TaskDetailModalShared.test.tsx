@@ -35,6 +35,50 @@ describe('TaskDetailModal Component - 全体共有タスクと畝選択の連動
     vi.clearAllMocks();
   });
 
+  it('区画未割り当て時に警告メッセージが表示され、完了ボタンが無効化されること', () => {
+    render(
+      <TaskDetailModal
+        task={commonTask}
+        studentId="unassigned-student"
+        studentName="未割り当て生徒"
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText('区画が未割り当てです。講師に区画の割り当てを依頼してください。')
+    ).toBeDefined();
+
+    const submitBtn = screen
+      .getByText('共通に記録して作業完了を報告する')
+      .closest('button') as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
+  });
+
+  it('保存処理失敗時に赤色エラーバナーが表示されること', async () => {
+    mockAddCropRecord.mockRejectedValueOnce(new Error('403 Forbidden: 権限がありません'));
+
+    render(
+      <TaskDetailModal
+        task={commonTask}
+        studentId="student-1"
+        studentName="生徒1"
+        onClose={vi.fn()}
+      />
+    );
+
+    const submitBtn = screen.getByText('共通に記録して作業完了を報告する');
+    await act(async () => {
+      fireEvent.click(submitBtn);
+    });
+
+    expect(mockAddCropRecord).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('403 Forbidden: 権限がありません')).toBeDefined();
+  });
+
   const commonTask = {
     id: 'task-spring-prep',
     title: '【春の準備】春夏野菜の種・苗配布＆資材受取',

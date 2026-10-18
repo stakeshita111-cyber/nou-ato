@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { uploadImageToStorage } from '@/lib/storage';
 import { WorkType } from '@/types/farm';
+import { SproutLoader } from '@/components/SproutLoader';
 
 export interface TaskModalItem {
   id?: string;
@@ -72,7 +73,7 @@ export default function TaskDetailModal({
   onClose,
   onComplete,
 }: TaskDetailModalProps) {
-  const { plots, addCropRecord } = useFarmManager();
+  const { plots, addCropRecord, isLoading } = useFarmManager();
 
   // 生徒自身の割当区画＆畝一覧を厳密取得
   const myPlot =
@@ -85,6 +86,8 @@ export default function TaskDetailModal({
         )
       : null) ||
     null;
+
+  const isUnassigned = !isLoading && !myPlot;
   const myBeds = (myPlot?.beds || [])
     .filter(
       (b: { id?: string; status?: string; bed_number?: string | number }) =>
@@ -114,6 +117,7 @@ export default function TaskDetailModal({
   const [reportMemo, setReportMemo] = useState<string>('');
   const [checkedSteps, setCheckedSteps] = useState<{ [key: number]: boolean }>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const isSubmittingRef = useRef<boolean>(false);
 
   if (!task) return null;
@@ -206,21 +210,25 @@ export default function TaskDetailModal({
   };
 
   const handleReportComplete = async () => {
-    if (isSubmittingRef.current) return;
+    if (isSubmittingRef.current || isUnassigned || isLoading) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
+    setSubmitError(null);
+
     try {
       let finalPhotoUrl = photoPreview;
       if (photoPreview && photoPreview.startsWith('data:')) {
-        finalPhotoUrl = await uploadImageToStorage(photoPreview, 'tasks');
-        if (!finalPhotoUrl) {
-          if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-            try {
-              window.alert(
-                '画像のアップロードに失敗しました。通信環境を確認して再度お試しください。'
-              );
-            } catch {}
+        try {
+          finalPhotoUrl = await uploadImageToStorage(photoPreview, 'tasks');
+          if (!finalPhotoUrl) {
+            setSubmitError(
+              '画像のアップロードに失敗しました。通信環境を確認して再度お試しください。'
+            );
+            return;
           }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '画像のアップロードに失敗しました。';
+          setSubmitError(msg);
           return;
         }
       }
@@ -252,25 +260,37 @@ export default function TaskDetailModal({
           image_url: finalPhotoUrl || undefined,
           photo_url: finalPhotoUrl || undefined,
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to add crop record:', error);
-        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-          try {
-            window.alert('作業記録の保存に失敗しました。通信状況を確認して再度お試しください。');
-          } catch {}
-        }
+        const msg =
+          error instanceof Error
+            ? error.message
+            : '作業記録の保存に失敗しました。通信状況を確認して再度お試しください。';
+        setSubmitError(msg);
         return;
       }
 
       if (onComplete) {
-        onComplete(
-          task.id || task.task_id || '',
-          selectedBedId,
-          finalPhotoUrl || undefined,
-          reportMemo
-        );
+        try {
+          await onComplete(
+            task.id || task.task_id || '',
+            selectedBedId,
+            finalPhotoUrl || undefined,
+            reportMemo
+          );
+        } catch (error: unknown) {
+          console.error('Failed to complete task:', error);
+          const msg = error instanceof Error ? error.message : 'タスク完了処理に失敗しました。';
+          setSubmitError(msg);
+          return;
+        }
       }
+
       onClose();
+    } catch (err: unknown) {
+      console.error('Error in handleReportComplete:', err);
+      const msg = err instanceof Error ? err.message : '処理中にエラーが発生しました。';
+      setSubmitError(msg);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -503,105 +523,142 @@ export default function TaskDetailModal({
                   <span>作業完了の報告</span>
                 </div>
 
-                {/* 1. 対象の畑(畝ベッド)の選択 */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-emerald-900">
-                    🌱 作業した畝（ベッド）を選択 *
-                  </label>
-                  <select
-                    value={selectedBedId}
-                    onChange={(e) => setSelectedBedId(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border-2 border-emerald-600 bg-white text-emerald-950 font-black text-xs cursor-pointer shadow-xs outline-none"
-                  >
-                    <option value="shared">🌐 共通</option>
-                    {myBeds.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        区画 {myPlot?.code || ''} - 畝 {b.bed_number}
-                        {b.crop_name && b.crop_name !== '未確定 🌱' ? ` (${b.crop_name})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 2. 作業メモ・気づきの入力 */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-gray-700">
-                    作業メモ・気づきコメント
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="作業時に気づいたことや作物の状態を入力してください..."
-                    value={reportMemo}
-                    onChange={(e) => setReportMemo(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-gray-300 bg-white text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                {/* 3. 現場写真の撮影・添付 */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-gray-700">
-                    📷 現場写真の添付{' '}
-                    {t.require_photo && <span className="text-rose-500 font-bold">*必須</span>}
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-2xl p-2.5 bg-white flex flex-col items-center justify-center text-center relative cursor-pointer min-h-[80px] hover:bg-gray-50 transition">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoSelect}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                    />
-                    {photoPreview ? (
-                      <div className="flex flex-col items-center gap-1.5 py-1 z-10">
-                        <Image
-                          src={photoPreview}
-                          alt="現場写真"
-                          width={160}
-                          height={96}
-                          unoptimized
-                          className="h-24 w-auto object-cover rounded-xl shadow-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPhotoPreview(null);
-                          }}
-                          className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 text-[10px] font-bold transition cursor-pointer"
-                        >
-                          ✕ 写真を解除
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <span className="text-lg">📷</span>
-                        <p className="font-bold text-[11px]">
-                          タップして写真を選択、または貼り付け (Ctrl+V)
-                        </p>
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-6 space-y-2">
+                    <SproutLoader size={48} />
+                    <p className="text-[11px] font-bold text-emerald-800">
+                      農園データを読み込み中...
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* 未割り当て警告イエローバナー */}
+                    {isUnassigned && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs font-bold flex items-center gap-2">
+                        <span className="text-base shrink-0">⚠️</span>
+                        <span>区画が未割り当てです。講師に区画の割り当てを依頼してください。</span>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* 完了送信ボタン */}
-                <button
-                  type="button"
-                  onClick={handleReportComplete}
-                  disabled={isSubmitting}
-                  className="w-full py-3 bg-[#1d5c23] hover:bg-[#16471a] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer mt-1"
-                >
-                  {isSubmitting ? (
-                    <span>送信中...</span>
-                  ) : (
-                    <>
-                      <span>✓</span>
-                      <span>
-                        {selectedBedId === 'shared'
-                          ? '共通に記録して作業完了を報告する'
-                          : '畝に記録して作業完了を報告する'}
-                      </span>
-                    </>
-                  )}
-                </button>
+                    {/* 送信エラー赤色アラートバナー */}
+                    {submitError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-bold flex items-center gap-2 animate-fade-in">
+                        <span className="text-base shrink-0">🚨</span>
+                        <span className="leading-snug">{submitError}</span>
+                      </div>
+                    )}
+
+                    {/* 1. 対象の畑(畝ベッド)の選択 */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-emerald-900">
+                        🌱 作業した畝（ベッド）を選択 *
+                      </label>
+                      <select
+                        value={selectedBedId}
+                        onChange={(e) => setSelectedBedId(e.target.value)}
+                        disabled={isUnassigned || isSubmitting}
+                        className="w-full p-2.5 rounded-xl border-2 border-emerald-600 bg-white text-emerald-950 font-black text-xs cursor-pointer shadow-xs outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 disabled:cursor-not-allowed"
+                      >
+                        <option value="shared">🌐 共通</option>
+                        {myBeds.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            区画 {myPlot?.code || ''} - 畝 {b.bed_number}
+                            {b.crop_name && b.crop_name !== '未確定 🌱' ? ` (${b.crop_name})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 2. 作業メモ・気づきの入力 */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-gray-700">
+                        作業メモ・気づきコメント
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="作業時に気づいたことや作物の状態を入力してください..."
+                        value={reportMemo}
+                        onChange={(e) => setReportMemo(e.target.value)}
+                        disabled={isUnassigned || isSubmitting}
+                        className="w-full p-2.5 rounded-xl border border-gray-300 bg-white text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* 3. 現場写真の撮影・添付 */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-gray-700">
+                        📷 現場写真の添付{' '}
+                        {t.require_photo && <span className="text-rose-500 font-bold">*必須</span>}
+                      </label>
+                      <div
+                        className={`border-2 border-dashed border-gray-300 rounded-2xl p-2.5 bg-white flex flex-col items-center justify-center text-center relative cursor-pointer min-h-[80px] hover:bg-gray-50 transition ${
+                          isUnassigned || isSubmitting
+                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                            : ''
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoSelect}
+                          disabled={isUnassigned || isSubmitting}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full disabled:cursor-not-allowed"
+                        />
+                        {photoPreview ? (
+                          <div className="flex flex-col items-center gap-1.5 py-1 z-10">
+                            <Image
+                              src={photoPreview}
+                              alt="現場写真"
+                              width={160}
+                              height={96}
+                              unoptimized
+                              className="h-24 w-auto object-cover rounded-xl shadow-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPhotoPreview(null);
+                              }}
+                              disabled={isUnassigned || isSubmitting}
+                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 text-[10px] font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              ✕ 写真を解除
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500 space-y-0.5">
+                            <span className="text-lg">📷</span>
+                            <p className="font-bold text-[11px]">
+                              タップして写真を選択、または貼り付け (Ctrl+V)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 完了送信ボタン */}
+                    <button
+                      type="button"
+                      onClick={handleReportComplete}
+                      disabled={isUnassigned || isSubmitting}
+                      className="w-full py-3 bg-[#1d5c23] hover:bg-[#16471a] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer mt-1"
+                    >
+                      {isSubmitting ? (
+                        <span>送信中...</span>
+                      ) : (
+                        <>
+                          <span>✓</span>
+                          <span>
+                            {selectedBedId === 'shared'
+                              ? '共通に記録して作業完了を報告する'
+                              : '畝に記録して作業完了を報告する'}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
