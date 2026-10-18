@@ -356,6 +356,7 @@ export default function StudentPage() {
       const msg = err instanceof Error ? err.message : '更新に失敗しました';
       setToastMessage(`❌ タスク完了報告に失敗しました: ${msg}`);
       setShowToast(true);
+      throw err;
     }
   };
 
