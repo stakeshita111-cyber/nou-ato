@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useFarmManager } from '@/hooks/useFarmManager';
@@ -10,6 +10,7 @@ import TeacherSidebar from '@/components/teacher/TeacherSidebar';
 import TeacherHeader from '@/components/teacher/TeacherHeader';
 import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
+import { isRegularRecord } from '@/lib/utils/journalHelper';
 
 // 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
 // これにより、初回アクセス時の React 19 Hydration クラッシュやモバイル端末での初期化エラーを 100% 防止します
@@ -76,6 +77,78 @@ export default function TeacherDashboardPage() {
       }
     });
   });
+
+  // 🌟 未返信/未確認日誌（要対応）の件数を算出 🌟
+  const [unreadJournalsCount, setUnreadJournalsCount] = useState<number>(0);
+
+  const fetchUnreadJournalsCount = useCallback(async () => {
+    try {
+      let query = supabase.from('journals').select('content, reply').is('reply', null);
+      if (activeFarmId) {
+        query = query.eq('farm_id', activeFarmId);
+      }
+      const { data, error } = await query;
+      if (error || !data) {
+        setUnreadJournalsCount(0);
+        return;
+      }
+
+      const count = data.filter((j) => {
+        const content = (j.content || '').trim();
+        return (
+          content &&
+          !content.includes('【収穫完了報告】') &&
+          !content.includes('【差し戻し通知】') &&
+          !content.includes('を完了報告しました') &&
+          content !== '（コメントなし）' &&
+          !isRegularRecord(content)
+        );
+      }).length;
+
+      setUnreadJournalsCount(count);
+    } catch (err) {
+      console.error('fetchUnreadJournalsCount error:', err);
+      setUnreadJournalsCount(0);
+    }
+  }, [activeFarmId]);
+
+  useEffect(() => {
+    const load = async () => {
+      await fetchUnreadJournalsCount();
+    };
+    load().catch((err) => {
+      console.error('fetchUnreadJournalsCount error in useEffect:', err);
+    });
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nouato_farm_sync_channel');
+      bc.onmessage = () => {
+        fetchUnreadJournalsCount().catch((err) => {
+          console.error('bc fetchUnreadJournalsCount error:', err);
+        });
+      };
+    } catch {}
+
+    const handleSync = () => {
+      fetchUnreadJournalsCount().catch((err) => {
+        console.error('handleSync fetchUnreadJournalsCount error:', err);
+      });
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nouato_sync_event', handleSync);
+      window.addEventListener('focus', handleSync);
+    }
+
+    return () => {
+      if (bc) bc.close();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nouato_sync_event', handleSync);
+        window.removeEventListener('focus', handleSync);
+      }
+    };
+  }, [fetchUnreadJournalsCount]);
 
   // 🌟 Hydration Mismatch 防止: 初期値は常に "dashboard"、マウント後にストレージから安全に復元 🌟
   const [activeMenu, setActiveMenu] = useState<string>('dashboard');
@@ -222,6 +295,7 @@ export default function TeacherDashboardPage() {
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
         pendingApprovalCount={pendingApprovalCount}
+        unreadJournalsCount={unreadJournalsCount}
       />
 
       {/* 2. メインエリア */}
