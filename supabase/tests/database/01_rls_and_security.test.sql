@@ -304,13 +304,13 @@ SELECT throws_matching(
 );
 
 -- Test 22: 復元された外部キー制約: crop_records.bed_id に存在しない bed_id を指定した INSERT は FK 違反(23503)で拒否される
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+-- (RLS をバイパスして純粋な外部キー制約 23503 の発動を検証)
+SET LOCAL ROLE postgres;
 
 SELECT throws_matching(
     $$ INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, date)
        VALUES ('rec-invalid-fk', 'bed-nonexistent', 'plot-a-1', 'ミニトマト', '2026-10-18') $$,
-    'violates foreign key constraint|23503',
+    'violates foreign key constraint|crop_records_bed_id_fkey|23503',
     '22. [FK制約] 存在しない bed_id を crop_records.bed_id に指定した INSERT は FK 違反 (23503) で拒否される'
 );
 
