@@ -135,3 +135,89 @@ export type WeatherData = {
   daily: DailyPoint[];
   adviceShort: string;
 };
+
+export interface AgriAdvice {
+  icon: string;
+  badge: string;
+  message: string;
+  bgClass: string;
+  borderClass: string;
+  textClass: string;
+  badgeClass: string;
+}
+
+export function getAgriAdvice(weather: WeatherData): AgriAdvice {
+  const { today, indices } = weather;
+
+  // 1. 降雨予報・高湿度時
+  if (
+    today.rainProb >= 60 ||
+    today.rainSum >= 5 ||
+    today.weather === 'rainy' ||
+    today.weather === 'storm'
+  ) {
+    return {
+      icon: '☔',
+      badge: '降雨予報・水やり控え目',
+      message: '今日・明日は雨予報のため、畝の水やりは控えめでOKです',
+      bgClass: 'bg-blue-50/90',
+      borderClass: 'border-blue-200',
+      textClass: 'text-blue-950',
+      badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
+    };
+  }
+
+  // 2. 高温注意報・熱中症警戒時
+  if (
+    today.tempMax >= 31 ||
+    indices.heatAlert.status === 'danger' ||
+    indices.heatAlert.status === 'warning'
+  ) {
+    return {
+      icon: '☀️',
+      badge: '高温注意・熱中症警戒',
+      message: '厳しい暑さが予想されます。農作業や収穫は朝夕の涼しい時間帯に行いましょう',
+      bgClass: 'bg-amber-50/90',
+      borderClass: 'border-amber-200',
+      textClass: 'text-amber-950',
+      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+    };
+  }
+
+  // 3. 強風時
+  if (today.windSpeed >= 5.5 || indices.spraying.status === 'danger') {
+    return {
+      icon: '💨',
+      badge: '強風注意・資材固定',
+      message: '風が強いため支柱や防風ネットの固定を点検し、農薬・液肥散布は見合わせましょう',
+      bgClass: 'bg-orange-50/90',
+      borderClass: 'border-orange-200',
+      textClass: 'text-orange-950',
+      badgeClass: 'bg-orange-100 text-orange-900 border-orange-300',
+    };
+  }
+
+  // 4. 散布適性良好時
+  if (indices.spraying.status === 'good') {
+    return {
+      icon: '🍃',
+      badge: '散布適性良好',
+      message: '風が穏やかで、葉面散布や害虫対策に適した天候です',
+      bgClass: 'bg-emerald-50/90',
+      borderClass: 'border-emerald-200',
+      textClass: 'text-emerald-950',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    };
+  }
+
+  // 5. 標準・好天
+  return {
+    icon: '🌱',
+    badge: '農作業日和',
+    message: '安定した天候です。畑の観察や追肥、収穫を計画的に行いましょう',
+    bgClass: 'bg-emerald-50/90',
+    borderClass: 'border-emerald-200',
+    textClass: 'text-emerald-950',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  };
+}

@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { getWeatherIcon, getWeatherText, type WeatherData, type HourlyPoint } from './types';
+import {
+  getWeatherIcon,
+  getWeatherText,
+  getAgriAdvice,
+  type WeatherData,
+  type HourlyPoint,
+} from './types';
 
 interface WeatherForecastCardsProps {
   weather: WeatherData;
@@ -1035,12 +1041,19 @@ export function WeatherForecastCards({
             })()}
           </div>
 
-          <div className="bg-emerald-50/80 px-3 py-2 rounded-xl border border-emerald-200 text-xs flex items-center space-x-2 text-emerald-950">
-            <span className="text-base">💡</span>
-            <span className="font-extrabold leading-tight">
-              【農作業アドバイス】本日の主要指標に基づき、適切な防除・給水・作業計画を立てましょう。
-            </span>
-          </div>
+          {(() => {
+            const advice = getAgriAdvice(weather);
+            return (
+              <div
+                className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 ${advice.bgClass} ${advice.borderClass}`}
+              >
+                <span className="text-lg shrink-0">{advice.icon}</span>
+                <span className={`font-extrabold leading-tight ${advice.textClass}`}>
+                  【農作業アドバイス】{advice.message}
+                </span>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
