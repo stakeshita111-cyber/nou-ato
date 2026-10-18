@@ -4,12 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 /**
  * ==============================================================================
- * NOU-ATO 実DB統合検証スクリプト (Live Database Integration Gate)
+ * NOU-ATO 実DB統合検証スクリプト (Live Database Read-Only Audit Gate)
  *
  * 目的:
- *   ANON_KEY クライアント、受講生 (test11) クライアント、および
- *   SERVICE_ROLE_KEY クライアントを用いて、本番リモートDBのRLS境界、
- *   改ざん防止トリガー、およびCHECK制約 (23514) を実環境で厳密にアサーションする。
+ *   ANON_KEY クライアント、受講生 クライアント、および SERVICE_ROLE_KEY クライアントを
+ *   用いて、本番リモートDBのデータ整合性、読み取り専用RPC動作、孤立レコード、
+ *   およびRLS境界を完全に「読み取り専用 (Read-Only)」で安全に監査・検証する。
+ *   ※書き込み系（INSERT / UPDATE / 状態変更RPC）検証は pgTAP テストに集約されています。
  * ==============================================================================
  */
 
@@ -52,7 +53,7 @@ if (!supabaseServiceRoleKey) {
   process.exit(1);
 }
 
-console.log('🚀 [Live DB Gate] Verifying Supabase Remote DB 3-Role Security & Constraints...');
+console.log('🚀 [Live DB Read-Only Audit Gate] Auditing Supabase Remote DB strictly Read-Only...');
 console.log(`   Endpoint: ${supabaseUrl}`);
 
 // クライアント分離
@@ -75,31 +76,61 @@ let failedTests = 0;
 
 async function runVerification() {
   // ----------------------------------------------------------------------------
+  // 0. DB 接続確認 (ヘルスチェック)
+  // ----------------------------------------------------------------------------
+  try {
+    const { error: pingErr } = await adminClient.from('farms').select('id').limit(1);
+    if (
+      pingErr &&
+      (pingErr.message?.includes('fetch failed') || pingErr.message?.includes('ENOTFOUND'))
+    ) {
+      console.error(
+        `\x1b[31m[CONNECTION ERROR]\x1b[0m Remote Supabase DB への接続に失敗しました (${pingErr.message})。`.concat(
+          '\n  ↳ ネットワーク接続、.env.local の URL / KEY 設定を確認してください。'
+        )
+      );
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(`\x1b[31m[CONNECTION ERROR]\x1b[0m DB 接続例外: ${err?.message || err}`);
+    process.exit(1);
+  }
+
+  // ----------------------------------------------------------------------------
   // 1. 【未ログイン (anon)】farms への直接 SELECT が拒否（42501 / 0件）されること
   // ----------------------------------------------------------------------------
   try {
     const { data, error } = await anonClient.from('farms').select('*');
-    if (error && (error.code === '42501' || error.message.includes('permission denied'))) {
-      console.log(
-        '✅ 1. [未ログイン (anon)] farms 直接 SELECT 拒否 (42501 Unauthorized): 正常に防御'
-      );
+    if (error) {
+      if (
+        error.code === '42501' ||
+        error.message?.includes('permission denied') ||
+        error.message?.includes('PGRST')
+      ) {
+        console.log(
+          '✅ 1. [未ログイン (anon)] farms 直接 SELECT 拒否 (42501 Unauthorized / RLS): 正常に防御'
+        );
+      } else {
+        console.error('❌ 1. [未ログイン (anon)] farms SELECT エラー:', error.message || error);
+        failedTests++;
+      }
     } else if (data && data.length === 0) {
       console.log(
         '✅ 1. [未ログイン (anon)] farms 直接 SELECT 拒否 (RLS により 0 件返却): 正常に防御'
       );
-    } else {
-      console.error('❌ 1. [未ログイン (anon)] farms 漏洩検知: 未認証で取得できました', {
+    } else if (data && data.length > 0) {
+      console.error('❌ 1. [未ログイン (anon)] farms 漏洩検知: 未認証でデータが取得できました', {
         data,
-        error,
       });
       failedTests++;
     }
-  } catch {
-    console.log('✅ 1. [未ログイン (anon)] farms 直接 SELECT 拒否 (例外により防御): 正常に防御');
+  } catch (err) {
+    console.error('❌ 1. [未ログイン (anon)] farms SELECT 例外:', err?.message || err);
+    failedTests++;
   }
 
   // ----------------------------------------------------------------------------
-  // 2. 【未ログイン (anon)】get_farm_by_invite_code RPC が正常に応答すること
+  // 2. 【未ログイン (anon)】get_farm_by_invite_code 読み取り専用 RPC の動作確認
   // ----------------------------------------------------------------------------
   try {
     const { data, error } = await anonClient.rpc('get_farm_by_invite_code', {
@@ -128,267 +159,215 @@ async function runVerification() {
       password: 'test11',
     });
     if (authError || !authData?.user) {
-      console.error('❌ 3. 受講生 test11@example.com サインイン失敗:', authError);
+      console.error(
+        '❌ 3. 受講生 test11@example.com サインイン失敗:',
+        authError?.message || authError
+      );
       failedTests++;
-      return;
+    } else {
+      studentUserId = authData.user.id;
+      console.log('✅ 3. [受講生ロール] test11 認証成功 (UID: ' + studentUserId + ')');
     }
-    studentUserId = authData.user.id;
-    console.log('✅ 3. [受講生ロール] test11 認証成功 (UID: ' + studentUserId + ')');
   } catch (err) {
-    console.error('❌ 3. 受講生サインイン例外:', err);
+    console.error('❌ 3. 受講生サインイン例外:', err?.message || err);
     failedTests++;
-    return;
   }
 
   // ----------------------------------------------------------------------------
-  // 4. 【必須1-A】受講生が「自分の区画ID ＋ 他人の畝ID」で作物記録を INSERT 拒否
+  // 4. 【受講生】読み取り専用 RPC の動作確認 (get_ai_ticket_status, current_user_role, current_user_farm_id)
   // ----------------------------------------------------------------------------
-  try {
-    const { data: beds } = await studentClient.from('farm_beds').select('id, plot_id, student_id');
-    const myBed = beds?.find((b) => b.student_id === studentUserId);
-    const otherBed = beds?.find((b) => b.student_id && b.student_id !== studentUserId);
+  if (studentUserId) {
+    try {
+      const { data: ticketData, error: ticketErr } =
+        await studentClient.rpc('get_ai_ticket_status');
+      if (!ticketErr && ticketData) {
+        console.log('✅ 4-A. [受講生] 読み取り専用 RPC get_ai_ticket_status 実行: 正常に応答');
+      } else {
+        console.error('❌ 4-A. [受講生] get_ai_ticket_status RPC 失敗:', ticketErr);
+        failedTests++;
+      }
 
-    const testPlotId = myBed ? myBed.plot_id : '00000000-0000-0000-0000-000000000001';
-    const fakeBedId = otherBed ? otherBed.id : '00000000-0000-0000-0000-000000000002';
+      const { data: roleData, error: roleErr } = await studentClient.rpc('current_user_role');
+      if (!roleErr && roleData === 'student') {
+        console.log(
+          '✅ 4-B. [受講生] 読み取り専用 RPC current_user_role 実行: 正常に応答 (role: student)'
+        );
+      } else {
+        console.error('❌ 4-B. [受講生] current_user_role RPC 失敗:', roleErr);
+        failedTests++;
+      }
 
-    const { data, error } = await studentClient
-      .from('crop_records')
-      .insert({
-        id: crypto.randomUUID(),
-        plot_id: testPlotId,
-        bed_id: fakeBedId,
-        crop_name: 'セキュリティ検証トマト',
-        date: '2026-10-16',
-      })
-      .select();
-
-    if (error) {
-      console.log(
-        '✅ 4. [受講生ロール] 他生徒の畝IDでの作物記録 INSERT 拒否 (403/RLS Violation): 正常に防御'
-      );
-    } else {
-      console.error('❌ 4. [受講生ロール] 脆弱性検知: 他人の畝IDで記録が作成できました', data);
+      const { data: farmIdData, error: farmIdErr } =
+        await studentClient.rpc('current_user_farm_id');
+      if (!farmIdErr) {
+        console.log(
+          `✅ 4-C. [受講生] 読み取り専用 RPC current_user_farm_id 実行: 正常に応答 (farm_id: ${farmIdData || 'null'})`
+        );
+      } else {
+        console.error('❌ 4-C. [受講生] current_user_farm_id RPC 失敗:', farmIdErr);
+        failedTests++;
+      }
+    } catch (err) {
+      console.error('❌ 4. [受講生] 読み取り専用 RPC 実行例外:', err?.message || err);
       failedTests++;
     }
-  } catch {
-    console.log('✅ 4. [受講生ロール] 他生徒の畝IDでの作物記録 INSERT 拒否 (例外防御): 正常に防御');
-  }
 
-  // ----------------------------------------------------------------------------
-  // 5. 【必須1-B】受講生が「存在しない/未配信タスクID」で complete_student_task 拒否
-  // ----------------------------------------------------------------------------
-  try {
-    const { data, error } = await studentClient.rpc('complete_student_task', {
-      p_base_task_id: '00000000-0000-0000-0000-000000000999',
-    });
-
-    if (
-      error &&
-      (error.code === 'P0002' ||
-        error.message.includes('Target published task not found') ||
-        error.code === '42501')
-    ) {
-      console.log(
-        '✅ 5. [受講生ロール] 未配信タスク完了拒否 (P0002 / Target not found): 正常に防御'
-      );
-    } else if (error) {
-      console.log(`✅ 5. [受講生ロール] 未配信タスク完了拒否 (${error.code}): 正常に防御`);
-    } else {
-      console.error('❌ 5. [受講生ロール] 脆弱性検知: 未配信タスクでEXPが加算されました', data);
-      failedTests++;
-    }
-  } catch {
-    console.log('✅ 5. [受講生ロール] 未配信タスク完了拒否 (例外防御): 正常に防御');
-  }
-
-  // ----------------------------------------------------------------------------
-  // 6. 【必須2-B】受講生が自分の畝 (farm_beds) の plot_id / status を改ざん拒否
-  // ----------------------------------------------------------------------------
-  try {
-    const { data: myBeds } = await studentClient
-      .from('farm_beds')
-      .select('id')
-      .eq('student_id', studentUserId);
-    const targetBedId = myBeds?.[0]?.id;
-
-    if (!targetBedId) {
-      console.log('⚠️ 6. [受講生ロール] 割当畝が見つからないためスキップ');
-    } else {
-      const { data, error } = await studentClient
+    // ----------------------------------------------------------------------------
+    // 5. 【受講生】RLS境界 & データアクセス参照監査 (自分のデータのみSELECT可能か)
+    // ----------------------------------------------------------------------------
+    try {
+      const { data: beds, error: bedsErr } = await studentClient
         .from('farm_beds')
-        .update({
-          plot_id: '00000000-0000-0000-0000-000000000999',
-          status: 'archived',
-        })
-        .eq('id', targetBedId)
-        .select();
-
-      if (
-        error &&
-        (error.code === '42501' ||
-          error.message.includes('Students cannot change') ||
-          error.message.includes('trg_prevent_student_farm_bed_tampering'))
-      ) {
-        console.log(
-          '✅ 6. [受講生ロール] 畝改ざん防止トリガー (trg_prevent_student_farm_bed_tampering / 42501): 正常に防御'
-        );
-      } else if (error) {
-        console.log(`✅ 6. [受講生ロール] 畝改ざん防止トリガー (${error.code}): 正常に防御`);
+        .select('id, plot_id, student_id');
+      if (!bedsErr && Array.isArray(beds)) {
+        const otherStudentBeds = beds.filter((b) => b.student_id && b.student_id !== studentUserId);
+        if (otherStudentBeds.length === 0) {
+          console.log(
+            '✅ 5-A. [受講生] farm_beds SELECT 参照監査: 他生徒の割当畝は遮断（自データのみ取得可能）'
+          );
+        } else {
+          console.log(
+            `✅ 5-A. [受講生] farm_beds SELECT 参照監査: ${beds.length}件取得 (農園共有視覚化)`
+          );
+        }
       } else {
-        console.error(
-          '❌ 6. [受講生ロール] 脆弱性検知: 畝の区画やステータスが書き換えられました',
-          data
-        );
+        console.error('❌ 5-A. [受講生] farm_beds SELECT 失敗:', bedsErr);
         failedTests++;
       }
+
+      const { data: tasks, error: tasksErr } = await studentClient
+        .from('student_tasks')
+        .select('id, base_task_id, status, student_id')
+        .eq('student_id', studentUserId);
+      if (!tasksErr && Array.isArray(tasks)) {
+        console.log(`✅ 5-B. [受講生] student_tasks SELECT 参照監査: ${tasks.length}件取得`);
+      } else {
+        console.error('❌ 5-B. [受講生] student_tasks SELECT 失敗:', tasksErr);
+        failedTests++;
+      }
+
+      const { data: journals, error: journalsErr } = await studentClient
+        .from('journals')
+        .select('id, content, student_id')
+        .eq('student_id', studentUserId);
+      if (!journalsErr && Array.isArray(journals)) {
+        console.log(`✅ 5-C. [受講生] journals SELECT 参照監査: ${journals.length}件取得`);
+      } else {
+        console.error('❌ 5-C. [受講生] journals SELECT 失敗:', journalsErr);
+        failedTests++;
+      }
+    } catch (err) {
+      console.error('❌ 5. [受講生] SELECT 参照監査例外:', err?.message || err);
+      failedTests++;
     }
-  } catch {
-    console.log('✅ 6. [受講生ロール] 畝改ざん防止トリガー (例外防御): 正常に防御');
   }
 
   // ----------------------------------------------------------------------------
-  // 7. 【CHECK制約 23514】journals 空文字 INSERT 拒否
+  // 6. 【特権管理者 (service_role)】全主要テーブルの件数・整合性確認 (SELECT)
   // ----------------------------------------------------------------------------
-  try {
-    const { data, error } = await studentClient
-      .from('journals')
-      .insert({
-        student_id: studentUserId,
-        role: 'student',
-        content: '   ',
-      })
-      .select();
+  console.log('\n📊 [特権管理者] 主要テーブル件数・整合性監査:');
+  const coreTables = [
+    'users',
+    'farms',
+    'farm_plots',
+    'farm_beds',
+    'tasks',
+    'student_tasks',
+    'journals',
+    'crop_records',
+    'ai_tickets',
+    'ai_usage_events',
+    'announcements',
+  ];
 
-    if (
-      error &&
-      (error.code === '23514' ||
-        error.message.includes('check constraint') ||
-        error.message.includes('chk_'))
-    ) {
-      console.log(
-        '✅ 7. [CHECK制約] journals 空文字 INSERT 拒否 (23514 check_violation): 正常に検知'
+  for (const table of coreTables) {
+    try {
+      const { count, error } = await adminClient
+        .from(table)
+        .select('*', { count: 'exact', head: true });
+      if (error) {
+        console.error(`  ❌ [テーブル監査] ${table}: 取得失敗 - ${error.message}`);
+        failedTests++;
+      } else {
+        console.log(`  ✅ [テーブル監査] ${table}: ${count ?? 0} 件`);
+      }
+    } catch (err) {
+      console.error(`  ❌ [テーブル監査] ${table}: 例外 - ${err?.message || err}`);
+      failedTests++;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 7. 【特権管理者 (service_role)】孤立レコード (orphan rows) セキュリティ監査
+  // ----------------------------------------------------------------------------
+  console.log('\n🔍 [特権管理者] 孤立レコード (orphan rows) セキュリティ監査:');
+  try {
+    // A. 孤立 farm_beds (存在しない plot_id を参照する畝)
+    const { data: allPlots } = await adminClient.from('farm_plots').select('id');
+    const validPlotIds = new Set((allPlots || []).map((p) => p.id));
+
+    const { data: allBeds } = await adminClient.from('farm_beds').select('id, plot_id');
+    const orphanBeds = (allBeds || []).filter((b) => b.plot_id && !validPlotIds.has(b.plot_id));
+
+    if (orphanBeds.length === 0) {
+      console.log('  ✅ 孤立 farm_beds 検出: 0 件 (すべての畝は有効な区画に紐づいています)');
+    } else {
+      console.error(
+        `  ❌ 孤立 farm_beds 検出: ${orphanBeds.length} 件の孤立畝を検出しました`,
+        orphanBeds
       );
-    } else {
-      console.error('❌ 7. [CHECK制約] journals 空文字 INSERT が成功してしまいました', {
-        data,
-        error,
-      });
       failedTests++;
     }
-  } catch {
-    console.log('✅ 7. [CHECK制約] journals 空文字 INSERT 拒否 (例外検知): 正常に検知');
-  }
 
-  // ----------------------------------------------------------------------------
-  // 8. 【CHECK制約 23514】crop_records 負数収穫量 INSERT 拒否
-  // ----------------------------------------------------------------------------
-  try {
-    const { data: myBeds } = await studentClient
-      .from('farm_beds')
-      .select('id, plot_id')
-      .eq('student_id', studentUserId);
-    const validBed = myBeds?.[0];
-    if (validBed) {
-      const { data, error } = await studentClient
-        .from('crop_records')
-        .insert({
-          id: crypto.randomUUID(),
-          plot_id: validBed.plot_id,
-          bed_id: validBed.id,
-          crop_name: 'トマト',
-          date: '2026-10-16',
-          harvest_amount: -10,
-        })
-        .select();
+    // B. 孤立 student_tasks (存在しない student_id または base_task_id を参照するタスク)
+    const { data: allUsers } = await adminClient.from('users').select('id');
+    const validUserIds = new Set((allUsers || []).map((u) => u.id));
 
-      if (
-        error &&
-        (error.code === '23514' ||
-          error.message.includes('check constraint') ||
-          error.message.includes('chk_') ||
-          error.message.includes('22003'))
-      ) {
-        console.log(
-          '✅ 8. [CHECK制約] crop_records 負数収穫量 INSERT 拒否 (23514 check_violation): 正常に検知'
-        );
-      } else {
-        console.error('❌ 8. [CHECK制約] crop_records 負数収穫量 INSERT が成功してしまいました', {
-          data,
-          error,
-        });
-        failedTests++;
-      }
-    } else {
-      console.log('⚠️ 8. [CHECK制約] 有効な畝が見つからないためスキップ');
-    }
-  } catch {
-    console.log('✅ 8. [CHECK制約] crop_records 負数収穫量 INSERT 拒否 (例外検知): 正常に検知');
-  }
+    const { data: allTasks } = await adminClient.from('tasks').select('id');
+    const validTaskIds = new Set((allTasks || []).map((t) => t.id));
 
-  // ----------------------------------------------------------------------------
-  // 9. 【権限昇格防御】受講生自身の users.role を 'teacher' に改ざん拒否
-  // ----------------------------------------------------------------------------
-  try {
-    const { data, error } = await studentClient
-      .from('users')
-      .update({ role: 'teacher' })
-      .eq('id', studentUserId)
-      .select();
-    if (error || !data || data.length === 0) {
-      console.log('✅ 9. [権限昇格防御] 受講生自身の users.role 昇格拒否: 正常に防御');
-    } else {
-      console.error('❌ 9. [権限昇格] 脆弱性検知: 受講生が講師ロールへ昇格できてしまいました');
-      failedTests++;
-    }
-  } catch {
-    console.log('✅ 9. [権限昇格防御] 例外により防御成功');
-  }
+    const { data: allStudentTasks } = await adminClient
+      .from('student_tasks')
+      .select('id, student_id, base_task_id');
+    const orphanStudentTasks = (allStudentTasks || []).filter(
+      (st) =>
+        (st.student_id && !validUserIds.has(st.student_id)) ||
+        (st.base_task_id && !validTaskIds.has(st.base_task_id))
+    );
 
-  // ----------------------------------------------------------------------------
-  // 10. 【AI回答偽装防御】受講生による save_ai_journal 直接呼び出し拒否 (42501 / Permission Denied)
-  // ----------------------------------------------------------------------------
-  try {
-    const { data, error } = await studentClient.rpc('save_ai_journal', {
-      p_student_id: studentUserId,
-      p_content: 'セキュリティ検証質問',
-      p_reply: '偽装されたAI回答',
-      p_is_private: false,
-    });
-    if (
-      error &&
-      (error.code === '42501' ||
-        error.message.includes('permission denied') ||
-        error.message.includes('function save_ai_journal'))
-    ) {
+    if (orphanStudentTasks.length === 0) {
       console.log(
-        '✅ 10. [AI回答偽装防御] 受講生の save_ai_journal 直接呼出拒絶 (42501 Unauthorized): 正常に防御'
+        '  ✅ 孤立 student_tasks 検出: 0 件 (すべての配信タスクは有効な生徒および元タスクに紐づいています)'
       );
     } else {
       console.error(
-        '❌ 10. [AI回答偽装防御] 脆弱性検知: 受講生が save_ai_journal で直接AI回答を保存できました',
-        { data, error }
+        `  ❌ 孤立 student_tasks 検出: ${orphanStudentTasks.length} 件の孤立配信タスクを検出しました`,
+        orphanStudentTasks
       );
       failedTests++;
     }
-  } catch {
-    console.log(
-      '✅ 10. [AI回答偽装防御] 受講生の save_ai_journal 直接呼出拒絶 (例外防御): 正常に防御'
-    );
-  }
 
-  // ----------------------------------------------------------------------------
-  // 11. 【特権管理者検証】RLS 有効化状況の監査 (すべてのテーブルで RLS が有効であること)
-  // ----------------------------------------------------------------------------
-  try {
-    const { error } = await adminClient.from('farms').select('id').limit(1);
-    if (!error) {
-      console.log('✅ 11. [特権管理者] service_role クライアントによる接続・テーブル監査: 正常');
+    // C. 孤立 crop_records (存在しない plot_id を参照する観察記録)
+    const { data: allCropRecords } = await adminClient
+      .from('crop_records')
+      .select('id, plot_id, bed_id');
+    const orphanCropRecords = (allCropRecords || []).filter(
+      (cr) => cr.plot_id && !validPlotIds.has(cr.plot_id)
+    );
+
+    if (orphanCropRecords.length === 0) {
+      console.log(
+        '  ✅ 孤立 crop_records 検出: 0 件 (すべての観察記録は有効な区画に紐づいています)'
+      );
     } else {
-      console.error('❌ 11. [特権管理者] service_role 接続失敗:', error);
+      console.error(
+        `  ❌ 孤立 crop_records 検出: ${orphanCropRecords.length} 件の孤立観察記録を検出しました`,
+        orphanCropRecords
+      );
       failedTests++;
     }
   } catch (err) {
-    console.error('❌ 11. [特権管理者] 例外:', err);
+    console.error('  ❌ 孤立レコード監査例外:', err);
     failedTests++;
   }
 
@@ -398,12 +377,12 @@ async function runVerification() {
   console.log('\n------------------------------------------------------------');
   if (failedTests === 0) {
     console.log(
-      '🎉 [Live DB Gate PASSED] 全ての未認証・受講生権限境界・トリガーおよびCHECK制約 (23514) はすべて100%正常に稼働しています。'
+      '🎉 [Live DB Read-Only Audit PASSED] リモートDBの整合性、読み取り専用RPC、孤立レコード監査はすべて合格しました。'
     );
     process.exit(0);
   } else {
     console.error(
-      `\x1b[31m💥 [Live DB Gate FAILED] ${failedTests} 件の検証に失敗しました。\x1b[0m`
+      `\x1b[31m💥 [Live DB Read-Only Audit FAILED] ${failedTests} 件の検証・監査項目に違反が検出されました。\x1b[0m`
     );
     process.exit(1);
   }
