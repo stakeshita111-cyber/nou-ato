@@ -14,6 +14,7 @@ interface TeacherSidebarProps {
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
   pendingApprovalCount?: number;
+  unreadJournalsCount?: number;
 }
 
 export default function TeacherSidebar({
@@ -22,6 +23,7 @@ export default function TeacherSidebar({
   isOpenMobile = false,
   onCloseMobile,
   pendingApprovalCount = 0,
+  unreadJournalsCount = 0,
 }: TeacherSidebarProps) {
   const { settings } = useThemeStore();
   const { activeFarmName } = useFarmStore();
@@ -280,26 +282,34 @@ export default function TeacherSidebar({
             {/* 5. 相談・日誌 */}
             <button
               onClick={() => handleItemClick('journals')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition ${
                 activeMenu === 'journals'
                   ? 'app-accent-light font-bold shadow-xs'
                   : 'text-gray-600 hover:bg-gray-100/70'
               }`}
             >
-              <svg
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
-              <span>相談・日誌</span>
+              <div className="flex items-center space-x-3">
+                <svg
+                  className="w-5 h-5 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 01-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+                <span>相談・日誌</span>
+              </div>
+              {/* 🌟 未返信・要対応日誌件数バッジ 🌟 */}
+              {unreadJournalsCount > 0 && (
+                <span className="bg-red-500 text-white text-[11px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-md flex items-center justify-center min-w-[20px]">
+                  {unreadJournalsCount}
+                </span>
+              )}
             </button>
 
             {/* 6. カレンダー */}
