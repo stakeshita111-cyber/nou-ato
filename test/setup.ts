@@ -1,6 +1,27 @@
 // Vitest global test setup file
 // Node.js 22未満やWebSocket未定義環境でのSupabase Realtime WebSocketエラーを防止
 
+import { vi } from 'vitest';
+
+vi.mock('next/navigation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+  return {
+    ...actual,
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
+      bfcacheId: 'test-bfcache-id',
+    }),
+    usePathname: () => '/',
+    useSearchParams: () => new URLSearchParams(),
+    redirect: vi.fn(),
+  };
+});
+
 if (typeof globalThis.WebSocket === 'undefined') {
   class MockWebSocket {
     static readonly CONNECTING = 0;

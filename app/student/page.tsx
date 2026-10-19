@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -19,6 +19,10 @@ import { z } from 'zod';
 import { formatDate } from '@/lib/utils/formatHelper';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
+import { useUrlTabState } from '@/hooks/useUrlTabState';
+
+const VALID_STUDENT_TABS = ['myfarm', 'weather', 'events', 'talk', 'feed', 'library'] as const;
+type StudentTab = (typeof VALID_STUDENT_TABS)[number];
 
 const ThemeSettingsStoreSchema = z.object({
   state: z
@@ -47,7 +51,7 @@ const SettingsMessageSchema = z.object({
     .optional(),
 });
 
-export default function StudentPage() {
+function StudentContent() {
   const router = useRouter();
   const {
     user,
@@ -71,21 +75,7 @@ export default function StudentPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [presetFaqs, setPresetFaqs] = useState<PresetFaqItem[]>(DEFAULT_PRESET_FAQS);
-  const VALID_STUDENT_TABS = ['myfarm', 'weather', 'events', 'talk', 'feed', 'library'];
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tabParam = urlParams.get('tab');
-      if (tabParam && VALID_STUDENT_TABS.includes(tabParam)) {
-        return tabParam;
-      }
-      const savedTab = sessionStorage.getItem('nouato_student_active_tab');
-      if (savedTab && VALID_STUDENT_TABS.includes(savedTab)) {
-        return savedTab;
-      }
-    }
-    return 'myfarm';
-  });
+  const [activeTab, setActiveTab] = useUrlTabState<StudentTab>(VALID_STUDENT_TABS, 'myfarm');
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
@@ -145,15 +135,14 @@ export default function StudentPage() {
     }
   };
 
-  const handleTabChange = (newTab: string) => {
-    setActiveTab(newTab);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('nouato_student_active_tab', newTab);
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', newTab);
-      window.history.replaceState(null, '', url.toString());
-    }
-  };
+  const handleTabChange = useCallback(
+    (newTab: string) => {
+      if (VALID_STUDENT_TABS.includes(newTab as StudentTab)) {
+        setActiveTab(newTab as StudentTab);
+      }
+    },
+    [setActiveTab]
+  );
 
   // 🌟 クライアント初期化時に即座にLocalStorageから判定 🌟
   const [talkTabEnabled, setTalkTabEnabled] = useState<boolean>(() => {
@@ -341,7 +330,7 @@ export default function StudentPage() {
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [talkTabEnabled, activeTab]);
+  }, [talkTabEnabled, activeTab, handleTabChange]);
 
   // ログイン中のアカウント表示名
   const userAccountName = user?.name ? user.name : user?.email ? user.email : '受講生';
@@ -813,5 +802,13 @@ export default function StudentPage() {
       {/* 共通トースト通知 */}
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
     </div>
+  );
+}
+
+export default function StudentPage() {
+  return (
+    <Suspense fallback={<SproutLoader fullScreen size={80} />}>
+      <StudentContent />
+    </Suspense>
   );
 }

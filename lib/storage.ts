@@ -85,6 +85,114 @@ export async function compressImage(
 }
 
 /**
+ * クライアントサイド自動画像圧縮ヘルパー (300KB超の画像を最大1280px WebPに圧縮)
+ * 外部ライブラリ非依存（標準 Image + HTMLCanvasElement）。
+ * SSR環境、テスト環境(jsdom)、SVG/GIF、または300KB以下の場合は即座に元の File を返却する（Fail-Safe）。
+ */
+export async function compressImageBeforeUpload(file: File): Promise<File> {
+  if (
+    typeof window === 'undefined' ||
+    typeof document === 'undefined' ||
+    typeof URL === 'undefined' ||
+    typeof URL.createObjectURL !== 'function' ||
+    !file.type.startsWith('image/') ||
+    file.type === 'image/svg+xml' ||
+    file.type === 'image/gif' ||
+    file.size <= 300 * 1024
+  ) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      return resolve(file);
+    }
+
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch {
+        // ignore
+      }
+
+      try {
+        let width = img.width;
+        let height = img.height;
+
+        if (!width || !height) {
+          return resolve(file);
+        }
+
+        const maxDimension = 1280;
+        if (width > maxDimension || height > maxDimension) {
+          const ratio = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        if (typeof canvas.getContext !== 'function') {
+          return resolve(file);
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return resolve(file);
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        if (typeof canvas.toBlob !== 'function') {
+          return resolve(file);
+        }
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) {
+              return resolve(file);
+            }
+
+            try {
+              const newFileName = file.name.replace(/\.[^/.]+$/, '') + '.webp';
+              const compressedFile = new File([blob], newFileName, {
+                type: 'image/webp',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } catch {
+              resolve(file);
+            }
+          },
+          'image/webp',
+          0.8
+        );
+      } catch {
+        resolve(file);
+      }
+    };
+
+    img.onerror = () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch {
+        // ignore
+      }
+      resolve(file);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Base64 文字列 (data:image/...) または File / Blob を Supabase Storage にアップロードし、公開URLを返却する
  * @param fileOrBase64 - File, Blob, または Base64 文字列
  * @param folder - 保存先フォルダ名（例: "tasks", "records", "beds"）
@@ -139,10 +247,14 @@ export async function uploadImageToStorage(
       }
     }
 
-    // クライアントサイド自動圧縮（Canvas API）を通過させる
-    blob = await compressImage(blob);
-    if (blob.type === 'image/jpeg') {
-      extension = 'jpg';
+    // クライアント自動圧縮（WebP変換 / 300KB超）
+    const file =
+      blob instanceof File
+        ? blob
+        : new File([blob], `image.${extension}`, { type: blob.type || 'image/jpeg' });
+    const targetFile = await compressImageBeforeUpload(file);
+    if (targetFile.type === 'image/webp') {
+      extension = 'webp';
     }
 
     // ユーザーIDを含むパス形式: <user_id>/<timestamp>_<filename> または <folder>/<user_id>/<timestamp>_<filename>
@@ -152,8 +264,8 @@ export async function uploadImageToStorage(
 
     const { error: uploadError } = await supabase.storage
       .from('crop-photos')
-      .upload(fileName, blob, {
-        contentType: blob.type || 'image/jpeg',
+      .upload(fileName, targetFile, {
+        contentType: targetFile.type || 'image/jpeg',
         upsert: false, // 衝突防止のため upsert は false (ユニークファイル名)
       });
 

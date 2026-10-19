@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { User } from '@supabase/supabase-js';
-import { uploadImageToStorage, compressImage } from '../lib/storage';
+import { uploadImageToStorage, compressImage, compressImageBeforeUpload } from '../lib/storage';
 import { supabase } from '../lib/supabase';
 
 vi.mock('../lib/supabase', () => {
@@ -274,5 +274,33 @@ describe('compressImage', () => {
     const result = await compressImage(inputBlob);
 
     expect(result).toBe(inputBlob);
+  });
+});
+
+describe('compressImageBeforeUpload', () => {
+  it('returns original file if size is <= 300KB', async () => {
+    const smallContent = new Uint8Array(100 * 1024); // 100KB
+    const file = new File([smallContent], 'small.jpg', { type: 'image/jpeg' });
+    const result = await compressImageBeforeUpload(file);
+    expect(result).toBe(file);
+  });
+
+  it('returns original file if type is image/svg+xml or image/gif', async () => {
+    const svgContent = new Uint8Array(500 * 1024); // 500KB (> 300KB)
+    const svgFile = new File([svgContent], 'graphic.svg', { type: 'image/svg+xml' });
+    const resultSvg = await compressImageBeforeUpload(svgFile);
+    expect(resultSvg).toBe(svgFile);
+
+    const gifContent = new Uint8Array(500 * 1024); // 500KB (> 300KB)
+    const gifFile = new File([gifContent], 'animation.gif', { type: 'image/gif' });
+    const resultGif = await compressImageBeforeUpload(gifFile);
+    expect(resultGif).toBe(gifFile);
+  });
+
+  it('returns original file if type is not an image', async () => {
+    const textContent = new Uint8Array(500 * 1024);
+    const textFile = new File([textContent], 'document.txt', { type: 'text/plain' });
+    const result = await compressImageBeforeUpload(textFile);
+    expect(result).toBe(textFile);
   });
 });

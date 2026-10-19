@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useFarmManager } from '@/hooks/useFarmManager';
@@ -11,6 +11,7 @@ import TeacherHeader from '@/components/teacher/TeacherHeader';
 import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
 import { isRegularRecord } from '@/lib/utils/journalHelper';
+import { useUrlTabState } from '@/hooks/useUrlTabState';
 
 // 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
 // これにより、初回アクセス時の React 19 Hydration クラッシュやモバイル端末での初期化エラーを 100% 防止します
@@ -61,9 +62,9 @@ const VALID_TEACHER_MENUS = [
   'payments',
   'settings',
   'students',
-];
+] as const;
 
-export default function TeacherDashboardPage() {
+function TeacherDashboardContent() {
   const router = useRouter();
   const { activeFarmId, fetchTeacherFarms } = useFarmStore();
   const { plots } = useFarmManager();
@@ -150,43 +151,18 @@ export default function TeacherDashboardPage() {
     };
   }, [fetchUnreadJournalsCount]);
 
-  // 🌟 Hydration Mismatch 防止: 初期値は常に "dashboard"、マウント後にストレージから安全に復元 🌟
-  const [activeMenu, setActiveMenu] = useState<string>('dashboard');
+  // 🌟 URLクエリパラメータ（?tab=...）と双方向同期 🌟
+  type TeacherMenu = (typeof VALID_TEACHER_MENUS)[number];
+  const [activeMenu, setActiveMenu] = useUrlTabState<TeacherMenu>(VALID_TEACHER_MENUS, 'dashboard');
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    let targetMenu: string | null = null;
-    if (tabParam && VALID_TEACHER_MENUS.includes(tabParam)) {
-      targetMenu = tabParam;
-    } else {
-      const savedMenu = sessionStorage.getItem('nouato_teacher_active_menu');
-      if (savedMenu && VALID_TEACHER_MENUS.includes(savedMenu)) {
-        targetMenu = savedMenu;
+  const handleMenuChange = useCallback(
+    (menu: string) => {
+      if (VALID_TEACHER_MENUS.includes(menu as TeacherMenu)) {
+        setActiveMenu(menu as TeacherMenu);
       }
-    }
-    if (targetMenu) {
-      const menuToSet = targetMenu;
-      queueMicrotask(() => {
-        setActiveMenu(menuToSet);
-      });
-    }
-  }, []);
-
-  const handleMenuChange = (menu: string) => {
-    setActiveMenu(menu);
-    if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.setItem('nouato_teacher_active_menu', menu);
-        const url = new URL(window.location.href);
-        url.searchParams.set('tab', menu);
-        window.history.replaceState(null, '', url.toString());
-      } catch (e) {
-        console.error('Storage error:', e);
-      }
-    }
-  };
+    },
+    [setActiveMenu]
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showTaskFormImmediate, setShowTaskFormImmediate] = useState(false);
@@ -375,5 +351,13 @@ export default function TeacherDashboardPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function TeacherDashboardPage() {
+  return (
+    <Suspense fallback={<SproutLoader fullScreen size={80} />}>
+      <TeacherDashboardContent />
+    </Suspense>
   );
 }
