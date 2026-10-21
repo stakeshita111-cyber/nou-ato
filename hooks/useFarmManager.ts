@@ -60,6 +60,7 @@ export function useFarmManager() {
   const [records, setRecords] = useState<CropRecord[]>([]);
   const [supabaseStudents, setSupabaseStudents] = useState<StudentProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // 畑サイズ（行列数）および未割当区画のデフォルト畝数
   const [gridCols, setGridCols] = useState<number>(6);
@@ -544,7 +545,7 @@ export function useFarmManager() {
         const farmMeta = { address: farmAddress, weatherLocation };
         const dims = { cols: currentCols, rows: currentRows, unassigned_beds: currentBeds };
 
-        await savePlotsAndBedsToDb(
+        const result = await savePlotsAndBedsToDb(
           updatedPlots,
           activeFarmId,
           dims,
@@ -552,8 +553,14 @@ export function useFarmManager() {
           lastSavedPlotsMapRef.current,
           lastSavedBedsMapRef.current
         );
+        if (result && result.ok === false) {
+          setSaveError(result.errorMessage || '保存処理に失敗しました。');
+        } else {
+          setSaveError(null);
+        }
       } catch (err) {
         console.warn('savePlotsGridIndicesToSupabase info:', err);
+        setSaveError('保存処理中にエラーが発生しました。');
       } finally {
         isSavingRef.current = false;
       }
@@ -1894,5 +1901,6 @@ export function useFarmManager() {
     unarchiveBed,
     addNewBedForPlot,
     reloadAllFromSupabase,
+    saveError,
   };
 }
