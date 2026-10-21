@@ -96,8 +96,8 @@ const extractDateInfo = (dateStrOrIso?: string) => {
   };
 };
 
-import { isRegularRecord } from '@/lib/utils/journalHelper';
-export { isRegularRecord };
+import { isRegularRecord, isFarmJournal } from '@/lib/utils/journalHelper';
+export { isRegularRecord, isFarmJournal };
 
 export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournalsViewProps) {
   const activeFarmId = useFarmStore((state) => state.activeFarmId);
@@ -302,9 +302,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   minute: '2-digit',
                 })}`
               : '最近',
-            taskTitle: isRegularRecord(cleanContent)
-              ? '🌱 畝の観察記録'
-              : '💡 気づきメモ・質問相談',
+            taskTitle: isFarmJournal(cleanContent)
+              ? isRegularRecord(cleanContent)
+                ? '🌱 畝の観察記録'
+                : '📍 畑からの相談・質問'
+              : '🤖 AI相談 (しるべぇ)',
             content: cleanContent,
             imageUrl: imgUrl,
             reply: j.reply || '',
@@ -638,15 +640,18 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const filteredJournals = journals.filter((j) => {
     // 1. タブフィルター
     if (filterTab === 'unreplied') {
-      // 🌟 返信済み、および「ただの記録（観察・作業記録）」は要対応から除外 🌟
-      if (j.reply && j.reply.trim().length > 0) return false;
+      // 🌟 畑画面からの相談・質問で、未返信のものに厳密に絞る 🌟
+      if (!isFarmJournal(j.content)) return false;
       if (isRegularRecord(j.content)) return false;
-    } else if (filterTab === 'records') {
-      // 🌟 生徒の日常の観察・作業記録のみを一覧表示 🌟
-      if (!isRegularRecord(j.content)) return false;
+      if (j.reply && j.reply.trim().length > 0) return false;
     } else if (filterTab === 'ai_answered') {
-      if (!j.reply || j.reply.trim().length === 0) return false;
+      // 🌟 AI相談画面（Talk）からの投稿（AIが一次回答したもの、またはAI相談質問） 🌟
+      if (isFarmJournal(j.content)) return false;
+    } else if (filterTab === 'records') {
+      // 🌟 畑の日常の観察・作業記録 🌟
+      if (!isFarmJournal(j.content) || !isRegularRecord(j.content)) return false;
     } else if (filterTab === 'approved') {
+      // 🌟 AI承認ナレッジ 🌟
       if (!j.is_approved) return false;
     }
 
@@ -670,14 +675,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     return true;
   });
 
-  // 未返信（要対応）件数のカウント: ただの記録を除外
+  // 未返信（要対応）件数のカウント: 畑からの相談で未返信のものに厳密限定
   const unrepliedCount = journals.filter(
-    (j) => (!j.reply || !j.reply.trim()) && !isRegularRecord(j.content)
+    (j) => isFarmJournal(j.content) && !isRegularRecord(j.content) && (!j.reply || !j.reply.trim())
   ).length;
+  // AI回答済み / AI相談の確認件数
+  const aiAnsweredCount = journals.filter((j) => !isFarmJournal(j.content)).length;
   // 観察・作業記録件数
-  const regularRecordsCount = journals.filter((j) => isRegularRecord(j.content)).length;
-  // 回答・対応済み件数
-  const repliedCount = journals.filter((j) => j.reply && j.reply.trim().length > 0).length;
+  const regularRecordsCount = journals.filter(
+    (j) => isFarmJournal(j.content) && isRegularRecord(j.content)
+  ).length;
+  // 承認ナレッジ件数
   const approvedCount = journals.filter((j) => j.is_approved).length;
 
   // ページめくり処理 (フィルタリング後のリストに連動)
@@ -1263,9 +1271,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         )}
       </div>
 
-      {/* 🌟 2. 状態別スマートフィルタータブ (未返信・観察記録・AI対応済み・承認ナレッジ・すべて) 🌟 */}
+      {/* 🌟 2. 状態別スマートフィルタータブ (未返信・AI回答済みの確認・観察記録・承認ナレッジ・すべて) 🌟 */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200/90 text-xs font-bold">
-        {/* 🔴 未返信（要対応） */}
+        {/* 🔴 未返信（畑の相談） */}
         <button
           type="button"
           onClick={() => setFilterTab('unreplied')}
@@ -1275,7 +1283,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          <span>🔴 要対応 (未返信)</span>
+          <span>🔴 未返信 (畑相談)</span>
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
               unrepliedCount > 0
@@ -1284,6 +1292,22 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             }`}
           >
             {unrepliedCount}
+          </span>
+        </button>
+
+        {/* 🤖 AI回答済みの確認 */}
+        <button
+          type="button"
+          onClick={() => setFilterTab('ai_answered')}
+          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+            filterTab === 'ai_answered'
+              ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <span>🤖 AI回答済みの確認</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
+            {aiAnsweredCount}
           </span>
         </button>
 
@@ -1300,22 +1324,6 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           <span>🌱 観察・作業記録</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800">
             {regularRecordsCount}
-          </span>
-        </button>
-
-        {/* 🟢 AI対応済み / 回答済み */}
-        <button
-          type="button"
-          onClick={() => setFilterTab('ai_answered')}
-          className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
-            filterTab === 'ai_answered'
-              ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <span>🟢 回答・対応済み</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
-            {repliedCount}
           </span>
         </button>
 

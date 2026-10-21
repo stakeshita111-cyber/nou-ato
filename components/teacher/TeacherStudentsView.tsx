@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { MASTER_TASKS } from '@/lib/taskMaster';
@@ -16,11 +15,6 @@ import { formatDate } from '@/lib/utils/formatHelper';
 type UserRow = Database['public']['Tables']['users']['Row'];
 type TaskRow = Database['public']['Tables']['tasks']['Row'];
 type StudentTaskRow = Database['public']['Tables']['student_tasks']['Row'];
-
-const TicketGrantErrorSchema = z.object({
-  detail: z.string().optional(),
-  message: z.string().optional(),
-});
 
 export interface StudentData {
   id: string;
@@ -531,34 +525,19 @@ export default function TeacherStudentsView() {
     }
   };
 
-  // 🎟️ 講師から特定受講生へ追加チケットを付与する処理
-  const handleGrantTicket = async (student: StudentData) => {
-    try {
-      // サーバーAPI POST /api/tickets/grant（講師・同一農園チェック済み、DB の ai_tickets に永続化）
-      const res = await fetch('/api/tickets/grant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: student.id, amount: 1 }),
-      });
-
-      if (!res.ok) {
-        const json: unknown = await res.json().catch(() => null);
-        const parsed = TicketGrantErrorSchema.safeParse(json);
-        const errDetail = parsed.success ? parsed.data.detail || parsed.data.message : null;
-        setToastMessage(`チケットを付与できませんでした: ${errDetail || `HTTP ${res.status}`}`);
-        setShowToast(true);
-        return;
-      }
-
-      setToastMessage(
-        `🎉 ${student.name} さんにAI相談チケットを1枚付与しました！（本日分・受講生は再読込なしで利用可能）`
-      );
+  const handleMailInvite = () => {
+    if (!inviteUrl) {
+      setToastMessage('招待コードを読み込み中です。少々お待ちください');
       setShowToast(true);
-    } catch (err) {
-      console.error('handleGrantTicket error:', err);
-      setToastMessage('チケット付与中に通信エラーが発生しました');
-      setShowToast(true);
+      return;
     }
+    const subject = encodeURIComponent(
+      `【${effectiveFarmName}】体験農業アプリ（のうあと）参加のご案内`
+    );
+    const body = encodeURIComponent(
+      `受講生のみなさま\n\n${effectiveFarmName}の体験農業支援アプリ「のうあと」への参加用リンクをお送りします。\n以下のリンクより登録・ログインをお願いいたします。\n\n▼ 参加登録リンク:\n${inviteUrl}\n\n※このリンクから直接農園に参加いただけます。\nどうぞよろしくお願いいたします。`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
   };
 
   // 📢 受講生全員へのメッセージ・お知らせ一括配信処理 (announcements テーブル)
@@ -867,11 +846,11 @@ export default function TeacherStudentsView() {
             <div className="flex items-center gap-2">
               <h3 className="text-base font-black text-emerald-950">受講生を招待する</h3>
               <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200/60">
-                LINE / QRコード対応
+                LINE / メール / QRコード対応
               </span>
             </div>
             <p className="text-xs text-emerald-900/80 font-medium mt-0.5">
-              LINE招待URLまたはQRコードを共有して、受講生の登録・参加を案内できます。
+              LINE招待URL、メール送信、またはQRコードを共有して、受講生の登録・参加を案内できます。
             </p>
           </div>
         </div>
@@ -882,6 +861,12 @@ export default function TeacherStudentsView() {
             className="flex-1 sm:flex-none px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
           >
             <span>📋 LINE招待URLをコピー</span>
+          </button>
+          <button
+            onClick={handleMailInvite}
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <span>✉️ メールで招待</span>
           </button>
           <button
             onClick={() => setShowQRModal(true)}
@@ -1106,8 +1091,8 @@ export default function TeacherStudentsView() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1115,7 +1100,8 @@ export default function TeacherStudentsView() {
                         setAssignModalStudent(student);
                         setShowAssignModal(true);
                       }}
-                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-xl border border-emerald-200 transition flex items-center gap-1"
+                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition flex items-center gap-1"
+                      title="この受講生にタスクを個別割り当て"
                     >
                       <span>🎯 割当</span>
                     </button>
@@ -1129,26 +1115,23 @@ export default function TeacherStudentsView() {
                         setIndividualBody('');
                         setShowIndividualModal(true);
                       }}
-                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-[11px] rounded-xl border border-amber-200 transition flex items-center gap-1"
+                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-200 transition flex items-center gap-1"
                       title="この受講生へ個別メッセージを配信"
                     >
                       <span>💬 個別配信</span>
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleGrantTicket(student);
-                      }}
-                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-[11px] rounded-xl border border-blue-200 transition flex items-center gap-1 active:scale-95"
-                      title="この受講生にAI相談チケットを1枚追加付与"
-                    >
-                      <span>🎟️ チケット+1</span>
-                    </button>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-gray-50">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudent(student)}
+                      className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-0.5"
+                    >
+                      <span>詳細</span>
+                      <span>→</span>
+                    </button>
+
                     <button
                       type="button"
                       title="この受講生を退会・削除する"
@@ -1160,14 +1143,6 @@ export default function TeacherStudentsView() {
                       className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-xs"
                     >
                       🗑️
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStudent(student)}
-                      className="text-emerald-800 text-[11px] font-bold hover:underline"
-                    >
-                      詳細 →
                     </button>
                   </div>
                 </div>
@@ -1265,12 +1240,18 @@ export default function TeacherStudentsView() {
                 {inviteUrl}
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                 <button
                   onClick={handleCopyInviteUrl}
                   className="py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
                 >
-                  <span>📋 URLをコピー</span>
+                  <span>📋 URLコピー</span>
+                </button>
+                <button
+                  onClick={handleMailInvite}
+                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
+                >
+                  <span>✉️ メール招待</span>
                 </button>
                 <button
                   onClick={() => {
@@ -1279,7 +1260,7 @@ export default function TeacherStudentsView() {
                   }}
                   className="py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
                 >
-                  <span>📱 QRコード表示</span>
+                  <span>📱 QRコード</span>
                 </button>
               </div>
             </div>

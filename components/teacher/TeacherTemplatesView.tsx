@@ -40,6 +40,8 @@ export default function TeacherTemplatesView() {
   const [selectedPhase, setSelectedPhase] = useState<string>('all');
   const [selectedCrop, setSelectedCrop] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<string>('default');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(8);
 
   // 生徒視点プレビューモーダル状態
   const [previewTemplate, setPreviewTemplate] = useState<TaskTemplate | null>(null);
@@ -382,22 +384,6 @@ export default function TeacherTemplatesView() {
     setShowToast(true);
   };
 
-  // 初期状態にリセット
-  const handleResetTemplates = () => {
-    if (
-      confirm(
-        '公式テンプレートを初期状態に戻しますか？（※ご自身で作成されたカスタムテンプレートは維持されます）'
-      )
-    ) {
-      const customOnly = templates.filter((t) => !t.id.startsWith('tpl_'));
-      const resetTemplates = mergeTemplates(customOnly);
-      setTemplates(resetTemplates);
-      localStorage.setItem('nouato_custom_templates', JSON.stringify(customOnly));
-      setToastMessage('🔄 テンプレートを初期状態にリセットしました。');
-      setShowToast(true);
-    }
-  };
-
   // ────────────── 動的連動カスケード作物の抽出 ──────────────
   // カテゴリ・季節・工程・キーワード検索に合致する「母集団」から、作物名とその該当件数を集計
   const availableCrops = useMemo(() => {
@@ -490,6 +476,14 @@ export default function TeacherTemplatesView() {
     sortOrder,
   ]);
 
+  // ────────────── ページネーション計算 ──────────────
+  const totalCount = filteredAndSortedTemplates.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (validCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalCount);
+  const paginatedTemplates = filteredAndSortedTemplates.slice(startIndex, endIndex);
+
   // アクティブなフィルター件数
   const activeFilterCount =
     (selectedCategory !== 'all' ? 1 : 0) +
@@ -504,6 +498,7 @@ export default function TeacherTemplatesView() {
     setSelectedPhase('all');
     setSelectedCrop('all');
     setSearchQuery('');
+    setCurrentPage(1);
   };
 
   // ────────────── サイドバーUIコンポーネント ──────────────
@@ -704,14 +699,6 @@ export default function TeacherTemplatesView() {
         <div className="flex gap-2 shrink-0">
           <button
             type="button"
-            onClick={handleResetTemplates}
-            className="px-4 py-2.5 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1 cursor-pointer"
-            title="公式テンプレートを初期データに再読み込みします"
-          >
-            <span>🔄 リセット</span>
-          </button>
-          <button
-            type="button"
             onClick={handleStartCreate}
             className="px-5 py-2.5 app-accent-btn font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 cursor-pointer"
           >
@@ -778,30 +765,50 @@ export default function TeacherTemplatesView() {
               )}
             </div>
 
-            <div className="hidden lg:flex items-center gap-2 shrink-0">
-              <span className="text-xs font-bold text-gray-500">並び順:</span>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-              >
-                <option value="default">デフォルト順</option>
-                <option value="title_asc">名前順 (昇順)</option>
-                <option value="title_desc">名前順 (降順)</option>
-                <option value="exp_desc">EXPが多い順</option>
-                <option value="difficulty_asc">難易度が低い順</option>
-              </select>
+            <div className="hidden lg:flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-500">並び順:</span>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+                >
+                  <option value="default">デフォルト順</option>
+                  <option value="title_asc">名前順 (昇順)</option>
+                  <option value="title_desc">名前順 (降順)</option>
+                  <option value="exp_desc">EXPが多い順</option>
+                  <option value="difficulty_asc">難易度が低い順</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-500">件数:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2.5 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+                >
+                  <option value={8}>8件ずつ</option>
+                  <option value={16}>16件ずつ</option>
+                  <option value={24}>24件ずつ</option>
+                </select>
+              </div>
             </div>
           </div>
 
           {/* 絞り込み条件ピル＆件数インジケーター */}
           <div className="flex items-center justify-between flex-wrap gap-2 px-1">
             <div className="flex items-center space-x-1.5 flex-wrap gap-y-1 text-xs">
-              <span className="font-bold text-gray-500">表示件数:</span>
+              <span className="font-bold text-gray-500">表示中:</span>
               <span className="font-black text-emerald-800 text-sm">
-                {filteredAndSortedTemplates.length}
+                {totalCount > 0 ? `${startIndex + 1}〜${endIndex}` : '0'}
               </span>
-              <span className="text-gray-400 font-medium">/ 全 {templates.length} 件</span>
+              <span className="text-gray-400 font-medium">
+                / 該当 {totalCount} 件 (全 {templates.length} 件)
+              </span>
 
               {/* 選択中のタグ表示 */}
               {selectedSeason !== 'all' && (
@@ -885,7 +892,7 @@ export default function TeacherTemplatesView() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredAndSortedTemplates.map((tpl) => {
+              {paginatedTemplates.map((tpl) => {
                 const isOfficial = tpl.id.startsWith('tpl_');
                 return (
                   <div
@@ -1032,6 +1039,71 @@ export default function TeacherTemplatesView() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* ページネーションコントロール */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white px-6 py-4 rounded-2xl border app-border shadow-2xs mt-4">
+              <div className="text-xs font-bold text-gray-500">
+                ページ <strong className="text-emerald-900 font-black">{validCurrentPage}</strong> /{' '}
+                {totalPages}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={validCurrentPage <= 1}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs"
+                >
+                  ← 前へ
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                    if (
+                      totalPages > 7 &&
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - validCurrentPage) > 2
+                    ) {
+                      if (pageNum === 2 || pageNum === totalPages - 1) {
+                        return (
+                          <span key={pageNum} className="px-1 text-gray-400 text-xs">
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 rounded-xl text-xs font-black transition ${
+                          validCurrentPage === pageNum
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={validCurrentPage >= totalPages}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-2xs"
+                >
+                  次へ →
+                </button>
+              </div>
             </div>
           )}
         </div>

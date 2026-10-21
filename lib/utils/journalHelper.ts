@@ -6,14 +6,16 @@ import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
 export const isRegularRecord = (content?: string): boolean => {
   if (!content) return false;
   const trimmed = content.trim();
-  // 【畝...】で始まる記録
-  if (trimmed.startsWith('【畝')) {
+  // 【畝...】または【区画...】で始まる記録
+  if (trimmed.startsWith('【畝') || trimmed.startsWith('【区画')) {
     const hasQuestion =
       /[?？]/.test(trimmed) ||
       trimmed.includes('教えて') ||
       trimmed.includes('どうすれば') ||
       trimmed.includes('どうしたら') ||
-      trimmed.includes('相談');
+      trimmed.includes('相談') ||
+      trimmed.includes('❗ [相談]') ||
+      trimmed.includes('❗[相談]');
     const hasUrgent = ['枯れ', '病', '害虫', '元気がない', 'しおれ', '異変', 'カビ'].some((k) =>
       trimmed.includes(k)
     );
@@ -21,6 +23,20 @@ export const isRegularRecord = (content?: string): boolean => {
     return !hasQuestion && !hasUrgent;
   }
   return false;
+};
+
+/**
+ * 🌟 畑画面（区画・畝）からの日誌・相談判定ヘルパー 🌟
+ */
+export const isFarmJournal = (content?: string): boolean => {
+  if (!content) return false;
+  const trimmed = content.trim();
+  return (
+    trimmed.startsWith('【畝') ||
+    trimmed.startsWith('【区画') ||
+    trimmed.includes('❗ [相談]') ||
+    trimmed.includes('❗[相談]')
+  );
 };
 
 /**

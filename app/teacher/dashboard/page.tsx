@@ -10,7 +10,7 @@ import TeacherSidebar from '@/components/teacher/TeacherSidebar';
 import TeacherHeader from '@/components/teacher/TeacherHeader';
 import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
-import { isRegularRecord } from '@/lib/utils/journalHelper';
+import { isRegularRecord, isFarmJournal } from '@/lib/utils/journalHelper';
 import { useUrlTabState } from '@/hooks/useUrlTabState';
 
 // 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
@@ -98,6 +98,7 @@ function TeacherDashboardContent() {
         const content = (j.content || '').trim();
         return (
           content &&
+          isFarmJournal(content) &&
           !content.includes('【収穫完了報告】') &&
           !content.includes('【差し戻し通知】') &&
           !content.includes('を完了報告しました') &&
