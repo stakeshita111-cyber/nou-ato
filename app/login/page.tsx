@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { clearNouatoSessionStorage } from '@/lib/localStorageCleanup';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
 
@@ -45,6 +46,9 @@ export default function UnifiedLoginPage() {
     setLoading(true);
 
     try {
+      // 既存の農園セッション・キャッシュをクリアして別アカウント間での混同を防止
+      clearNouatoSessionStorage();
+
       // 1. Supabase Auth ログイン
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: validation.data.email,

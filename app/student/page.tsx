@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { clearNouatoSessionStorage } from '@/lib/localStorageCleanup';
 import { useStudentDashboard } from '@/hooks/useStudentDashboard';
 import { useEvents } from '@/hooks/useEvents';
 import { useThemeStore } from '@/store/useThemeStore';
@@ -394,6 +395,7 @@ function StudentContent() {
   // ログアウト処理
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    clearNouatoSessionStorage();
     setToastMessage('ログアウトしました。ログイン画面へ遷移します');
     setShowToast(true);
     setTimeout(() => {
