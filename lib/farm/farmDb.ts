@@ -181,7 +181,10 @@ export async function savePlotsAndBedsToDb(
   farmMeta: { address?: string; weatherLocation?: Record<string, unknown> | null },
   lastSavedPlotsMap: Map<string, string>,
   lastSavedBedsMap: Map<string, string>
-) {
+): Promise<{ ok: boolean; errorMessage?: string }> {
+  let hasError = false;
+  let firstErrorMessage: string | undefined;
+
   // 1. farm_plots upsert (diff detection)
   const allPlotPayloads = updatedPlots
     .filter((plot) => plot && !plot.id.startsWith('plot_placeholder_'))
@@ -201,6 +204,10 @@ export async function savePlotsAndBedsToDb(
       const { error: plotsError } = await supabase.from('farm_plots').upsert(chunk);
       if (plotsError) {
         console.error('farm_plots bulk upsert error:', plotsError);
+        hasError = true;
+        if (!firstErrorMessage) {
+          firstErrorMessage = plotsError.message;
+        }
       } else {
         for (const p of chunk) {
           lastSavedPlotsMap.set(p.id, JSON.stringify(p));
@@ -231,6 +238,10 @@ export async function savePlotsAndBedsToDb(
       const { error: bedsError } = await supabase.from('farm_beds').upsert(chunk);
       if (bedsError) {
         console.warn('farm_beds upsert notice:', bedsError.message || bedsError);
+        hasError = true;
+        if (!firstErrorMessage) {
+          firstErrorMessage = bedsError.message || String(bedsError);
+        }
       } else {
         for (const b of chunk) {
           lastSavedBedsMap.set(b.id, JSON.stringify(b));
@@ -261,6 +272,11 @@ export async function savePlotsAndBedsToDb(
       console.warn('farms metadata update notice:', e);
     }
   }
+
+  if (hasError) {
+    return { ok: false, errorMessage: firstErrorMessage };
+  }
+  return { ok: true };
 }
 
 export async function reorderBedsInDb(plotId: string, orderedBedIds: string[]) {

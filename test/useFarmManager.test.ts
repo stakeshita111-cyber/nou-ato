@@ -7,7 +7,9 @@ import {
   reorderArray,
   buildFixedPlots,
 } from '@/lib/farm/farmCalculations';
-import { reorderBedsInDb } from '@/lib/farm/farmDb';
+import { vi } from 'vitest';
+import { reorderBedsInDb, savePlotsAndBedsToDb } from '@/lib/farm/farmDb';
+import { supabase } from '@/lib/supabase';
 import { FarmPlot } from '@/types/farm';
 
 describe('farmCalculations & Payload Builders', () => {
@@ -129,5 +131,49 @@ describe('reorderBedsInDb RPC Invocation', () => {
   it('handles empty or invalid inputs gracefully', async () => {
     await expect(reorderBedsInDb('', [])).resolves.toBeUndefined();
     await expect(reorderBedsInDb('plot_cell_A1', [])).resolves.toBeUndefined();
+  });
+});
+
+describe('savePlotsAndBedsToDb error handling', () => {
+  it('returns ok: false and errorMessage when upsert encounters error', async () => {
+    const samplePlot: FarmPlot = {
+      id: 'plot_cell_A1',
+      farm_id: 'farm_1',
+      name: '区画 A1',
+      code: 'A1',
+      grid_index: 0,
+      is_vacant: false,
+      student_id: '11111111-2222-3333-4444-555555555555',
+      student_name: '山田 太郎',
+      position: { x: 0, y: 0 },
+      beds: [],
+    };
+    const dims = { cols: 6, rows: 8, unassigned_beds: 7 };
+    const farmMeta = { address: '東京都' };
+
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'farm_plots') {
+        return {
+          upsert: vi.fn().mockResolvedValue({ error: { message: 'RLS policy violation' } }),
+        } as unknown as ReturnType<typeof supabase.from>;
+      }
+      return {
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+      } as unknown as ReturnType<typeof supabase.from>;
+    });
+
+    const result = await savePlotsAndBedsToDb(
+      [samplePlot],
+      'farm_1',
+      dims,
+      farmMeta,
+      new Map(),
+      new Map()
+    );
+
+    expect(result).toEqual({ ok: false, errorMessage: 'RLS policy violation' });
+
+    vi.restoreAllMocks();
   });
 });
