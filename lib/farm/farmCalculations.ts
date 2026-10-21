@@ -117,6 +117,24 @@ export function buildPlotUpsertPayload(
   };
 }
 
+export function buildPlotId(farmId: string | null | undefined, code: string): string {
+  if (farmId && /^[0-9a-fA-F-]{36}$/.test(farmId)) {
+    return `${farmId}_plot_cell_${code}`;
+  }
+  return `plot_cell_${code}`;
+}
+
+export function buildBedId(
+  farmId: string | null | undefined,
+  plotCode: string,
+  bedNumber: string | number
+): string {
+  if (farmId && /^[0-9a-fA-F-]{36}$/.test(farmId)) {
+    return `${farmId}_plot_cell_${plotCode}_bed_${bedNumber}`;
+  }
+  return `plot_cell_${plotCode}_bed_${bedNumber}`;
+}
+
 export function buildBedUpsertPayloadsForPlot(plot: FarmPlot): BedUpsertPayload[] {
   if (!plot || plot.id.startsWith('plot_placeholder_')) return [];
   const bedsToUpsert: BedUpsertPayload[] = [];
@@ -128,9 +146,7 @@ export function buildBedUpsertPayloadsForPlot(plot: FarmPlot): BedUpsertPayload[
     for (let bIdx = 0; bIdx < activeOnlyBeds.length; bIdx++) {
       const b = activeOnlyBeds[bIdx];
       const bedNumber = String(b.bed_number || bIdx + 1);
-      const plotCode = plot.code || 'C3';
-      const bedId =
-        b.id && !b.id.startsWith('bed_') ? b.id : `plot_cell_${plotCode}_bed_${bedNumber}`;
+      const bedId = b.id && !b.id.startsWith('bed_') ? b.id : `${plot.id}_bed_${bedNumber}`;
       const validBedStudentId =
         plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id) ? plot.student_id : null;
       bedsToUpsert.push({
@@ -171,7 +187,10 @@ export const buildFixedPlots = (
       const idx = r * cols + c;
 
       const existing = existingPlots.find((p) => p.code === cellAddress);
-      const uniquePlotId = `plot_cell_${cellAddress}`;
+      const uniquePlotId =
+        existing && !existing.id.startsWith('plot_placeholder_')
+          ? existing.id
+          : buildPlotId(activeFarmId, cellAddress);
 
       if (existing && !existing.id.startsWith('plot_placeholder_')) {
         const isVacantStatus =
@@ -187,12 +206,12 @@ export const buildFixedPlots = (
           beds: existing.beds?.length
             ? existing.beds.map((b, bIdx) => ({
                 ...b,
-                id: b.id || `bed_${cellAddress}_${bIdx + 1}`,
+                id: b.id || `${uniquePlotId}_bed_${b.bed_number || bIdx + 1}`,
                 plot_id: uniquePlotId,
                 bed_number: b.bed_number || bIdx + 1,
               }))
             : Array.from({ length: targetBedsCount }).map((_, bIdx) => ({
-                id: `bed_${cellAddress}_${bIdx + 1}`,
+                id: `${uniquePlotId}_bed_${bIdx + 1}`,
                 plot_id: uniquePlotId,
                 bed_number: bIdx + 1,
                 crop_name: '未確定 🌱',
@@ -209,7 +228,7 @@ export const buildFixedPlots = (
           is_vacant: false,
           position: { x: c * 120, y: r * 120 },
           beds: Array.from({ length: targetBedsCount }).map((_, bIdx) => ({
-            id: `bed_${cellAddress}_${bIdx + 1}`,
+            id: `${uniquePlotId}_bed_${bIdx + 1}`,
             plot_id: uniquePlotId,
             bed_number: bIdx + 1,
             crop_name: '未確定 🌱',

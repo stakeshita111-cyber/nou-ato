@@ -328,7 +328,10 @@ export function useFarmManager() {
         const relevantDbBeds = dbBeds || [];
 
         relevantDbBeds.forEach((b: Database['public']['Tables']['farm_beds']['Row']) => {
-          const isBelong = b.plot_id === plot.id || b.id?.startsWith(`plot_cell_${plotCode}_bed_`);
+          const isBelong =
+            b.plot_id === plot.id ||
+            b.id?.startsWith(`plot_cell_${plotCode}_bed_`) ||
+            b.id?.includes(`_plot_cell_${plotCode}_bed_`);
           if (!isBelong) return;
 
           const isArchived = b.status === 'archived' || b.id?.startsWith('archived_');
@@ -363,7 +366,7 @@ export function useFarmManager() {
 
         for (let bedNum = 1; bedNum <= activeCount; bedNum++) {
           const dbB = rawActiveBeds[bedNum - 1];
-          const bedId = dbB?.id || `plot_cell_${plotCode}_bed_${bedNum}`;
+          const bedId = dbB?.id || `${plot.id}_bed_${bedNum}`;
           const pendingData = pendingApprovalMap.get(`${plotCode}_${bedNum}`);
 
           let status: BedStatus = 'active';
@@ -942,7 +945,7 @@ export function useFarmManager() {
         const newBeds: FarmBed[] = [];
         for (let i = 1; i <= newCount; i++) {
           newBeds.push({
-            id: `plot_cell_${plot.code}_bed_${i}`,
+            id: `${plot.id}_bed_${i}`,
             plot_id: plot.id,
             bed_number: i,
             crop_name: '未確定 🌱',
@@ -1096,9 +1099,9 @@ export function useFarmManager() {
             ? b.id
               ? b.id
                   .replace(new RegExp(`_${oldPlot.code}_`), `_${targetCode}_`)
-                  .replace(new RegExp(`plot_cell_${oldPlot.code}`), `plot_cell_${targetCode}`)
+                  .replace(new RegExp(`${oldPlot.id}`), `${realPlotId}`)
               : `archived_bed_${targetCode}_${bedNum}_${Date.now()}`
-            : `plot_cell_${targetCode}_bed_${bedNum}`;
+            : `${realPlotId}_bed_${bedNum}`;
 
         return {
           ...b,
@@ -1122,9 +1125,9 @@ export function useFarmManager() {
               ? b.id
                 ? b.id
                     .replace(new RegExp(`_${targetCode}_`), `_${oldPlot.code}_`)
-                    .replace(new RegExp(`plot_cell_${targetCode}`), `plot_cell_${oldPlot.code}`)
+                    .replace(new RegExp(`${realPlotId}`), `${oldPlot.id}`)
                 : `archived_bed_${oldPlot.code}_${bedNum}_${Date.now()}`
-              : `plot_cell_${oldPlot.code}_bed_${bedNum}`;
+              : `${oldPlot.id}_bed_${bedNum}`;
           return {
             ...b,
             id: newBedId,
@@ -1138,7 +1141,7 @@ export function useFarmManager() {
         const unassignedCount =
           targetExistingBeds.filter((b) => b.status !== 'archived').length || 6;
         migratedBedsForOld = Array.from({ length: unassignedCount }).map((_, idx) => ({
-          id: `plot_cell_${oldPlot.code}_bed_${idx + 1}`,
+          id: `${oldPlot.id}_bed_${idx + 1}`,
           plot_id: oldPlot.id,
           bed_number: idx + 1,
           crop_name: '未確定 🌱',
@@ -1519,7 +1522,13 @@ export function useFarmManager() {
       console.warn('journals completion insert notice:', e);
     }
 
-    const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNum}`;
+    const targetPlot = plots.find((p) => p.code === targetPlotCode);
+    const targetBed = targetPlot?.beds?.find((b) => String(b.bed_number) === String(targetBedNum));
+    const exactBedId =
+      targetBed?.id ||
+      (targetPlot
+        ? `${targetPlot.id}_bed_${targetBedNum}`
+        : `plot_cell_${targetPlotCode}_bed_${targetBedNum}`);
     try {
       await supabase
         .from('farm_beds')
@@ -1530,7 +1539,7 @@ export function useFarmManager() {
           completion_notes: details.completionNotes || null,
           completion_image_url: details.imageUrl || null,
         })
-        .eq('id', exactBedId);
+        .or(`id.eq.${exactBedId},id.eq.${targetBed?.id || ''}`);
     } catch (e) {
       console.warn('farm_beds status update notice:', e);
     }
@@ -1671,7 +1680,15 @@ export function useFarmManager() {
         progress_percent: 100,
       });
 
-      const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`;
+      const targetPlot = finalPlots.find((p) => p.code === targetPlotCode);
+      const targetBed = targetPlot?.beds?.find(
+        (b) => String(b.bed_number) === String(targetBedNumber)
+      );
+      const exactBedId =
+        targetBed?.id ||
+        (targetPlot
+          ? `${targetPlot.id}_bed_${targetBedNumber}`
+          : `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`);
       await supabase
         .from('crop_records')
         .update({ bed_id: archiveId })
@@ -1682,7 +1699,15 @@ export function useFarmManager() {
       console.warn('archive bed insert notice:', e);
     }
 
-    const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`;
+    const targetPlot = finalPlots.find((p) => p.code === targetPlotCode);
+    const targetBed = targetPlot?.beds?.find(
+      (b) => String(b.bed_number) === String(targetBedNumber)
+    );
+    const exactBedId =
+      targetBed?.id ||
+      (targetPlot
+        ? `${targetPlot.id}_bed_${targetBedNumber}`
+        : `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`);
     try {
       await supabase
         .from('farm_beds')
@@ -1749,7 +1774,17 @@ export function useFarmManager() {
 
     setPlots(nextPlots);
 
-    const exactBedId = `plot_cell_${targetPlotCode}_bed_${targetBedNum}`;
+    const targetPlot = nextPlots.find(
+      (p) => p.id === plotId || p.code === plotId || p.code === targetPlotCode
+    );
+    const targetBed = targetPlot?.beds?.find(
+      (b) => b.id === bedId || String(b.bed_number) === String(targetBedNum)
+    );
+    const exactBedId =
+      targetBed?.id ||
+      (targetPlot
+        ? `${targetPlot.id}_bed_${targetBedNum}`
+        : `plot_cell_${targetPlotCode}_bed_${targetBedNum}`);
     try {
       await supabase
         .from('farm_beds')
@@ -1757,7 +1792,7 @@ export function useFarmManager() {
           status: 'rejected',
           completion_notes: rejectReason,
         })
-        .eq('id', exactBedId);
+        .or(`id.eq.${exactBedId},id.eq.${bedId}`);
     } catch (e) {
       console.warn('farm_beds reject update error:', e);
     }

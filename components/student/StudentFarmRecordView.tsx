@@ -86,13 +86,16 @@ export default function StudentFarmRecordView({
     null;
 
   const plotCode = myPlot?.code || 'A1';
+  const fallbackPlotId =
+    myPlot?.id ||
+    (myPlot?.farm_id ? `${myPlot.farm_id}_plot_cell_${plotCode}` : `plot_cell_${plotCode}`);
   const defaultBedCount = myPlot?.beds && myPlot.beds.length > 0 ? myPlot.beds.length : 7;
   const rawBeds: FarmBed[] =
     myPlot?.beds && myPlot.beds.length > 0
       ? myPlot.beds
       : Array.from({ length: defaultBedCount }, (_, i) => ({
-          id: `plot_cell_${plotCode}_bed_${i + 1}`,
-          plot_id: `plot_cell_${plotCode}`,
+          id: `${fallbackPlotId}_bed_${i + 1}`,
+          plot_id: fallbackPlotId,
           bed_number: i + 1,
           crop_name: '未確定 🌱',
           is_updated: false,
@@ -108,7 +111,7 @@ export default function StudentFarmRecordView({
     .sort((a, b) => (Number(a.bed_number) || 0) - (Number(b.bed_number) || 0))
     .map((b, idx) => ({
       ...b,
-      id: b.id || `plot_cell_${plotCode}_bed_${b.bed_number || idx + 1}`,
+      id: b.id || `${fallbackPlotId}_bed_${b.bed_number || idx + 1}`,
       bed_number: Number(b.bed_number) || idx + 1,
       status: b.status || 'active',
       crop_name: b.crop_name || '未確定 🌱',

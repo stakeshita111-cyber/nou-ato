@@ -812,7 +812,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         bedsData.forEach((b) => {
           if (b.student_id && b.plot_id && !studentPlotMap[b.student_id]) {
             const plotInfo = plotMap[b.plot_id];
-            const code = plotInfo?.code || b.plot_id.replace(/^plot_cell_/, '');
+            const code = plotInfo?.code || b.plot_id.replace(/^.*plot_cell_/, '');
             if (code) {
               studentPlotMap[b.student_id] = {
                 plotCode: code,
@@ -884,7 +884,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           const derivedPlotCode =
             r.plot_code ||
             plotInfo?.code ||
-            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^plot_cell_/, '') : undefined) ||
+            (bedInfo?.plot_id ? bedInfo.plot_id.replace(/^.*plot_cell_/, '') : undefined) ||
             studentMapped?.plotCode;
 
           const derivedFarmId =
