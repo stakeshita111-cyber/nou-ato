@@ -24,6 +24,8 @@ import { useUrlTabState } from '@/hooks/useUrlTabState';
 const VALID_STUDENT_TABS = ['myfarm', 'weather', 'events', 'talk', 'feed', 'library'] as const;
 type StudentTab = (typeof VALID_STUDENT_TABS)[number];
 
+type JoinFarmRpcResponse = { success?: boolean; error?: string; farm_id?: string } | null;
+
 const ThemeSettingsStoreSchema = z.object({
   state: z
     .object({
@@ -78,6 +80,47 @@ function StudentContent() {
   const [activeTab, setActiveTab] = useUrlTabState<StudentTab>(VALID_STUDENT_TABS, 'myfarm');
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  const [rejoinInviteCode, setRejoinInviteCode] = useState('');
+  const [isRejoining, setIsRejoining] = useState(false);
+
+  // 招待コード入力による農園参加・再参加処理
+  const handleRejoinFarm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedCode = rejoinInviteCode.trim();
+    if (!trimmedCode) {
+      setToastMessage('招待コードを入力してください');
+      setShowToast(true);
+      return;
+    }
+
+    setIsRejoining(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('join_farm', {
+        invite_code: trimmedCode,
+      });
+
+      const joinResult = data as JoinFarmRpcResponse;
+
+      if (rpcError || (joinResult && joinResult.success === false)) {
+        const errorMsg =
+          rpcError?.message || (joinResult as { error?: string })?.error || '招待コードが無効です';
+        setToastMessage(`農園への参加に失敗しました: ${errorMsg}`);
+        setShowToast(true);
+        return;
+      }
+
+      setToastMessage('🎉 農園への参加が完了しました！画面を更新します...');
+      setShowToast(true);
+      window.location.reload();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '予期せぬエラーが発生しました';
+      setToastMessage(`農園への参加に失敗しました: ${message}`);
+      setShowToast(true);
+    } finally {
+      setIsRejoining(false);
+    }
+  };
 
   // メニュー外（画面外）クリック・タッチ検知でアカウントメニューを閉じる
   useEffect(() => {
@@ -425,9 +468,38 @@ function StudentContent() {
           <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 text-left space-y-1 text-[11px] text-gray-600 font-semibold">
             <p className="font-bold text-gray-800">💡 再度利用したい場合:</p>
             <p>
-              農園の講師から共有された新しい招待リンク（URLまたはQRコード）から再度農園へご参加ください。
+              農園の講師から共有された新しい招待コードを入力して農園に参加するか、招待リンク（URLまたはQRコード）からご参加ください。
             </p>
           </div>
+
+          {/* 招待コード再参加フォーム */}
+          <form
+            onSubmit={(e) => {
+              handleRejoinFarm(e).catch((err) => {
+                console.error('handleRejoinFarm error:', err);
+              });
+            }}
+            className="space-y-2 text-left"
+          >
+            <label className="block text-[11px] font-bold text-gray-700">
+              招待コードで農園に参加
+            </label>
+            <input
+              type="text"
+              value={rejoinInviteCode}
+              onChange={(e) => setRejoinInviteCode(e.target.value)}
+              placeholder="招待コード（例: FARM-XXXX）"
+              className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1c4d21] focus:bg-white transition placeholder-gray-400 uppercase"
+              disabled={isRejoining}
+            />
+            <button
+              type="submit"
+              disabled={isRejoining || !rejoinInviteCode.trim()}
+              className="w-full py-2.5 bg-[#1c4d21] hover:bg-[#123915] text-white font-bold text-xs rounded-xl shadow-md transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <span>{isRejoining ? '参加処理中...' : '農園に参加する'}</span>
+            </button>
+          </form>
 
           <div className="pt-2 space-y-2">
             <button
