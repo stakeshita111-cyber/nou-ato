@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
 
+export const inviteCodeSchema = z.string().trim().min(1, '招待コードを入力してください');
+
 export const inviteSignUpSchema = z.object({
   name: z.string().trim().min(1, 'ユーザー名（お名前）を入力してください'),
   email: z
@@ -25,6 +27,7 @@ function InviteContent() {
   const inviteCodeParam = searchParams.get('code');
 
   // 農園選択・情報
+  const [inviteCodeInput, setInviteCodeInput] = useState<string>(inviteCodeParam || '');
   const [inviteCode, setInviteCode] = useState<string>(inviteCodeParam || '');
   const [selectedFarmId, setSelectedFarmId] = useState<string>('');
   const [farmName, setFarmName] = useState('農園を確認中...');
@@ -40,38 +43,76 @@ function InviteContent() {
   const [showToast, setShowToast] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const verifyInviteCode = async (codeToVerify: string, isManual = false) => {
+    const trimmedCode = codeToVerify.trim();
+    if (!trimmedCode) {
+      setSelectedFarmId('');
+      setFarmName('農園情報が見つかりません');
+      setTeacherName('');
+      if (isManual) {
+        setToastMessage(
+          '❌ 有効な招待コードが見つかりませんでした。講師に招待コードをご確認ください'
+        );
+        setShowToast(true);
+      }
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_farm_by_invite_code', {
+        target_invite_code: trimmedCode,
+      });
+
+      if (!error && data && data.length > 0) {
+        const farmInfo = data[0];
+        setFarmName(farmInfo.farm_name || '自然農園');
+        setTeacherName(farmInfo.teacher_name || '講師');
+        setSelectedFarmId(farmInfo.farm_id);
+        setInviteCode(trimmedCode);
+        if (isManual) {
+          setToastMessage(`🎉 「${farmInfo.farm_name || '自然農園'}」が確認できました`);
+          setShowToast(true);
+        }
+      } else {
+        setSelectedFarmId('');
+        setFarmName('農園情報が見つかりません');
+        setTeacherName('');
+        if (isManual) {
+          setToastMessage(
+            '❌ 有効な招待コードが見つかりませんでした。講師に招待コードをご確認ください'
+          );
+          setShowToast(true);
+        }
+      }
+    } catch (err: unknown) {
+      console.error('verifyInviteCode exception:', err);
+      setSelectedFarmId('');
+      setFarmName('農園情報が見つかりません');
+      setTeacherName('');
+      if (isManual) {
+        setToastMessage(
+          '❌ 有効な招待コードが見つかりませんでした。講師に招待コードをご確認ください'
+        );
+        setShowToast(true);
+      }
+    }
+  };
+
   // 招待コードから農園情報を安全に取得 (RLS anonバイパス不要のSECURITY DEFINER RPCを使用)
   useEffect(() => {
     let active = true;
-    const fetchCurrentFarm = async () => {
-      try {
-        if (inviteCodeParam) {
-          const { data, error } = await supabase.rpc('get_farm_by_invite_code', {
-            target_invite_code: inviteCodeParam,
-          });
-
-          if (!error && data && data.length > 0 && active) {
-            const farmInfo = data[0];
-            setFarmName(farmInfo.farm_name || '自然農園');
-            setTeacherName(farmInfo.teacher_name || '講師');
-            setSelectedFarmId(farmInfo.farm_id);
-            setInviteCode(inviteCodeParam);
-            return;
-          }
-        }
-
-        if (active) {
-          // URLに招待コード指定がない、または該当なし
-          setFarmName('農園情報が見つかりません');
-          setTeacherName('');
-        }
-      } catch (err) {
-        console.error('fetchCurrentFarm error:', err);
+    const init = async () => {
+      if (inviteCodeParam) {
+        await verifyInviteCode(inviteCodeParam, false);
+      } else if (active) {
+        setFarmName('農園情報が見つかりません');
+        setTeacherName('');
+        setSelectedFarmId('');
       }
     };
 
-    fetchCurrentFarm().catch((err: unknown) => {
-      console.error('Unhandled error in fetchCurrentFarm:', err);
+    init().catch((err: unknown) => {
+      console.error('Unhandled error in init in useEffect:', err);
     });
 
     return () => {
@@ -83,6 +124,11 @@ function InviteContent() {
 
   // 1. LINEで登録して参加
   const handleLineSignUp = async () => {
+    if (!inviteCode.trim() || !selectedFarmId) {
+      setToastMessage('⚠️ 有効な招待コードを入力し、参加する農園を確認してください');
+      setShowToast(true);
+      return;
+    }
     if (isLineDisabled) {
       setToastMessage('💡 LINE連携機能は現在準備中です。メールアドレスでご登録ください。');
       setShowToast(true);
@@ -127,6 +173,12 @@ function InviteContent() {
   // 2. メールアドレスで登録
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!inviteCode.trim() || !selectedFarmId) {
+      setToastMessage('⚠️ 有効な招待コードを入力し、参加する農園を確認してください');
+      setShowToast(true);
+      return;
+    }
 
     const validation = inviteSignUpSchema.safeParse({ name, email, password });
     if (!validation.success) {
@@ -277,6 +329,31 @@ function InviteContent() {
             </p>
           </div>
 
+          {/* 招待コード手入力UI */}
+          <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 space-y-2">
+            <label className="block text-[11px] font-bold text-emerald-900">招待コード</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={inviteCodeInput}
+                onChange={(e) => setInviteCodeInput(e.target.value)}
+                placeholder="招待コードを入力（例: A1B2C3D4）"
+                className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:ring-2 focus:ring-[#1c4d21]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  verifyInviteCode(inviteCodeInput, true).catch((err: unknown) => {
+                    console.error('Unhandled error in verifyInviteCode:', err);
+                  });
+                }}
+                className="px-3 py-2 bg-[#1c4d21] hover:bg-[#123915] text-white font-bold text-xs rounded-xl shadow-xs transition shrink-0"
+              >
+                確認
+              </button>
+            </div>
+          </div>
+
           {/* 💬 LINEで登録して参加 ボタン */}
           <div className="space-y-3">
             <button
@@ -364,8 +441,12 @@ function InviteContent() {
             {/* メールで登録 → ボタン */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-bold rounded-full shadow-xs transition flex items-center justify-center space-x-1.5 text-xs mt-2"
+              disabled={loading || !selectedFarmId || !inviteCode.trim()}
+              className={`w-full py-3 bg-white border border-gray-300 font-bold rounded-full shadow-xs transition flex items-center justify-center space-x-1.5 text-xs mt-2 ${
+                loading || !selectedFarmId || !inviteCode.trim()
+                  ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400'
+                  : 'hover:bg-gray-50 text-gray-800'
+              }`}
             >
               <span>{loading ? '登録中...' : 'メールで登録 →'}</span>
             </button>

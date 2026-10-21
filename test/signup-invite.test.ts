@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { teacherSignUpSchema } from '@/app/auth/signup/teacher/page';
-import { inviteSignUpSchema } from '@/app/invite/page';
+import { inviteSignUpSchema, inviteCodeSchema } from '@/app/invite/page';
 
 describe('Teacher Sign-up and Student Invite Zod Validation Suite (本番スキーマ直接検証)', () => {
   describe('1. 講師サインアップスキーマ (teacherSignUpSchema)', () => {
@@ -134,6 +134,40 @@ describe('Teacher Sign-up and Student Invite Zod Validation Suite (本番スキ�
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.issues[0]?.message).toBe('パスワードは6文字以上で入力してください');
+      }
+    });
+  });
+
+  describe('3. 招待コード検証スキーマ (inviteCodeSchema)', () => {
+    it('正常な招待コードでバリデーションが成功すること', () => {
+      const result = inviteCodeSchema.safeParse('A1B2C3D4');
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe('A1B2C3D4');
+      }
+    });
+
+    it('前後の余分な空白が自動トリムされること', () => {
+      const result = inviteCodeSchema.safeParse('  A1B2C3D4  ');
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe('A1B2C3D4');
+      }
+    });
+
+    it('空文字の場合に拒否されること', () => {
+      const result = inviteCodeSchema.safeParse('');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toBe('招待コードを入力してください');
+      }
+    });
+
+    it('空白のみの場合に拒否されること', () => {
+      const result = inviteCodeSchema.safeParse('   ');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toBe('招待コードを入力してください');
       }
     });
   });
