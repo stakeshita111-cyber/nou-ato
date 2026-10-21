@@ -17,7 +17,13 @@ ALTER TABLE public.farm_beds
     ADD CONSTRAINT fk_farm_beds_plot_id
     FOREIGN KEY (plot_id) REFERENCES public.farm_plots(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
--- 2) crop_records_bed_id_fkey (crop_records.bed_id -> farm_beds(id) ON UPDATE CASCADE ON DELETE SET NULL)
+-- 2) crop_records_plot_id_fkey (crop_records.plot_id -> farm_plots(id) ON UPDATE CASCADE ON DELETE CASCADE)
+ALTER TABLE public.crop_records DROP CONSTRAINT IF EXISTS crop_records_plot_id_fkey;
+ALTER TABLE public.crop_records
+    ADD CONSTRAINT crop_records_plot_id_fkey
+    FOREIGN KEY (plot_id) REFERENCES public.farm_plots(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- 3) crop_records_bed_id_fkey (crop_records.bed_id -> farm_beds(id) ON UPDATE CASCADE ON DELETE SET NULL)
 ALTER TABLE public.crop_records DROP CONSTRAINT IF EXISTS crop_records_bed_id_fkey;
 ALTER TABLE public.crop_records
     ADD CONSTRAINT crop_records_bed_id_fkey
@@ -26,27 +32,21 @@ ALTER TABLE public.crop_records
 -- ------------------------------------------------------------------------------
 -- 2. 既存の 'plot_cell_' プレフィックス行を農園スコープIDへ安全に移行
 -- ------------------------------------------------------------------------------
--- A. crop_records.plot_id の移行 (プレフィックスなしの 'plot_cell_' のみ対象)
-UPDATE public.crop_records cr
-SET plot_id = p.farm_id || '_' || cr.plot_id
-FROM public.farm_plots p
-WHERE cr.plot_id = p.id
-  AND p.farm_id IS NOT NULL
-  AND cr.plot_id ~ '^plot_cell_[A-Za-z0-9]+$';
+-- A. 親テーブル farm_plots.id の移行
+--    ON UPDATE CASCADE により、farm_beds.plot_id および crop_records.plot_id が自動追従
+UPDATE public.farm_plots
+SET id = farm_id || '_' || id
+WHERE farm_id IS NOT NULL
+  AND id ~ '^plot_cell_[A-Za-z0-9]+$';
 
--- B. farm_beds.id の移行 (プレフィックスなしの 'plot_cell_' のみ対象)
+-- B. farm_beds.id の移行
+--    ON UPDATE CASCADE により、crop_records.bed_id が自動追従
 UPDATE public.farm_beds b
 SET id = p.farm_id || '_' || b.id
 FROM public.farm_plots p
 WHERE b.plot_id = p.id
   AND p.farm_id IS NOT NULL
   AND b.id ~ '^plot_cell_[A-Za-z0-9]+_bed_\d+$';
-
--- C. farm_plots.id の移行 (ON UPDATE CASCADE により farm_beds.plot_id が自動追従)
-UPDATE public.farm_plots
-SET id = farm_id || '_' || id
-WHERE farm_id IS NOT NULL
-  AND id ~ '^plot_cell_[A-Za-z0-9]+$';
 
 -- ------------------------------------------------------------------------------
 -- 3. swap_farm_plots RPC の改修 (デッドロック防止 ＆ スコープID対応)
