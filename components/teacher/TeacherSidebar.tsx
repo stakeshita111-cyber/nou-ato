@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { clearNouatoSessionStorage } from '@/lib/localStorageCleanup';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useFarmStore } from '@/store/useFarmStore';
 
@@ -37,6 +38,7 @@ export default function TeacherSidebar({
     setIsUserMenuOpen(false);
     try {
       await supabase.auth.signOut();
+      clearNouatoSessionStorage();
     } catch (err) {
       console.error('Sign out error:', err);
     }
