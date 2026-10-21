@@ -22,7 +22,7 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900/90 text-white px-5 py-3 rounded-full shadow-lg text-sm font-medium flex items-center space-x-2 backdrop-blur-sm animate-bounce">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-gray-900/90 text-white px-5 py-3 rounded-full shadow-2xl text-sm font-medium flex items-center space-x-2 backdrop-blur-md animate-bounce border border-gray-700">
       <svg
         className="w-5 h-5 text-green-400 flex-shrink-0"
         fill="none"

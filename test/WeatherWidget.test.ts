@@ -10,7 +10,9 @@ describe('WeatherWidget', () => {
     // showMobileDetails = true defaults button label to "▲ 詳細グラフを閉じる"
     expect(html).toContain('▲ 詳細グラフを閉じる');
 
-    // Check that the container class has "flex" instead of "hidden md:flex"
-    expect(html).toContain('w-full flex-col md:flex-row items-stretch gap-3 flex');
+    // 横長配置のピンポイント気象サマリーおよび7大指標グリッドが正常にレンダリングされることを検証
+    expect(html).toContain('ピンポイント気象');
+    expect(html).toContain('農作業・生理判定 (7大指標)');
+    expect(html).toContain('防除・散布');
   });
 });

@@ -27,6 +27,7 @@ interface CitySearchModalProps {
   onConfirmLocation: () => void;
   setToastMessage: (msg: string) => void;
   setShowToast: (show: boolean) => void;
+  gpsErrorMessage?: string | null;
 }
 
 export function CitySearchModal({
@@ -40,6 +41,7 @@ export function CitySearchModal({
   onConfirmLocation,
   setToastMessage,
   setShowToast,
+  gpsErrorMessage,
 }: CitySearchModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<
@@ -125,6 +127,13 @@ export function CitySearchModal({
             📍 GPS取得
           </button>
         </div>
+
+        {gpsErrorMessage && (
+          <div className="bg-amber-50 border border-amber-300 text-amber-900 p-2.5 rounded-xl text-xs flex items-start space-x-2 animate-fade-in">
+            <span className="text-base shrink-0 leading-none">⚠️</span>
+            <div className="flex-1 font-bold leading-relaxed">{gpsErrorMessage}</div>
+          </div>
+        )}
 
         <form onSubmit={handleSearchCity} className="space-y-1.5 pt-1">
           <label className="block text-xs font-bold text-gray-700">

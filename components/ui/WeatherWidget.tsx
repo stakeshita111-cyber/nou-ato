@@ -65,6 +65,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
   const [selectedMapLat, setSelectedMapLat] = useState<number>(lat);
   const [selectedMapLon, setSelectedMapLon] = useState<number>(lon);
   const [selectedMapCityName, setSelectedMapCityName] = useState<string>(municipalityName);
+  const [gpsErrorMessage, setGpsErrorMessage] = useState<string | null>(null);
 
   const advice = getAgriAdvice(weather);
 
@@ -72,12 +73,16 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     setSelectedMapLat(lat);
     setSelectedMapLon(lon);
     setSelectedMapCityName(municipalityName);
+    setGpsErrorMessage(null);
     setIsLocationModalOpen(true);
   };
 
   const handleGetCurrentLocationInModal = () => {
+    setGpsErrorMessage(null);
     if (!navigator.geolocation) {
-      setToastMessage('⚠️ お使いの端末の位置情報機能に対応していません');
+      const msg = '⚠️ お使いの端末の位置情報機能に対応していません';
+      setGpsErrorMessage(msg);
+      setToastMessage(msg);
       setShowToast(true);
       return;
     }
@@ -110,14 +115,19 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         processPosition().catch((err) => {
           console.error('Error processing GPS position:', err);
           setLoading(false);
-          setToastMessage('⚠️ GPS位置情報の処理中にエラーが発生しました。');
+          const msg = '⚠️ GPS位置情報の処理中にエラーが発生しました。';
+          setGpsErrorMessage(msg);
+          setToastMessage(msg);
           setShowToast(true);
         });
       },
       (err) => {
         console.error('GPS error:', err);
         setLoading(false);
-        setToastMessage('⚠️ GPS位置情報の取得に失敗しました。マップ検索をお試しください。');
+        const msg =
+          '⚠️ GPS位置情報の取得に失敗しました。ブラウザの位置情報権限を許可するか、下の市町村名検索をお試しください。';
+        setGpsErrorMessage(msg);
+        setToastMessage(msg);
         setShowToast(true);
       }
     );
@@ -229,42 +239,36 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         </div>
       </div>
 
-      {/* 今日のサマリー情報バー */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-emerald-50/50 p-2.5 rounded-2xl border border-emerald-100/60 text-xs">
+      {/* 今日のサマリー情報バー (降水確率・風速・UV/光合成の3大主要指標) */}
+      <div className="grid grid-cols-3 gap-2 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-emerald-50/50 p-2.5 rounded-2xl border border-emerald-100/60 text-xs">
         <div className="flex items-center space-x-2 p-1.5 bg-white/80 rounded-xl border border-emerald-100/80 shadow-2xs">
-          <span className="text-base">☔</span>
-          <div>
-            <span className="text-[10px] text-gray-500 font-bold block">降水確率 / 雨量</span>
-            <span className="font-black text-gray-900">
+          <span className="text-base shrink-0">☔</span>
+          <div className="min-w-0">
+            <span className="text-[10px] text-gray-500 font-bold block truncate">
+              降水確率 / 雨量
+            </span>
+            <span className="font-black text-gray-900 text-xs sm:text-sm">
               {weather.today.rainProb}% / {weather.today.rainSum}mm
             </span>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 p-1.5 bg-white/80 rounded-xl border border-emerald-100/80 shadow-2xs">
-          <span className="text-base">💨</span>
-          <div>
-            <span className="text-[10px] text-gray-500 font-bold block">風速</span>
-            <span className="font-black text-gray-900">{weather.today.windSpeed} m/s</span>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2 p-1.5 bg-white/80 rounded-xl border border-emerald-100/80 shadow-2xs">
-          <span className="text-base">☀️</span>
-          <div>
-            <span className="text-[10px] text-gray-500 font-bold block">UV / 光合成</span>
-            <span className="font-black text-gray-900">
-              UV {weather.today.uvIndex} ({weather.today.sunlightText})
+          <span className="text-base shrink-0">💨</span>
+          <div className="min-w-0">
+            <span className="text-[10px] text-gray-500 font-bold block truncate">風速</span>
+            <span className="font-black text-gray-900 text-xs sm:text-sm">
+              {weather.today.windSpeed} m/s
             </span>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 p-1.5 bg-white/80 rounded-xl border border-emerald-100/80 shadow-2xs col-span-2 sm:col-span-1">
-          <span className="text-base">💬</span>
-          <div className="truncate">
-            <span className="text-[10px] text-gray-500 font-bold block">農作業指針</span>
-            <span className="font-black text-emerald-950 truncate block">
-              {weather.adviceShort}
+        <div className="flex items-center space-x-2 p-1.5 bg-white/80 rounded-xl border border-emerald-100/80 shadow-2xs">
+          <span className="text-base shrink-0">☀️</span>
+          <div className="min-w-0">
+            <span className="text-[10px] text-gray-500 font-bold block truncate">UV / 日照</span>
+            <span className="font-black text-gray-900 text-xs sm:text-sm">
+              UV {weather.today.uvIndex} ({weather.today.sunlightText})
             </span>
           </div>
         </div>
@@ -297,6 +301,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         onConfirmLocation={handleConfirmMapLocation}
         setToastMessage={setToastMessage}
         setShowToast={setShowToast}
+        gpsErrorMessage={gpsErrorMessage}
       />
 
       {/* ブロードキャスト注意報送信モーダル */}
