@@ -6,6 +6,8 @@ import {
   checkBoundingBoxOverlap,
   reorderArray,
   buildFixedPlots,
+  buildPlotId,
+  buildBedId,
 } from '@/lib/farm/farmCalculations';
 import { vi } from 'vitest';
 import { reorderBedsInDb, savePlotsAndBedsToDb } from '@/lib/farm/farmDb';
@@ -124,6 +126,65 @@ describe('farmCalculations & Payload Builders', () => {
     expect(fixedPlots[2].code).toBe('A2');
     expect(fixedPlots[3].code).toBe('B2');
     expect(fixedPlots[0].beds.length).toBe(3);
+  });
+
+  it('buildPlotId formats with farm UUID when valid, falls back otherwise', () => {
+    const farmUuid = '00000000-0000-0000-0000-000000000001';
+    expect(buildPlotId(farmUuid, 'A1')).toBe('00000000-0000-0000-0000-000000000001_plot_cell_A1');
+    expect(buildPlotId('invalid-farm', 'B2')).toBe('plot_cell_B2');
+    expect(buildPlotId(null, 'C3')).toBe('plot_cell_C3');
+    expect(buildPlotId(undefined, 'D4')).toBe('plot_cell_D4');
+  });
+
+  it('buildBedId formats with farm UUID when valid, falls back otherwise', () => {
+    const farmUuid = '00000000-0000-0000-0000-000000000001';
+    expect(buildBedId(farmUuid, 'A1', 1)).toBe(
+      '00000000-0000-0000-0000-000000000001_plot_cell_A1_bed_1'
+    );
+    expect(buildBedId('invalid-farm', 'B2', 2)).toBe('plot_cell_B2_bed_2');
+    expect(buildBedId(null, 'C3', 3)).toBe('plot_cell_C3_bed_3');
+  });
+
+  it('buildFixedPlots uses farm-scoped IDs when activeFarmId is a valid UUID', () => {
+    const farmUuid = '11111111-2222-3333-4444-555555555555';
+    const plots = buildFixedPlots(farmUuid, [], 1, 1, 2);
+    expect(plots.length).toBe(1);
+    expect(plots[0].id).toBe(`${farmUuid}_plot_cell_A1`);
+    expect(plots[0].beds[0].id).toBe(`${farmUuid}_plot_cell_A1_bed_1`);
+    expect(plots[0].beds[0].plot_id).toBe(`${farmUuid}_plot_cell_A1`);
+    expect(plots[0].beds[1].id).toBe(`${farmUuid}_plot_cell_A1_bed_2`);
+  });
+
+  it('buildFixedPlots preserves existing legacy plot and bed IDs without breaking mutations', () => {
+    const farmUuid = '11111111-2222-3333-4444-555555555555';
+    const legacyPlot: FarmPlot = {
+      id: 'legacy_plot_cell_A1',
+      farm_id: farmUuid,
+      name: '区画 A1',
+      code: 'A1',
+      grid_index: 0,
+      is_vacant: false,
+      student_id: undefined,
+      student_name: undefined,
+      position: { x: 0, y: 0 },
+      beds: [
+        {
+          id: 'legacy_bed_custom_1',
+          plot_id: 'legacy_plot_cell_A1',
+          bed_number: 1,
+          crop_name: 'トマト 🍅',
+          status: 'active',
+          season: '2026年 秋冬',
+          progress_percent: 10,
+          is_updated: false,
+        },
+      ],
+    };
+    const plots = buildFixedPlots(farmUuid, [legacyPlot], 1, 1, 1);
+    expect(plots.length).toBe(1);
+    expect(plots[0].id).toBe('legacy_plot_cell_A1');
+    expect(plots[0].beds[0].id).toBe('legacy_bed_custom_1');
+    expect(plots[0].beds[0].plot_id).toBe('legacy_plot_cell_A1');
   });
 });
 

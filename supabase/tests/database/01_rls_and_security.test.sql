@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(22);
+SELECT plan(24);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -311,6 +311,29 @@ SELECT throws_matching(
        VALUES ('rec-invalid-fk', 'bed-nonexistent', 'plot-a-1', 'ミニトマト', '2026-10-18') $$,
     'violates foreign key constraint|23503',
     '22. [FK制約] 存在しない bed_id を crop_records.bed_id に指定した INSERT は FK 違反 (23503) で拒否される'
+);
+
+-- Test 23: マルチテナントID分離: 農園Bの講師(Teacher B)が農園Aと同一番号の区画・畝(A1 / 畝1)を農園スコープIDで作成でき、農園Aと衝突しない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+
+INSERT INTO public.farm_plots (id, farm_id, name, code, student_id)
+VALUES ('11111111-1111-1111-1111-111111111112_plot_cell_A1', '11111111-1111-1111-1111-111111111112', '区画 A1 (農園B)', 'A1', '00000000-0000-0000-0000-000000000005');
+
+INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, student_id, student_name, status, season)
+VALUES ('11111111-1111-1111-1111-111111111112_plot_cell_A1_bed_1', '11111111-1111-1111-1111-111111111112_plot_cell_A1', 1, 'いちご', '00000000-0000-0000-0000-000000000005', '生徒C', 'active', '2026年 秋冬');
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_plots WHERE code = 'A1'),
+    2,
+    '23. [multi-tenant-pk] 農園Aと農園Bで同じ区画コード A1 を保持しても農園スコープIDにより主キー衝突せず共存できる'
+);
+
+-- Test 24: swap_farm_plots: 他農園の区画を指定した入れ替えは P0002 例外で拒否され、他農園データへの干渉が防止される
+SELECT throws_matching(
+    $$ SELECT public.swap_farm_plots('plot-a-1', '11111111-1111-1111-1111-111111111112_plot_cell_A1') $$,
+    'Target plots not found in your farm',
+    '24. [swap_plots] 他農園の区画を含む入れ替え要求は P0002 例外で弾かれ、他農園データへの干渉が防止される'
 );
 
 SELECT * FROM finish();

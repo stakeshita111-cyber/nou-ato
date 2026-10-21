@@ -13,6 +13,7 @@ import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { supabase } from '@/lib/supabase';
 import { swapFarmPlotsInDb } from '@/lib/farm/farmDb';
+import { buildPlotId } from '@/lib/farm/farmCalculations';
 import { useFarmStore } from '@/store/useFarmStore';
 
 const FarmMetaDescriptionSchema = z.object({
@@ -404,13 +405,13 @@ export default function TeacherFarmCanvasView({
           ? b.id
             ? b.id
                 .replace(new RegExp(`_${fromAddr}_`), `_${toAddr}_`)
-                .replace(new RegExp(`plot_cell_${fromAddr}`), `plot_cell_${toAddr}`)
+                .replace(new RegExp(`${fromPlot.id}`), `${toPlot.id}`)
             : `archived_bed_${toAddr}_${bedNum}_${Date.now()}`
-          : `plot_cell_${toAddr}_bed_${bedNum}`;
+          : `${toPlot.id}_bed_${bedNum}`;
       return {
         ...b,
         id: newId,
-        plot_id: `plot_cell_${toAddr}`,
+        plot_id: toPlot.id,
         bed_number: bedNum,
       };
     });
@@ -422,13 +423,13 @@ export default function TeacherFarmCanvasView({
           ? b.id
             ? b.id
                 .replace(new RegExp(`_${toAddr}_`), `_${fromAddr}_`)
-                .replace(new RegExp(`plot_cell_${toAddr}`), `plot_cell_${fromAddr}`)
+                .replace(new RegExp(`${toPlot.id}`), `${fromPlot.id}`)
             : `archived_bed_${fromAddr}_${bedNum}_${Date.now()}`
-          : `plot_cell_${fromAddr}_bed_${bedNum}`;
+          : `${fromPlot.id}_bed_${bedNum}`;
       return {
         ...b,
         id: newId,
-        plot_id: `plot_cell_${fromAddr}`,
+        plot_id: fromPlot.id,
         bed_number: bedNum,
       };
     });
@@ -503,7 +504,7 @@ export default function TeacherFarmCanvasView({
       for (let c = 0; c < newCols; c++) {
         const colLetter = String.fromCharCode(65 + c);
         const cellAddress = `${colLetter}${rowNum}`;
-        const uniquePlotId = `plot_cell_${cellAddress}`;
+        const uniquePlotId = buildPlotId(activeFarmId, cellAddress);
         const existing = plots.find((p) => p.code === cellAddress);
 
         if (existing) {
@@ -512,8 +513,8 @@ export default function TeacherFarmCanvasView({
           const beds = existing.beds?.length
             ? existing.beds
             : Array.from({ length: defaultBeds }).map((_, bIdx) => ({
-                id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
-                plot_id: uniquePlotId,
+                id: `${existing.id || uniquePlotId}_bed_${bIdx + 1}`,
+                plot_id: existing.id || uniquePlotId,
                 bed_number: bIdx + 1,
                 crop_name: '未確定 🌱',
                 is_updated: false,
@@ -531,7 +532,7 @@ export default function TeacherFarmCanvasView({
         } else {
           // 新規マスを未割り当て区画として生成
           const newBeds: FarmBed[] = Array.from({ length: defaultBeds }).map((_, bIdx) => ({
-            id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
+            id: `${uniquePlotId}_bed_${bIdx + 1}`,
             plot_id: uniquePlotId,
             bed_number: bIdx + 1,
             crop_name: '未確定 🌱',
@@ -612,15 +613,15 @@ export default function TeacherFarmCanvasView({
       for (let c = 0; c < gridCols; c++) {
         const colLetter = String.fromCharCode(65 + c);
         const cellAddress = `${colLetter}${rowNum}`;
-        const uniquePlotId = `plot_cell_${cellAddress}`;
+        const uniquePlotId = buildPlotId(activeFarmId, cellAddress);
         const existing = plots.find((p) => p.code === cellAddress);
 
         if (existing) {
           const beds = existing.beds?.length
             ? existing.beds
             : Array.from({ length: defaultBeds }).map((_, bIdx) => ({
-                id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
-                plot_id: uniquePlotId,
+                id: `${existing.id || uniquePlotId}_bed_${bIdx + 1}`,
+                plot_id: existing.id || uniquePlotId,
                 bed_number: bIdx + 1,
                 crop_name: '未確定 🌱',
                 is_updated: false,
@@ -637,7 +638,7 @@ export default function TeacherFarmCanvasView({
           });
         } else {
           const newBeds: FarmBed[] = Array.from({ length: defaultBeds }).map((_, bIdx) => ({
-            id: `plot_cell_${cellAddress}_bed_${bIdx + 1}`,
+            id: `${uniquePlotId}_bed_${bIdx + 1}`,
             plot_id: uniquePlotId,
             bed_number: bIdx + 1,
             crop_name: '未確定 🌱',

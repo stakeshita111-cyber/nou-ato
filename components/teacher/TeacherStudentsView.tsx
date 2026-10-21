@@ -186,7 +186,7 @@ export default function TeacherStudentsView() {
               const plotLabel = plotCellMatch
                 ? `区画 ${plotCellMatch[1].toUpperCase()}`
                 : b.plot_id
-                  ? String(b.plot_id).replace(/^plot_cell_/, '区画 ')
+                  ? String(b.plot_id).replace(/^.*plot_cell_/, '区画 ')
                   : `畝 ${b.bed_number || 1}`;
               if (assignedUser && !plotMap[assignedUser]) plotMap[assignedUser] = plotLabel;
               if (assignedName && !plotMap[assignedName]) plotMap[assignedName] = plotLabel;
