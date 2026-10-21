@@ -185,4 +185,24 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
       "ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'todo' AND NEW.status <> 'todo') THEN"
     );
   });
+
+  it('9. 同一農園内の受講生間における crop_records / farm_beds 参照権限最小化 (20261021020000_harden_student_select_policies.sql) が正しく定義されていること', () => {
+    const studentSelectMigration = path.join(
+      migrationsDir,
+      '20261021020000_harden_student_select_policies.sql'
+    );
+    expect(fs.existsSync(studentSelectMigration)).toBe(true);
+    const sql = fs.readFileSync(studentSelectMigration, 'utf-8');
+
+    // farm_beds_select_policy: 講師は自農園全体、受講生は自身の畝/区画のみ
+    expect(sql).toContain('CREATE POLICY "farm_beds_select_policy" ON public.farm_beds');
+    expect(sql).toContain("public.current_user_role() = 'teacher'");
+    expect(sql).toContain("public.current_user_role() = 'student'");
+    expect(sql).toContain('farm_beds.student_id = auth.uid()');
+
+    // crop_records_select_policy: 講師は自農園全体、受講生は自身の畝/区画のみ
+    expect(sql).toContain('CREATE POLICY "crop_records_select_policy" ON public.crop_records');
+    expect(sql).toContain('b.student_id = auth.uid()');
+    expect(sql).toContain('p.student_id = auth.uid()');
+  });
 });

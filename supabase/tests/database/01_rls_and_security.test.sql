@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(26);
+SELECT plan(28);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -361,6 +361,29 @@ SELECT throws_matching(
        VALUES ('11111111-1111-1111-1111-111111111199'::uuid, '重複農園', '00000000-0000-0000-0000-000000000001'::uuid, 'TEST-INVITE-001') $$,
     'violates unique constraint|23505',
     '26. [invite_code一意制約] 既存の招待コードと同一コードによる農園登録は unique 違反 (23505) で拒否される'
+);
+
+-- Test 27: farm_beds_select_policy: 受講生Bは自農園内であっても他生徒の畝(bed-c-1等)をSELECTできず、自身の畝(bed-b-1)のみ取得可能
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000003", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_beds WHERE id = 'bed-c-1'),
+    0,
+    '27. [farm_beds_select] 受講生は他生徒の畝を直接SELECTしても0件となり閲覧できない'
+);
+
+-- Test 28: crop_records_select_policy: 受講生Bが有効な作物記録を作成後、他生徒(Student C)からSELECTしても0件となり閲覧できない
+INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, harvest_amount, date)
+VALUES ('rec-b-private', 'bed-b-1', 'plot-b-1', 'きゅうり', 3, '2026-10-18');
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000005", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000005';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.crop_records WHERE id = 'rec-b-private'),
+    0,
+    '28. [crop_records_select] 受講生間の作物記録SELECTは他生徒からは0件となりプライバシーが厳格に保護される'
 );
 
 SELECT * FROM finish();
