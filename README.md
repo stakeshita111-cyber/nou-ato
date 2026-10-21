@@ -77,7 +77,7 @@
 | **AI / RAG**             | Google AI Studio (Gemini 2.5 Flash / Flash-Lite: `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
 | **API アーキテクチャ**   | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI                                                          |
 | **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build, Supabase DB Reset & pgTAP)                           |
-| **テストフレームワーク** | Vitest (35ファイル・293項目), pgTAP (`supabase test db`: 22項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
+| **テストフレームワーク** | Vitest (37ファイル・304項目), pgTAP (`supabase test db`: 22項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
 
 ---
 
@@ -235,10 +235,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全35テストファイル / 293項目 ＋ pgTAP 実DBテスト 1ファイル / 22項目全件PASS、カバレッジ90%以上）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全37テストファイル / 304項目 ＋ pgTAP 実DBテスト 1ファイル / 22項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全293件・100%通過)
+# 1. 自動テストの実行 (全304件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)
@@ -292,7 +292,7 @@ nou-ato/
 ├── scripts/              # データベース監査・ビルド検証スクリプト
 ├── store/                # Zustand グローバル状態ストア (useThemeStore等)
 ├── supabase/             # Supabase マイグレーションSQL (44本)・pgTAPテスト (22項目)
-├── test/                 # 自動テストスイート (Vitest: 35ファイル・全293項目)
+├── test/                 # 自動テストスイート (Vitest: 37ファイル・全304項目)
 ├── types/                # TypeScript型定義 (Database, Supabase)
 └── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```
