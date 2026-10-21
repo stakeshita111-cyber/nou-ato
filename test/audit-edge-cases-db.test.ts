@@ -143,9 +143,24 @@ describe('[権限越境] SECURITY DEFINER RPC', () => {
     expect(guardIdx).toBeLessThan(mutateIdx);
   });
 
-  it('withdraw_student は対象が role=student であること', () => {
+  it('withdraw_student は対象が role=student であること、および区画・畝をアトミックに解放すること', () => {
     const body = effectiveFunctionBody('withdraw_student') ?? '';
     expect(body).toMatch(/role\s*=\s*'student'|v_student_role/i);
+    expect(body).toMatch(
+      /UPDATE\s+public\.farm_beds\s+SET[^;]*student_id\s*=\s*NULL[^;]*student_name\s*=\s*NULL/i
+    );
+    expect(body).toMatch(
+      /UPDATE\s+public\.farm_plots\s+SET[^;]*student_id\s*=\s*NULL[^;]*is_vacant\s*=\s*true/i
+    );
+  });
+
+  it('farms.invite_code に一意制約インデックスが存在すること', () => {
+    expect(allSql).toMatch(/CREATE\s+UNIQUE\s+INDEX[^\n]+farms[^\n]+invite_code/i);
+  });
+
+  it('register_teacher は招待コード衝突防止ループを備えていること', () => {
+    const body = effectiveFunctionBody('register_teacher') ?? '';
+    expect(body).toMatch(/LOOP[\s\S]*new_invite_code[\s\S]*EXIT\s+WHEN\s+NOT\s+EXISTS/i);
   });
 });
 

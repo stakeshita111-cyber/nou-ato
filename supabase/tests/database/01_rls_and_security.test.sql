@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(24);
+SELECT plan(26);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -334,6 +334,33 @@ SELECT throws_matching(
     $$ SELECT public.swap_farm_plots('plot-a-1', '11111111-1111-1111-1111-111111111112_plot_cell_A1') $$,
     'Target plots not found in your farm',
     '24. [swap_plots] 他農園の区画を含む入れ替え要求は P0002 例外で弾かれ、他農園データへの干渉が防止される'
+);
+
+-- Test 25: withdraw_student: 退会処理により、該当生徒の区画(farm_plots)および畝(farm_beds)がDB層でアトミックに解放される
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT public.withdraw_student('00000000-0000-0000-0000-000000000002');
+
+SELECT is(
+    (
+        SELECT (p.student_id IS NULL AND p.is_vacant = true AND b.student_id IS NULL AND b.student_name IS NULL AND u.farm_id IS NULL)
+        FROM public.farm_plots p
+        JOIN public.farm_beds b ON b.plot_id = p.id
+        JOIN public.users u ON u.id = '00000000-0000-0000-0000-000000000002'::uuid
+        WHERE p.id = 'plot-a-1'
+    ),
+    true,
+    '25. [withdraw_student] 退会時に区画の student_id/is_vacant、畝の student_name、ユーザーの farm_id がDB層でアトミックに解放される'
+);
+
+-- Test 26: farms.invite_code 一意性制約: 重複する招待コードでの農園作成は unique 違反 (23505) で拒否される
+RESET ROLE;
+SELECT throws_matching(
+    $$ INSERT INTO public.farms (id, name, owner_id, invite_code)
+       VALUES ('11111111-1111-1111-1111-111111111199'::uuid, '重複農園', '00000000-0000-0000-0000-000000000001'::uuid, 'TEST-INVITE-001') $$,
+    'violates unique constraint|23505',
+    '26. [invite_code一意制約] 既存の招待コードと同一コードによる農園登録は unique 違反 (23505) で拒否される'
 );
 
 SELECT * FROM finish();
