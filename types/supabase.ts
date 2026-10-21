@@ -213,6 +213,13 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
+            foreignKeyName: 'crop_records_bed_id_fkey';
+            columns: ['bed_id'];
+            isOneToOne: false;
+            referencedRelation: 'farm_beds_with_students';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'crop_records_plot_id_fkey';
             columns: ['plot_id'];
             isOneToOne: false;
@@ -751,7 +758,7 @@ export type Database = {
           status?: string;
           tags?: string[] | null;
           target_crop?: string | null;
-          title?: string;
+          title: string;
           tools_needed?: string | null;
           updated_at?: string | null;
           video_url?: string | null;
@@ -866,6 +873,13 @@ export type Database = {
           total_harvest: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'farm_beds_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'fk_farm_beds_plot_id';
             columns: ['plot_id'];
