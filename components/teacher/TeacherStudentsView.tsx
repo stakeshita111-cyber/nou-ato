@@ -788,6 +788,34 @@ export default function TeacherStudentsView() {
         return;
       }
 
+      // 2. 退会受講生に割り当てられていた区画(farm_plots)の空き区画化および畝(farm_beds)の生徒名クリアを確実に同期
+      try {
+        const { data: assignedPlots } = await supabase
+          .from('farm_plots')
+          .select('id, code')
+          .eq('student_id', studentId);
+
+        if (assignedPlots && assignedPlots.length > 0) {
+          for (const plot of assignedPlots) {
+            await supabase
+              .from('farm_plots')
+              .update({
+                student_id: null,
+                is_vacant: true,
+                name: plot.code ? `区画 ${plot.code}` : '空き区画',
+              })
+              .eq('id', plot.id);
+          }
+        }
+
+        await supabase
+          .from('farm_beds')
+          .update({ student_id: null, student_name: null })
+          .eq('student_id', studentId);
+      } catch (cleanupErr) {
+        console.warn('Plot/bed post-withdrawal cleanup notice:', cleanupErr);
+      }
+
       // 画面とキャッシュの更新
       setShowDeleteConfirmModal(false);
       setSelectedStudent(null);

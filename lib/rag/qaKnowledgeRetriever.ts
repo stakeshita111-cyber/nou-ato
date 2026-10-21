@@ -493,12 +493,12 @@ ${knowledgeSection}`;
       : `受講生の新しい相談メッセージ: 「${cleanUserQuestion}」`;
 
     const preferredModel = process.env.GEMINI_MODEL;
-    const baseModels = ['gemini-flash-lite-latest', 'gemini-3.5-flash'];
+    const baseModels = ['gemini-flash-lite-latest', 'gemini-2.5-flash'];
     const modelsToTry = preferredModel
       ? [
           preferredModel,
           preferredModel === 'gemini-flash-lite-latest'
-            ? 'gemini-3.5-flash'
+            ? 'gemini-2.5-flash'
             : 'gemini-flash-lite-latest',
         ]
       : baseModels;

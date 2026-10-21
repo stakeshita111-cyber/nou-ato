@@ -5,6 +5,8 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 
+export const maxDuration = 60;
+
 const chatRequestBodySchema = z.object({
   message: z
     .string()

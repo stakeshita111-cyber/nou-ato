@@ -77,7 +77,7 @@
 | **AI / RAG**             | Google AI Studio (Gemini 2.5 Flash / Flash-Lite: `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
 | **API アーキテクチャ**   | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI                                                          |
 | **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build, Supabase DB Reset & pgTAP)                           |
-| **テストフレームワーク** | Vitest (32ファイル・259項目), pgTAP (`supabase test db`: 16項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
+| **テストフレームワーク** | Vitest (35ファイル・293項目), pgTAP (`supabase test db`: 22項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
 
 ---
 
@@ -137,7 +137,7 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全43本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全44本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
    - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
@@ -181,6 +181,7 @@ npx supabase db push
    - `20261016020000_reconcile_schema_and_foreign_keys.sql` (本番DBとマイグレーション間の列・外部キー完全整合化)
    - `20261016030000_sync_student_published_tasks.sql` (公開済みタスクの受講生先行配備・同期RPC)
    - `20261016040000_harden_student_tasks_rls_and_column_nullability.sql` (student_tasks直接UPDATEのRLS厳格化・NOT NULL制約完全同期)
+   - `20261018000000_restore_foreign_keys_and_fix_task_trigger.sql` (users参照の外部キー6本・crop_records.bed_id外部キー復元・タスク同期トリガー修正)
 
 ---
 
@@ -234,10 +235,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全32テストファイル / 259項目 ＋ pgTAP 実DBテスト 1ファイル / 16項目全件PASS、カバレッジ90%以上）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全35テストファイル / 293項目 ＋ pgTAP 実DBテスト 1ファイル / 22項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全259件・100%通過)
+# 1. 自動テストの実行 (全293件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)
@@ -290,8 +291,8 @@ nou-ato/
 ├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager, logger, apiResponse)
 ├── scripts/              # データベース監査・ビルド検証スクリプト
 ├── store/                # Zustand グローバル状態ストア (useThemeStore等)
-├── supabase/             # Supabase マイグレーションSQL (43本)・pgTAPテスト (16項目)
-├── test/                 # 自動テストスイート (Vitest: 32ファイル・全259項目)
+├── supabase/             # Supabase マイグレーションSQL (44本)・pgTAPテスト (22項目)
+├── test/                 # 自動テストスイート (Vitest: 35ファイル・全293項目)
 ├── types/                # TypeScript型定義 (Database, Supabase)
 └── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```

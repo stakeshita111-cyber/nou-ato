@@ -127,9 +127,14 @@ export function useKanbanBoard(columns: ColumnType[]) {
       window.addEventListener('nouato_active_farm_changed', handleTaskUpdated);
     }
 
+    const channelName = farmId ? `tasks_realtime_channel_${farmId}` : 'tasks_realtime_channel';
+    const realtimeFilter = farmId
+      ? { event: '*' as const, schema: 'public', table: 'tasks', filter: `farm_id=eq.${farmId}` }
+      : { event: '*' as const, schema: 'public', table: 'tasks' };
+
     const realtimeChannel = supabase
-      .channel('tasks_realtime_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+      .channel(channelName)
+      .on('postgres_changes', realtimeFilter, () => {
         void fetchTasks();
       })
       .subscribe();
@@ -144,7 +149,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
         console.error('Failed to remove realtimeChannel:', e);
       });
     };
-  }, [fetchTasks]);
+  }, [fetchTasks, farmId]);
 
   const notifyTaskSync = () => {
     if (typeof window !== 'undefined') {
