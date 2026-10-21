@@ -226,7 +226,10 @@ SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001"
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 
 SELECT lives_ok(
-    $$ SELECT public.swap_farm_plots('plot-a-1', 'plot-b-1') $$,
+    $$ 
+        SELECT public.swap_farm_plots('plot-a-1', 'plot-b-1');
+        SELECT public.swap_farm_plots('plot-a-1', 'plot-b-1');
+    $$,
     '16. [teacher] 講師は swap_farm_plots により区画・畝・観察記録を1トランザクションで入れ替えられる'
 );
 
@@ -364,8 +367,10 @@ SELECT throws_matching(
 );
 
 -- Test 27: farm_beds_select_policy: 受講生Bは自農園内であっても他生徒の畝(bed-c-1等)をSELECTできず、自身の畝(bed-b-1)のみ取得可能
+SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000003", "role": "authenticated"}';
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.farm_beds WHERE id = 'bed-c-1'),
@@ -377,8 +382,10 @@ SELECT is(
 INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, harvest_amount, date)
 VALUES ('rec-b-private', 'bed-b-1', 'plot-b-1', 'きゅうり', 3, '2026-10-18');
 
+SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000005", "role": "authenticated"}';
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000005';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.crop_records WHERE id = 'rec-b-private'),

@@ -128,13 +128,15 @@ BEGIN
         CASE
           WHEN b.status = 'archived' THEN 'archived_bed_' || v_to_plot.code || '_' || b.bed_number || '_' || substr(md5(b.id), 1, 8)
           WHEN b.id LIKE '%_bed_%' THEN v_to_plot.id || '_bed_' || b.bed_number
-          ELSE gen_random_uuid()::text
+          WHEN b.id LIKE 'bed-%' THEN 'bed-' || lower(substr(v_to_plot.code, 1, 1)) || '-' || b.bed_number
+          ELSE v_to_plot.id || '_bed_' || b.bed_number
         END
       ELSE
         CASE
           WHEN b.status = 'archived' THEN 'archived_bed_' || v_from_plot.code || '_' || b.bed_number || '_' || substr(md5(b.id), 1, 8)
           WHEN b.id LIKE '%_bed_%' THEN v_from_plot.id || '_bed_' || b.bed_number
-          ELSE gen_random_uuid()::text
+          WHEN b.id LIKE 'bed-%' THEN 'bed-' || lower(substr(v_from_plot.code, 1, 1)) || '-' || b.bed_number
+          ELSE v_from_plot.id || '_bed_' || b.bed_number
         END
     END AS new_id,
     CASE
@@ -178,10 +180,8 @@ BEGIN
   WHERE cr.plot_id IN (v_from_plot.id, v_to_plot.id)
      OR cr.bed_id IN (SELECT old_id FROM _tmp_swap_beds);
 
-  -- 6. farm_beds への一時プレフィックス付与（主キー衝突防止）
-  UPDATE public.farm_beds
-  SET id = 'swap_tmp_' || id,
-      plot_id = NULL
+  -- 6. 既存の畝を一旦削除 (crop_records.bed_id は ON DELETE SET NULL により安全に一時解除)
+  DELETE FROM public.farm_beds
   WHERE plot_id IN (v_from_plot.id, v_to_plot.id);
 
   -- 7. 畝スナップショットから新規行を入れ替え先 plot_id で復元
@@ -204,10 +204,6 @@ BEGIN
       plot_id = tr.new_plot_id
   FROM _tmp_swap_records tr
   WHERE cr.id = tr.record_id;
-
-  -- 9. 旧 farm_beds 一時行を完全削除
-  DELETE FROM public.farm_beds
-  WHERE id LIKE 'swap_tmp_%' AND plot_id IS NULL;
 
   -- 10. farm_plots の受講生・空き状況・更新日時をスワップ
   UPDATE public.farm_plots
