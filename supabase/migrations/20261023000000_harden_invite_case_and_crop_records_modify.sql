@@ -273,7 +273,7 @@ BEGIN
         v_clean_task_id := p_base_task_id::UUID;
     EXCEPTION WHEN OTHERS THEN
         RAISE EXCEPTION 'Invalid task ID format' USING ERRCODE = '22P02';
-    END IF;
+    END;
 
     UPDATE public.student_tasks
     SET status = 'todo',
