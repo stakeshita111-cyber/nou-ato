@@ -299,6 +299,8 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         }}
         onGetCurrentLocation={handleGetCurrentLocationInModal}
         onConfirmLocation={handleConfirmMapLocation}
+        toastMessage={toastMessage}
+        showToast={showToast}
         setToastMessage={setToastMessage}
         setShowToast={setShowToast}
         gpsErrorMessage={gpsErrorMessage}

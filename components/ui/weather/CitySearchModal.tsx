@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
+import Toast from '@/components/ui/Toast';
 import type { LeafletMapInstance } from './types';
 import { WeatherMapView } from './WeatherMapView';
 
@@ -25,6 +26,8 @@ interface CitySearchModalProps {
   onLocationSelected: (lat: number, lon: number, cityName: string) => void;
   onGetCurrentLocation: () => void;
   onConfirmLocation: () => void;
+  toastMessage?: string;
+  showToast?: boolean;
   setToastMessage: (msg: string) => void;
   setShowToast: (show: boolean) => void;
   gpsErrorMessage?: string | null;
@@ -39,6 +42,8 @@ export function CitySearchModal({
   onLocationSelected,
   onGetCurrentLocation,
   onConfirmLocation,
+  toastMessage,
+  showToast,
   setToastMessage,
   setShowToast,
   gpsErrorMessage,
@@ -99,7 +104,11 @@ export function CitySearchModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in text-gray-800">
-      <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-gray-200">
+      {showToast && toastMessage && (
+        <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
+      )}
+
+      <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-gray-200 relative">
         <div className="flex justify-between items-center border-b pb-3">
           <div>
             <span className="bg-emerald-100 text-emerald-900 text-[10px] font-black px-2.5 py-0.5 rounded-full">
@@ -107,7 +116,10 @@ export function CitySearchModal({
             </span>
             <h3 className="text-base font-black text-gray-900 mt-1">📍 地域を選択</h3>
           </div>
-          <button onClick={onClose} className="text-gray-400 font-bold text-lg">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 font-bold text-lg p-1"
+          >
             ✕
           </button>
         </div>
@@ -129,9 +141,14 @@ export function CitySearchModal({
         </div>
 
         {gpsErrorMessage && (
-          <div className="bg-amber-50 border border-amber-300 text-amber-900 p-2.5 rounded-xl text-xs flex items-start space-x-2 animate-fade-in">
+          <div className="bg-rose-50 border-2 border-rose-300 text-rose-950 p-3 rounded-2xl text-xs flex items-start space-x-2.5 animate-fade-in shadow-xs">
             <span className="text-base shrink-0 leading-none">⚠️</span>
-            <div className="flex-1 font-bold leading-relaxed">{gpsErrorMessage}</div>
+            <div className="flex-1 leading-relaxed">
+              <strong className="block font-black text-rose-900 mb-0.5">
+                GPS位置情報の取得に失敗しました
+              </strong>
+              <p className="font-medium text-rose-800">{gpsErrorMessage}</p>
+            </div>
           </div>
         )}
 
