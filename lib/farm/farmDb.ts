@@ -55,10 +55,16 @@ export async function fetchStudentsDb(
   teacherDisplayName?: string
 ): Promise<{ students: StudentProfile[]; studentMap: Map<string, string> }> {
   const studentMap = new Map<string, string>();
-  const { data: usersData } = await supabase
+  let query = supabase
     .from('users')
     .select('id, display_name, role, farm_id')
     .eq('role', 'student');
+
+  if (activeFarmId) {
+    query = query.eq('farm_id', activeFarmId);
+  }
+
+  const { data: usersData } = await query;
 
   if (!usersData || usersData.length === 0) {
     return { students: [], studentMap };
@@ -107,7 +113,9 @@ export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
       id: r.id,
       bed_id: r.bed_id,
       plot_id: r.plot_id,
-      date: r.date || new Date(r.created_at).toLocaleDateString('ja-JP'),
+      date:
+        r.date ||
+        (r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
       growth_stage: ((r.growth_stage as GrowthStage) || '観察記録') as GrowthStage,
       height_cm: r.height_cm ?? undefined,
       work_types: (Array.isArray(r.work_types) ? r.work_types : ['手入れ']) as WorkType[],

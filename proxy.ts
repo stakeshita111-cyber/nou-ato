@@ -70,6 +70,13 @@ export async function proxy(request: NextRequest) {
     }
   } catch (error) {
     console.error('Middleware error in proxy:', error);
+    // 3. 例外発生時のフェイルクローズ (TC-AUTH-005: 認証エラーや通信障害時に保護ルートを素通しせずログインへ安全誘導)
+    if (pathname.startsWith('/teacher') || pathname.startsWith('/student')) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = '/login';
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
     return response;
   }
 

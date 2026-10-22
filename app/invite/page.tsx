@@ -149,10 +149,7 @@ function InviteContent() {
         provider: 'custom:line',
         options: {
           scopes: 'openid profile email',
-          redirectTo: `${origin}/auth/callback?next=/student&code=${encodeURIComponent(inviteCode)}`,
-          queryParams: {
-            code: inviteCode,
-          },
+          redirectTo: `${origin}/auth/callback?next=/student&invite=${encodeURIComponent(inviteCode)}`,
         },
       });
 

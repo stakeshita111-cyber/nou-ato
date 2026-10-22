@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import Toast from '@/components/ui/Toast';
@@ -17,7 +17,6 @@ const mergeAccountSchema = z.object({
 });
 
 function AccountMergeForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
@@ -77,17 +76,14 @@ function AccountMergeForm() {
         return;
       }
 
-      setToastMessage('🎉 アカウントの統合が完了しました！');
+      // linkIdentity 呼び出し成功時はブラウザがLINEの認可画面へリダイレクトされるため、
+      // 早期リダイレクト競合を防ぎ、ローディング状態を維持して安全に遷移させる
+      setToastMessage('LINE認証画面へ移動しています...');
       setShowToast(true);
-
-      setTimeout(() => {
-        router.push('/student');
-      }, 900);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       setToastMessage('エラーが発生しました: ' + message);
       setShowToast(true);
-    } finally {
       setLoading(false);
     }
   };

@@ -78,13 +78,35 @@ export async function POST(request: Request) {
       reservationId = resId;
     }
 
-    // 3. 多層防御③: 会話履歴をブラウザ信頼せず、サーバー側でDB(journals)から最新履歴を取得・構築
-    const { data: dbJournals } = await supabase
+    // 3. 多層防御③: 会話履歴をブラウザ信頼せず、サーバー側で自農園のDB(journals)から最新履歴を取得・構築
+    let studentFarmId: string | null =
+      typeof userMeta?.farm_id === 'string' ? userMeta.farm_id : null;
+
+    if (!studentFarmId) {
+      try {
+        const usersTable = supabase.from('users');
+        if (typeof usersTable?.select === 'function') {
+          const { data: userProfile } = await usersTable
+            .select('farm_id')
+            .eq('id', studentId)
+            .maybeSingle();
+          studentFarmId = userProfile?.farm_id || null;
+        }
+      } catch {}
+    }
+
+    let journalsQuery = supabase
       .from('journals')
       .select('content, reply, role, created_at')
       .eq('student_id', studentId)
       .order('created_at', { ascending: false })
       .limit(6);
+
+    if (studentFarmId) {
+      journalsQuery = journalsQuery.eq('farm_id', studentFarmId);
+    }
+
+    const { data: dbJournals } = await journalsQuery;
 
     const history: ChatHistoryItem[] = [];
     if (dbJournals && dbJournals.length > 0) {
