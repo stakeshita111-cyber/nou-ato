@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
-import Toast from '@/components/ui/Toast';
 import type { LeafletMapInstance } from './types';
 import { WeatherMapView } from './WeatherMapView';
 
@@ -42,8 +41,6 @@ export function CitySearchModal({
   onLocationSelected,
   onGetCurrentLocation,
   onConfirmLocation,
-  toastMessage,
-  showToast,
   setToastMessage,
   setShowToast,
   gpsErrorMessage,
@@ -104,10 +101,6 @@ export function CitySearchModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in text-gray-800">
-      {showToast && toastMessage && (
-        <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
-      )}
-
       <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-gray-200 relative">
         <div className="flex justify-between items-center border-b pb-3">
           <div>
@@ -141,7 +134,10 @@ export function CitySearchModal({
         </div>
 
         {gpsErrorMessage && (
-          <div className="bg-rose-50 border-2 border-rose-300 text-rose-950 p-3 rounded-2xl text-xs flex items-start space-x-2.5 animate-fade-in shadow-xs">
+          <div
+            role="alert"
+            className="bg-rose-50 border-2 border-rose-300 text-rose-950 p-3 rounded-2xl text-xs flex items-start space-x-2.5 animate-fade-in shadow-xs"
+          >
             <span className="text-base shrink-0 leading-none">⚠️</span>
             <div className="flex-1 leading-relaxed">
               <strong className="block font-black text-rose-900 mb-0.5">
@@ -203,7 +199,7 @@ export function CitySearchModal({
           </div>
         </div>
 
-        <div className="flex justify-between items-center pt-3 border-t">
+        <div className="flex flex-wrap justify-between items-center gap-2 pt-3 border-t">
           <button
             type="button"
             onClick={onClose}
@@ -215,7 +211,7 @@ export function CitySearchModal({
           <button
             type="button"
             onClick={onConfirmLocation}
-            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-lg transition transform active:scale-95 flex items-center space-x-1"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-lg transition transform active:scale-95 flex items-center space-x-1"
           >
             <span>📍 「{selectedMapCityName}」で位置決定・保存</span>
           </button>

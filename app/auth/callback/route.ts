@@ -104,16 +104,17 @@ export async function GET(request: Request) {
               invite_code: inviteCodeParam.trim(),
             });
 
-            // 招待Cookieをクリーンアップ
-            try {
-              cookieStore.delete('nouato_invite_code');
-            } catch {}
-
             if (joinErr) {
               console.error('join_farm error in OAuth callback:', joinErr);
               targetNext = `/invite?error=invalid_invite`;
             }
           }
+
+          // 招待Cookieをクリーンアップ
+          try {
+            cookieStore.delete('nouato_invite_code');
+            cookieStore.delete('nouato_invite_farm_id');
+          } catch {}
         } catch (callbackErr) {
           console.error('Failed to process user setup in callback:', callbackErr);
         }

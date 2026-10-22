@@ -295,3 +295,83 @@ $$;
 
 REVOKE ALL ON FUNCTION public.uncomplete_student_task(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.uncomplete_student_task(text) TO authenticated;
+
+-- ------------------------------------------------------------------------------
+-- 5. withdraw_student RPC の堅牢化 (空き区画 description 同期 & 担当畝完全クリア)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.withdraw_student(p_student_id UUID)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_caller_id UUID;
+    v_caller_role TEXT;
+    v_caller_farm_id UUID;
+    v_student_farm_id UUID;
+    v_student_role TEXT;
+BEGIN
+    v_caller_id := auth.uid();
+    IF v_caller_id IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '28000';
+    END IF;
+
+    -- 呼び出し元の権限と農園IDを取得
+    SELECT role, farm_id INTO v_caller_role, v_caller_farm_id
+    FROM public.users WHERE id = v_caller_id;
+
+    IF v_caller_role != 'teacher' OR v_caller_farm_id IS NULL THEN
+        RAISE EXCEPTION 'Permission denied: Only teachers can withdraw students' USING ERRCODE = '42501';
+    END IF;
+
+    -- 対象受講生の所属農園とロールを確認
+    SELECT farm_id, role INTO v_student_farm_id, v_student_role
+    FROM public.users WHERE id = p_student_id;
+
+    IF v_student_farm_id IS DISTINCT FROM v_caller_farm_id THEN
+        RAISE EXCEPTION 'Target student does not belong to your farm' USING ERRCODE = '42501';
+    END IF;
+
+    IF v_student_role != 'student' THEN
+        RAISE EXCEPTION 'Cannot withdraw non-student users' USING ERRCODE = '42501';
+    END IF;
+
+    -- 1. 割り当てられていた畝を解放（直接紐付けまたは担当区画経由の畝をクリア）
+    UPDATE public.farm_beds
+    SET student_id = NULL,
+        student_name = NULL,
+        crop_name = CASE WHEN status != 'archived' THEN '未確定 🌱' ELSE crop_name END,
+        progress_percent = CASE WHEN status != 'archived' THEN 0 ELSE progress_percent END,
+        updated_at = NOW()
+    WHERE student_id = p_student_id
+       OR plot_id IN (SELECT id FROM public.farm_plots WHERE student_id = p_student_id);
+
+    -- 2. 割り当てられていた区画(farm_plots)を解放（description も 'vacant' に同期しUI不整合を完全防止）
+    UPDATE public.farm_plots
+    SET student_id = NULL,
+        is_vacant = true,
+        description = 'vacant',
+        name = CASE WHEN code IS NOT NULL AND code != '' THEN '区画 ' || code ELSE '空き区画' END,
+        updated_at = NOW()
+    WHERE student_id = p_student_id;
+
+    -- 3. 孤立タスクの確実な削除
+    DELETE FROM public.student_tasks
+    WHERE student_id = p_student_id;
+
+    -- 4. 受講生の所属農園を解除 (farm_id = NULL)
+    UPDATE public.users
+    SET farm_id = NULL,
+        updated_at = NOW()
+    WHERE id = p_student_id;
+
+    RETURN json_build_object(
+        'success', true,
+        'withdrawn_student_id', p_student_id
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.withdraw_student(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.withdraw_student(UUID) TO authenticated;

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Toast from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
 import {
   useWeatherLive,
   saveLocationToDBAndStorage,
@@ -115,19 +116,18 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         processPosition().catch((err) => {
           console.error('Error processing GPS position:', err);
           setLoading(false);
-          const msg = '⚠️ GPS位置情報の処理中にエラーが発生しました。';
+          const msg = 'GPS位置情報の処理中にエラーが発生しました。';
           setGpsErrorMessage(msg);
-          setToastMessage(msg);
+          setToastMessage(`⚠️ ${msg}`);
           setShowToast(true);
         });
       },
       (err) => {
         console.error('GPS error:', err);
         setLoading(false);
-        const msg =
-          '⚠️ GPS位置情報の取得に失敗しました。ブラウザの位置情報権限を許可するか、下の市町村名検索をお試しください。';
+        const msg = 'ブラウザの位置情報権限を許可するか、下の市町村名検索をお試しください。';
         setGpsErrorMessage(msg);
-        setToastMessage(msg);
+        setToastMessage(`⚠️ GPS位置情報の取得に失敗しました。${msg}`);
         setShowToast(true);
       }
     );
@@ -146,13 +146,68 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     setShowToast(true);
   };
 
-  const handleSendBroadcast = () => {
-    if (!broadcastMessage.trim()) return;
-    localStorage.setItem('nouato_last_weather_broadcast', broadcastMessage);
-    setIsBroadcastModalOpen(false);
+  const handleSendBroadcast = async () => {
+    const trimmed = broadcastMessage.trim();
+    if (!trimmed) return;
 
-    setToastMessage('✨ 全受講生へ気象注意報・農作業アドバイスを一括送信しました！');
-    setShowToast(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setToastMessage('⚠️ ログイン状態を確認できませんでした。再ログインしてください');
+        setShowToast(true);
+        return;
+      }
+
+      const { data: uRow } = await supabase
+        .from('users')
+        .select('farm_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      const farmId = uRow?.farm_id || null;
+
+      if (!farmId) {
+        setToastMessage('⚠️ 所属農園を特定できなかったため配信できませんでした');
+        setShowToast(true);
+        return;
+      }
+
+      const { error: insErr } = await supabase.from('announcements').insert([
+        {
+          farm_id: farmId,
+          author_id: user.id,
+          target_student_id: null,
+          title: `📢 気象注意報・農作業アドバイス (${municipalityName})`,
+          body: trimmed,
+        },
+      ]);
+
+      if (insErr) {
+        console.error('Weather broadcast insert error:', insErr);
+        setToastMessage('⚠️ 気象注意報の配信に失敗しました。時間をおいて再度お試しください');
+        setShowToast(true);
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nouato_sync_event'));
+        try {
+          const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+
+      setIsBroadcastModalOpen(false);
+      setBroadcastMessage('');
+      setToastMessage('✨ 全受講生へ気象注意報・農作業アドバイスを一括送信しました！');
+      setShowToast(true);
+    } catch (err) {
+      console.error('Weather broadcast persistence error:', err);
+      setToastMessage('⚠️ 気象注意報の配信中にエラーが発生しました');
+      setShowToast(true);
+    }
   };
 
   return (

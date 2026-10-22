@@ -1,4 +1,4 @@
-﻿# 体系的要件定義書（PRD）：体験農業経営支援アプリ「のうあと (NOU-ATO)」
+# 体系的要件定義書（PRD）：体験農業経営支援アプリ「のうあと (NOU-ATO)」
 
 > **最終更新**: 2026年9月4日 | **開発ステータス**: Phase 1 & 2 完了 / Phase 3（AI RAG・語調・対話基盤稼働中） / Phase 4（E2Eテスト計画策定・品質保証基盤導入）
 
@@ -54,7 +54,7 @@ Python（重量級インフラ）を排除し、フロントからバックエ�
 - **認証**: Supabase Auth (Email/Password 認証 ＋ LINE OAuth / LINE 招待URL・QRコード発行)
 - **ベクトル検索 (RAG)**: pgvector（類似度検索）
 - **セキュリティ**: Row Level Security (RLS) によるマルチテナント（農園ごとのデータ隔離）の完全適用
-- **AI・外部API連携**: Google AI Studio (Gemini 1.5 Flash API), LINE Messaging API Webhook
+- **AI・外部API連携**: Google AI Studio (Gemini 2.5 Flash / Flash-Lite: gemini-flash-lite-latest), LINE Messaging API Webhook
 - **テスト・品質保証**: Playwright（E2E自動テスト、マルチコンテキスト2画面同期テスト）、TypeScript型検査 (`tsc --noEmit`)
 - **インフラ・デプロイ**: Vercel
 
@@ -259,7 +259,7 @@ CREATE TABLE public.reservations (
    - クエスト完了時に対象畝(ベッド)を選択、草丈、作業内容、現場写真、観察ノートを添付送信。
    - 畝の栽培完了報告（`BedCompletionModal`）から講師への修了承認申請フロー。
 5. **🤖 AI相棒「しるべぇ」リアルタイム相談トーク (`StudentTalkView`)【実装済 ✅】**:
-   - Gemini 1.5 Flash API ＋ 農園ナレッジDB（過去日誌Q&A、重み1.2倍）による自走支援チャット。
+   - Gemini 2.5 Flash / Flash-Lite: gemini-flash-lite-latest ＋ 農園ナレッジDB（過去日誌Q&A、重み1.2倍）による自走支援チャット。
    - 会話履歴の Supabase `journals` テーブルへの自動永続化。
 6. **📅 イベントカレンダー予約【実装済 ✅】**:
    - 講師が作成した講習会や収穫体験イベントの参加申し込み予約（残枠自動計算）。
@@ -330,7 +330,7 @@ CREATE TABLE public.reservations (
   - [ ] LINE Bot からの作業リマインド・アナウンスプッシュ配信。
 
 - **[-] Phase 3: AI相棒「しるべぇ」(RAG パイプライン ＆ Gemini API) (【進行中 / 対話・RAG基盤稼働中】)**
-  - [x] Gemini 1.5 Flash API 連携による「しるべぇ」24時間自動応答エンドポイント (`/api/chat/rag`)。
+  - [x] Gemini 2.5 Flash / Flash-Lite: gemini-flash-lite-latest 連携による「しるべぇ」24時間自動応答エンドポイント (`/api/chat/rag`)。
   - [x] 農園DBナレッジ（過去の講師回答・日誌データ）を参照した重み付け類似検索（DBナレッジ重要度1.2倍重み）。
   - [x] 生徒用チャット対話UI (`StudentTalkView`) および Supabase `journals` への対話履歴自動永続化。
   - [x] AIしるべぇの語調・キャラクタースタイル切り替え機能（フレンドリー/敬語など）。

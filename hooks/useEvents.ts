@@ -41,7 +41,11 @@ export function useEvents(farmId?: string) {
         }
       }
 
-      const { data } = await supabase.from('events').select('*').order('date', { ascending: true });
+      let eventsQuery = supabase.from('events').select('*').order('date', { ascending: true });
+      if (fid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fid)) {
+        eventsQuery = eventsQuery.eq('farm_id', fid);
+      }
+      const { data } = await eventsQuery;
 
       if (data && data.length > 0) {
         const formatted: EventItem[] = (

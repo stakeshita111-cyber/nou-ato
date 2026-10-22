@@ -70,7 +70,7 @@
               >
             </div>
             <p class="text-xs text-gray-400 font-mono mt-0.5">
-              Next.js 16 (App Router) × React 19 × Supabase RLS × Gemini 1.5 Flash-Lite ×
+              Next.js 16 (App Router) × React 19 × Supabase RLS × Gemini 2.5 Flash / Flash-Lite ×
               Antigravity
             </p>
           </div>
@@ -78,7 +78,7 @@
         <div class="flex items-center gap-2 text-xs font-mono text-gray-400">
           <span
             class="px-3 py-1 rounded-lg bg-gray-900 border border-gray-800 text-emerald-400 font-bold"
-            >208 Tests (100% PASS)</span
+            >318 Tests (100% PASS)</span
           >
           <span
             class="px-3 py-1 rounded-lg bg-gray-900 border border-gray-800 text-teal-400 font-bold"
@@ -219,7 +219,7 @@ flowchart TB
         PII["PII自動サニタイズ<br>(電話・メール・住所置換)"]
         Topical["安全トピック照合<br>(自然栽培関連性判定)"]
         KB_Filter["承認済みナレッジフィルタ<br>(is_approved = true)"]
-        Gemini["Google AI Studio<br>Gemini 1.5 Flash-Lite"]
+        Gemini["Google AI Studio<br>Gemini 2.5 Flash / Flash-Lite"]
     end
 
     subgraph SupabaseLayer["🛡️ Supabase クラウド (PostgreSQL + RLS + Realtime)"]
@@ -290,7 +290,7 @@ flowchart TB
             </p>
           </div>
           <div class="p-2.5 bg-gray-900/90 rounded-xl border border-gray-800">
-            <p class="font-bold text-emerald-300">TeacherCanvasView.tsx</p>
+            <p class="font-bold text-emerald-300">TeacherFarmCanvasView.tsx</p>
             <p class="text-[11px] text-gray-400 mt-0.5">
               @dnd-kit 畝配置キャンバス・スリム畝カード（縦幅圧縮）
             </p>
@@ -351,7 +351,7 @@ flowchart TB
             <span>🤖</span> AI & プライバシー防御
           </h3>
           <span class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded"
-            >Gemini 1.5 Flash-Lite</span
+            >Gemini 2.5 Flash / Flash-Lite</span
           >
         </div>
         <p class="text-xs text-gray-400">多層防御プライバシーと高速RAG相談</p>

@@ -132,8 +132,8 @@
     },
     "/api/chat/check-knowledge": {
       "post": {
-        "summary": "入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合および自己解決保存",
-        "description": "受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。\nまた、`saveOnly: true` 指定時は自己解決したQ&Aをチケット消費なしで `journals` テーブルへ保存します。",
+        "summary": "入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合",
+        "description": "受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。",
         "operationId": "postCheckKnowledge",
         "requestBody": {
           "required": true,
@@ -149,21 +149,6 @@
                     "maxLength": 1000,
                     "description": "照合対象の質問テキスト",
                     "example": "きゅうりの葉っぱが黄色くなってきました"
-                  },
-                  "saveOnly": {
-                    "type": "boolean",
-                    "description": "自己解決したFAQを日誌として保存のみ行うモードフラグ",
-                    "default": false
-                  },
-                  "answer": {
-                    "type": "string",
-                    "maxLength": 5000,
-                    "description": "saveOnly=true 時に保存する解決済み回答テキスト"
-                  },
-                  "isPrivate": {
-                    "type": "boolean",
-                    "description": "個人メモ（非公開）として保存するフラグ",
-                    "default": false
                   }
                 }
               }
@@ -172,7 +157,7 @@
         },
         "responses": {
           "200": {
-            "description": "照合結果リストまたは保存成否の返却",
+            "description": "照合結果リストの返却",
             "content": {
               "application/json": {
                 "schema": {
@@ -183,10 +168,6 @@
                       "items": {
                         "$ref": "#/components/schemas/KnowledgeMatch"
                       }
-                    },
-                    "saved": {
-                      "type": "boolean",
-                      "description": "saveOnly=true 指定時の日誌保存成否"
                     }
                   }
                 }
@@ -615,31 +596,23 @@
       },
       "PresetFaqItem": {
         "type": "object",
-        "required": ["id", "category", "question", "answer", "keywords"],
+        "required": ["id", "chipLabel", "question", "answer"],
         "properties": {
           "id": {
             "type": "string",
             "maxLength": 100
           },
-          "category": {
+          "chipLabel": {
             "type": "string",
             "maxLength": 50
           },
           "question": {
             "type": "string",
-            "maxLength": 300
+            "maxLength": 500
           },
           "answer": {
             "type": "string",
             "maxLength": 2000
-          },
-          "keywords": {
-            "type": "array",
-            "maxItems": 20,
-            "items": {
-              "type": "string",
-              "maxLength": 50
-            }
           }
         }
       },

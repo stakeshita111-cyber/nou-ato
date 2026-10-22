@@ -168,7 +168,7 @@ export function useFarmManager() {
             seenStudentIds.add(sId);
           }
 
-          let isVac = false;
+          let isVac = Boolean(dp.is_vacant);
           if (dp.description === 'vacant') {
             isVac = true;
           } else if (dp.description) {
@@ -181,7 +181,7 @@ export function useFarmManager() {
                 'is_vacant' in rawMeta &&
                 typeof (rawMeta as { is_vacant: unknown }).is_vacant === 'boolean'
               ) {
-                isVac = (rawMeta as { is_vacant: boolean }).is_vacant;
+                isVac = Boolean(dp.is_vacant) || (rawMeta as { is_vacant: boolean }).is_vacant;
               }
             } catch {}
           }
@@ -1560,6 +1560,9 @@ export function useFarmManager() {
   ) => {
     let targetBedNumber = 1;
     let targetPlotCode = 'C3';
+    let resolvedPlotId = plotId;
+    let oldStudentId: string | undefined;
+    let oldStudentName: string | undefined;
     let oldCropName = '野菜';
     let oldHarvest = '';
     let oldNotes = '';
@@ -1570,6 +1573,9 @@ export function useFarmManager() {
     const nextPlots = plots.map((plot) => {
       if (plot.id === plotId || plot.code === plotId) {
         targetPlotCode = plot.code;
+        resolvedPlotId = plot.id;
+        oldStudentId = plot.student_id;
+        oldStudentName = plot.student_name;
         const updatedBeds = (plot.beds || []).map((bed) => {
           const numFromId = Number(bedId?.split('_').pop()) || bed.bed_number;
           if (
@@ -1583,6 +1589,8 @@ export function useFarmManager() {
             oldNotes = bed.completion_notes || '';
             oldImg = bed.completion_image_url || '';
             oldSeason = bed.season || '2026年 春夏';
+            if (bed.student_id) oldStudentId = bed.student_id;
+            if (bed.student_name) oldStudentName = bed.student_name;
 
             return {
               ...bed,
@@ -1640,9 +1648,11 @@ export function useFarmManager() {
     const archiveId = `archived_bed_${targetPlotCode}_${targetBedNumber}_${Date.now()}`;
     const newArchivedBed: FarmBed = {
       id: archiveId,
-      plot_id: plotId,
+      plot_id: resolvedPlotId,
       bed_number: targetBedNumber,
       crop_name: oldCropName,
+      student_id: oldStudentId,
+      student_name: oldStudentName,
       status: 'archived',
       season: oldSeason,
       harvested_at: todayStr,
@@ -1668,9 +1678,11 @@ export function useFarmManager() {
     try {
       await insertBedDb({
         id: archiveId,
-        plot_id: plotId,
+        plot_id: resolvedPlotId,
         bed_number: String(targetBedNumber),
         crop_name: oldCropName,
+        student_id: oldStudentId || null,
+        student_name: oldStudentName || null,
         status: 'archived',
         season: oldSeason,
         harvested_at: todayStr,

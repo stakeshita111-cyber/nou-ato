@@ -10,7 +10,7 @@
 
 ### 1.1 背景と目的
 
-NOU-ATO では、AI相棒「しるべぇ」による24時間受講生相談機能機能（RAG）に Google AI Studio / Google Cloud Vertex AI の Gemini API（Gemini 1.5 Flash-Lite）を採用しています。
+NOU-ATO では、AI相棒「しるべぇ」による24時間受講生相談機能機能（RAG）に Google AI Studio / Google Cloud Vertex AI の Gemini API（Gemini 2.5 Flash / Flash-Lite: `gemini-flash-lite-latest`）を採用しています。
 LLM API は従量課金制であるため、無限ループやスクレイピング、悪意あるリクエストが発生した場合、数時間で多額の請求が発生する懸念があります。
 本ランブックに従い、**Google Cloud コンソール層での物理的上限設定**と**アプリケーション層での利用制限**を多層で組み合わせることで、意図しない超過請求を 100% 物理的に防御します。
 
@@ -18,7 +18,7 @@ LLM API は従量課金制であるため、無限ループやスクレイピン
 
 | レイヤー                      | 対策内容                    | 役割・効果                                                | 適用場所                       |
 | :---------------------------- | :-------------------------- | :-------------------------------------------------------- | :----------------------------- |
-| **Layer 1: アプリ層制限**     | **1人1日3回のAIチケット制** | 受講生ごとの過剰リクエストをDB (`ai_usage`) 層で遮断      | `/api/chat/rag` & Supabase RPC |
+| **Layer 1: アプリ層制限**     | **1人1日3回のAIチケット制** | 受講生ごとの過剰リクエストをDB (`ai_tickets`) 層で遮断    | `/api/chat/rag` & Supabase RPC |
 | **Layer 2: キャッシュ照合**   | **事前ナレッジ高速照合**    | 重複質問を Gemini 呼び出し前にインメモリ処理 (0円)        | `/api/chat/check-knowledge`    |
 | **Layer 3: GCP Quota制限**    | **1分/1日の物理上限 caps**  | 万一アプリ層が突破されても API 総呼び出しを上限固定       | GCP Console (Quotas)           |
 | **Layer 4: GCP 予算アラート** | **段階的課金アラート通知**  | 月額予算の 20% / 60% / 100% 到達で即時メール & Slack 通知 | GCP Billing & Pub/Sub          |
@@ -115,13 +115,13 @@ NOU-ATO では、インフラ層の上限設定だけに頼らず、アプリケ
  3. GCP Quota 物理上限 (15 RPM / 1,500 RPD) ──► 🛡️ 429ブロック (物理上限防衛)
        │ (Quota内)
        ▼
- 4. Gemini 1.5 Flash API 応答生成 ─────────────► 🤖 回答ストリーミング & ai_usage 記録
+  4. Gemini 2.5 Flash API 応答生成 ─────────────► 🤖 回答ストリーミング & ai_usage_events 記録
 ```
 
 ### 4.1 アプリケーション側実装箇所
 
 - **チケット管理**: `lib/ticketManager.ts` & `app/api/chat/rag/route.ts`
-  - Supabase `ai_usage` テーブルおよび `check_and_increment_ai_usage` RPC により、ユーザー単位で日あたり3回を厳密管理。
+  - Supabase `ai_tickets` / `ai_usage_events` テーブルおよび `reserve_ai_usage` / `finalize_ai_usage` RPC により、ユーザー単位で日あたり3回＋付与枠を2フェーズ台帳で厳密管理。
 - **事前ナレッジ検索**: `lib/rag/qaKnowledgeRetriever.ts`
   - トピック単語抽出・Stop words 除去による軽量マッチング。
 - **構造化ログ・アラート**: `lib/logger.ts`
@@ -137,11 +137,11 @@ NOU-ATO では、インフラ層の上限設定だけに頼らず、アプリケ
 
 1. **ログの確認**: Supabase Dashboard の SQL Editor / Vercel Logs にて、`api/chat/rag` へのリクエスト状況を確認します。
    ```sql
-   -- 当日のAI利用リクエスト数上位ユーザーの特定
-   SELECT user_id, count_used, last_reset_date
-   FROM public.ai_usage
-   WHERE last_reset_date = CURRENT_DATE
-   ORDER BY count_used DESC
+   -- 当日のAI利用リクエスト数上位受講生の特定 (ai_tickets)
+   SELECT student_id, count, granted_count, date
+   FROM public.ai_tickets
+   WHERE date = CURRENT_DATE
+   ORDER BY count DESC
    LIMIT 10;
    ```
 2. **原因の分類**:

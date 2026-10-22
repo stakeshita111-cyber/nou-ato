@@ -128,7 +128,7 @@
               href="markdown-viewer.html?doc=nfr"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
             >
-              🛡�E�E非機�E要件書
+              🛡️ 非機能要件書
             </a>
             <a
               href="markdown-viewer.html?doc=log"
@@ -146,13 +146,13 @@
               href="markdown-viewer.html?doc=curl"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
             >
-              🔌 cURLサンプル雁E
+              🔌 cURLサンプル集
             </a>
             <a
               href="markdown-viewer.html?doc=readme"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition shadow-2xs"
             >
-              📖 プロジェクチEEADME
+              📖 プロジェクトREADME
             </a>
           </div>
         </div>
@@ -172,490 +172,715 @@
 
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
-            const embeddedSpec = {
-        "openapi": "3.1.0",
-        "info": {
-          "title": "NOU-ATO (のぁE��と) API Specification",
-          "description": "体験農業経営支援アプリ「NOU-ATO」�EバックエンチEAPI 仕様書です、En農園特化型 AI ナレチE��検索�E�EAG�E�、AI しるべぁE��話相諁E��シスチE��設定などのエンド�Eイントを提供します、Enエラーレスポンスは RFC 7807 (Problem Details for HTTP APIs) に準拠してぁE��す、E,
-          "version": "1.0.0",
-          "contact": {
-            "name": "NOU-ATO Development Team"
-          }
+      const embeddedSpec = {
+        openapi: '3.1.0',
+        info: {
+          title: 'NOU-ATO (のうあと) API Specification',
+          description:
+            '体験農業経営支援アプリ「NOU-ATO」のバックエンド API 仕様書です。\n農園特化型 AI ナレッジ検索（RAG）、AI しるべぇ対話相談、システム設定、チケット付与などのエンドポイントを提供します。\nエラーレスポンスは RFC 7807 (Problem Details for HTTP APIs) に準拠しています。',
+          version: '1.0.0',
+          contact: {
+            name: 'NOU-ATO Development Team',
+          },
         },
-        "servers": [
+        servers: [
           {
-            "url": "http://localhost:3000",
-            "description": "ローカル開発環墁E
+            url: 'http://localhost:3000',
+            description: 'ローカル開発環境',
           },
           {
-            "url": "https://nou-ato.vercel.app",
-            "description": "本番環墁E(Production)"
-          }
+            url: 'https://nou-ato.vercel.app',
+            description: '本番環境 (Production)',
+          },
         ],
-        "paths": {
-          "/api/chat/rag": {
-            "post": {
-              "summary": "AI しるべぁE(農園特化型 RAG) チャチE��相諁E,
-              "description": "受講生の農業に関する質問を受け付け、Gemini 1.5 Flash-Lite と農園蓄積ナレチE���E�過去日誌�E承認済みノウハウ�E�を絁E��合わせた回答を生�Eします、En1日3回�EチケチE��制に対応し、呪斁E��よる回復めE��モ専用モードもサポ�Eトします。対話履歴は Supabase の journals チE�Eブルに自動記録されます、E,
-              "operationId": "postChatRag",
-              "requestBody": {
-                "required": true,
-                "content": {
-                  "application/json": {
-                    "schema": {
-                      "$ref": "#/components/schemas/ChatRagRequest"
+        paths: {
+          '/api/chat/rag': {
+            post: {
+              summary: 'AI しるべぇ (農園特化型 RAG) チャット相談',
+              description:
+                '受講生の農業に関する質問を受け付け、Gemini (gemini-flash-lite-latest / gemini-2.5-flash) と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。\n1日3回のチケット制に対応し、サーバー側でのアトミック台帳管理（consume_ai_ticket / refund_ai_ticket）やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。',
+              operationId: 'postChatRag',
+              requestBody: {
+                required: true,
+                content: {
+                  'application/json': {
+                    schema: {
+                      $ref: '#/components/schemas/ChatRagRequest',
                     },
-                    "example": {
-                      "message": "ミニト�Eト�E脁E��かきはぁE��行うべきですか�E�E,
-                      "studentName": "受講生",
-                      "isMemoOnly": false
-                    }
-                  }
-                }
+                    example: {
+                      message: 'ミニトマトの脇芽かきはいつ行うべきですか？',
+                      studentName: '受講生',
+                      isMemoOnly: false,
+                      isPrivate: false,
+                    },
+                  },
+                },
               },
-              "responses": {
-                "200": {
-                  "description": "チャチE��回答生成�E劁E,
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/ChatRagResponse"
+              responses: {
+                200: {
+                  description: 'チャット回答生成成功',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        $ref: '#/components/schemas/ChatRagResponse',
                       },
-                      "example": {
-                        "reply": "🌱【脇芽かきのコチE��\nミニト�Eト�E主枝と葉�E付け根から出てくる「わき芽」�E、晴れた日の午前中に手で摘み取るのがおすすめです！E,
-                        "referencedQa": [
+                      example: {
+                        reply:
+                          '🌱【脇芽かきのコツ】\nミニトマトの主枝と葉の付け根から出てくる「わき芽」は、晴れた日の午前中に手で摘み取るのがおすすめです！',
+                        referencedQa: [
                           {
-                            "id": "db_journal_123",
-                            "question": "ト�Eト�E芽かきのめE��方を教えてください",
-                            "answer": "天気�E良ぁE��の午前中に手でぽきっと折るように摘み取ります、E,
-                            "similarityScore": 8.5
-                          }
+                            id: 'db_journal_123',
+                            question: 'トマトの芽かきのやり方を教えてください',
+                            answer: '天気の良い日の午前中に手でぽきっと折るように摘み取ります。',
+                            similarityScore: 8.5,
+                          },
                         ],
-                        "timestamp": "2026-09-25T12:00:00.000Z"
-                      }
-                    }
-                  }
-                },
-                "400": {
-                  "description": "不正なリクエスチE(メチE��ージ未持E��など)",
-                  "content": {
-                    "application/problem+json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/ProblemDetails"
-                      }
-                    }
-                  }
-                },
-                "401": {
-                  "description": "未ログイン・認証エラー (RFC 7807)",
-                  "content": {
-                    "application/problem+json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/ProblemDetails"
+                        timestamp: '2026-09-25T12:00:00.000Z',
+                        saved: true,
+                        status: 'ok',
                       },
-                      "example": {
-                        "type": "https://httpstatuses.com/401",
-                        "title": "Unauthorized",
-                        "status": 401,
-                        "detail": "ログインが忁E��です。�E度ログインしてください、E
-                      }
-                    }
-                  }
+                    },
+                  },
                 },
-                "429": {
-                  "description": "1日の相諁E��限趁E�� (RFC 7807)",
-                  "content": {
-                    "application/problem+json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/ProblemDetails"
+                400: {
+                  description: '不正なリクエスト (メッセージ未指定など)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
                       },
-                      "example": {
-                        "type": "https://httpstatuses.com/429",
-                        "title": "Too Many Requests",
-                        "status": 429,
-                        "detail": "本日のAI相諁E��ケチE��の上限に達しました、E
-                      }
-                    }
-                  }
+                    },
+                  },
                 },
-                "500": {
-                  "description": "サーバ�E冁E��エラー (Gemini API 呼び出し失敗など)",
-                  "content": {
-                    "application/problem+json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/ProblemDetails"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "/api/chat/check-knowledge": {
-            "post": {
-              "summary": "入力中の質問と農園ナレチE��・FAQ のリアルタイム類似照吁E,
-              "description": "受講生が質問�E力フォームに入力中のチE��ストから作物品種・キーワードを解析し、即答可能なプリセチE��FAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します、E,
-              "operationId": "postCheckKnowledge",
-              "requestBody": {
-                "required": true,
-                "content": {
-                  "application/json": {
-                    "schema": {
-                      "type": "object",
-                      "required": ["question"],
-                      "properties": {
-                        "question": {
-                          "type": "string",
-                          "description": "照合対象の質問テキスチE,
-                          "example": "きゅぁE��の葉っぱが黁E��くなってきました"
-                        }
-                      }
-                    }
-                  }
-                }
+                401: {
+                  description: '未ログイン・認証エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                      example: {
+                        type: 'https://httpstatuses.com/401',
+                        title: 'Unauthorized',
+                        status: 401,
+                        detail: 'ログインが必要です。再度ログインしてください。',
+                      },
+                    },
+                  },
+                },
+                429: {
+                  description: '1日の相談上限超過 (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                      example: {
+                        type: 'https://httpstatuses.com/429',
+                        title: 'Too Many Requests',
+                        status: 429,
+                        detail: '本日のAI相談チケットの上限に達しました。',
+                      },
+                    },
+                  },
+                },
+                500: {
+                  description: 'サーバー内部エラー (Gemini API 呼び出し失敗など)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                503: {
+                  description: 'データベース接続障害またはAIサービス一時利用不可 (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
               },
-              "responses": {
-                "200": {
-                  "description": "照合結果リスト�E返却",
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "type": "object",
-                        "properties": {
-                          "matches": {
-                            "type": "array",
-                            "items": {
-                              "$ref": "#/components/schemas/KnowledgeMatch"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "/api/settings": {
-            "get": {
-              "summary": "シスチE��・機�E設定�E取征E,
-              "description": "講師および受講生画面の機�Eフラグ�E�生徒用AI相諁E��ブ�E表示/非表示など�E�を取得します、E,
-              "operationId": "getSettings",
-              "responses": {
-                "200": {
-                  "description": "設定情報の返却成功",
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "type": "object",
-                        "properties": {
-                          "settings": {
-                            "type": "object"
-                          },
-                          "showStudentTalkTab": {
-                            "type": "boolean",
-                            "description": "生徒画面の相諁E��ブを表示するか否ぁE
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
             },
-            "post": {
-              "summary": "シスチE��・機�E設定�E更新",
-              "description": "講師による機�Eフラグ設定�E動的更新を受け付けます、E,
-              "operationId": "updateSettings",
-              "requestBody": {
-                "required": true,
-                "content": {
-                  "application/json": {
-                    "schema": {
-                      "type": "object",
-                      "properties": {
-                        "showStudentTalkTab": {
-                          "type": "boolean",
-                          "example": true
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "responses": {
-                "200": {
-                  "description": "設定更新成功",
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "type": "object",
-                        "properties": {
-                          "success": {
-                            "type": "boolean"
-                          },
-                          "settings": {
-                            "type": "object"
-                          },
-                          "showStudentTalkTab": {
-                            "type": "boolean"
-                          }
-                        }
-                      }
-                    }
-                  }
-                },
-                "400": {
-                  "description": "不正な設定パラメータ",
-                  "content": {
-                    "application/problem+json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/ProblemDetails"
-                      }
-                    }
-                  }
-                }
-              }
-            }
           },
-          "/api/tickets/grant": {
-            "post": {
-              "summary": "講師による受講生追加チケチE��付丁E,
-              "description": "講師が同一農園�E受講生に対して、当日のAI相諁E��ケチE��を追加付与します、E,
-              "requestBody": {
-                "required": true,
-                "content": {
-                  "application/json": {
-                    "schema": {
-                      "type": "object",
-                      "required": ["studentId", "amount"],
-                      "properties": {
-                        "studentId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "description": "対象受講生のユーザーID"
+          '/api/chat/check-knowledge': {
+            post: {
+              summary: '入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合',
+              description:
+                '受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。',
+              operationId: 'postCheckKnowledge',
+              requestBody: {
+                required: true,
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      required: ['question'],
+                      properties: {
+                        question: {
+                          type: 'string',
+                          minLength: 1,
+                          maxLength: 1000,
+                          description: '照合対象の質問テキスト',
+                          example: 'きゅうりの葉っぱが黄色くなってきました',
                         },
-                        "amount": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 10,
-                          "description": "付与するチケチE��枚数�E�E、E0枚！E,
-                          "example": 1
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "responses": {
-                "200": {
-                  "description": "付与�E劁E,
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "type": "object",
-                        "properties": {
-                          "success": {
-                            "type": "boolean"
-                          },
-                          "studentId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "grantedTickets": {
-                            "type": "integer"
-                          },
-                          "newTotal": {
-                            "type": "integer"
-                          }
-                        }
-                      }
-                    }
-                  }
-                },
-                "401": {
-                  "description": "未ログイン (RFC 7807)"
-                },
-                "403": {
-                  "description": "講師権限なぁEまた�E 他農園�E受講生 (RFC 7807)"
-                }
-              }
-            }
-          }
-        },
-        "components": {
-          "schemas": {
-            "ChatRagRequest": {
-              "type": "object",
-              "required": ["message"],
-              "properties": {
-                "message": {
-                  "type": "string",
-                  "description": "相諁E�E容�E�E、E000斁E��！E,
-                  "example": "ミニト�Eト�E脁E��かきはぁE��行うべきですか�E�E
-                },
-                "studentName": {
-                  "type": "string",
-                  "description": "受講生の表示吁E,
-                  "example": "受講生"
-                },
-                "isMemoOnly": {
-                  "type": "boolean",
-                  "description": "メモストック保存�Eみか（チケチE��消費なし！E,
-                  "example": false
-                }
-              }
-            },
-            "ChatRagResponse": {
-              "type": "object",
-              "required": ["reply", "referencedQa", "timestamp"],
-              "properties": {
-                "reply": {
-                  "type": "string",
-                  "description": "AI また�EシスチE��からの回答テキスチE
-                },
-                "referencedQa": {
-                  "type": "array",
-                  "description": "回答生成に参�Eされた農園ノウハウ・日誌Q&A",
-                  "items": {
-                    "$ref": "#/components/schemas/ReferencedQaItem"
-                  }
-                },
-                "timestamp": {
-                  "type": "string",
-                  "format": "date-time",
-                  "description": "回答生成日晁E
-                }
-              }
-            },
-            "ReferencedQaItem": {
-              "type": "object",
-              "required": ["question", "answer"],
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "nullable": true
-                },
-                "question": {
-                  "type": "string"
-                },
-                "answer": {
-                  "type": "string"
-                },
-                "similarityScore": {
-                  "type": "number"
-                }
-              }
-            },
-            "KnowledgeMatch": {
-              "type": "object",
-              "required": ["id", "question", "answer", "matchedKeywords", "score"],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "question": {
-                  "type": "string"
-                },
-                "answer": {
-                  "type": "string"
-                },
-                "matchedKeywords": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "score": {
-                  "type": "number"
-                }
-              }
-            },
-            "ProblemDetails": {
-              "type": "object",
-              "required": ["type", "title", "status"],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "description": "エラー種別を識別する URI リファレンス (RFC 7807)",
-                  "example": "https://httpstatuses.com/400"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "人間が琁E��可能なエラーの概要タイトル",
-                  "example": "Bad Request"
-                },
-                "status": {
-                  "type": "integer",
-                  "description": "HTTP スチE�EタスコーチE,
-                  "example": 400
-                },
-                "detail": {
-                  "type": "string",
-                  "description": "本エラーの具体的な発生事由",
-                  "example": "メチE��ージが空でぁE
-                },
-                "instance": {
-                  "type": "string",
-                  "description": "エラー発生リソースの URI"
-                },
-                "error": {
-                  "type": "string",
-                  "description": "従来クライアントとの後方互換用エラーメチE��ージ",
-                  "example": "メチE��ージが空でぁE
-                },
-                "invalidParams": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string"
                       },
-                      "reason": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+                    },
+                  },
+                },
+              },
+              responses: {
+                200: {
+                  description: '照合結果リストの返却',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          matches: {
+                            type: 'array',
+                            items: {
+                              $ref: '#/components/schemas/KnowledgeMatch',
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                400: {
+                  description: '不正なリクエスト (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                401: {
+                  description: '未ログイン・認証エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                500: {
+                  description: 'サーバー内部エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '/api/settings': {
+            get: {
+              summary: 'システム・機能設定の取得',
+              description:
+                '講師および受講生画面の機能フラグ（生徒用AI相談タブの表示/非表示）および農園別カスタムFAQプリセットを取得します。',
+              operationId: 'getSettings',
+              parameters: [
+                {
+                  name: 'farm_id',
+                  in: 'query',
+                  required: false,
+                  description: '取得対象の農園ID（省略時はログインユーザーの所属農園ID）',
+                  schema: {
+                    type: 'string',
+                    format: 'uuid',
+                  },
+                },
+              ],
+              responses: {
+                200: {
+                  description: '設定情報の返却成功',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          settings: {
+                            type: 'object',
+                            additionalProperties: true,
+                          },
+                          showStudentTalkTab: {
+                            type: 'boolean',
+                            description: '生徒画面の相談タブを表示するか否か',
+                          },
+                          presetFaqs: {
+                            type: 'array',
+                            description: '農園別カスタムFAQプリセット一覧',
+                            items: {
+                              $ref: '#/components/schemas/PresetFaqItem',
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                401: {
+                  description: '未ログイン・認証エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                500: {
+                  description: 'サーバー内部エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            post: {
+              summary: 'システム・機能設定の更新',
+              description:
+                '講師による機能フラグ設定およびカスタムFAQプリセットの動的更新を受け付けます。',
+              operationId: 'updateSettings',
+              requestBody: {
+                required: true,
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        showStudentTalkTab: {
+                          type: 'boolean',
+                          example: true,
+                        },
+                        presetFaqs: {
+                          type: 'array',
+                          maxItems: 50,
+                          items: {
+                            $ref: '#/components/schemas/PresetFaqItem',
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              responses: {
+                200: {
+                  description: '設定更新成功',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          success: {
+                            type: 'boolean',
+                          },
+                          settings: {
+                            type: 'object',
+                          },
+                          showStudentTalkTab: {
+                            type: 'boolean',
+                          },
+                          presetFaqs: {
+                            type: 'array',
+                            items: {
+                              $ref: '#/components/schemas/PresetFaqItem',
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                400: {
+                  description: '不正な設定パラメータ (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                401: {
+                  description: '未ログイン・認証エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                403: {
+                  description: '講師権限なし (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                500: {
+                  description: 'サーバー内部エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '/api/tickets/grant': {
+            post: {
+              summary: '講師による受講生追加チケット付与',
+              description: '講師が同一農園の受講生に対して、当日のAI相談チケットを追加付与します。',
+              operationId: 'postGrantTickets',
+              requestBody: {
+                required: true,
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      required: ['studentId', 'amount'],
+                      properties: {
+                        studentId: {
+                          type: 'string',
+                          format: 'uuid',
+                          description: '対象受講生のユーザーID',
+                        },
+                        amount: {
+                          type: 'integer',
+                          minimum: 1,
+                          maximum: 10,
+                          description: '付与するチケット枚数（1〜10枚）',
+                          example: 1,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              responses: {
+                200: {
+                  description: '付与成功',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          success: {
+                            type: 'boolean',
+                          },
+                          studentId: {
+                            type: 'string',
+                            format: 'uuid',
+                          },
+                          amount: {
+                            type: 'integer',
+                            description: '今回付与したチケット枚数',
+                          },
+                          newCount: {
+                            type: 'integer',
+                            nullable: true,
+                            description:
+                              '付与後の当日使用可能カウント（負数により残り相談可能回数が増加）',
+                          },
+                          timestamp: {
+                            type: 'string',
+                            format: 'date-time',
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                400: {
+                  description: '不正なリクエストパラメータ (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                401: {
+                  description: '未ログイン・認証エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                403: {
+                  description: '講師権限なし または 他農園の受講生 (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                404: {
+                  description: '対象受講生が存在しない (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+                500: {
+                  description: 'サーバー内部エラー (RFC 7807)',
+                  content: {
+                    'application/problem+json': {
+                      schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        components: {
+          schemas: {
+            ChatRagRequest: {
+              type: 'object',
+              required: ['message'],
+              properties: {
+                message: {
+                  type: 'string',
+                  description: '受講生の質問・相談メッセージ本文（1〜1000文字）',
+                  example: 'ミニトマトの脇芽かきはいつ行うべきですか？',
+                },
+                studentName: {
+                  type: 'string',
+                  description: '受講生氏名（パーソナライズ用）',
+                  default: '受講生',
+                  example: '受講生',
+                },
+                isMemoOnly: {
+                  type: 'boolean',
+                  description: 'チケット0枚時のメモ専用モードフラグ（チケット消費なし）',
+                  default: false,
+                  example: false,
+                },
+                isPrivate: {
+                  type: 'boolean',
+                  description: '個人メモ（非公開日誌）として保存するフラグ',
+                  default: false,
+                  example: false,
+                },
+              },
+            },
+            ChatRagResponse: {
+              type: 'object',
+              required: ['reply', 'referencedQa', 'timestamp'],
+              properties: {
+                reply: {
+                  type: 'string',
+                  description: 'AI またはシステムからの回答テキスト',
+                },
+                referencedQa: {
+                  type: 'array',
+                  description: '回答生成に参照された農園ノウハウ・日誌Q&A',
+                  items: {
+                    $ref: '#/components/schemas/ReferencedQaItem',
+                  },
+                },
+                timestamp: {
+                  type: 'string',
+                  format: 'date-time',
+                  description: '回答生成日時',
+                },
+                saved: {
+                  type: 'boolean',
+                  description: 'journals テーブルへの日誌保存成否',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['ok', 'degraded'],
+                  description: 'AI 回答生成ステータス（フォールバック時は degraded）',
+                },
+              },
+            },
+            ReferencedQaItem: {
+              type: 'object',
+              required: ['question', 'answer'],
+              properties: {
+                id: {
+                  type: 'string',
+                  nullable: true,
+                },
+                question: {
+                  type: 'string',
+                },
+                answer: {
+                  type: 'string',
+                },
+                similarityScore: {
+                  type: 'number',
+                },
+              },
+            },
+            KnowledgeMatch: {
+              type: 'object',
+              required: ['id', 'question', 'answer', 'matchedKeywords', 'score'],
+              properties: {
+                id: {
+                  type: 'string',
+                },
+                question: {
+                  type: 'string',
+                },
+                answer: {
+                  type: 'string',
+                },
+                matchedKeywords: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                  },
+                },
+                score: {
+                  type: 'number',
+                },
+              },
+            },
+            PresetFaqItem: {
+              type: 'object',
+              required: ['id', 'chipLabel', 'question', 'answer'],
+              properties: {
+                id: {
+                  type: 'string',
+                  maxLength: 100,
+                },
+                chipLabel: {
+                  type: 'string',
+                  maxLength: 50,
+                },
+                question: {
+                  type: 'string',
+                  maxLength: 500,
+                },
+                answer: {
+                  type: 'string',
+                  maxLength: 2000,
+                },
+              },
+            },
+            ProblemDetails: {
+              type: 'object',
+              required: ['type', 'title', 'status'],
+              properties: {
+                type: {
+                  type: 'string',
+                  description: 'エラー種別を識別する URI リファレンス (RFC 7807)',
+                  example: 'https://httpstatuses.com/400',
+                },
+                title: {
+                  type: 'string',
+                  description: '人間が理解可能なエラーの概要タイトル',
+                  example: 'Bad Request',
+                },
+                status: {
+                  type: 'integer',
+                  description: 'HTTP ステータスコード',
+                  example: 400,
+                },
+                detail: {
+                  type: 'string',
+                  description: '本エラーの具体的な発生事由',
+                  example: 'メッセージが空です',
+                },
+                instance: {
+                  type: 'string',
+                  description: 'エラー発生リソースの URI',
+                },
+                error: {
+                  type: 'string',
+                  description: '従来クライアントとの後方互換用エラーメッセージ',
+                  example: 'メッセージが空です',
+                },
+                invalidParams: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: {
+                        type: 'string',
+                      },
+                      reason: {
+                        type: 'string',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      function renderUI(spec) {
+        window.ui = SwaggerUIBundle({
+          spec: spec,
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+          layout: 'BaseLayout',
+        });
       }
-      ;
 
-            function renderUI(spec) {
-              window.ui = SwaggerUIBundle({
-                spec: spec,
-                dom_id: '#swagger-ui',
-                deepLinking: true,
-                presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-                layout: 'BaseLayout',
-              });
-            }
-
-            window.onload = () => {
-              // file:/// プロトコルめE��ーカル環墁E��も確実に表示できるよう embeddedSpec を即時また�Eフォールバック適用
-              try {
-                if (location.protocol === 'file:') {
-                  renderUI(embeddedSpec);
-                } else {
-                  fetch('./openapi.json')
-                    .then((res) => {
-                      if (!res.ok) throw new Error('HTTP error ' + res.status);
-                      return res.json();
-                    })
-                    .then((spec) => renderUI(spec))
-                    .catch((err) => {
-                      console.warn('fetch failed, using embedded spec:', err);
-                      renderUI(embeddedSpec);
-                    });
-                }
-              } catch (e) {
+      window.onload = () => {
+        // file:/// プロトコルやローカル環境でも確実に表示できるよう embeddedSpec を即時またはフォールバック適用
+        try {
+          if (location.protocol === 'file:') {
+            renderUI(embeddedSpec);
+          } else {
+            fetch('./openapi.json')
+              .then((res) => {
+                if (!res.ok) throw new Error('HTTP error ' + res.status);
+                return res.json();
+              })
+              .then((spec) => renderUI(spec))
+              .catch((err) => {
+                console.warn('fetch failed, using embedded spec:', err);
                 renderUI(embeddedSpec);
-              }
-            };
+              });
+          }
+        } catch (e) {
+          renderUI(embeddedSpec);
+        }
+      };
     </script>
   </body>
 </html>

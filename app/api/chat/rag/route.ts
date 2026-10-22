@@ -53,7 +53,28 @@ export async function POST(request: Request) {
     const effectiveStudentName =
       metaFullName || metaName || sessionUser.email?.split('@')[0] || studentName;
 
-    // 2. 多層防御②: 2フェーズ台帳によるアトミックな予約 (1日3回 + 講師付与チケット分)
+    // 2. 多層防御②: 所属農園をDBから取得 (user_metadata はユーザー自身が書き換え可能なため信頼しない)
+    //    退会済み・農園未所属の受講生は AI 枠を消費させずに 403 を返す
+    let studentFarmId: string | null = null;
+    try {
+      const usersTable = supabase.from('users');
+      if (typeof usersTable?.select === 'function') {
+        const { data: userProfile } = await usersTable
+          .select('farm_id, role')
+          .eq('id', studentId)
+          .maybeSingle();
+        if (userProfile) {
+          studentFarmId = userProfile.farm_id || null;
+          if (userProfile.role === 'student' && !studentFarmId) {
+            return ApiResponse.forbidden(
+              '農園に所属していないためAI相談を利用できません。招待コードから農園に参加してください'
+            );
+          }
+        }
+      }
+    } catch {}
+
+    // 3. 多層防御③: 2フェーズ台帳によるアトミックな予約 (1日3回 + 講師付与チケット分)
     let reservationId: string | null = null;
     if (!isMemoOnly) {
       const { data: resId, error: rpcErr } = await supabase.rpc('reserve_ai_usage');
@@ -78,23 +99,7 @@ export async function POST(request: Request) {
       reservationId = resId;
     }
 
-    // 3. 多層防御③: 会話履歴をブラウザ信頼せず、サーバー側で自農園のDB(journals)から最新履歴を取得・構築
-    let studentFarmId: string | null =
-      typeof userMeta?.farm_id === 'string' ? userMeta.farm_id : null;
-
-    if (!studentFarmId) {
-      try {
-        const usersTable = supabase.from('users');
-        if (typeof usersTable?.select === 'function') {
-          const { data: userProfile } = await usersTable
-            .select('farm_id')
-            .eq('id', studentId)
-            .maybeSingle();
-          studentFarmId = userProfile?.farm_id || null;
-        }
-      } catch {}
-    }
-
+    // 4. 多層防御④: 会話履歴をブラウザ信頼せず、サーバー側で自農園のDB(journals)から最新履歴を取得・構築
     let journalsQuery = supabase
       .from('journals')
       .select('content, reply, role, created_at')

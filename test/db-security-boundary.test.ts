@@ -205,4 +205,29 @@ describe('Database Security & RLS Isolation Suite (スキーマ整合性 & 境�
     expect(sql).toContain('b.student_id = auth.uid()');
     expect(sql).toContain('p.student_id = auth.uid()');
   });
+
+  it('10. 招待コード大文字小文字不問化・作物記録MODIFYポリシー整合・課題未完了化RPC厳格化 (20261023000000_harden_invite_case_and_crop_records_modify.sql) が正しく定義されていること', () => {
+    const latestMigration = path.join(
+      migrationsDir,
+      '20261023000000_harden_invite_case_and_crop_records_modify.sql'
+    );
+    expect(fs.existsSync(latestMigration)).toBe(true);
+    const sql = fs.readFileSync(latestMigration, 'utf-8');
+
+    // 1. get_farm_by_invite_code / join_farm の lower() 照合
+    expect(sql).toContain('lower(f.invite_code) = lower(clean_code)');
+    expect(sql).toContain('lower(public.farms.invite_code) = lower(clean_code)');
+
+    // 2. crop_records_modify_policy での親区画所有権フォールバック
+    expect(sql).toContain('CREATE POLICY "crop_records_modify_policy" ON public.crop_records');
+    expect(sql).toContain('p.student_id = auth.uid()');
+
+    // 3. uncomplete_student_task RPC の厳格化 (P0002 / 22P02)
+    expect(sql).toContain('FUNCTION public.uncomplete_student_task(');
+    expect(sql).toContain('22P02');
+    expect(sql).toContain('P0002');
+
+    // 4. withdraw_student RPC の description vacant 同期
+    expect(sql).toContain("description = 'vacant'");
+  });
 });

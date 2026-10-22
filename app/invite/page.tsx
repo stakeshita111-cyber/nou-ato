@@ -25,6 +25,7 @@ function InviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteCodeParam = searchParams.get('code');
+  const errorParam = searchParams.get('error');
 
   // 農園選択・情報
   const [inviteCodeInput, setInviteCodeInput] = useState<string>(inviteCodeParam || '');
@@ -102,6 +103,12 @@ function InviteContent() {
   useEffect(() => {
     let active = true;
     const init = async () => {
+      if (errorParam === 'invalid_invite') {
+        setToastMessage(
+          '⚠️ 農園への参加処理に失敗しました。招待コードを再確認してもう一度お試しください'
+        );
+        setShowToast(true);
+      }
       if (inviteCodeParam) {
         await verifyInviteCode(inviteCodeParam, false);
       } else if (active) {
@@ -118,7 +125,7 @@ function InviteContent() {
     return () => {
       active = false;
     };
-  }, [inviteCodeParam]);
+  }, [inviteCodeParam, errorParam]);
 
   const isLineDisabled = process.env.NEXT_PUBLIC_LINE_ENABLED !== 'true';
 
@@ -234,12 +241,7 @@ function InviteContent() {
       }
 
       if (userId) {
-        // 表示名の更新
-        if (validData.name) {
-          await supabase.from('users').update({ display_name: validData.name }).eq('id', userId);
-        }
-
-        // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を呼び出し)
+        // 安全な農園紐づけ (SECURITY DEFINER 関数 join_farm を先に呼び出し、講師アカウントの誤上書きを防止)
         if (inviteCode) {
           const { data: joinResRaw, error: joinErr } = await supabase.rpc('join_farm', {
             invite_code: inviteCode,
@@ -261,6 +263,11 @@ function InviteContent() {
             setLoading(false);
             return;
           }
+        }
+
+        // 表示名の更新 (join_farm が成功した受講生のみ更新)
+        if (validData.name) {
+          await supabase.from('users').update({ display_name: validData.name }).eq('id', userId);
         }
       }
 

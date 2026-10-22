@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(28);
+SELECT plan(30);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -391,6 +391,26 @@ SELECT is(
     (SELECT count(*)::int FROM public.crop_records WHERE id = 'rec-b-private'),
     0,
     '28. [crop_records_select] 受講生間の作物記録SELECTは他生徒からは0件となりプライバシーが厳格に保護される'
+);
+
+-- Test 29: get_farm_by_invite_code: 招待コードを小文字で照合しても大文字で保存された農園がヒットする (lower)
+RESET ROLE;
+SELECT is(
+    (SELECT farm_name FROM public.get_farm_by_invite_code('test-invite-001')),
+    'テスト自然農園A',
+    '29. [invite_code_lower] get_farm_by_invite_code は招待コードの大文字小文字を区別せず照合可能'
+);
+
+-- Test 30: uncomplete_student_task: 未完了(todo)状態のタスクに対して呼び出すと P0002 例外で拒否される
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_matching(
+    $$ SELECT public.uncomplete_student_task('22222222-2222-2222-2222-222222222221') $$,
+    'Completed task not found or already in todo',
+    '30. [uncomplete_task] 未完了タスクに対する uncomplete_student_task 呼び出しは P0002 で拒否される'
 );
 
 SELECT * FROM finish();

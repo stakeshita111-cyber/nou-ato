@@ -29,7 +29,7 @@ curl -X POST http://localhost:3000/api/chat/rag \
 ```json
 {
   "reply": "ミニトマトの脇芽かきは、晴れた日の午前中に行うのがおすすめです...",
-  "status": "ready",
+  "status": "ok",
   "saved": true,
   "referencedQa": []
 }
@@ -89,8 +89,8 @@ curl -X POST http://localhost:3000/api/tickets/grant \
 {
   "success": true,
   "studentId": "00000000-0000-0000-0000-000000000000",
-  "grantedTickets": 1,
-  "newTotal": 4
+  "amount": 1,
+  "newCount": 4
 }
 ```
 

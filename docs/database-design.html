@@ -225,7 +225,7 @@ erDiagram
     farm_beds {
         text id PK
         text plot_id FK
-        varchar bed_number
+        integer bed_number
         uuid student_id FK
         varchar crop_name
         integer progress_percent
@@ -518,10 +518,10 @@ erDiagram
                 </tr>
                 <tr>
                   <td class="p-2.5 font-mono font-bold text-emerald-900">bed_number</td>
-                  <td class="p-2.5 font-mono">varchar(50)</td>
+                  <td class="p-2.5 font-mono">integer</td>
                   <td class="p-2.5 text-center">-</td>
                   <td class="p-2.5 text-center">No</td>
-                  <td class="p-2.5 text-slate-600">畝番号・識別記号 (例: 畝-1)</td>
+                  <td class="p-2.5 text-slate-600">畝番号 (1, 2, 3...)</td>
                 </tr>
                 <tr>
                   <td class="p-2.5 font-mono font-bold text-emerald-900">student_id</td>

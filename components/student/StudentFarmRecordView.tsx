@@ -80,10 +80,8 @@ export default function StudentFarmRecordView({
               studentName.includes(p.student_name))
         )
       : null) ||
-    // 3. 未ログイン/デフォルト時のフォールバック (最初の利用可能プロット)
-    plots.find((p) => !p.is_vacant) ||
-    plots[0] ||
-    null;
+    // 3. studentId が未指定のデモ環境のみ最初のプロットへフォールバック (ログイン済み未割当生徒は null として未割当案内を表示)
+    (!studentId ? plots.find((p) => !p.is_vacant) || plots[0] || null : null);
 
   const plotCode = myPlot?.code || 'A1';
   const fallbackPlotId =

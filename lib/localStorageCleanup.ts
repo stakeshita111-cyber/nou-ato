@@ -14,7 +14,7 @@ export function clearNouatoSessionStorage(): void {
 
     for (let i = 0; i < storageLength; i++) {
       const key = window.localStorage.key(i);
-      if (key && key.startsWith('nouato_')) {
+      if (key && (key.startsWith('nouato_') || key.startsWith('nou-ato-'))) {
         keysToRemove.push(key);
       }
     }
@@ -22,6 +22,11 @@ export function clearNouatoSessionStorage(): void {
     // Direct removal using keys array to avoid index shifting during iteration
     for (const key of keysToRemove) {
       window.localStorage.removeItem(key);
+    }
+
+    if (typeof document !== 'undefined') {
+      document.cookie = 'nouato_invite_code=; path=/; max-age=0';
+      document.cookie = 'nouato_invite_farm_id=; path=/; max-age=0';
     }
   } catch (err) {
     console.error('Failed to clear nouato localStorage session cache:', err);

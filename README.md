@@ -77,7 +77,7 @@
 | **AI / RAG**             | Google AI Studio (Gemini 2.5 Flash / Flash-Lite: `gemini-flash-lite-latest`), 農園ナレッジ類似度照合エンジン |
 | **API アーキテクチャ**   | OpenAPI 3.1, RFC 7807 (Problem Details), Swagger UI                                                          |
 | **CI / CD**              | GitHub Actions (Lint, Typecheck, Test, Coverage, Build, Supabase DB Reset & pgTAP)                           |
-| **テストフレームワーク** | Vitest (37ファイル・311項目), pgTAP (`supabase test db`: 28項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
+| **テストフレームワーク** | Vitest (38ファイル・318項目), pgTAP (`supabase test db`: 30項目), @vitest/coverage-v8 (閾値 70% 準拠)        |
 
 ---
 
@@ -137,7 +137,7 @@ npx supabase db push
 
 1. Supabase Dashboard にログインし、対象プロジェクトを選択します。
 2. 左メニューの **SQL Editor** を開きます。
-3. `supabase/migrations/` 配下の全44本のマイグレーションファイルをタイムスタンプ順に適用します：
+3. `supabase/migrations/` 配下の全48本のマイグレーションファイルをタイムスタンプ順に適用します：
    - `00000000000000_initial_schema.sql` (ベーステーブル・RLS・RPC関数)
    - `20260925000000_database_integrity_and_sync.sql` (外部キー制約、整合性トリガー、マイファーム同期ビュー)
    - `20260926000000_add_show_student_talk_tab_to_farms.sql` (農園テーブルへの相談タブ表示フラグ追加)
@@ -182,6 +182,10 @@ npx supabase db push
    - `20261016030000_sync_student_published_tasks.sql` (公開済みタスクの受講生先行配備・同期RPC)
    - `20261016040000_harden_student_tasks_rls_and_column_nullability.sql` (student_tasks直接UPDATEのRLS厳格化・NOT NULL制約完全同期)
    - `20261018000000_restore_foreign_keys_and_fix_task_trigger.sql` (users参照の外部キー6本・crop_records.bed_id外部キー復元・タスク同期トリガー修正)
+   - `20261021000000_farm_scoped_plot_and_bed_ids.sql` (農園スコープID化・カスケード移行)
+   - `20261021010000_withdraw_student_and_farms_hardening.sql` (生徒退会処理アトミック化・招待コード重複防止)
+   - `20261021020000_harden_student_select_policies.sql` (同一農園内受講生の閲覧最小権限化)
+   - `20261023000000_harden_invite_case_and_crop_records_modify.sql` (招待コード大文字小文字不問化・作物記録MODIFYポリシー完全整合・退園空き区画同期)
 
 ---
 
@@ -235,10 +239,10 @@ npm run dev
 
 ## 🧪 テスト・品質検証コマンド
 
-本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全37テストファイル / 311項目 ＋ pgTAP 実DBテスト 1ファイル / 28項目全件PASS、カバレッジ90%以上）を配備しています。
+本プロジェクトでは品質とセキュリティを担保するため、CI/CD連動のテストスイート（全38テストファイル / 318項目 ＋ pgTAP 実DBテスト 1ファイル / 30項目全件PASS、カバレッジ90%以上）を配備しています。
 
 ```bash
-# 1. 自動テストの実行 (全311件・100%通過)
+# 1. 自動テストの実行 (全318件・100%通過)
 npm run test
 
 # 2. テストカバレッジ検証 (目標値 70% 判定 / 実績 90.1%以上達成)
@@ -291,8 +295,8 @@ nou-ato/
 ├── lib/                  # 共通ユーティリティ (RAG, Supabase, TicketManager, logger, apiResponse)
 ├── scripts/              # データベース監査・ビルド検証スクリプト
 ├── store/                # Zustand グローバル状態ストア (useThemeStore等)
-├── supabase/             # Supabase マイグレーションSQL (47本)・pgTAPテスト (28項目)
-├── test/                 # 自動テストスイート (Vitest: 37ファイル・全311項目)
+├── supabase/             # Supabase マイグレーションSQL (48本)・pgTAPテスト (30項目)
+├── test/                 # 自動テストスイート (Vitest: 38ファイル・全318項目)
 ├── types/                # TypeScript型定義 (Database, Supabase)
 └── utils/                # サーバー/クライアント用ヘルパー (Supabaseクライアント等)
 ```

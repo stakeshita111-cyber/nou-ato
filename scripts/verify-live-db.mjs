@@ -226,9 +226,10 @@ async function runVerification() {
             '✅ 5-A. [受講生] farm_beds SELECT 参照監査: 他生徒の割当畝は遮断（自データのみ取得可能）'
           );
         } else {
-          console.log(
-            `✅ 5-A. [受講生] farm_beds SELECT 参照監査: ${beds.length}件取得 (農園共有視覚化)`
+          console.error(
+            `❌ 5-A. [受講生] farm_beds SELECT 参照監査: 他生徒の割当畝が ${otherStudentBeds.length} 件取得されました (RLS境界違反)`
           );
+          failedTests++;
         }
       } else {
         console.error('❌ 5-A. [受講生] farm_beds SELECT 失敗:', bedsErr);
@@ -275,6 +276,9 @@ async function runVerification() {
     'student_tasks',
     'journals',
     'crop_records',
+    'events',
+    'reservations',
+    'payments',
     'ai_tickets',
     'ai_usage_events',
     'announcements',

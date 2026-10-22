@@ -438,6 +438,9 @@ export function useStudentDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'journals' }, () => {
         fetchData().catch((err) => console.error('realtime journals error:', err));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        fetchData().catch((err) => console.error('realtime announcements error:', err));
+      })
       .subscribe();
 
     return () => {
