@@ -540,6 +540,23 @@ export default function TeacherStudentsView() {
     window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
   };
 
+  const handleCopyInviteText = async () => {
+    if (!inviteUrl) {
+      setToastMessage('招待コードを読み込み中です。少々お待ちください');
+      setShowToast(true);
+      return;
+    }
+    const text = `受講生のみなさま\n\n${effectiveFarmName}の体験農業支援アプリ「のうあと」への参加用リンクをお送りします。\n以下のリンクより登録・ログインをお願いいたします。\n\n▼ 参加登録リンク:\n${inviteUrl}\n\n※このリンクから直接農園に参加いただけます。\nどうぞよろしくお願いいたします。`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setToastMessage('📋 メール・連絡用の招待案内文面を丸ごとコピーしました！');
+      setShowToast(true);
+    } catch {
+      setToastMessage('文面のコピーに失敗しました');
+      setShowToast(true);
+    }
+  };
+
   // 📢 受講生全員へのメッセージ・お知らせ一括配信処理 (announcements テーブル)
   const handleSendBroadcastAll = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -858,19 +875,29 @@ export default function TeacherStudentsView() {
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
             onClick={handleCopyInviteUrl}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+            className="flex-1 sm:flex-none px-3.5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            title="招待URLのみをクリップボードにコピー"
           >
-            <span>📋 LINE招待URLをコピー</span>
+            <span>📋 LINE招待URLコピー</span>
+          </button>
+          <button
+            onClick={handleCopyInviteText}
+            className="flex-1 sm:flex-none px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            title="件名・案内文・URLを丸ごとクリップボードにコピー（Gmailや連絡網にそのまま貼り付け可能）"
+          >
+            <span>✉️ 招待文面をコピー</span>
           </button>
           <button
             onClick={handleMailInvite}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+            className="flex-1 sm:flex-none px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            title="PCの既定メールアプリ（Outlook等）を起動して新規メールを作成"
           >
-            <span>✉️ メールで招待</span>
+            <span>📧 メールアプリ起動</span>
           </button>
           <button
             onClick={() => setShowQRModal(true)}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+            className="flex-1 sm:flex-none px-3.5 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            title="対面用の招待QRコードを表示"
           >
             <span>📱 QRコード表示</span>
           </button>
@@ -892,31 +919,33 @@ export default function TeacherStudentsView() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <button
-            onClick={() => setShowBroadcastModal(true)}
-            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
-          >
-            <span>📢 全員へ一括配信</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowBroadcastModal(true)}
+              className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-amber-950 font-black text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 active:scale-95 cursor-pointer"
+            >
+              <span>📢 全員へ一括配信</span>
+            </button>
 
-          <button
-            onClick={() => {
-              void fetchBroadcastHistory();
-              setShowHistoryModal(true);
-            }}
-            className="px-4 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5"
-          >
-            <span>📋 配信履歴・管理</span>
-          </button>
+            <button
+              onClick={() => {
+                void fetchBroadcastHistory();
+                setShowHistoryModal(true);
+              }}
+              className="px-3.5 py-2.5 bg-gray-800 hover:bg-gray-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 active:scale-95 cursor-pointer"
+            >
+              <span>📋 配信履歴・管理</span>
+            </button>
+          </div>
 
-          <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 text-xs font-bold">
+          <div className="flex items-center space-x-1.5 bg-gray-100/80 p-1 rounded-2xl border border-gray-200 text-xs font-bold">
             <button
               onClick={() => {
                 setFilter('all');
                 setCurrentPage(1);
               }}
-              className={`px-3.5 py-2 rounded-xl transition ${
+              className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
                 filter === 'all'
                   ? 'bg-white text-emerald-900 shadow-xs font-black'
                   : 'text-gray-600 hover:text-gray-900'
@@ -929,7 +958,7 @@ export default function TeacherStudentsView() {
                 setFilter('unread');
                 setCurrentPage(1);
               }}
-              className={`px-3.5 py-2 rounded-xl transition ${
+              className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
                 filter === 'unread'
                   ? 'bg-white text-emerald-900 shadow-xs font-black'
                   : 'text-gray-600 hover:text-gray-900'
@@ -1240,7 +1269,7 @@ export default function TeacherStudentsView() {
                 {inviteUrl}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                 <button
                   onClick={handleCopyInviteUrl}
                   className="py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
@@ -1248,10 +1277,16 @@ export default function TeacherStudentsView() {
                   <span>📋 URLコピー</span>
                 </button>
                 <button
+                  onClick={handleCopyInviteText}
+                  className="py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
+                >
+                  <span>✉️ 文面コピー</span>
+                </button>
+                <button
                   onClick={handleMailInvite}
                   className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1"
                 >
-                  <span>✉️ メール招待</span>
+                  <span>📧 メール起動</span>
                 </button>
                 <button
                   onClick={() => {

@@ -9,6 +9,7 @@ import type { Database } from '@/types/supabase';
 export type StudentPreviewData = StudentData;
 
 type CropRecordRow = Database['public']['Tables']['crop_records']['Row'];
+type StudentTaskRow = Database['public']['Tables']['student_tasks']['Row'];
 
 interface StudentPreviewModalProps {
   student: StudentPreviewData;
@@ -24,20 +25,37 @@ export default function StudentPreviewModal({
   onAssignTask,
 }: StudentPreviewModalProps) {
   const [cropRecords, setCropRecords] = useState<CropRecordRow[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<StudentTaskRow[]>([]);
+  const [activeTab, setActiveTab] = useState<'records' | 'tasks'>('records');
   const [loadingRecords, setLoadingRecords] = useState(true);
   const studentId = student?.id;
 
-  // 生徒の作業・観察記録 (crop_records) を取得
+  // 生徒の作業・観察記録 (crop_records) および完了タスク (student_tasks) を取得
   useEffect(() => {
     let isMounted = true;
-    const fetchRecords = async () => {
+    const fetchStudentActivity = async () => {
       if (!studentId) {
         setLoadingRecords(false);
         return;
       }
       try {
         setLoadingRecords(true);
-        // 1. 生徒の区画・畝を取得
+
+        // 1. 完了済みタスク (student_tasks) の取得
+        const { data: tasksData } = await supabase
+          .from('student_tasks')
+          .select('*')
+          .eq('student_id', studentId)
+          .eq('status', 'completed')
+          .is('deleted_at', null)
+          .order('completed_at', { ascending: false })
+          .limit(30);
+
+        if (tasksData && isMounted) {
+          setCompletedTasks(tasksData);
+        }
+
+        // 2. 生徒の区画・畝を取得
         const { data: plots } = await supabase
           .from('farm_plots')
           .select('id')
@@ -79,7 +97,7 @@ export default function StudentPreviewModal({
       }
     };
 
-    void fetchRecords();
+    void fetchStudentActivity();
     return () => {
       isMounted = false;
     };
@@ -174,116 +192,221 @@ export default function StudentPreviewModal({
             )}
           </div>
 
-          {/* 2. 生徒の作業・観察記録タイムライン */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between px-1">
-              <h4 className="font-black text-gray-800 text-xs flex items-center gap-1.5">
-                <span>🌱</span>
-                <span>生徒の作業・観察記録 ({cropRecords.length}件)</span>
-              </h4>
-            </div>
+          {/* 2. タブ切り替えバー (観察記録 vs 完了課題) */}
+          <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-2xl border border-gray-200 text-xs font-bold shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('records')}
+              className={`flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'records'
+                  ? 'bg-white text-emerald-900 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>🌱 観察ノート</span>
+              <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full">
+                {cropRecords.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tasks')}
+              className={`flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'tasks'
+                  ? 'bg-white text-emerald-900 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>✅ 完了した課題</span>
+              <span className="text-[10px] px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded-full">
+                {completedTasks.length}
+              </span>
+            </button>
+          </div>
 
-            {loadingRecords ? (
-              <div className="py-6 text-center text-gray-400 font-bold bg-gray-50 rounded-2xl border border-gray-100">
-                観察記録を読み込み中...
+          {/* 3. タブコンテンツ */}
+          {activeTab === 'records' ? (
+            /* 生徒の作業・観察記録タイムライン */
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="font-black text-gray-800 text-xs flex items-center gap-1.5">
+                  <span>🌱</span>
+                  <span>生徒の作業・観察記録 ({cropRecords.length}件)</span>
+                </h4>
               </div>
-            ) : cropRecords.length === 0 ? (
-              <div className="p-4 text-center bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-                <p className="font-bold text-gray-600">まだ登録された作業・観察記録はありません</p>
-                {lastJournal && (
-                  <div className="mt-2 text-left bg-white p-3 rounded-xl border border-gray-200 space-y-1.5">
-                    <p className="text-[11px] text-gray-400 font-bold">最近提出されたメモ・写真:</p>
-                    {lastJournal.photo_url && (
-                      <div className="h-28 bg-gray-100 rounded-lg overflow-hidden relative border border-gray-100">
-                        <Image
-                          src={lastJournal.photo_url}
-                          alt="提出写真"
-                          width={380}
-                          height={112}
-                          unoptimized
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    {lastJournal.content && (
-                      <p className="text-gray-700 font-medium">💬 「{lastJournal.content}」</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {cropRecords.map((rec) => {
-                  const img = rec.image_url || rec.photo_url;
-                  return (
-                    <div
-                      key={rec.id}
-                      className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-2xs space-y-2 hover:border-emerald-300 transition"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="bg-emerald-100 text-emerald-900 font-black px-2 py-0.5 rounded-lg text-[11px]">
-                            🌱 {rec.crop_name || '作物'}
-                          </span>
-                          {rec.growth_stage && (
-                            <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-md text-[10px]">
-                              {rec.growth_stage}
-                            </span>
-                          )}
-                          {rec.height_cm != null && rec.height_cm > 0 && (
-                            <span className="bg-blue-50 text-blue-800 border border-blue-200 font-bold px-1.5 py-0.5 rounded text-[10px]">
-                              草丈 {rec.height_cm}cm
-                            </span>
-                          )}
-                          {rec.harvest_amount != null && rec.harvest_amount > 0 && (
-                            <span className="bg-purple-50 text-purple-800 border border-purple-200 font-bold px-1.5 py-0.5 rounded text-[10px]">
-                              収穫量 {rec.harvest_amount}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-gray-400 font-bold">{rec.date}</span>
-                      </div>
 
-                      {/* 作業種別タグ */}
-                      {rec.work_types && rec.work_types.length > 0 && (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {rec.work_types.map((w, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded text-[10px]"
-                            >
-                              {w}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 写真 */}
-                      {img && (
-                        <div className="h-40 bg-gray-100 rounded-xl overflow-hidden relative border border-gray-100">
+              {loadingRecords ? (
+                <div className="py-6 text-center text-gray-400 font-bold bg-gray-50 rounded-2xl border border-gray-100">
+                  観察記録を読み込み中...
+                </div>
+              ) : cropRecords.length === 0 ? (
+                <div className="p-4 text-center bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                  <p className="font-bold text-gray-600">
+                    まだ登録された作業・観察記録はありません
+                  </p>
+                  {lastJournal && (
+                    <div className="mt-2 text-left bg-white p-3 rounded-xl border border-gray-200 space-y-1.5">
+                      <p className="text-[11px] text-gray-400 font-bold">
+                        最近提出されたメモ・写真:
+                      </p>
+                      {lastJournal.photo_url && (
+                        <div className="h-28 bg-gray-100 rounded-lg overflow-hidden relative border border-gray-100">
                           <Image
-                            src={img}
-                            alt="作業・観察写真"
-                            width={480}
-                            height={160}
+                            src={lastJournal.photo_url}
+                            alt="提出写真"
+                            width={380}
+                            height={112}
                             unoptimized
                             className="w-full h-full object-cover"
                           />
                         </div>
                       )}
-
-                      {/* メモ本文 */}
-                      {rec.notes && (
-                        <p className="bg-gray-50 p-2.5 rounded-xl text-gray-700 leading-relaxed font-medium">
-                          {rec.notes}
-                        </p>
+                      {lastJournal.content && (
+                        <p className="text-gray-700 font-medium">💬 「{lastJournal.content}」</p>
                       )}
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {cropRecords.map((rec) => {
+                    const img = rec.image_url || rec.photo_url;
+                    return (
+                      <div
+                        key={rec.id}
+                        className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-2xs space-y-2 hover:border-emerald-300 transition"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="bg-emerald-100 text-emerald-900 font-black px-2 py-0.5 rounded-lg text-[11px]">
+                              🌱 {rec.crop_name || '作物'}
+                            </span>
+                            {rec.growth_stage && (
+                              <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-md text-[10px]">
+                                {rec.growth_stage}
+                              </span>
+                            )}
+                            {rec.height_cm != null && rec.height_cm > 0 && (
+                              <span className="bg-blue-50 text-blue-800 border border-blue-200 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                                草丈 {rec.height_cm}cm
+                              </span>
+                            )}
+                            {rec.harvest_amount != null && rec.harvest_amount > 0 && (
+                              <span className="bg-purple-50 text-purple-800 border border-purple-200 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                                収穫量 {rec.harvest_amount}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-gray-400 font-bold">{rec.date}</span>
+                        </div>
+
+                        {/* 作業種別タグ */}
+                        {rec.work_types && rec.work_types.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {rec.work_types.map((w, idx) => (
+                              <span
+                                key={idx}
+                                className="bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded text-[10px]"
+                              >
+                                {w}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 写真 */}
+                        {img && (
+                          <div className="h-40 bg-gray-100 rounded-xl overflow-hidden relative border border-gray-100">
+                            <Image
+                              src={img}
+                              alt="作業・観察写真"
+                              width={480}
+                              height={160}
+                              unoptimized
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {/* メモ本文 */}
+                        {rec.notes && (
+                          <p className="bg-gray-50 p-2.5 rounded-xl text-gray-700 leading-relaxed font-medium">
+                            {rec.notes}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* 生徒の完了済みタスク一覧 */
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="font-black text-gray-800 text-xs flex items-center gap-1.5">
+                  <span>✅</span>
+                  <span>達成・完了した課題 ({completedTasks.length}件)</span>
+                </h4>
               </div>
-            )}
-          </div>
+
+              {completedTasks.length === 0 ? (
+                <div className="p-6 text-center bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
+                  <p className="font-bold text-gray-600">まだ完了した課題はありません</p>
+                  <p className="text-gray-400 text-[11px]">
+                    生徒がタスクを達成して完了報告を行うとここに一覧表示されます。
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {completedTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-2xs space-y-2 hover:border-emerald-300 transition"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="bg-blue-50 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded-md text-[10px]">
+                            {t.category || '共通'}
+                          </span>
+                          {t.target_crop && (
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold px-2 py-0.5 rounded-md text-[10px]">
+                              🌱 {t.target_crop}
+                            </span>
+                          )}
+                          {t.exp != null && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              +{t.exp} EXP
+                            </span>
+                          )}
+                        </div>
+                        {t.completed_at && (
+                          <span className="text-[11px] text-gray-400 font-bold">
+                            達成: {new Date(t.completed_at).toLocaleDateString('ja-JP')}
+                          </span>
+                        )}
+                      </div>
+
+                      <h5 className="font-black text-gray-900 text-xs leading-snug">{t.title}</h5>
+
+                      {t.description && (
+                        <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">
+                          {t.description}
+                        </p>
+                      )}
+
+                      {t.memo && (
+                        <div className="bg-gray-50 p-2 rounded-xl text-[11px] text-gray-700 border border-gray-100">
+                          <span className="font-bold text-gray-500">提出メモ: </span>
+                          <span>{t.memo}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* アクションボタン群 */}

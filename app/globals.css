@@ -404,11 +404,11 @@ select:focus {
 @keyframes toastSlideUpBounce {
   0% {
     opacity: 0;
-    transform: translate(-50%, 36px) scale(0.95);
+    transform: translate(-50%, 28px) scale(0.97);
   }
-  65% {
+  70% {
     opacity: 1;
-    transform: translate(-50%, -6px) scale(1.01);
+    transform: translate(-50%, -2px) scale(1.002);
   }
   100% {
     opacity: 1;
