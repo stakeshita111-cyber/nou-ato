@@ -8,9 +8,12 @@
 --   2. crop_records_modify_policy の SELECT ポリシー完全整合化
 --      - 畝(farm_beds)に記録を保存・更新する際、畝の student_id = auth.uid() のみならず、
 --        親区画(farm_plots)の student_id = auth.uid() である場合も許可
---      - SELECT(閲覧)できるのに INSERT/UPDATE で RLS 違反になるねじれを解消
 --   3. uncomplete_student_task RPC の厳格化
 --      - 自農園・本人のタスク行のみ更新を許可し、親タスクの整合性を担保
+--   4. withdraw_student RPC の堅牢化
+--      - 空き区画 description 同期 & 担当畝完全クリア
+--   5. handle_task_changes トリガーの適正化
+--      - テンプレート除外 & todoステータス遷移時のみ配信しDB負荷を抑制
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
@@ -375,3 +378,40 @@ $$;
 
 REVOKE ALL ON FUNCTION public.withdraw_student(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.withdraw_student(UUID) TO authenticated;
+
+-- ------------------------------------------------------------------------------
+-- 6. handle_task_changes トリガーの適正化 (テンプレート除外 & todoステータス遷移時のみ配信)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_task_changes()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- ① 物理削除 (DELETE) 時
+    IF (TG_OP = 'DELETE') THEN
+        DELETE FROM public.student_tasks WHERE base_task_id = OLD.id;
+        RETURN OLD;
+    END IF;
+
+    -- ② 論理削除 (deleted_at 設定) 時
+    IF (TG_OP = 'UPDATE' AND NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL) THEN
+        DELETE FROM public.student_tasks WHERE base_task_id = NEW.id;
+        RETURN NEW;
+    END IF;
+
+    -- ③ テンプレートでなく、タスクが 'todo' (公開中) に新規作成、または非公開から 'todo' に変更された場合
+    IF (NEW.is_template IS NOT TRUE AND NEW.status = 'todo' AND NEW.deleted_at IS NULL) THEN
+        IF (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'todo' OR OLD.deleted_at IS NOT NULL) THEN
+            PERFORM public.publish_task_to_all_students(NEW.id);
+        END IF;
+    -- ④ タスクが 'todo' 以外のステータス（pool, prep 等）に変更された場合は生徒タスクから削除
+    ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'todo' AND NEW.status <> 'todo') THEN
+        DELETE FROM public.student_tasks WHERE base_task_id = NEW.id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+

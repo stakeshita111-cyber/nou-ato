@@ -246,12 +246,15 @@ export default function TeacherStudentsView() {
           string,
           { content?: string; photo_url?: string; created_at?: string }
         > = {};
+        const unreadCountMap: Record<string, number> = {};
         const globalJournalCompletedTitles = new Set<string>();
 
         try {
           let jDataQuery = supabase
             .from('journals')
-            .select('id, student_id, farm_id, content, text, image_url, created_at')
+            .select(
+              'id, student_id, farm_id, content, text, reply, is_approved, image_url, created_at'
+            )
             .order('created_at', { ascending: false });
           if (currentFarmId) {
             jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
@@ -266,6 +269,10 @@ export default function TeacherStudentsView() {
                   photo_url: j.image_url ? String(j.image_url) : undefined,
                   created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
                 };
+              }
+              // 講師の未返信かつ未承認の日誌を未読カウントとして集計
+              if (!j.reply && !j.is_approved) {
+                unreadCountMap[sid] = (unreadCountMap[sid] || 0) + 1;
               }
               const journalText = String(j.content || j.text || '');
               if (
@@ -291,13 +298,12 @@ export default function TeacherStudentsView() {
             'bg-purple-800 text-white',
           ];
 
-          // 同一受講生(多対1)のカード重複防止と名寄せグループ化
+          // 受講生ID(u.id)ベースでの重複防止 (同姓同名や初期名「受講生」の消失を防止)
           const uniqueUsers: UserRow[] = [];
-          const seenNames = new Set<string>();
+          const seenIds = new Set<string>();
           (usersData as UserRow[]).forEach((u) => {
-            const normName = (u.display_name || u.email || '').replace(/\s+/g, '');
-            if (!seenNames.has(normName) && normName.length > 0) {
-              seenNames.add(normName);
+            if (u.id && !seenIds.has(u.id)) {
+              seenIds.add(u.id);
               uniqueUsers.push(u);
             }
           });
@@ -387,11 +393,12 @@ export default function TeacherStudentsView() {
               progress: calcProgress,
               completedCount: completedTasks,
               totalTaskCount: totalTasks,
-              unreadCount: 0,
+              unreadCount: unreadCountMap[uId] || 0,
               lastReport: u.created_at ? formatDate(String(u.created_at)) : '最近',
               hasOverdue: false,
               activeTask,
               lastJournal: lastJournalMap[uId] || null,
+              createdAt: u.created_at ?? undefined,
             };
           });
           setStudents(formatted);

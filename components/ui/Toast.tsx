@@ -16,6 +16,7 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
   const [prevMessage, setPrevMessage] = useState(message);
   const [isExiting, setIsExiting] = useState(false);
   const onCloseRef = useRef(onClose);
+  const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -30,6 +31,11 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
   }
 
   useEffect(() => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+
     if (!isOpen) return;
 
     const holdDuration = Math.max(duration - FADE_OUT_DURATION_MS, 800);
@@ -46,19 +52,32 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
     return () => {
       clearTimeout(exitTimer);
       clearTimeout(closeTimer);
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
     };
   }, [isOpen, message, duration]);
 
   const handleClick = () => {
     if (isExiting) return;
     setIsExiting(true);
-    setTimeout(() => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
       setIsExiting(false);
       onCloseRef.current();
+      clickTimerRef.current = null;
     }, FADE_OUT_DURATION_MS);
   };
 
   if (!isOpen && !isExiting) return null;
+
+  const isError =
+    message.includes('❌') ||
+    message.includes('失敗') ||
+    message.includes('エラー') ||
+    message.includes('Error');
+  const isWarn = message.includes('⚠️') || message.includes('注意') || message.includes('警告');
 
   return (
     <div
@@ -70,14 +89,44 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
         isExiting ? 'animate-toast-out' : 'animate-toast-in'
       }`}
     >
-      <svg
-        className="w-5 h-5 text-emerald-400 flex-shrink-0"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
+      {isError ? (
+        <svg
+          className="w-5 h-5 text-rose-400 flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      ) : isWarn ? (
+        <svg
+          className="w-5 h-5 text-amber-400 flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+      ) : (
+        <svg
+          className="w-5 h-5 text-emerald-400 flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      )}
       <span className="leading-snug tracking-tight">{message}</span>
     </div>
   );

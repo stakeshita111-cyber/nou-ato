@@ -88,7 +88,21 @@ export default function StudentPreviewModal({
           .limit(30);
 
         if (!error && recData && isMounted) {
-          setCropRecords(recData);
+          const parsedRecords = recData.map((r) => {
+            let cleanNotes = r.notes || '';
+            let imgUrl = r.image_url || (r as Record<string, unknown>).photo_url || undefined;
+            const imgMatch = cleanNotes.match(/\n?\[IMG:([\s\S]+?)\]/);
+            if (imgMatch) {
+              imgUrl = imgMatch[1];
+              cleanNotes = cleanNotes.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
+            }
+            return {
+              ...r,
+              notes: cleanNotes,
+              image_url: typeof imgUrl === 'string' ? imgUrl : null,
+            };
+          });
+          setCropRecords(parsedRecords);
         }
       } catch (err) {
         console.warn('StudentPreviewModal fetchRecords error:', err);

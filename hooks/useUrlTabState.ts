@@ -35,17 +35,28 @@ export function useUrlTabState<T extends string>(
 
   const [activeTab, setActiveTabState] = useState<T>(initialTab);
   const prevSearchParamRef = useRef<string | null>(searchParams?.get(paramKey) ?? null);
+  const pendingTabRef = useRef<T | null>(null);
 
   useEffect(() => {
     const currentParam = searchParams?.get(paramKey) ?? null;
+    if (pendingTabRef.current !== null) {
+      const expectedParam = pendingTabRef.current === defaultTab ? null : pendingTabRef.current;
+      if (currentParam === expectedParam) {
+        pendingTabRef.current = null;
+      } else {
+        return;
+      }
+    }
+
     if (currentParam !== prevSearchParamRef.current) {
       prevSearchParamRef.current = currentParam;
       setActiveTabState(resolveTab(currentParam));
     }
-  }, [searchParams, paramKey, resolveTab]);
+  }, [searchParams, paramKey, resolveTab, defaultTab]);
 
   const setTab = useCallback(
     (nextTab: T) => {
+      pendingTabRef.current = nextTab;
       setActiveTabState(nextTab);
       const params = new URLSearchParams(searchParams?.toString() ?? '');
       if (nextTab === defaultTab) {

@@ -85,6 +85,11 @@ function StudentContent() {
   const [rejoinInviteCode, setRejoinInviteCode] = useState('');
   const [isRejoining, setIsRejoining] = useState(false);
 
+  // 講師からの返信がついた未読日誌の有無
+  const hasUnreadReplies = journals.some(
+    (j: Record<string, unknown>) => Boolean(j.reply) && j.role !== 'ai'
+  );
+
   // 招待コード入力による農園参加・再参加処理
   const handleRejoinFarm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,6 +346,7 @@ function StudentContent() {
 
     // 親ウィンドウやiframeからのpostMessage受信
     const handleWindowMessage = (e: MessageEvent) => {
+      if (typeof window !== 'undefined' && e.origin !== window.location.origin) return;
       const parsed = SettingsMessageSchema.safeParse(e.data);
       if (parsed.success) {
         if (parsed.data.type === 'TALK_TAB_TOGGLE' && parsed.data.show !== undefined) {
@@ -426,7 +432,12 @@ function StudentContent() {
 
   // 生徒: カレンダーからイベント参加予約申し込み
   const handleReserveEvent = async (eventId: string) => {
-    const result = await reserveEvent(eventId, userAccountName, '受講区画 A');
+    const studentPlotName =
+      (user?.plot_name as string) ||
+      (user?.plot as string) ||
+      (user?.plot_code as string) ||
+      '受講区画';
+    const result = await reserveEvent(eventId, userAccountName, studentPlotName);
     if (result === 'already_reserved') {
       setToastMessage('既にこのイベントには参加予約を申し込んでいます');
     } else if (result) {
@@ -848,7 +859,9 @@ function StudentContent() {
               activeTab === 'talk' ? 'bg-[#1d5c23] text-white' : 'text-gray-400 hover:text-gray-600'
             }`}
           >
-            <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+            {hasUnreadReplies && (
+              <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            )}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -872,9 +885,6 @@ function StudentContent() {
           <span className="text-[10px] font-bold mt-0.5">成長</span>
         </button>
       </footer>
-
-      {/* 共通トースト通知 */}
-      <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
     </div>
   );
 }

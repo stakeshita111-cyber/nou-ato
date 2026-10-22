@@ -150,19 +150,18 @@ async function runVerification() {
   }
 
   // ----------------------------------------------------------------------------
-  // 3. 【受講生認証】test11@example.com でサインイン
+  // 3. 【受講生認証】監査用アカウントでサインイン (環境変数優先)
   // ----------------------------------------------------------------------------
   let studentUserId = null;
+  const auditEmail = process.env.AUDIT_STUDENT_EMAIL || 'test11@example.com';
+  const auditPassword = process.env.AUDIT_STUDENT_PASSWORD || 'test11';
   try {
     const { data: authData, error: authError } = await studentClient.auth.signInWithPassword({
-      email: 'test11@example.com',
-      password: 'test11',
+      email: auditEmail,
+      password: auditPassword,
     });
     if (authError || !authData?.user) {
-      console.error(
-        '❌ 3. 受講生 test11@example.com サインイン失敗:',
-        authError?.message || authError
-      );
+      console.error(`❌ 3. 受講生 ${auditEmail} サインイン失敗:`, authError?.message || authError);
       failedTests++;
     } else {
       studentUserId = authData.user.id;
@@ -307,10 +306,13 @@ async function runVerification() {
   console.log('\n🔍 [特権管理者] 孤立レコード (orphan rows) セキュリティ監査:');
   try {
     // A. 孤立 farm_beds (存在しない plot_id を参照する畝)
-    const { data: allPlots } = await adminClient.from('farm_plots').select('id');
+    const { data: allPlots } = await adminClient.from('farm_plots').select('id').limit(10000);
     const validPlotIds = new Set((allPlots || []).map((p) => p.id));
 
-    const { data: allBeds } = await adminClient.from('farm_beds').select('id, plot_id');
+    const { data: allBeds } = await adminClient
+      .from('farm_beds')
+      .select('id, plot_id')
+      .limit(10000);
     const orphanBeds = (allBeds || []).filter((b) => b.plot_id && !validPlotIds.has(b.plot_id));
 
     if (orphanBeds.length === 0) {
@@ -324,15 +326,16 @@ async function runVerification() {
     }
 
     // B. 孤立 student_tasks (存在しない student_id または base_task_id を参照するタスク)
-    const { data: allUsers } = await adminClient.from('users').select('id');
+    const { data: allUsers } = await adminClient.from('users').select('id').limit(10000);
     const validUserIds = new Set((allUsers || []).map((u) => u.id));
 
-    const { data: allTasks } = await adminClient.from('tasks').select('id');
+    const { data: allTasks } = await adminClient.from('tasks').select('id').limit(10000);
     const validTaskIds = new Set((allTasks || []).map((t) => t.id));
 
     const { data: allStudentTasks } = await adminClient
       .from('student_tasks')
-      .select('id, student_id, base_task_id');
+      .select('id, student_id, base_task_id')
+      .limit(10000);
     const orphanStudentTasks = (allStudentTasks || []).filter(
       (st) =>
         (st.student_id && !validUserIds.has(st.student_id)) ||
@@ -354,7 +357,8 @@ async function runVerification() {
     // C. 孤立 crop_records (存在しない plot_id を参照する観察記録)
     const { data: allCropRecords } = await adminClient
       .from('crop_records')
-      .select('id, plot_id, bed_id');
+      .select('id, plot_id, bed_id')
+      .limit(10000);
     const orphanCropRecords = (allCropRecords || []).filter(
       (cr) => cr.plot_id && !validPlotIds.has(cr.plot_id)
     );

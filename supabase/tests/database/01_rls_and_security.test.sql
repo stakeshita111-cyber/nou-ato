@@ -397,7 +397,7 @@ SELECT is(
 RESET ROLE;
 SELECT is(
     (SELECT farm_name FROM public.get_farm_by_invite_code('test-invite-001')),
-    'テスト自然農園A',
+    'テスト農園',
     '29. [invite_code_lower] get_farm_by_invite_code は招待コードの大文字小文字を区別せず照合可能'
 );
 

@@ -147,15 +147,17 @@ export function buildBedUpsertPayloadsForPlot(plot: FarmPlot): BedUpsertPayload[
       const b = activeOnlyBeds[bIdx];
       const bedNumber = String(b.bed_number || bIdx + 1);
       const bedId = b.id && !b.id.startsWith('bed_') ? b.id : `${plot.id}_bed_${bedNumber}`;
+      const rawBedStudentId = b.student_id || plot.student_id;
       const validBedStudentId =
-        plot.student_id && /^[0-9a-fA-F-]{36}$/.test(plot.student_id) ? plot.student_id : null;
+        rawBedStudentId && /^[0-9a-fA-F-]{36}$/.test(rawBedStudentId) ? rawBedStudentId : null;
+      const resolvedStudentName = b.student_name || plot.student_name || null;
       bedsToUpsert.push({
         id: bedId,
         plot_id: plot.id,
         bed_number: bedNumber,
         crop_name: b.crop_name || '未確定 🌱',
         student_id: isVac ? null : validBedStudentId,
-        student_name: isVac ? null : plot.student_name || null,
+        student_name: isVac ? null : resolvedStudentName,
         progress_percent: b.progress_percent || 0,
         status: b.status || 'active',
         season: b.season || '2026年 秋冬',
@@ -186,7 +188,9 @@ export const buildFixedPlots = (
       const cellAddress = `${colLetter}${rowNum}`; // A1, B1, D1, D2...
       const idx = r * cols + c;
 
-      const existing = existingPlots.find((p) => p.code === cellAddress);
+      const existing = existingPlots.find(
+        (p) => p.code === cellAddress && (!p.farm_id || p.farm_id === activeFarmId)
+      );
       const uniquePlotId =
         existing && !existing.id.startsWith('plot_placeholder_')
           ? existing.id

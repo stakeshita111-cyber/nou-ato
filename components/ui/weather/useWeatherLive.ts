@@ -133,11 +133,11 @@ export async function saveLocationToDBAndStorage(
 
     const { data: uData } = await supabase
       .from('users')
-      .select('farm_id')
+      .select('farm_id, role')
       .eq('id', user.id)
       .maybeSingle();
 
-    if (uData?.farm_id) {
+    if (uData?.role === 'teacher' && uData?.farm_id) {
       await supabase
         .from('farms')
         .update({

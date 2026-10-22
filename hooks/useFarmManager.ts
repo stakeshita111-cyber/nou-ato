@@ -1079,9 +1079,9 @@ export function useFarmManager() {
 
     const oldPlot = currentList.find(
       (p) =>
-        (p.student_id === studentId ||
-          (p.student_name &&
-            (p.student_name.includes(studentName) || studentName.includes(p.student_name)))) &&
+        (studentId
+          ? p.student_id === studentId
+          : p.student_name && p.student_name === studentName) &&
         p.code !== targetCode &&
         p.id !== realPlotId
     );
@@ -1529,22 +1529,44 @@ export function useFarmManager() {
       (targetPlot
         ? `${targetPlot.id}_bed_${targetBedNum}`
         : `plot_cell_${targetPlotCode}_bed_${targetBedNum}`);
+
     try {
-      await supabase
-        .from('farm_beds')
-        .update({
-          status: 'completed_pending',
-          harvested_at: todayStr,
-          total_harvest: details.totalHarvest || null,
-          completion_notes: details.completionNotes || null,
-          completion_image_url: details.imageUrl || null,
-        })
-        .or(`id.eq.${exactBedId},id.eq.${targetBed?.id || ''}`);
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id;
+      let isTeacher = false;
+      if (currentUserId) {
+        const { data: uData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', currentUserId)
+          .maybeSingle();
+        if (uData?.role === 'teacher') isTeacher = true;
+      }
+
+      // 生徒は DB トリガー (prevent_student_farm_bed_tampering) により status を直接 UPDATE できないため、
+      // 講師権限時のみ DB の status を更新し savePlotsGridIndicesToSupabase を実行する
+      if (isTeacher) {
+        const bedFilter =
+          targetBed?.id && targetBed.id !== exactBedId
+            ? `id.eq.${exactBedId},id.eq.${targetBed.id}`
+            : `id.eq.${exactBedId}`;
+        await supabase
+          .from('farm_beds')
+          .update({
+            status: 'completed_pending',
+            harvested_at: todayStr,
+            total_harvest: details.totalHarvest || null,
+            completion_notes: details.completionNotes || null,
+            completion_image_url: details.imageUrl || null,
+          })
+          .or(bedFilter);
+
+        await savePlotsGridIndicesToSupabase(nextPlots);
+      }
     } catch (e) {
       console.warn('farm_beds status update notice:', e);
     }
 
-    await savePlotsGridIndicesToSupabase(nextPlots);
     notifyBroadcast();
   };
 
@@ -1701,12 +1723,15 @@ export function useFarmManager() {
         (targetPlot
           ? `${targetPlot.id}_bed_${targetBedNumber}`
           : `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`);
-      await supabase
-        .from('crop_records')
-        .update({ bed_id: archiveId })
-        .or(
-          `bed_id.eq.${exactBedId},bed_id.eq.${bedId},bed_id.like.%${targetPlotCode}_bed_${targetBedNumber}`
-        );
+      const bedCondition =
+        exactBedId === bedId
+          ? `bed_id.eq.${exactBedId}`
+          : `bed_id.eq.${exactBedId},bed_id.eq.${bedId}`;
+      let crQuery = supabase.from('crop_records').update({ bed_id: archiveId }).or(bedCondition);
+      if (resolvedPlotId) {
+        crQuery = crQuery.eq('plot_id', resolvedPlotId);
+      }
+      await crQuery;
     } catch (e) {
       console.warn('archive bed insert notice:', e);
     }
@@ -1724,7 +1749,7 @@ export function useFarmManager() {
       await supabase
         .from('farm_beds')
         .update({
-          crop_name: '未確定 🌱',
+          crop_name: newCropName || '未確定 🌱',
           status: 'active',
           season: newSeason,
           progress_percent: 0,
@@ -1733,7 +1758,11 @@ export function useFarmManager() {
           total_harvest: null,
           completion_image_url: null,
         })
-        .or(`id.eq.${exactBedId},id.eq.${bedId}`);
+        .or(
+          bedId && bedId !== exactBedId
+            ? `id.eq.${exactBedId},id.eq.${bedId}`
+            : `id.eq.${exactBedId}`
+        );
     } catch (e) {
       console.warn('farm_beds reset update error:', e);
     }

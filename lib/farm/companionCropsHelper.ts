@@ -151,7 +151,7 @@ export function isRecordMatchingCrop(
         !targetString.includes('返信') &&
         !targetString.startsWith('畝')
       ) {
-        return cropsInTag.includes(cleanTarget) || targetString.includes(cleanTarget);
+        return cropsInTag.includes(cleanTarget) || targetString === cleanTarget;
       }
     }
   }
@@ -159,7 +159,7 @@ export function isRecordMatchingCrop(
   // 2. 作目タグがない場合は recordCropName を判定
   if (recordCropName) {
     const crops = parseCrops(recordCropName);
-    if (crops.includes(cleanTarget) || recordCropName.includes(cleanTarget)) {
+    if (crops.includes(cleanTarget) || recordCropName === cleanTarget) {
       return true;
     }
   }

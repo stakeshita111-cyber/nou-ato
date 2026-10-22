@@ -97,6 +97,22 @@ export async function POST(request: Request) {
         );
       }
       reservationId = resId;
+    } else {
+      // 3-B. メモ専用モードの濫用防止（1日最大20件まで）
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { count: memoCount } = await supabase
+        .from('journals')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .gte('created_at', todayStart.toISOString())
+        .like('reply', '%【質問メモをお預かりしました】%');
+
+      if ((memoCount ?? 0) >= 20) {
+        return ApiResponse.tooManyRequests(
+          '本日の質問メモ保存上限（1日20件）に達しました。明日以降に再度お試しいただくか、直接講師へご相談ください'
+        );
+      }
     }
 
     // 4. 多層防御④: 会話履歴をブラウザ信頼せず、サーバー側で自農園のDB(journals)から最新履歴を取得・構築

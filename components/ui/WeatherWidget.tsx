@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
+import { useFarmStore } from '@/store/useFarmStore';
 import {
   useWeatherLive,
   saveLocationToDBAndStorage,
@@ -138,7 +139,14 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     setLat(selectedMapLat);
     setLon(selectedMapLon);
 
-    await saveLocationToDBAndStorage(selectedMapCityName, selectedMapLat, selectedMapLon);
+    if (!hideBroadcastButton) {
+      await saveLocationToDBAndStorage(selectedMapCityName, selectedMapLat, selectedMapLon);
+    } else if (typeof window !== 'undefined') {
+      localStorage.setItem('nouato_weather_city_name', selectedMapCityName);
+      localStorage.setItem('nouato_weather_lat', selectedMapLat.toString());
+      localStorage.setItem('nouato_weather_lon', selectedMapLon.toString());
+    }
+
     await fetchLiveWeather(selectedMapCityName, selectedMapLat, selectedMapLon);
     setIsLocationModalOpen(false);
 
@@ -160,12 +168,16 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         return;
       }
 
+      const storeFarmId = useFarmStore.getState().activeFarmId;
       const { data: uRow } = await supabase
         .from('users')
         .select('farm_id')
         .eq('id', user.id)
         .maybeSingle();
-      const farmId = uRow?.farm_id || null;
+      const farmId =
+        (storeFarmId && /^[0-9a-fA-F-]{36}$/.test(storeFarmId) ? storeFarmId : null) ||
+        uRow?.farm_id ||
+        null;
 
       if (!farmId) {
         setToastMessage('⚠️ 所属農園を特定できなかったため配信できませんでした');
