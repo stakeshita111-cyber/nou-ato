@@ -13,6 +13,7 @@ const FADE_OUT_DURATION_MS = 350;
 
 export default function Toast({ message, isOpen, onClose, duration = 3000 }: ToastProps) {
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevMessage, setPrevMessage] = useState(message);
   const [isExiting, setIsExiting] = useState(false);
   const onCloseRef = useRef(onClose);
 
@@ -20,8 +21,9 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  if (isOpen !== prevIsOpen) {
+  if (isOpen !== prevIsOpen || message !== prevMessage) {
     setPrevIsOpen(isOpen);
+    setPrevMessage(message);
     if (isOpen) {
       setIsExiting(false);
     }
@@ -45,7 +47,7 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
       clearTimeout(exitTimer);
       clearTimeout(closeTimer);
     };
-  }, [isOpen, duration]);
+  }, [isOpen, message, duration]);
 
   const handleClick = () => {
     if (isExiting) return;
@@ -60,6 +62,7 @@ export default function Toast({ message, isOpen, onClose, duration = 3000 }: Toa
 
   return (
     <div
+      key={`${message}_${isOpen}`}
       role="status"
       aria-live="polite"
       onClick={handleClick}
