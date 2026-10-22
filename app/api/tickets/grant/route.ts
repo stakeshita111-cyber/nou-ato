@@ -93,18 +93,35 @@ export async function POST(request: Request) {
       return ApiResponse.internalError('チケット付与処理に失敗しました: ' + rpcError.message);
     }
 
-    let newCount = 3 + amount;
-    if (typeof rpcData === 'object' && rpcData !== null) {
-      if (
-        Array.isArray(rpcData) &&
-        rpcData.length > 0 &&
-        typeof (rpcData[0] as Record<string, unknown>)?.count === 'number'
-      ) {
-        newCount = (rpcData[0] as Record<string, unknown>).count as number;
-      } else if (typeof (rpcData as Record<string, unknown>).count === 'number') {
-        newCount = (rpcData as Record<string, unknown>).count as number;
-      }
+    const grantTicketRpcResultSchema = z.union([
+      z.object({
+        count: z.number().int().nonnegative(),
+        granted_count: z.number().int().optional(),
+        success: z.boolean().optional(),
+      }),
+      z
+        .array(
+          z.object({
+            count: z.number().int().nonnegative(),
+            granted_count: z.number().int().optional(),
+            success: z.boolean().optional(),
+          })
+        )
+        .min(1),
+    ]);
+
+    const parsedRpc = grantTicketRpcResultSchema.safeParse(rpcData);
+    if (!parsedRpc.success) {
+      logger.error(
+        'Invalid RPC response from grant_ai_tickets:',
+        'api/tickets/grant',
+        undefined,
+        parsedRpc.error
+      );
+      return ApiResponse.internalError('チケット付与結果の取得に失敗しました');
     }
+
+    const newCount = Array.isArray(parsedRpc.data) ? parsedRpc.data[0].count : parsedRpc.data.count;
 
     logger.info(
       `Granted ${amount} ticket(s) to student ${studentId}. New count: ${newCount}`,

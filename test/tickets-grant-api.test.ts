@@ -13,6 +13,8 @@ let mockTargetStudent: { role: string; farm_id?: string | null } | null = {
   role: 'student',
   farm_id: 'farm-123',
 };
+let mockRpcData: unknown = [{ count: 4 }];
+let mockRpcError: unknown = null;
 
 vi.mock('@/utils/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -60,8 +62,8 @@ vi.mock('@/utils/supabase/server', () => ({
       };
     }),
     rpc: vi.fn(async () => ({
-      data: [{ count: 4 }],
-      error: null,
+      data: mockRpcData,
+      error: mockRpcError,
     })),
   })),
 }));
@@ -75,8 +77,8 @@ vi.mock('@/lib/supabase', () => ({
       select: vi.fn(() => ({ eq: vi.fn(() => ({})) })),
     })),
     rpc: vi.fn(async () => ({
-      data: [{ count: 4 }],
-      error: null,
+      data: mockRpcData,
+      error: mockRpcError,
     })),
   },
 }));
@@ -87,6 +89,8 @@ describe('/api/tickets/grant Route Handler', () => {
     mockSessionUser = { id: 'teacher-user-123', email: 'teacher@example.com' };
     mockDbUser = { role: 'teacher', farm_id: 'farm-123' };
     mockTargetStudent = { role: 'student', farm_id: 'farm-123' };
+    mockRpcData = [{ count: 4 }];
+    mockRpcError = null;
   });
 
   it('POST validates studentId and returns 400 when missing', async () => {
@@ -184,5 +188,22 @@ describe('/api/tickets/grant Route Handler', () => {
     expect(body.studentId).toBe(studentId);
     expect(body.amount).toBe(1);
     expect(typeof body.newCount).toBe('number');
+  });
+
+  it('POST returns 500 when RPC returns invalid schema without count', async () => {
+    mockRpcData = { invalid: 'payload' };
+    const studentId = '00000000-0000-0000-0000-000000000001';
+    const request = new Request('http://localhost/api/tickets/grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId, amount: 1 }),
+    });
+
+    const res = await POST(request);
+    expect(res.status).toBe(500);
+
+    const body = await res.json();
+    expect(body.title).toBe('Internal Server Error');
+    expect(body.detail).toContain('チケット付与結果の取得に失敗しました');
   });
 });

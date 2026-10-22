@@ -399,3 +399,41 @@ select:focus {
   transform-origin: 40px 65px;
   animation: nouAtoSoilBump 2.2s ease-in-out infinite;
 }
+
+/* 🌟 トースト用アニメーション (スっと下から出て1バウンド停止 & スっとフェードアウト) 🌟 */
+@keyframes toastSlideUpBounce {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 40px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -7px) scale(1.02);
+  }
+  80% {
+    transform: translate(-50%, 2px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes toastFadeOut {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.96);
+  }
+}
+
+.animate-toast-in {
+  animation: toastSlideUpBounce 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: toastFadeOut 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
