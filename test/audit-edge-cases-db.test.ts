@@ -162,6 +162,17 @@ describe('[権限越境] SECURITY DEFINER RPC', () => {
     const body = effectiveFunctionBody('register_teacher') ?? '';
     expect(body).toMatch(/LOOP[\s\S]*new_invite_code[\s\S]*EXIT\s+WHEN\s+NOT\s+EXISTS/i);
   });
+
+  it('get_farm_by_invite_code および join_farm は招待コードを大文字小文字不問 (lower) で照合すること', () => {
+    const getFarmBody = effectiveFunctionBody('get_farm_by_invite_code') ?? '';
+    const joinFarmBody = effectiveFunctionBody('join_farm') ?? '';
+    expect(getFarmBody).toMatch(
+      /lower\s*\(\s*f\.invite_code\s*\)\s*=\s*lower\s*\(\s*clean_code\s*\)/i
+    );
+    expect(joinFarmBody).toMatch(
+      /lower\s*\([^)]*invite_code\s*\)\s*=\s*lower\s*\(\s*clean_code\s*\)/i
+    );
+  });
 });
 
 describe('[境界値] DB 制約 (金額・文字数)', () => {
