@@ -5,15 +5,64 @@ const mockRpc = vi.fn();
 const mockFrom = vi.fn();
 const mockGenerateRagAnswer = vi.fn();
 
+const defaultUsersMock = {
+  select: vi.fn().mockReturnValue({
+    eq: vi.fn().mockReturnValue({
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { role: 'student', farm_id: 'farm-123' },
+        error: null,
+      }),
+    }),
+  }),
+};
+
+const createChainableJournalsMock = (
+  data = [{ content: '前回の質問', reply: '前回の回答', role: 'student' }]
+) => {
+  const chain = {
+    eq: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn().mockResolvedValue({ data, error: null }),
+    gte: vi.fn(),
+    like: vi.fn().mockResolvedValue({ count: 5, error: null }),
+  };
+  chain.eq.mockReturnValue(chain);
+  chain.order.mockReturnValue(chain);
+  chain.gte.mockReturnValue(chain);
+  return {
+    select: vi.fn().mockReturnValue(chain),
+  };
+};
+
 vi.mock('@/utils/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
       getUser: mockGetUser,
     },
     rpc: mockRpc,
-    from: mockFrom,
+    from: (tableName: string) => {
+      const res = mockFrom(tableName);
+      if (tableName === 'users' && (!res || typeof res.select !== 'function')) {
+        return defaultUsersMock;
+      }
+      if (tableName === 'journals' && (!res || typeof res.select !== 'function')) {
+        return createChainableJournalsMock();
+      }
+      return res;
+    },
   })),
 }));
+
+vi.mock('@supabase/supabase-js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@supabase/supabase-js')>();
+  return {
+    ...actual,
+    createClient: vi.fn(() => ({
+      rpc: mockRpc,
+      from: mockFrom,
+    })),
+  };
+});
 
 vi.mock('@/lib/rag/qaKnowledgeRetriever', () => ({
   generateRagAnswer: (...args: unknown[]) => mockGenerateRagAnswer(...args),
@@ -24,14 +73,24 @@ import { POST } from '@/app/api/chat/rag/route';
 describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェーズ台帳)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'mock-service-role-key';
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
     mockGenerateRagAnswer.mockResolvedValue({
       reply:
         '【相談トピック: 栽培について】\nご質問ありがとうございます！水やりは朝の時間帯がおすすめです🌱',
       referencedQa: [],
       status: 'ok',
     });
+    mockFrom.mockImplementation((tableName: string) => {
+      if (tableName === 'users') {
+        return defaultUsersMock;
+      }
+      if (tableName === 'journals') {
+        return createChainableJournalsMock();
+      }
+      return {};
+    });
   });
-
   it('1. 未ログイン(認証なし)の場合は 401 Unauthorized を返却すること', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },
@@ -248,6 +307,399 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       p_content: '病気かもしれません',
       p_reply: undefined,
       p_is_private: true,
+    });
+  });
+
+  describe('Phase 2 Hardening Tests', () => {
+    it('2-1-A. プロフィール取得エラー時は 503 を返し、reserve_ai_usage を呼ばないこと', async () => {
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user_test_123',
+            email: 'student@example.com',
+          },
+        },
+        error: null,
+      });
+
+      mockFrom.mockImplementation((tableName: string) => {
+        if (tableName === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: null,
+                  error: { message: 'Database connection error' },
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      const req = new Request('http://localhost:3000/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'トマトの育て方' }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(503);
+      expect(mockRpc).not.toHaveBeenCalledWith('reserve_ai_usage');
+    });
+
+    it('2-1-B. プロフィール行が存在しない場合は 403 を返し、reserve_ai_usage を呼ばないこと', async () => {
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user_test_123',
+            email: 'student@example.com',
+          },
+        },
+        error: null,
+      });
+
+      mockFrom.mockImplementation((tableName: string) => {
+        if (tableName === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: null,
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      const req = new Request('http://localhost:3000/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'トマトの育て方' }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(403);
+      expect(mockRpc).not.toHaveBeenCalledWith('reserve_ai_usage');
+    });
+
+    it('2-2. SUPABASE_SERVICE_ROLE_KEY が設定されていない場合は 503 を返し、reserve_ai_usage を呼ばないこと', async () => {
+      const origKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      try {
+        delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        mockGetUser.mockResolvedValue({
+          data: {
+            user: {
+              id: 'user_test_123',
+              email: 'student@example.com',
+            },
+          },
+          error: null,
+        });
+
+        mockFrom.mockImplementation((tableName: string) => {
+          if (tableName === 'users') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: { role: 'student', farm_id: 'farm-123' },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return {};
+        });
+
+        const req = new Request('http://localhost:3000/api/chat/rag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'トマトの育て方' }),
+        });
+
+        const res = await POST(req);
+        expect(res.status).toBe(503);
+        expect(mockRpc).not.toHaveBeenCalledWith('reserve_ai_usage');
+      } finally {
+        if (origKey !== undefined) {
+          process.env.SUPABASE_SERVICE_ROLE_KEY = origKey;
+        }
+      }
+    });
+
+    it('2-3. finalize_ai_usage がエラーを返しても 200 で回答を返し、logger.error が呼ばれること', async () => {
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user_test_123',
+            email: 'student@example.com',
+          },
+        },
+        error: null,
+      });
+
+      mockFrom.mockImplementation((tableName: string) => {
+        if (tableName === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { role: 'student', farm_id: 'farm-123' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (tableName === 'journals') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockRpc.mockImplementation((rpcName: string) => {
+        if (rpcName === 'reserve_ai_usage') {
+          return Promise.resolve({ data: 'reserve-uuid-fail', error: null });
+        }
+        if (rpcName === 'finalize_ai_usage') {
+          return Promise.resolve({
+            data: null,
+            error: { message: 'Failed to finalize reservation' },
+          });
+        }
+        if (rpcName === 'save_ai_journal') {
+          return Promise.resolve({ data: { id: 'journal-1' }, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const req = new Request('http://localhost:3000/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'トマトの育て方' }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.reply).toBeDefined();
+    });
+
+    it('2-4-A. 通常のAI相談では save_ai_journal に p_is_memo: false が渡ること', async () => {
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user_test_123',
+            email: 'student@example.com',
+          },
+        },
+        error: null,
+      });
+
+      mockFrom.mockImplementation((tableName: string) => {
+        if (tableName === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { role: 'student', farm_id: 'farm-123' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (tableName === 'journals') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockRpc.mockImplementation((rpcName: string) => {
+        if (rpcName === 'reserve_ai_usage') {
+          return Promise.resolve({ data: 'reserve-uuid-ok', error: null });
+        }
+        if (rpcName === 'finalize_ai_usage') {
+          return Promise.resolve({ data: null, error: null });
+        }
+        if (rpcName === 'save_ai_journal') {
+          return Promise.resolve({ data: { id: 'journal-1' }, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const req = new Request('http://localhost:3000/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'トマトの育て方' }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith(
+        'save_ai_journal',
+        expect.objectContaining({
+          p_is_memo: false,
+        })
+      );
+    });
+
+    it('2-4-B. メモ専用モードでは save_ai_journal に p_is_memo: true が渡ること', async () => {
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user_test_123',
+            email: 'student@example.com',
+          },
+        },
+        error: null,
+      });
+
+      mockFrom.mockImplementation((tableName: string) => {
+        if (tableName === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { role: 'student', farm_id: 'farm-123' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (tableName === 'journals') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                gte: vi.fn().mockReturnValue({
+                  like: vi.fn().mockResolvedValue({ count: 5, error: null }),
+                }),
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockRpc.mockImplementation((rpcName: string) => {
+        if (rpcName === 'save_ai_journal') {
+          return Promise.resolve({ data: { id: 'journal-memo-1' }, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const req = new Request('http://localhost:3000/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'メモ内容です', isMemoOnly: true }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith(
+        'save_ai_journal',
+        expect.objectContaining({
+          p_is_memo: true,
+        })
+      );
+    });
+
+    it('2-4-C. メモ専用モードで save_ai_journal が P0429 エラーを返した場合は 429 Too Many Requests を返すこと', async () => {
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user_test_123',
+            email: 'student@example.com',
+          },
+        },
+        error: null,
+      });
+
+      mockFrom.mockImplementation((tableName: string) => {
+        if (tableName === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { role: 'student', farm_id: 'farm-123' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (tableName === 'journals') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                gte: vi.fn().mockReturnValue({
+                  like: vi.fn().mockResolvedValue({ count: 5, error: null }),
+                }),
+                eq: vi.fn().mockReturnValue({
+                  order: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockRpc.mockImplementation((rpcName: string) => {
+        if (rpcName === 'save_ai_journal') {
+          return Promise.resolve({
+            data: null,
+            error: { code: 'P0429', message: 'Daily memo limit exceeded' },
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const req = new Request('http://localhost:3000/api/chat/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'メモ内容です', isMemoOnly: true }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.detail).toContain('本日の質問メモ保存上限');
     });
   });
 });

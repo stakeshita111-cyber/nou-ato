@@ -477,6 +477,7 @@ export type Database = {
           id: string;
           image_url: string | null;
           is_approved: boolean | null;
+          is_memo: boolean;
           is_private: boolean;
           reply: string | null;
           role: string | null;
@@ -495,6 +496,7 @@ export type Database = {
           id?: string;
           image_url?: string | null;
           is_approved?: boolean | null;
+          is_memo?: boolean;
           is_private?: boolean;
           reply?: string | null;
           role?: string | null;
@@ -513,6 +515,7 @@ export type Database = {
           id?: string;
           image_url?: string | null;
           is_approved?: boolean | null;
+          is_memo?: boolean;
           is_private?: boolean;
           reply?: string | null;
           role?: string | null;
@@ -942,6 +945,7 @@ export type Database = {
       save_ai_journal: {
         Args: {
           p_content: string;
+          p_is_memo?: boolean;
           p_is_private?: boolean;
           p_reply?: string;
           p_student_id: string;

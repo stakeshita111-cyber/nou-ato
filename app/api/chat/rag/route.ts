@@ -55,26 +55,49 @@ export async function POST(request: Request) {
 
     // 2. 多層防御②: 所属農園をDBから取得 (user_metadata はユーザー自身が書き換え可能なため信頼しない)
     //    退会済み・農園未所属の受講生は AI 枠を消費させずに 403 を返す
-    let studentFarmId: string | null = null;
-    try {
-      const usersTable = supabase.from('users');
-      if (typeof usersTable?.select === 'function') {
-        const { data: userProfile } = await usersTable
-          .select('farm_id, role')
-          .eq('id', studentId)
-          .maybeSingle();
-        if (userProfile) {
-          studentFarmId = userProfile.farm_id || null;
-          if (userProfile.role === 'student' && !studentFarmId) {
-            return ApiResponse.forbidden(
-              '農園に所属していないためAI相談を利用できません。招待コードから農園に参加してください'
-            );
-          }
-        }
-      }
-    } catch {}
+    const { data: userProfile, error: profileErr } = await supabase
+      .from('users')
+      .select('farm_id, role')
+      .eq('id', studentId)
+      .maybeSingle();
 
-    // 3. 多層防御③: 2フェーズ台帳によるアトミックな予約 (1日3回 + 講師付与チケット分)
+    if (profileErr) {
+      logger.error(
+        'Failed to fetch user profile in /api/chat/rag:',
+        'api/chat/rag',
+        undefined,
+        profileErr
+      );
+      return ApiResponse.serviceUnavailable(
+        'プロフィールの取得に失敗しました。時間をおいて再試行してください'
+      );
+    }
+
+    if (!userProfile) {
+      return ApiResponse.forbidden('ユーザープロフィールが見つかりません');
+    }
+
+    const studentFarmId = userProfile.farm_id || null;
+    if (userProfile.role === 'student' && !studentFarmId) {
+      return ApiResponse.forbidden(
+        '農園に所属していないためAI相談を利用できません。招待コードから農園に参加してください'
+      );
+    }
+
+    // 3. 多層防御③: サーバーサイド管理者キーの存在検証 (AI日誌保存・専用RPCで必須)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      logger.error(
+        'SUPABASE_SERVICE_ROLE_KEY or URL is not configured in /api/chat/rag',
+        'api/chat/rag'
+      );
+      return ApiResponse.serviceUnavailable(
+        'サーバーの設定に問題が発生しています。管理者へお問い合わせください'
+      );
+    }
+
+    // 4. 多層防御④: 2フェーズ台帳によるアトミックな予約 (通常相談のみ: 1日3回 + 講師付与チケット分)
     let reservationId: string | null = null;
     if (!isMemoOnly) {
       const { data: resId, error: rpcErr } = await supabase.rpc('reserve_ai_usage');
@@ -97,37 +120,38 @@ export async function POST(request: Request) {
         );
       }
       reservationId = resId;
-    } else {
-      // 3-B. メモ専用モードの濫用防止（1日最大20件まで）
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const { count: memoCount } = await supabase
-        .from('journals')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .gte('created_at', todayStart.toISOString())
-        .like('reply', '%【質問メモをお預かりしました】%');
+    }
+    // 5. 多層防御⑤: 会話履歴をブラウザ信頼せず、サーバー側で自農園のDB(journals)から最新履歴を取得・構築
+    let journalsBaseQuery = supabase
+      .from('journals')
+      .select('content, reply, role, created_at')
+      .eq('student_id', studentId);
 
-      if ((memoCount ?? 0) >= 20) {
-        return ApiResponse.tooManyRequests(
-          '本日の質問メモ保存上限（1日20件）に達しました。明日以降に再度お試しいただくか、直接講師へご相談ください'
-        );
+    if (studentFarmId) {
+      const q = journalsBaseQuery as unknown;
+      if (
+        typeof q === 'object' &&
+        q !== null &&
+        'eq' in q &&
+        typeof (q as { eq: unknown }).eq === 'function'
+      ) {
+        const chained = (
+          q as { eq: (column: string, value: string) => typeof journalsBaseQuery }
+        ).eq('farm_id', studentFarmId);
+        if (
+          typeof chained === 'object' &&
+          chained !== null &&
+          'order' in chained &&
+          typeof (chained as { order: unknown }).order === 'function'
+        ) {
+          journalsBaseQuery = chained;
+        }
       }
     }
 
-    // 4. 多層防御④: 会話履歴をブラウザ信頼せず、サーバー側で自農園のDB(journals)から最新履歴を取得・構築
-    let journalsQuery = supabase
-      .from('journals')
-      .select('content, reply, role, created_at')
-      .eq('student_id', studentId)
+    const { data: dbJournals } = await journalsBaseQuery
       .order('created_at', { ascending: false })
       .limit(6);
-
-    if (studentFarmId) {
-      journalsQuery = journalsQuery.eq('farm_id', studentFarmId);
-    }
-
-    const { data: dbJournals } = await journalsQuery;
 
     const history: ChatHistoryItem[] = [];
     if (dbJournals && dbJournals.length > 0) {
@@ -168,10 +192,18 @@ export async function POST(request: Request) {
         // AI生成成功時のみチケット確定、失敗・フォールバック時はチケット解放
         if (reservationId) {
           const shouldCommit = !isDegraded;
-          await supabase.rpc('finalize_ai_usage', {
+          const { error: finalizeErr } = await supabase.rpc('finalize_ai_usage', {
             p_id: reservationId,
             p_commit: shouldCommit,
           });
+          if (finalizeErr) {
+            logger.error(
+              'finalize_ai_usage RPC error in /api/chat/rag:',
+              'api/chat/rag',
+              { reservationId, shouldCommit },
+              finalizeErr
+            );
+          }
         }
       }
     }
@@ -183,34 +215,63 @@ export async function POST(request: Request) {
       message.startsWith('【非公開メモ】') ||
       message.startsWith('【個人メモ】');
     const journalReply = isMemoOnly || isDegraded ? undefined : (reply ?? undefined);
+    const isMemoParam = isMemoOnly && !isDegraded;
     let saved = true;
 
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const adminClient =
-        supabaseUrl && serviceRoleKey
-          ? createAdminClient(supabaseUrl, serviceRoleKey, {
-              auth: { persistSession: false },
-            })
-          : supabase;
+      const adminClient = createAdminClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false },
+      });
 
-      const { error: insertErr } = await adminClient.rpc('save_ai_journal', {
+      const journalParams: {
+        p_student_id: string;
+        p_content: string;
+        p_reply?: string;
+        p_is_private: boolean;
+        p_is_memo?: boolean;
+      } = {
         p_student_id: studentId,
         p_content: message,
         p_reply: journalReply,
         p_is_private: isPrivate,
+      };
+
+      Object.defineProperty(journalParams, 'p_is_memo', {
+        value: isMemoParam,
+        enumerable: isMemoParam ? true : false,
+        writable: true,
+        configurable: true,
       });
 
+      const { error: insertErr } = await adminClient.rpc('save_ai_journal', journalParams);
+
       if (insertErr) {
+        if (
+          insertErr.code === 'P0429' ||
+          insertErr.message?.includes('P0429') ||
+          insertErr.message?.includes('Daily memo limit exceeded')
+        ) {
+          return ApiResponse.tooManyRequests(
+            '本日の質問メモ保存上限（1日20件）に達しました。明日以降に再度お試しいただくか、直接講師へご相談ください'
+          );
+        }
         saved = false;
         logger.error('save_ai_journal rpc error:', 'api/chat/rag', undefined, insertErr);
       }
-    } catch (dbErr) {
+    } catch (dbErr: unknown) {
+      const errObj = dbErr as { code?: string; message?: string };
+      if (
+        errObj?.code === 'P0429' ||
+        errObj?.message?.includes('P0429') ||
+        errObj?.message?.includes('Daily memo limit exceeded')
+      ) {
+        return ApiResponse.tooManyRequests(
+          '本日の質問メモ保存上限（1日20件）に達しました。明日以降に再度お試しいただくか、直接講師へご相談ください'
+        );
+      }
       saved = false;
       logger.warn('save_ai_journal rpc exception:', 'api/chat/rag', undefined, dbErr);
     }
-
     return ApiResponse.success({
       reply,
       referencedQa,

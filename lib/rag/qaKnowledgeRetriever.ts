@@ -172,7 +172,12 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   // 1. 文頭の「〇〇さん、こんにちは！😊」等の個人向け挨拶ブロックを除去
   clean = clean.replace(
     /^[^\n\r]{1,30}さん[、,!\s]*(?:こんにちは|メッセージありがとうございます|おはようございます|お疲れ様です)[^\n\r]*[\n\r]*/gm,
-    ''
+    (match) => {
+      if (/^(?:みなさん|皆さん)/.test(match)) {
+        return match;
+      }
+      return '';
+    }
   );
 
   // 2. 「チケット無事に復活しましたね✨」などの個人対話文脈行を除去
@@ -201,9 +206,43 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   );
   clean = clean.replace(/(?:^|\s)@[a-zA-Z0-9_]{3,15}(?=\s|$|[、,。!！])/g, ' [個人情報]');
 
-  // 7. 個人名呼びかけ・氏名単体「受講生の〇〇さん」「〇〇さん、」等の除去/一般化 (名乗り処理の前に実行)
+  // 7. 個人名呼びかけ・敬称（例: 「佐藤さん」「佐藤さんに聞いた」）のサニタイズ
+  //    一般語（様子、様々、皆様、みなさん、お客様など）は除外し、個人名＋敬称を [個人名] に置換
   clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+(?:さん|様|くん|ちゃん)/g, '受講生の方');
-  clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, '');
+  const generalHonorificTerms = [
+    '様子',
+    '様々',
+    'さまざま',
+    '皆様',
+    'みなさま',
+    '皆さん',
+    'みなさん',
+    'お客様',
+    'お客さん',
+    '神様',
+    '模様',
+    '同様',
+    'お疲れ様',
+    'ご苦労様',
+  ];
+
+  clean = clean.replace(
+    /([^ \n\r!！🌱〜,、。?？\(\)\[\]]{1,10})(さん|様|くん|ちゃん|氏)/g,
+    (match: string, prefix: string, suffix: string, offset: number, fullString: string) => {
+      const whole = prefix + suffix;
+      const nextChar = fullString[offset + match.length] || '';
+
+      // 1. 「様子」「様々」など、様 の後ろに続く熟語
+      if (suffix === '様' && (nextChar === '子' || nextChar === '々')) {
+        return match;
+      }
+      // 2. 「皆様」「みなさん」「お客様」などの一般語
+      if (generalHonorificTerms.some((term) => whole === term || whole.endsWith(term))) {
+        return match;
+      }
+      return '[個人名]';
+    }
+  );
 
   // 8. 氏名・自己紹介名乗り（例: 山田太郎です、〜と申します）
   clean = clean.replace(/(?:[一-龠ぁ-んァ-ヶ]{1,10})と申します/g, '[受講生]と申します');
@@ -223,15 +262,25 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   });
 
   // 9. 家庭・家族情報（例: うちの娘が、息子の〇〇が）
+  //    「大丈夫」「丈夫」「工夫」など家族を指さない「夫」を除外
   clean = clean.replace(
     /(?:うちの|私の|僕の|俺の|我が家の)?(?:娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母|お父さん|お母さん)(?:の[^\s\n\r,。!！]{1,10})?/g,
-    '[ご家族]'
+    (match, offset: number, fullString: string) => {
+      if (match.includes('夫')) {
+        const indexInFull = offset + match.indexOf('夫');
+        const prevChar = indexInFull > 0 ? fullString[indexInFull - 1] : '';
+        if (prevChar === '丈' || prevChar === '工') {
+          return match;
+        }
+      }
+      return '[ご家族]';
+    }
   );
 
   // 10. 文頭の余分な改行・空白の整理
   clean = clean.trim();
 
-  return clean || text.trim();
+  return clean !== '' ? clean : '[ご相談内容]';
 }
 
 /**
