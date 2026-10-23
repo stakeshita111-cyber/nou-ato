@@ -37,6 +37,16 @@ const rpcSpy = vi.fn((name: string, args?: Record<string, unknown>) => {
 });
 const generateRagAnswerSpy = vi.fn();
 
+vi.mock('@supabase/supabase-js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@supabase/supabase-js')>();
+  return {
+    ...actual,
+    createClient: vi.fn(() => ({
+      rpc: rpcSpy,
+    })),
+  };
+});
+
 vi.mock('@/utils/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
@@ -69,10 +79,13 @@ vi.mock('@/utils/supabase/server', () => ({
         };
       }
       if (table === 'journals') {
+        const queryChain = {
+          eq: () => queryChain,
+          order: () => queryChain,
+          limit: async () => ({ data: [], error: null }),
+        };
         return {
-          select: () => ({
-            eq: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }),
-          }),
+          select: () => queryChain,
           insert: async (rows: unknown[]) => {
             state.journalInserts.push(...rows);
             return { error: null };
@@ -104,6 +117,8 @@ function jsonRequest(url: string, body: unknown): Request {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
   state.sessionUser = { id: 'teacher-1', email: 't@example.com', user_metadata: {} };
   state.usersById = {
     'teacher-1': { role: 'teacher', farm_id: 'farm-A' },
@@ -189,6 +204,7 @@ describe('[境界値] POST /api/tickets/grant の amount バリデーション',
 describe('[境界値] POST /api/chat/rag のメッセージ検証', () => {
   beforeEach(() => {
     state.sessionUser = { id: 'student-A', email: 's@example.com', user_metadata: {} };
+    state.usersById['student-A'] = { role: 'student', farm_id: 'farm-A' };
     state.journalInserts = [];
   });
 

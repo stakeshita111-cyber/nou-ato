@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(51);
+SELECT plan(57);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -640,6 +640,101 @@ SELECT is(
     (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000096'),
     0,
     '44-B. [users_auth_cascade] auth ユーザー削除時に public.users のプロフィール行も削除される (孤立行が残らない)'
+);
+
+-- ==============================================================================
+-- Phase 2: AI相談・質問メモ堅牢化テスト
+-- ==============================================================================
+
+-- Test 45: [save_ai_journal_auth] authenticated ユーザーからの直接呼び出しは 42501 で拒否される
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000002'::uuid, 'テスト', NULL, false, false) $$,
+    '42501',
+    NULL,
+    '45. [save_ai_journal_auth] authenticated ユーザーからの直接呼び出しは 42501 で拒否される'
+);
+
+-- Test 46: [save_ai_journal_sig] 4引数の古い save_ai_journal シグネチャは DROP されて存在しない
+RESET ROLE;
+SELECT is(
+    (SELECT count(*)::int FROM pg_proc WHERE proname = 'save_ai_journal' AND pronargs = 4),
+    0,
+    '46. [save_ai_journal_sig] 4引数の古い save_ai_journal シグネチャは DROP されて存在しない'
+);
+
+-- Test 47: [save_ai_journal_memo_daily_limit] メモ20件目は成功し、21件目は P0429 になる
+-- テスト用生徒E (00000000-0000-0000-0000-000000000095) を農園Aに作成
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000095', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_e@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (id, email, display_name, role, farm_id)
+VALUES ('00000000-0000-0000-0000-000000000095', 'student_e@test.local', '生徒E', 'student', '11111111-1111-1111-1111-111111111111')
+ON CONFLICT (id) DO UPDATE SET role = 'student', farm_id = '11111111-1111-1111-1111-111111111111';
+
+-- 1〜19件目のメモを直接 INSERT で準備
+DO $$
+DECLARE
+    i INT;
+BEGIN
+    FOR i IN 1..19 LOOP
+        INSERT INTO public.journals (id, farm_id, student_id, user_id, role, content, reply, is_private, is_approved, is_memo, created_at, updated_at)
+        VALUES (gen_random_uuid(), '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000095'::uuid, '00000000-0000-0000-0000-000000000095'::uuid, 'student', '事前メモ ' || i, NULL, false, false, true, NOW(), NOW());
+    END LOOP;
+END;
+$$;
+
+-- 20件目の save_ai_journal (p_is_memo = true) は成功すること
+SELECT lives_ok(
+    $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000095'::uuid, '20件目のメモ', NULL, false, true) $$,
+    '47-A. [save_ai_journal_memo] 当日20件目のメモ保存 RPC は正常に成功する'
+);
+
+-- 21件目の save_ai_journal (p_is_memo = true) は P0429 で拒否されること
+SELECT throws_ok(
+    $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000095'::uuid, '21件目のメモ', NULL, false, true) $$,
+    'P0429',
+    'Daily memo limit exceeded (20 memos per day)',
+    '47-B. [save_ai_journal_memo] 当日21件目のメモ保存 RPC は P0429 で拒否される'
+);
+
+-- Test 48: [save_ai_journal_yesterday_memos] 前日(日本時間)の created_at で 20 件入れておいても当日のメモは成功する
+-- テスト用生徒F (00000000-0000-0000-0000-000000000094) を作成
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000094', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_f@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (id, email, display_name, role, farm_id)
+VALUES ('00000000-0000-0000-0000-000000000094', 'student_f@test.local', '生徒F', 'student', '11111111-1111-1111-1111-111111111111')
+ON CONFLICT (id) DO UPDATE SET role = 'student', farm_id = '11111111-1111-1111-1111-111111111111';
+
+-- 前日 JST 23:59:59 (当日の JST 0:00 より前) のメモを 20 件投入
+DO $$
+DECLARE
+    i INT;
+    v_yesterday_jst TIMESTAMPTZ;
+BEGIN
+    v_yesterday_jst := (date_trunc('day', NOW() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo') - INTERVAL '1 second';
+    FOR i IN 1..20 LOOP
+        INSERT INTO public.journals (id, farm_id, student_id, user_id, role, content, reply, is_private, is_approved, is_memo, created_at, updated_at)
+        VALUES (gen_random_uuid(), '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000094'::uuid, '00000000-0000-0000-0000-000000000094'::uuid, 'student', '前日メモ ' || i, NULL, false, false, true, v_yesterday_jst, v_yesterday_jst);
+    END LOOP;
+END;
+$$;
+
+-- 前日20件あっても、当日分としては1件目なので成功すること
+SELECT lives_ok(
+    $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000094'::uuid, '当日1件目メモ', NULL, false, true) $$,
+    '48. [save_ai_journal_yesterday] 前日に20件メモがあっても当日のメモ保存 RPC は正常に成功する'
+);
+
+-- Test 49: [save_ai_journal_non_memo_unlimited] is_memo = false の保存はメモ20件上限に達していても成功する
+SELECT lives_ok(
+    $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000095'::uuid, '通常のAI相談質問', 'AIによる回答', false, false) $$,
+    '49. [save_ai_journal_non_memo] is_memo = false (通常AI相談) の保存は日次メモ件数に関わらず正常に成功する'
 );
 
 SELECT * FROM finish();

@@ -172,7 +172,12 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   // 1. 文頭の「〇〇さん、こんにちは！😊」等の個人向け挨拶ブロックを除去
   clean = clean.replace(
     /^[^\n\r]{1,30}さん[、,!\s]*(?:こんにちは|メッセージありがとうございます|おはようございます|お疲れ様です)[^\n\r]*[\n\r]*/gm,
-    ''
+    (match) => {
+      if (/^(?:みなさん|皆さん)/.test(match)) {
+        return match;
+      }
+      return '';
+    }
   );
 
   // 2. 「チケット無事に復活しましたね✨」などの個人対話文脈行を除去
@@ -201,37 +206,144 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   );
   clean = clean.replace(/(?:^|\s)@[a-zA-Z0-9_]{3,15}(?=\s|$|[、,。!！])/g, ' [個人情報]');
 
-  // 7. 個人名呼びかけ・氏名単体「受講生の〇〇さん」「〇〇さん、」等の除去/一般化 (名乗り処理の前に実行)
-  clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+(?:さん|様|くん|ちゃん)/g, '受講生の方');
-  clean = clean.replace(/[^ \n\r!！🌱〜]{1,10}(?:さん|様|くん|ちゃん|氏)[、,!\s]*/g, '');
+  // 7. 家庭・家族情報（例: うちの娘が、お母さんと、おじいちゃんの）
+  //    敬称置換（さん/ちゃん等）より前に実行し、「お母さん」「おじいちゃん」等を先に [ご家族] に変換
+  //    父・母・妻・夫・娘 の1文字の語は、直前または直後が漢字ならマスクしない（ただし「うちの/私の/僕の/俺の/我が家の」が前にある場合は常にマスク）
+  //    main にあった (?:の[^\s\n\r,。!！]{1,10})? を復元し、息子の太郎などの個人名を保護
+  clean = clean.replace(
+    /(うちの|私の|僕の|俺の|我が家の)?(お母さん|お父さん|おじいちゃん|おばあちゃん|じいちゃん|ばあちゃん|お兄ちゃん|お姉ちゃん|娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母)(?:の([^\s\n\r,。!！]{1,10}))?/g,
+    (
+      match: string,
+      possessive: string | undefined,
+      kinWord: string,
+      noSuffix: string | undefined,
+      offset: number,
+      fullString: string
+    ) => {
+      // 1. 父・母・妻・夫・娘 の1文字の語に対する漢字隣接判定
+      //    ただし直前が「うちの／私の／僕の／俺の／我が家の」の場合は常にマスクする
+      const singleCharKin = ['父', '母', '妻', '夫', '娘'];
+      if (!possessive && singleCharKin.includes(kinWord)) {
+        const prevChar = offset > 0 ? fullString[offset - 1] : '';
+        const kinEndIndex = offset + kinWord.length;
+        const nextChar = kinEndIndex < fullString.length ? fullString[kinEndIndex] : '';
 
-  // 8. 氏名・自己紹介名乗り（例: 山田太郎です、〜と申します）
+        const isKanji = (ch: string) => /[一-龠]/.test(ch);
+        // 直前の文字が漢字の場合、または直後の文字が漢字の場合はマスクしない
+        if (isKanji(prevChar) || isKanji(nextChar)) {
+          return match;
+        }
+      }
+
+      // 2. 「の〇〇」の後続判定（畑などの一般農園名詞は保護し、人名等はマスク）
+      if (noSuffix) {
+        const farmCommonNouns = [
+          '畑',
+          '田んぼ',
+          '田',
+          '庭',
+          '野菜',
+          '作物',
+          '苗',
+          '土',
+          '畝',
+          'ハウス',
+          '果樹',
+          '作業',
+          '手伝い',
+          '農園',
+          '道具',
+          '肥料',
+          '水',
+          'プランター',
+        ];
+        if (!noSuffix.includes('の') && farmCommonNouns.some((noun) => noSuffix.startsWith(noun))) {
+          return '[ご家族]の' + noSuffix;
+        }
+      }
+
+      return '[ご家族]';
+    }
+  );
+
+  // 8. 個人名呼びかけ・敬称（例: 「佐藤さん」「佐藤さんに聞いた」）のサニタイズ
+  //    一般語（様子、様々、皆様、みなさん、お客様など）は除外し、個人名＋敬称を [個人名] に置換
+  clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+(?:さん|様|くん|ちゃん)/g, '受講生の方');
+  const generalHonorificTerms = [
+    '様子',
+    '様々',
+    'さまざま',
+    '皆様',
+    'みなさま',
+    '皆さん',
+    'みなさん',
+    'お客様',
+    'お客さん',
+    '神様',
+    '仏様',
+    'お日様',
+    'お天道様',
+    '赤ちゃん',
+    '王様',
+    '模様',
+    '同様',
+    'お疲れ様',
+    'ご苦労様',
+  ];
+
+  clean = clean.replace(
+    /([^ \n\r!！🌱〜,、。?？\(\)\[\]]{1,10})(さん|様|くん|ちゃん|氏)/g,
+    (match: string, prefix: string, suffix: string, offset: number, fullString: string) => {
+      const whole = prefix + suffix;
+      const nextChar = fullString[offset + match.length] || '';
+
+      // 1. 「様子」「様々」など、様 の後ろに続く熟語
+      if (suffix === '様' && (nextChar === '子' || nextChar === '々')) {
+        return match;
+      }
+
+      // 2. 敬称が「様」のときは、直前の文字が漢字かカタカナの場合だけマスク対象とする（「同じ様に」「この様な」を保護）
+      if (suffix === '様') {
+        const lastCharOfPrefix = prefix[prefix.length - 1];
+        const isKanjiOrKatakana = /[一-龠ァ-ヶー]/.test(lastCharOfPrefix);
+        if (!isKanjiOrKatakana) {
+          return match;
+        }
+      }
+
+      // 3. 一般語の保護（お日様、お天道様、仏様、赤ちゃん、王様など）
+      if (generalHonorificTerms.some((term) => whole === term || whole.endsWith(term))) {
+        return match;
+      }
+
+      return '[個人名]';
+    }
+  );
+
+  // 9. 氏名・自己紹介名乗り（例: 山田太郎です、〜と申します）
   clean = clean.replace(/(?:[一-龠ぁ-んァ-ヶ]{1,10})と申します/g, '[受講生]と申します');
   clean = clean.replace(
     /(?:私|僕|俺|名前)(?:は|が)?\s*([一-龠ぁ-んァ-ヶ]{2,10})です/g,
     '[受講生]です'
   );
-  clean = clean.replace(/(?:[一-龠]{2,4}\s+[一-龠]{1,4}|[一-龠]{2,4}[一-龠]{2})です/g, (match) => {
-    if (
-      /(?:時期|方法|対策|栽培|管理|作業|状態|目安|結果|様子|予定|確認|報告|相談|質問|感謝|初心者|追肥|病気|害虫|水やり|野菜|農園|収穫|土作り)です$/.test(
-        match
-      )
-    ) {
-      return match;
-    }
-    return '[受講生]です';
-  });
-
-  // 9. 家庭・家族情報（例: うちの娘が、息子の〇〇が）
   clean = clean.replace(
-    /(?:うちの|私の|僕の|俺の|我が家の)?(?:娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母|お父さん|お母さん)(?:の[^\s\n\r,。!！]{1,10})?/g,
-    '[ご家族]'
+    /(?:[一-龠]{2,4}\s+[一-龠]{1,4}|[一-龠]{2,4}[一-龠]{2})です/g,
+    (match: string) => {
+      if (
+        /(?:時期|方法|対策|栽培|管理|作業|状態|目安|結果|様子|予定|確認|報告|相談|質問|感謝|初心者|追肥|病気|害虫|水やり|野菜|農園|収穫|土作り)です$/.test(
+          match
+        )
+      ) {
+        return match;
+      }
+      return '[受講生]です';
+    }
   );
 
   // 10. 文頭の余分な改行・空白の整理
   clean = clean.trim();
 
-  return clean || text.trim();
+  return clean !== '' ? clean : '[ご相談内容]';
 }
 
 /**
