@@ -33,7 +33,6 @@ import {
   insertCropRecordDb,
   updateCropRecordDb,
   deleteCropRecordDb,
-  addFarmDb,
 } from '@/lib/farm/farmDb';
 
 export {
@@ -1924,29 +1923,6 @@ export function useFarmManager() {
     setGridRows,
     unassignedBedsCount,
     setUnassignedBedsCount,
-    addFarm: async (name: string) => {
-      const generatedId =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `farm_${Date.now()}`;
-      const newFarm: Farm = {
-        id: generatedId,
-        name,
-        created_at: new Date().toISOString(),
-      };
-      setFarms((prev) => [...prev, newFarm]);
-      setActiveFarmId(newFarm.id);
-
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        await addFarmDb(newFarm.id, newFarm.name, authData?.user?.id);
-      } catch (e) {
-        console.error('addFarm error:', e);
-      }
-
-      notifyBroadcast();
-      return newFarm;
-    },
     plots,
     setPlots,
     savePlotsGridIndicesToSupabase,

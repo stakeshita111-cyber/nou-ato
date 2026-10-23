@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(30);
+SELECT plan(48);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -70,9 +70,9 @@ BEGIN
     -- student_tasks 登録 (公開中タスクはトリガーで自動配信されるため、ON CONFLICT (student_id, base_task_id) で同期)
     INSERT INTO public.student_tasks (student_id, base_task_id, title, status, exp)
     VALUES 
-        (v_student_a_id, v_task_pub_id, '公開中の水やりタスク', 'todo', 50),
-        (v_student_a_id, v_task_draft_id, '未公開の下書きタスク', 'todo', 50)
-    ON CONFLICT (student_id, base_task_id) DO UPDATE SET status = 'todo';
+        (v_student_a_id, v_task_pub_id, '公開中の水やりタスク', 'not_started', 50),
+        (v_student_a_id, v_task_draft_id, '未公開の下書きタスク', 'not_started', 50)
+    ON CONFLICT (student_id, base_task_id) DO UPDATE SET status = 'not_started';
 END $$;
 
 -- ==============================================================================
@@ -206,8 +206,8 @@ WHERE student_id = '00000000-0000-0000-0000-000000000002'::uuid
 
 SELECT is(
     (SELECT status FROM public.student_tasks WHERE student_id = '00000000-0000-0000-0000-000000000002'::uuid AND base_task_id = '22222222-2222-2222-2222-222222222222'::uuid),
-    'todo',
-    '14. [student_a] 未公開（下書き）タスクの student_tasks 直接 UPDATE は RLS で遮断され todo のまま維持される'
+    'not_started',
+    '14. [student_a] 未公開（下書き）タスクの student_tasks 直接 UPDATE は RLS で遮断され not_started のまま維持される'
 );
 
 -- ==============================================================================
@@ -409,8 +409,212 @@ SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT throws_matching(
     $$ SELECT public.uncomplete_student_task('22222222-2222-2222-2222-222222222221') $$,
-    'Completed task not found or already in todo',
+    'Completed task not found or already in not_started',
     '30. [uncomplete_task] 未完了タスクに対する uncomplete_student_task 呼び出しは P0002 で拒否される'
+);
+
+-- Test 31: [publish_task_to_all_students_auth] 生徒(Student A)が publish_task_to_all_students を呼び出すと権限エラー(42501)
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_matching(
+    $$ SELECT public.publish_task_to_all_students('22222222-2222-2222-2222-222222222221') $$,
+    'Forbidden: only the teacher of this farm can publish tasks|42501',
+    '31. [publish_task_to_all_students] 生徒によるタスク配信呼び出しは 42501 で拒否される'
+);
+
+-- Test 32: [publish_task_to_all_students_cross_farm] 他農園講師(Teacher B)が農園Aのタスクに対して呼び出すと 42501 で拒否される
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_matching(
+    $$ SELECT public.publish_task_to_all_students('22222222-2222-2222-2222-222222222221') $$,
+    'Forbidden: only the teacher of this farm can publish tasks|42501',
+    '32. [publish_task_to_all_students] 他農園講師によるタスク配信呼び出しは 42501 で拒否される'
+);
+
+-- Test 33: [publish_task_to_all_students_success] 自農園講師(Teacher 1)によるタスク配信は正常に成功する (正常系)
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    $$ SELECT public.publish_task_to_all_students('22222222-2222-2222-2222-222222222221') $$,
+    '33. [publish_task_to_all_students] 自農園講師によるタスク配信呼び出しは正常に成功する'
+);
+
+-- Test 34: [farms_insert_blocked] 認証済み講師でも farms への直接 INSERT は RLS で拒否される (作成は register_teacher 経由必須)
+SELECT throws_matching(
+    $$ INSERT INTO public.farms (id, name, owner_id) VALUES ('99999999-9999-9999-9999-999999999999', '不正直接作成農園', '00000000-0000-0000-0000-000000000001') $$,
+    'row-level security|permission denied|42501',
+    '34. [farms_insert_blocked] 認証ユーザーでも farms への直接 INSERT は拒否される'
+);
+
+-- Test 35: [farms_immutable_fields] farms の invite_code / owner_id / id を UPDATE しようとするとトリガーで 42501 拒否される
+SELECT throws_matching(
+    $$ UPDATE public.farms SET invite_code = 'hacked-invite-code' WHERE id = '11111111-1111-1111-1111-111111111111' $$,
+    'Cannot modify immutable farm fields|42501',
+    '35. [farms_immutable_fields] invite_code の更新はトリガーで 42501 拒否される'
+);
+
+-- Test 36: [farms_mutable_fields] farms の name など変更可能列は講師が引き続き UPDATE できる (正常系)
+SELECT lives_ok(
+    $$ UPDATE public.farms SET name = '名称変更テスト農園' WHERE id = '11111111-1111-1111-1111-111111111111' $$,
+    '36. [farms_mutable_fields] 講師による農園名 (name) の UPDATE は正常に成功する'
+);
+
+-- Test 37: [withdraw_student_isolated] 退会処理時、同一区画内にいる別生徒の畝は解放されず保持されること (正常系)
+RESET ROLE;
+-- 生徒B(00000000-0000-0000-0000-000000000003)は現在農園Aに所属中
+-- 区画B(plot-b-1)に別生徒C(00000000-0000-0000-0000-000000000005)の畝(bed-b-2)を追加
+INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, student_id, student_name, status, season)
+VALUES ('bed-b-2', 'plot-b-1', 2, 'にんじん', '00000000-0000-0000-0000-000000000005', '生徒C', 'active', '2026年 秋冬')
+ON CONFLICT (id) DO UPDATE SET student_id = EXCLUDED.student_id;
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    $$ SELECT public.withdraw_student('00000000-0000-0000-0000-000000000003') $$,
+    '37-A. 講師による受講生Bの退会処理 RPC は成功する'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT student_id FROM public.farm_beds WHERE id = 'bed-b-2'),
+    '00000000-0000-0000-0000-000000000005'::uuid,
+    '37-B. [withdraw_student_isolated] 同一区画内の他受講生(生徒C)の畝は巻き添え解放されずに保持される'
+);
+
+-- Test 38: [uncomplete_student_task_success] 完了タスクを uncomplete した際、status が not_started に戻り memo が保持されること (正常系)
+-- テスト用生徒Dを作成して検証
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000097', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_d@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (id, email, display_name, role, farm_id)
+VALUES ('00000000-0000-0000-0000-000000000097', 'student_d@test.local', '生徒D', 'student', '11111111-1111-1111-1111-111111111111')
+ON CONFLICT (id) DO UPDATE SET role = 'student', farm_id = '11111111-1111-1111-1111-111111111111';
+
+INSERT INTO public.student_tasks (id, student_id, base_task_id, title, status, completed_at, memo)
+VALUES ('33333333-3333-3333-3333-333333333399', '00000000-0000-0000-0000-000000000097', '22222222-2222-2222-2222-222222222221', '公開中の水やりタスク', 'completed', now(), '講師によるアドバイスメモ')
+ON CONFLICT (student_id, base_task_id) DO UPDATE SET status = 'completed', completed_at = now(), memo = '講師によるアドバイスメモ';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000097", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000097';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    $$ SELECT public.uncomplete_student_task('22222222-2222-2222-2222-222222222221') $$,
+    '38-A. 生徒Dによる完了取り消し RPC は成功する'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT status FROM public.student_tasks WHERE student_id = '00000000-0000-0000-0000-000000000097' AND base_task_id = '22222222-2222-2222-2222-222222222221'),
+    'not_started',
+    '38-B. uncomplete 後は status が not_started になっている'
+);
+
+SELECT is(
+    (SELECT memo FROM public.student_tasks WHERE student_id = '00000000-0000-0000-0000-000000000097' AND base_task_id = '22222222-2222-2222-2222-222222222221'),
+    '講師によるアドバイスメモ',
+    '38-C. uncomplete 後も memo が NULL にならず保持されている'
+);
+
+-- Test 39: [register_teacher_success] 新規未所属ユーザーによる講師登録 RPC が成功し、農園が開設されること (正常系)
+RESET ROLE;
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000099', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'new_teacher@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (id, email, display_name, role, farm_id)
+VALUES ('00000000-0000-0000-0000-000000000099', 'new_teacher@test.local', '新規講師99', 'student', NULL)
+ON CONFLICT (id) DO UPDATE SET role = 'student', farm_id = NULL;
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000099", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000099';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    $$ SELECT public.register_teacher('新規開設農園99') $$,
+    '39-A. [register_teacher] 未所属ユーザーによる講師登録 RPC は正常に成功する'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT role FROM public.users WHERE id = '00000000-0000-0000-0000-000000000099'),
+    'teacher',
+    '39-B. [register_teacher] 登録後のユーザーロールは teacher に更新されている'
+);
+
+-- Test 40: [join_farm_success] 新規未所属生徒が大文字小文字を問わず招待コードで農園に参加できること (正常系)
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000098', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'new_student@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (id, email, display_name, role, farm_id)
+VALUES ('00000000-0000-0000-0000-000000000098', 'new_student@test.local', '新規生徒98', 'student', NULL)
+ON CONFLICT (id) DO UPDATE SET role = 'student', farm_id = NULL;
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000098", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000098';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    $$ SELECT public.join_farm('test-invite-001') $$,
+    '40-A. [join_farm] 未所属生徒による小文字招待コードでの参加 RPC は正常に成功する'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT farm_id FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    '40-B. [join_farm] 参加後のユーザー farm_id はテスト農園のIDに設定されている'
+);
+
+-- 40-C: 参加時のトリガー (handle_new_student_task_assignment → publish_task_to_all_students) で
+--       公開中タスクが新規生徒に配信されていること (トリガー経由の呼び出しが講師チェックで止まらないことの回帰防止)
+SELECT is(
+    (SELECT count(*)::int FROM public.student_tasks
+     WHERE student_id = '00000000-0000-0000-0000-000000000098'
+       AND base_task_id = '22222222-2222-2222-2222-222222222221'),
+    1,
+    '40-C. [join_farm] 参加した生徒に公開中タスクの student_tasks が配信されている'
+);
+
+-- Test 41: [register_teacher_reject_enrolled_student] 農園に所属中の生徒(生徒C)は講師登録できず 42501 で拒否される
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000005", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000005';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    $$ SELECT public.register_teacher('乗っ取り農園') $$,
+    '42501',
+    'Already belongs to a farm as student',
+    '41. [register_teacher] 農園に所属中の生徒による講師登録は 42501 で拒否される'
+);
+
+-- Test 42: [student_tasks_status_check] student_tasks.status は not_started / completed 以外を CHECK 制約で拒否する
+RESET ROLE;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    $$ INSERT INTO public.student_tasks (student_id, title, status)
+       VALUES ('00000000-0000-0000-0000-000000000002', 'CHECK制約テスト', 'todo') $$,
+    '23514',
+    NULL,
+    '42. [student_tasks_status_check] status = todo の INSERT は CHECK 制約 (23514) で拒否される'
 );
 
 SELECT * FROM finish();

@@ -479,18 +479,3 @@ export async function deleteCropRecordDb(recordId: string) {
     console.error('deleteCropRecordDb error:', e);
   }
 }
-
-export async function addFarmDb(id: string, name: string, ownerId?: string) {
-  const payload: Database['public']['Tables']['farms']['Insert'] = {
-    id,
-    name,
-    created_at: new Date().toISOString(),
-  };
-  if (ownerId) {
-    payload.owner_id = ownerId;
-  }
-  const { error } = await supabase.from('farms').upsert([payload]);
-  if (error) {
-    console.error('addFarmDb error:', error);
-  }
-}

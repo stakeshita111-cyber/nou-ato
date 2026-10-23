@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
 
 export interface FarmItem {
   id: string;
@@ -18,7 +17,6 @@ interface FarmStoreState {
   setFarms: (farms: FarmItem[]) => void;
   setActiveFarmId: (farmId: string) => void;
   fetchTeacherFarms: () => Promise<FarmItem[]>;
-  createNewFarm: (name: string) => Promise<FarmItem | null>;
 }
 
 export const useFarmStore = create<FarmStoreState>()(
@@ -109,67 +107,6 @@ export const useFarmStore = create<FarmStoreState>()(
           console.error('fetchTeacherFarms error:', err);
           set({ isLoading: false });
           return [];
-        }
-      },
-
-      createNewFarm: async (name: string) => {
-        const cleanName = name.trim();
-        if (!cleanName) return null;
-
-        try {
-          const { data: authData } = await supabase.auth.getUser();
-          const currentUserId = authData?.user?.id;
-          const newId =
-            typeof crypto !== 'undefined' && crypto.randomUUID
-              ? crypto.randomUUID()
-              : `farm_${Date.now()}`;
-
-          const payload: Database['public']['Tables']['farms']['Insert'] = {
-            id: newId,
-            name: cleanName,
-            created_at: new Date().toISOString(),
-          };
-          if (currentUserId) {
-            payload.owner_id = currentUserId;
-          }
-
-          const { data, error } = await supabase.from('farms').insert([payload]).select().single();
-          if (error) {
-            console.error('createNewFarm insert error:', error);
-            return null;
-          }
-
-          const createdItem: FarmItem = data || payload;
-          const nextList = [...get().farms, createdItem];
-          set({
-            farms: nextList,
-            activeFarmId: createdItem.id,
-            activeFarmName: createdItem.name,
-          });
-
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('nouato_active_farm_id', createdItem.id);
-              localStorage.setItem('nouato_current_farm_name', createdItem.name);
-              window.dispatchEvent(
-                new CustomEvent('nouato_active_farm_changed', {
-                  detail: { farmId: createdItem.id, farmName: createdItem.name },
-                })
-              );
-              const bc = new BroadcastChannel('nouato_farm_sync_channel');
-              bc.postMessage({
-                type: 'FARM_SWITCHED',
-                farmId: createdItem.id,
-                farmName: createdItem.name,
-              });
-              bc.close();
-            } catch {}
-          }
-
-          return createdItem;
-        } catch (err) {
-          console.error('createNewFarm error:', err);
-          return null;
         }
       },
     }),
