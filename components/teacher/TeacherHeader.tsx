@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { z } from 'zod';
 import { useFarmStore } from '@/store/useFarmStore';
 import Toast from '@/components/ui/Toast';
 
-const farmNameSchema = z.string().trim().min(1, '農園名を入力してください');
+// 2つ目以降の農園の作成は、所属テーブル (farm_members) 導入後に create_farm RPC で提供する
+export const MULTI_FARM_NOT_READY_MESSAGE = '🏡 複数農園の作成は近日対応予定です';
 
 interface TeacherHeaderProps {
   title?: string;
@@ -18,40 +18,14 @@ export default function TeacherHeader({
   onSearch,
   onToggleMobileMenu,
 }: TeacherHeaderProps) {
-  const { farms, activeFarmId, setActiveFarmId, createNewFarm } = useFarmStore();
+  const { farms, activeFarmId, setActiveFarmId } = useFarmStore();
 
-  const [showAddFarmModal, setShowAddFarmModal] = useState(false);
-  const [newFarmName, setNewFarmName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
-  const handleCreateFarm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const validation = farmNameSchema.safeParse(newFarmName);
-    if (!validation.success) return;
-
-    setIsSubmitting(true);
-    try {
-      const created = await createNewFarm(validation.data);
-      if (created) {
-        setToastMessage(
-          `🎉 新しい農園「${created.name}」を作成し、ダッシュボードを切り替えました！`
-        );
-        setShowToast(true);
-        setShowAddFarmModal(false);
-        setNewFarmName('');
-      } else {
-        setToastMessage('農園の作成に失敗しました');
-        setShowToast(true);
-      }
-    } catch (err) {
-      console.error(err);
-      setToastMessage('エラーが発生しました');
-      setShowToast(true);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleAddFarmClick = () => {
+    setToastMessage(MULTI_FARM_NOT_READY_MESSAGE);
+    setShowToast(true);
   };
 
   const handleSelectFarm = (farmId: string) => {
@@ -109,7 +83,7 @@ export default function TeacherHeader({
 
               <button
                 type="button"
-                onClick={() => setShowAddFarmModal(true)}
+                onClick={handleAddFarmClick}
                 className="ml-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-[11px] transition shadow-2xs cursor-pointer shrink-0"
                 title="新しい農園を作成"
               >
@@ -144,71 +118,6 @@ export default function TeacherHeader({
           )}
         </div>
       </header>
-
-      {/* 🏡 新規農園作成モーダル 🏡 */}
-      {showAddFarmModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
-          onClick={() => setShowAddFarmModal(false)}
-        >
-          <div
-            className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🏡</span>
-                <h3 className="font-black text-base text-gray-900">新しい農園を追加</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddFarmModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center text-sm font-black transition cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateFarm} className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-gray-700 mb-1.5">
-                  農園名 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="例: 竹下農園 第2ファーム"
-                  value={newFarmName}
-                  onChange={(e) => setNewFarmName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50 focus:bg-white"
-                  autoFocus
-                />
-                <p className="text-[11px] text-gray-400 mt-1.5">
-                  ※
-                  同じアカウントで独立した2つ目の農園として管理できます。区画や受講生は完全に分離されます。
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowAddFarmModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !newFarmName.trim()}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-md transition cursor-pointer"
-                >
-                  {isSubmitting ? '作成中...' : '作成して切り替える'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 }

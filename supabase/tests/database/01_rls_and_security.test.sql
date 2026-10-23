@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(45);
+SELECT plan(48);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -409,7 +409,7 @@ SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT throws_matching(
     $$ SELECT public.uncomplete_student_task('22222222-2222-2222-2222-222222222221') $$,
-    'Completed task not found or already in',
+    'Completed task not found or already in not_started',
     '30. [uncomplete_task] 未完了タスクに対する uncomplete_student_task 呼び出しは P0002 で拒否される'
 );
 
@@ -578,6 +578,43 @@ SELECT is(
     (SELECT farm_id FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
     '11111111-1111-1111-1111-111111111111'::uuid,
     '40-B. [join_farm] 参加後のユーザー farm_id はテスト農園のIDに設定されている'
+);
+
+-- 40-C: 参加時のトリガー (handle_new_student_task_assignment → publish_task_to_all_students) で
+--       公開中タスクが新規生徒に配信されていること (トリガー経由の呼び出しが講師チェックで止まらないことの回帰防止)
+SELECT is(
+    (SELECT count(*)::int FROM public.student_tasks
+     WHERE student_id = '00000000-0000-0000-0000-000000000098'
+       AND base_task_id = '22222222-2222-2222-2222-222222222221'),
+    1,
+    '40-C. [join_farm] 参加した生徒に公開中タスクの student_tasks が配信されている'
+);
+
+-- Test 41: [register_teacher_reject_enrolled_student] 農園に所属中の生徒(生徒C)は講師登録できず 42501 で拒否される
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000005", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000005';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    $$ SELECT public.register_teacher('乗っ取り農園') $$,
+    '42501',
+    'Already belongs to a farm as student',
+    '41. [register_teacher] 農園に所属中の生徒による講師登録は 42501 で拒否される'
+);
+
+-- Test 42: [student_tasks_status_check] student_tasks.status は not_started / completed 以外を CHECK 制約で拒否する
+RESET ROLE;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    $$ INSERT INTO public.student_tasks (student_id, title, status)
+       VALUES ('00000000-0000-0000-0000-000000000002', 'CHECK制約テスト', 'todo') $$,
+    '23514',
+    NULL,
+    '42. [student_tasks_status_check] status = todo の INSERT は CHECK 制約 (23514) で拒否される'
 );
 
 SELECT * FROM finish();

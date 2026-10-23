@@ -479,14 +479,3 @@ export async function deleteCropRecordDb(recordId: string) {
     console.error('deleteCropRecordDb error:', e);
   }
 }
-
-export async function addFarmDb(_id: string, name: string, _ownerId?: string) {
-  // farms への直接 INSERT/UPSERT は RLS で禁止されたため、register_teacher RPC を経由する
-  const { data, error } = await supabase.rpc('register_teacher', {
-    farm_name: name,
-  });
-  if (error) {
-    console.error('addFarmDb register_teacher RPC error:', error);
-  }
-  return data;
-}

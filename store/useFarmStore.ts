@@ -17,7 +17,6 @@ interface FarmStoreState {
   setFarms: (farms: FarmItem[]) => void;
   setActiveFarmId: (farmId: string) => void;
   fetchTeacherFarms: () => Promise<FarmItem[]>;
-  createNewFarm: (name: string) => Promise<FarmItem | null>;
 }
 
 export const useFarmStore = create<FarmStoreState>()(
@@ -108,68 +107,6 @@ export const useFarmStore = create<FarmStoreState>()(
           console.error('fetchTeacherFarms error:', err);
           set({ isLoading: false });
           return [];
-        }
-      },
-
-      createNewFarm: async (name: string) => {
-        const cleanName = name.trim();
-        if (!cleanName) return null;
-
-        try {
-          const { data: authData } = await supabase.auth.getUser();
-          const currentUserId = authData?.user?.id;
-
-          // farms への直接 INSERT は RLS で禁止されたため、register_teacher RPC を呼び出す
-          const { data: rpcData, error } = await supabase.rpc('register_teacher', {
-            farm_name: cleanName,
-          });
-          if (error || !rpcData) {
-            console.error('createNewFarm register_teacher error:', error);
-            return null;
-          }
-
-          const parsed = rpcData as { success?: boolean; farm_id?: string; farm_name?: string };
-          if (!parsed.success || !parsed.farm_id) {
-            console.error('createNewFarm RPC returned unsuccessful:', rpcData);
-            return null;
-          }
-
-          const createdItem: FarmItem = {
-            id: parsed.farm_id,
-            name: parsed.farm_name || cleanName,
-            created_at: new Date().toISOString(),
-            owner_id: currentUserId,
-          };
-          const nextList = [...get().farms, createdItem];
-          set({
-            farms: nextList,
-            activeFarmId: createdItem.id,
-            activeFarmName: createdItem.name,
-          });
-
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('nouato_active_farm_id', createdItem.id);
-              localStorage.setItem('nouato_current_farm_name', createdItem.name);
-              window.dispatchEvent(
-                new CustomEvent('nouato_active_farm_changed', {
-                  detail: { farmId: createdItem.id, farmName: createdItem.name },
-                })
-              );
-              const bc = new BroadcastChannel('nouato_farm_sync_channel');
-              bc.postMessage({
-                type: 'FARM_SWITCHED',
-                farmId: createdItem.id,
-                farmName: createdItem.name,
-              });
-              bc.close();
-            } catch {}
-          }
-
-          return createdItem;
-        } catch (err) {
-          console.error('createNewFarm error:', err);
-          return null;
         }
       },
     }),
