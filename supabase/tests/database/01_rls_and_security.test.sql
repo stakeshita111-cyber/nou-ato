@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(57);
+SELECT plan(64);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -737,5 +737,73 @@ SELECT lives_ok(
     '49. [save_ai_journal_non_memo] is_memo = false (通常AI相談) の保存は日次メモ件数に関わらず正常に成功する'
 );
 
+
+-- ==============================================================================
+-- Phase 3: tasks.farm_id NOT NULL 化 ＆ マルチテナント分離テスト
+-- ==============================================================================
+
+-- Test 50: [tasks_farm_id_not_null] tasks.farm_id に NULL を INSERT しようとすると NOT NULL 制約違反 (23502) で拒否される
+RESET ROLE;
+SELECT throws_matching(
+    $$ INSERT INTO public.tasks (id, farm_id, title, status)
+       VALUES (gen_random_uuid(), NULL, '農園未定タスク', 'pool') $$,
+    '23502|null value in column|violates not-null',
+    '50. [tasks_farm_id_not_null] tasks.farm_id に NULL を INSERT すると 23502 NOT NULL 制約違反で拒否される'
+);
+
+-- Test 51: [tasks_farm_id_update_null] tasks.farm_id を NULL に UPDATE しようとすると NOT NULL 制約違反 (23502) で拒否される
+SELECT throws_matching(
+    $$ UPDATE public.tasks SET farm_id = NULL WHERE id = '22222222-2222-2222-2222-222222222221' $$,
+    '23502|null value in column|violates not-null',
+    '51. [tasks_farm_id_update_null] tasks.farm_id を NULL に UPDATE すると 23502 NOT NULL 制約違反で拒否される'
+);
+
+-- 農園Bのタスクを作成 (管理者権限)
+INSERT INTO public.tasks (id, farm_id, title, status, is_template, created_at)
+VALUES ('22222222-2222-2222-2222-222222222223'::uuid, '11111111-1111-1111-1111-111111111112'::uuid, '農園Bのタスク', 'todo', false, now())
+ON CONFLICT (id) DO NOTHING;
+
+-- Test 52: [tasks_select_multi_tenant] 講師A (teacher_id) は自農園Aのタスクのみ閲覧でき、農園Bのタスクは閲覧できない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222223'),
+    0,
+    '52-A. [tasks_select_multi_tenant] 講師Aは農園Bのタスクを SELECT できない (0件)'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'),
+    1,
+    '52-B. [tasks_select_multi_tenant] 講師Aは自農園Aのタスクを SELECT できる (1件)'
+);
+
+-- Test 53: [tasks_modify_multi_tenant] 講師Aは農園Bのタスクを UPDATE / DELETE できない
+SELECT is(
+    (WITH upd AS (UPDATE public.tasks SET title = '改ざんタイトル' WHERE id = '22222222-2222-2222-2222-222222222223' RETURNING *) SELECT count(*)::int FROM upd),
+    0,
+    '53-A. [tasks_modify_multi_tenant] 講師Aによる農園Bのタスク UPDATE は 0件更新 (RLS遮断)'
+);
+
+SELECT is(
+    (WITH del AS (DELETE FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222223' RETURNING *) SELECT count(*)::int FROM del),
+    0,
+    '53-B. [tasks_modify_multi_tenant] 講師Aによる農園Bのタスク DELETE は 0件削除 (RLS遮断)'
+);
+
+-- Test 54: [tasks_student_select_multi_tenant] 生徒A (student_a_id) は自農園Aのタスクのみ閲覧でき、農園Bのタスクは閲覧できない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222223'),
+    0,
+    '54. [tasks_student_select_multi_tenant] 生徒Aは農園Bのタスクを SELECT できない (0件)'
+);
 SELECT * FROM finish();
 ROLLBACK;

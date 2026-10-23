@@ -54,6 +54,28 @@ describe('[マルチテナント] 最終有効 RLS ポリシー', () => {
     expect(p).not.toMatch(/farm_id IS NULL/i);
   });
 
+  it('tasks_select_policy は自農園限定 (farm_id IS NULL 許可なし)', () => {
+    const p = effectivePolicy('tasks', 'tasks_select_policy');
+    expect(p).not.toBeNull();
+    expect(p).toContain('farm_id = public.current_user_farm_id()');
+    expect(p).not.toMatch(/farm_id IS NULL/i);
+  });
+
+  it('tasks.farm_id に NOT NULL 制約が付与されていること', () => {
+    const match =
+      /ALTER TABLE\s+(?:ONLY\s+)?public\.tasks\s+ALTER COLUMN\s+farm_id\s+SET NOT NULL/i.test(
+        allSql
+      );
+    expect(match).toBe(true);
+  });
+
+  it('handle_new_student_task_assignment 関数内で farm_id IS NULL 分岐が存在しないこと', () => {
+    const body = effectiveFunctionBody('handle_new_student_task_assignment');
+    expect(body).not.toBeNull();
+    expect(body).not.toMatch(/farm_id IS NULL/i);
+    expect(body).toContain('farm_id = NEW.farm_id');
+  });
+
   it('farm_beds_modify_policy が「student_id = auth.uid()」だけで通る分岐を持たない', () => {
     const p = effectivePolicy('farm_beds', 'farm_beds_modify_policy') ?? '';
     expect(p).not.toMatch(/OR\s*\(\s*student_id\s*=\s*auth\.uid\(\)\s*\)/i);

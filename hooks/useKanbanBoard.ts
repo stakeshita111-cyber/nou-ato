@@ -75,32 +75,40 @@ export function useKanbanBoard(columns: ColumnType[]) {
           .maybeSingle();
         effectiveFarmId = userData?.farm_id || '';
       }
-      if (effectiveFarmId) {
-        setFarmId(effectiveFarmId);
+      if (!effectiveFarmId) {
+        console.warn('fetchTasks: farm_id が不明なためタスクの取得を中断します');
+        setTasks([]);
+        setTrashTasks([]);
+        return;
       }
+      setFarmId(effectiveFarmId);
 
-      // 1. 有効なタスク (自農園のもの、または共通テンプレート教材)
-      let tasksQuery = supabase.from('tasks').select('*').is('deleted_at', null);
+      // 1. 有効なタスク (自農園のもの)
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .is('deleted_at', null)
+        .eq('farm_id', effectiveFarmId)
+        .order('created_at', { ascending: false });
 
-      if (effectiveFarmId) {
-        tasksQuery = tasksQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
-      }
-
-      const { data: tasksData } = await tasksQuery.order('created_at', { ascending: false });
-      if (tasksData) {
+      if (tasksError) {
+        console.error('fetchTasks tasks error:', tasksError);
+      } else if (tasksData) {
         const mappedTasks: Task[] = tasksData.map((t) => mapRowToTask(t));
         setTasks(mappedTasks);
       }
 
       // 2. ゴミ箱内のタスク (deleted_at IS NOT NULL)
-      let trashQuery = supabase.from('tasks').select('*').not('deleted_at', 'is', null);
+      const { data: trashData, error: trashError } = await supabase
+        .from('tasks')
+        .select('*')
+        .not('deleted_at', 'is', null)
+        .eq('farm_id', effectiveFarmId)
+        .order('deleted_at', { ascending: false });
 
-      if (effectiveFarmId) {
-        trashQuery = trashQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
-      }
-
-      const { data: trashData } = await trashQuery.order('deleted_at', { ascending: false });
-      if (trashData) {
+      if (trashError) {
+        console.error('fetchTasks trash error:', trashError);
+      } else if (trashData) {
         const mappedTrash: Task[] = trashData.map((t) => mapRowToTask(t));
         setTrashTasks(mappedTrash);
       }

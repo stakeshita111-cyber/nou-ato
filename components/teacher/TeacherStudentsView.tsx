@@ -205,21 +205,25 @@ export default function TeacherStudentsView() {
 
         // 3. 各受講生の割当タスク全数・完了数・進行中タスクをゼロベースで厳密計算
         let publicTasks: TaskRow[] = [];
-        try {
-          let pTasksQuery = supabase
-            .from('tasks')
-            .select('*')
-            .eq('status', 'todo')
-            .is('deleted_at', null);
-          if (currentFarmId) {
-            pTasksQuery = pTasksQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+        if (!currentFarmId) {
+          console.warn('fetchStudents: currentFarmId が未設定のため tasks クエリをスキップします');
+        } else {
+          try {
+            const { data: ptData, error: ptErr } = await supabase
+              .from('tasks')
+              .select('*')
+              .eq('status', 'todo')
+              .is('deleted_at', null)
+              .eq('farm_id', currentFarmId)
+              .order('created_at', { ascending: true });
+            if (ptErr) {
+              console.warn('fetchStudents public tasks lookup error:', ptErr);
+            } else if (ptData && ptData.length > 0) {
+              publicTasks = ptData;
+            }
+          } catch (err) {
+            console.warn('fetchStudents public tasks lookup:', err);
           }
-          const { data: ptData } = await pTasksQuery.order('created_at', { ascending: true });
-          if (ptData && ptData.length > 0) {
-            publicTasks = ptData;
-          }
-        } catch (err) {
-          console.warn('fetchStudents public tasks lookup:', err);
         }
 
         // Supabase の student_tasks 取得 (実在するカラムのみクエリしエラーを防止)
@@ -249,46 +253,54 @@ export default function TeacherStudentsView() {
         const unreadCountMap: Record<string, number> = {};
         const globalJournalCompletedTitles = new Set<string>();
 
-        try {
-          let jDataQuery = supabase
-            .from('journals')
-            .select(
-              'id, student_id, farm_id, content, text, reply, is_approved, image_url, created_at'
-            )
-            .order('created_at', { ascending: false });
-          if (currentFarmId) {
-            jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
-          }
-          const { data: jData } = await jDataQuery;
-          if (jData && jData.length > 0) {
-            jData.forEach((j) => {
-              const sid = String(j.student_id || 'student_default');
-              if (!lastJournalMap[sid]) {
-                lastJournalMap[sid] = {
-                  content: String(j.content || j.text || ''),
-                  photo_url: j.image_url ? String(j.image_url) : undefined,
-                  created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
-                };
-              }
-              // 講師の未返信かつ未承認の日誌を未読カウントとして集計
-              if (!j.reply && !j.is_approved) {
-                unreadCountMap[sid] = (unreadCountMap[sid] || 0) + 1;
-              }
-              const journalText = String(j.content || j.text || '');
-              if (
-                journalText &&
-                (journalText.includes('タスク完了') || journalText.includes('完了'))
-              ) {
-                if (!journalCompletedTitlesMap[sid]) {
-                  journalCompletedTitlesMap[sid] = new Set();
+        if (!currentFarmId) {
+          console.warn(
+            'fetchStudents: currentFarmId が未設定のため journals クエリをスキップします'
+          );
+        } else {
+          try {
+            const { data: jData, error: jErr } = await supabase
+              .from('journals')
+              .select(
+                'id, student_id, farm_id, content, text, reply, is_approved, image_url, created_at'
+              )
+              .eq('farm_id', currentFarmId)
+              .order('created_at', { ascending: false });
+            if (jErr) {
+              console.warn('fetchStudents journals query error:', jErr);
+            }
+            if (jData && jData.length > 0) {
+              jData.forEach((j) => {
+                const sid = String(j.student_id || 'student_default');
+                if (!lastJournalMap[sid]) {
+                  lastJournalMap[sid] = {
+                    content: String(j.content || j.text || ''),
+                    photo_url: j.image_url ? String(j.image_url) : undefined,
+                    created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
+                  };
                 }
-                const cleanedTitle = journalText.replace('✅【タスク完了】', '').trim();
-                journalCompletedTitlesMap[sid].add(cleanedTitle);
-                globalJournalCompletedTitles.add(cleanedTitle);
-              }
-            });
+                // 講師の未返信かつ未承認の日誌を未読カウントとして集計
+                if (!j.reply && !j.is_approved) {
+                  unreadCountMap[sid] = (unreadCountMap[sid] || 0) + 1;
+                }
+                const journalText = String(j.content || j.text || '');
+                if (
+                  journalText &&
+                  (journalText.includes('タスク完了') || journalText.includes('完了'))
+                ) {
+                  if (!journalCompletedTitlesMap[sid]) {
+                    journalCompletedTitlesMap[sid] = new Set();
+                  }
+                  const cleanedTitle = journalText.replace('✅【タスク完了】', '').trim();
+                  journalCompletedTitlesMap[sid].add(cleanedTitle);
+                  globalJournalCompletedTitles.add(cleanedTitle);
+                }
+              });
+            }
+          } catch (err) {
+            console.warn('fetchStudents journals lookup:', err);
           }
-        } catch {}
+        }
 
         if (!usersError && usersData && usersData.length > 0) {
           const colors = [

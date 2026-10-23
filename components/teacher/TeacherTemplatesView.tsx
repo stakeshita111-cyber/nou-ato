@@ -191,7 +191,7 @@ export default function TeacherTemplatesView() {
           if (userData?.farm_id) farmId = userData.farm_id;
         }
 
-        if (userId) {
+        if (userId && farmId) {
           await supabase.from('tasks').upsert({
             id: savedTemplate.id,
             title: savedTemplate.title,
@@ -207,7 +207,7 @@ export default function TeacherTemplatesView() {
             exp: savedTemplate.exp || 50,
             require_photo: Boolean(savedTemplate.require_photo),
             created_by: userId,
-            farm_id: farmId || null,
+            farm_id: farmId,
             checklist: {
               phase: savedTemplate.phase,
               season: savedTemplate.season,
@@ -251,6 +251,10 @@ export default function TeacherTemplatesView() {
         .filter(Boolean)
         .join('\n\n');
 
+      if (!farmId) {
+        throw new Error('農園IDが未特定のため教材タスクを作成できません');
+      }
+
       const newTaskData = {
         title: tpl.title,
         status: 'pool', // 教材準備レーンへ
@@ -267,7 +271,7 @@ export default function TeacherTemplatesView() {
         badge_icon: tpl.badge_icon || null,
         reference_links: tpl.reference_links || null,
         created_by: user?.id || null,
-        farm_id: farmId || null,
+        farm_id: farmId,
       };
 
       const { error } = await supabase

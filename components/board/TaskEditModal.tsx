@@ -117,34 +117,38 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
         if (userData?.farm_id) farmId = userData.farm_id;
       }
 
-      const { error } = await supabase.from('tasks').insert([
-        {
-          id: newTemplate.id,
-          title: newTemplate.title,
-          description: newTemplate.description || '',
-          category: newTemplate.category || '共通',
-          status: 'template',
-          is_template: true,
-          target_crop: newTemplate.target_crop || null,
-          estimated_time: newTemplate.estimated_time || null,
-          tools_needed: newTemplate.tools_needed || null,
-          memo: newTemplate.memo || null,
-          difficulty: newTemplate.difficulty || 1,
-          exp: newTemplate.exp || 50,
-          require_photo: Boolean(newTemplate.require_photo),
-          created_by: userId || null,
-          farm_id: farmId || null,
-          checklist: {
-            phase: newTemplate.phase,
-            season: newTemplate.season,
-            badge_name: newTemplate.badge_name,
-            badge_icon: newTemplate.badge_icon,
+      if (!farmId) {
+        console.warn('TaskEditModal: farmId が未特定のため tasks テーブルへの保存をスキップします');
+      } else {
+        const { error } = await supabase.from('tasks').insert([
+          {
+            id: newTemplate.id,
+            title: newTemplate.title,
+            description: newTemplate.description || '',
+            category: newTemplate.category || '共通',
+            status: 'template',
+            is_template: true,
+            target_crop: newTemplate.target_crop || null,
+            estimated_time: newTemplate.estimated_time || null,
+            tools_needed: newTemplate.tools_needed || null,
+            memo: newTemplate.memo || null,
+            difficulty: newTemplate.difficulty || 1,
+            exp: newTemplate.exp || 50,
+            require_photo: Boolean(newTemplate.require_photo),
+            created_by: userId || null,
+            farm_id: farmId,
+            checklist: {
+              phase: newTemplate.phase,
+              season: newTemplate.season,
+              badge_name: newTemplate.badge_name,
+              badge_icon: newTemplate.badge_icon,
+            },
           },
-        },
-      ]);
+        ]);
 
-      if (error) {
-        console.warn('Supabase insert template notice:', error);
+        if (error) {
+          console.warn('Supabase insert template notice:', error);
+        }
       }
 
       if (typeof window !== 'undefined') {
