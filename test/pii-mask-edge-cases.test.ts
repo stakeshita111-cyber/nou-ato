@@ -93,6 +93,26 @@ describe('Phase 2: sanitizePiiText PII Masking & False-Positive Tests', () => {
           '先生、トマトの脇芽はどうしますか'
         );
       });
+
+      it('「酵母を使った肥料はどうですか」が変形されないこと', () => {
+        expect(sanitizePiiText('酵母を使った肥料はどうですか')).toBe(
+          '酵母を使った肥料はどうですか'
+        );
+      });
+
+      it('「稲妻が多いと豊作と聞きました」が変形されないこと', () => {
+        expect(sanitizePiiText('稲妻が多いと豊作と聞きました')).toBe(
+          '稲妻が多いと豊作と聞きました'
+        );
+      });
+
+      it('「母屋の裏の畑です」が変形されないこと', () => {
+        expect(sanitizePiiText('母屋の裏の畑です')).toBe('母屋の裏の畑です');
+      });
+
+      it('「分母が大きい」が変形されないこと', () => {
+        expect(sanitizePiiText('分母が大きい')).toBe('分母が大きい');
+      });
     });
 
     describe('【完全一致で期待値どおりになること】', () => {
@@ -113,15 +133,46 @@ describe('Phase 2: sanitizePiiText PII Masking & False-Positive Tests', () => {
           'トマトの苗を植えました。[個人名]、ありがとう'
         );
       });
+
+      it('「母と一緒に植えました」→「[ご家族]と一緒に植えました」', () => {
+        expect(sanitizePiiText('母と一緒に植えました')).toBe('[ご家族]と一緒に植えました');
+      });
+
+      it('「うちの妻が収穫しました」→「[ご家族]が収穫しました」', () => {
+        expect(sanitizePiiText('うちの妻が収穫しました')).toBe('[ご家族]が収穫しました');
+      });
     });
 
-    describe('【「佐藤」が残らないこと（toContain で否定）】', () => {
-      it('「昨日佐藤さんに聞いたら、葉の様子を見ると良いと言われました」で「佐藤」が残らず「昨日」が残ること', () => {
+    describe('【個人名が残らないこと（not.toContain）】', () => {
+      it('「昨日佐藤さんに聞いたら、葉の様子を見ると良いと言われました」で「佐藤」が含まれないこと', () => {
         const result = sanitizePiiText(
           '昨日佐藤さんに聞いたら、葉の様子を見ると良いと言われました'
         );
         expect(result).not.toContain('佐藤');
-        expect(result).toContain('昨日');
+      });
+
+      it('「息子の太郎が手伝ってくれました」に「太郎」が含まれないこと', () => {
+        expect(sanitizePiiText('息子の太郎が手伝ってくれました')).not.toContain('太郎');
+      });
+
+      it('「うちの娘のはなこと収穫しました」に「はなこ」が含まれないこと', () => {
+        expect(sanitizePiiText('うちの娘のはなこと収穫しました')).not.toContain('はなこ');
+      });
+
+      it('「明日香さんと植えました」に「香」が含まれないこと', () => {
+        expect(sanitizePiiText('明日香さんと植えました')).not.toContain('香');
+      });
+
+      it('「田中様に教わりました」に「田中」が含まれないこと', () => {
+        expect(sanitizePiiText('田中様に教わりました')).not.toContain('田中');
+      });
+
+      it('「タナカ様に教わりました」に「タナカ」が含まれないこと', () => {
+        expect(sanitizePiiText('タナカ様に教わりました')).not.toContain('タナカ');
+      });
+
+      it('「さとうさんに聞きました」に「さとう」が含まれないこと', () => {
+        expect(sanitizePiiText('さとうさんに聞きました')).not.toContain('さとう');
       });
     });
   });

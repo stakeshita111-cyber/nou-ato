@@ -208,18 +208,60 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
 
   // 7. 家庭・家族情報（例: うちの娘が、お母さんと、おじいちゃんの）
   //    敬称置換（さん/ちゃん等）より前に実行し、「お母さん」「おじいちゃん」等を先に [ご家族] に変換
-  //    お母さん／お父さん／おじいちゃん／おばあちゃん／じいちゃん／ばあちゃん／お兄ちゃん／お姉ちゃん も [ご家族] にする
-  //    「大丈夫」「丈夫」「工夫」など家族を指さない「夫」を除外
+  //    父・母・妻・夫・娘 の1文字の語は、直前または直後が漢字ならマスクしない（ただし「うちの/私の/僕の/俺の/我が家の」が前にある場合は常にマスク）
+  //    main にあった (?:の[^s\n\r,。!！]{1,10})? を復元し、息子の太郎などの個人名を保護
   clean = clean.replace(
-    /(?:うちの|私の|僕の|俺の|我が家の)?(?:お母さん|お父さん|おじいちゃん|おばあちゃん|じいちゃん|ばあちゃん|お兄ちゃん|お姉ちゃん|娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母)/g,
-    (match: string, offset: number, fullString: string) => {
-      if (match.includes('夫')) {
-        const indexInFull = offset + match.indexOf('夫');
-        const prevChar = indexInFull > 0 ? fullString[indexInFull - 1] : '';
-        if (prevChar === '丈' || prevChar === '工') {
+    /(うちの|私の|僕の|俺の|我が家の)?(お母さん|お父さん|おじいちゃん|おばあちゃん|じいちゃん|ばあちゃん|お兄ちゃん|お姉ちゃん|娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母)(?:の([^\s\n\r,。!！]{1,10}))?/g,
+    (
+      match: string,
+      possessive: string | undefined,
+      kinWord: string,
+      noSuffix: string | undefined,
+      offset: number,
+      fullString: string
+    ) => {
+      // 1. 父・母・妻・夫・娘 の1文字の語に対する漢字隣接判定
+      //    ただし直前が「うちの／私の／僕の／俺の／我が家の」の場合は常にマスクする
+      const singleCharKin = ['父', '母', '妻', '夫', '娘'];
+      if (!possessive && singleCharKin.includes(kinWord)) {
+        const prevChar = offset > 0 ? fullString[offset - 1] : '';
+        const kinEndIndex = offset + kinWord.length;
+        const nextChar = kinEndIndex < fullString.length ? fullString[kinEndIndex] : '';
+
+        const isKanji = (ch: string) => /[一-龠]/.test(ch);
+        // 直前の文字が漢字の場合、または直後の文字が漢字の場合はマスクしない
+        if (isKanji(prevChar) || isKanji(nextChar)) {
           return match;
         }
       }
+
+      // 2. 「の〇〇」の後続判定（畑などの一般農園名詞は保護し、人名等はマスク）
+      if (noSuffix) {
+        const farmCommonNouns = [
+          '畑',
+          '田んぼ',
+          '田',
+          '庭',
+          '野菜',
+          '作物',
+          '苗',
+          '土',
+          '畝',
+          'ハウス',
+          '果樹',
+          '作業',
+          '手伝い',
+          '農園',
+          '道具',
+          '肥料',
+          '水',
+          'プランター',
+        ];
+        if (farmCommonNouns.some((noun) => noSuffix.startsWith(noun))) {
+          return '[ご家族]の' + noSuffix;
+        }
+      }
+
       return '[ご家族]';
     }
   );
@@ -250,16 +292,8 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   ];
 
   clean = clean.replace(
-    /(昨日|きょう|今日|あした|明日|さっき|先ほど|先日)?([^ \n\r!！🌱〜,、。?？\(\)\[\]]{1,10})(さん|様|くん|ちゃん|氏)/g,
-    (
-      match: string,
-      timePrefix: string | undefined,
-      prefix: string,
-      suffix: string,
-      offset: number,
-      fullString: string
-    ) => {
-      const lead = timePrefix || '';
+    /([^ \n\r!！🌱〜,、。?？\(\)\[\]]{1,10})(さん|様|くん|ちゃん|氏)/g,
+    (match: string, prefix: string, suffix: string, offset: number, fullString: string) => {
       const whole = prefix + suffix;
       const nextChar = fullString[offset + match.length] || '';
 
@@ -282,7 +316,7 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
         return match;
       }
 
-      return lead + '[個人名]';
+      return '[個人名]';
     }
   );
 

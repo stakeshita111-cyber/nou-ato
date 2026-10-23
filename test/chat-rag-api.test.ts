@@ -23,12 +23,9 @@ const createChainableJournalsMock = (
     eq: vi.fn(),
     order: vi.fn(),
     limit: vi.fn().mockResolvedValue({ data, error: null }),
-    gte: vi.fn(),
-    like: vi.fn().mockResolvedValue({ count: 5, error: null }),
   };
   chain.eq.mockReturnValue(chain);
   chain.order.mockReturnValue(chain);
-  chain.gte.mockReturnValue(chain);
   return {
     select: vi.fn().mockReturnValue(chain),
   };
@@ -214,6 +211,9 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
     const body = await res.json();
     expect(body.reply).toContain('【相談トピック');
     expect(body.timestamp).toBeDefined();
+
+    // studentFarmId が存在する場合に journals のクエリへ .eq('farm_id', <farm_id>) が渡ること
+    expect(journalsMock.select().eq).toHaveBeenCalledWith('farm_id', 'farm-123');
 
     // finalize_ai_usage が commit: true で呼ばれたか検証
     expect(mockRpc).toHaveBeenCalledWith('finalize_ai_usage', {
