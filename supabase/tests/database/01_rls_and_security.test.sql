@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(48);
+SELECT plan(51);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -615,6 +615,31 @@ SELECT throws_ok(
     '23514',
     NULL,
     '42. [student_tasks_status_check] status = todo の INSERT は CHECK 制約 (23514) で拒否される'
+);
+
+-- Test 43: [users_auth_fkey] public.users.id は auth.users.id を参照している
+SELECT fk_ok(
+    'public', 'users', 'id',
+    'auth', 'users', 'id',
+    '43. [users_auth_fkey] public.users.id は auth.users.id への外部キーを持つ'
+);
+
+-- Test 44: [users_auth_cascade] auth ユーザーを削除すると public.users のプロフィール行も削除される
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000096', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'delete_me@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now());
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000096'),
+    1,
+    '44-A. [users_auth_cascade] auth ユーザー作成時に public.users のプロフィール行が作られる'
+);
+
+DELETE FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000096';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000096'),
+    0,
+    '44-B. [users_auth_cascade] auth ユーザー削除時に public.users のプロフィール行も削除される (孤立行が残らない)'
 );
 
 SELECT * FROM finish();
