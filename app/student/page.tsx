@@ -11,6 +11,7 @@ import { useThemeStore } from '@/store/useThemeStore';
 import StudentTalkView from '@/components/student/StudentTalkView';
 import StudentSkillBoardView from '@/components/student/StudentSkillBoardView';
 import StudentFarmRecordView from '@/components/student/StudentFarmRecordView';
+import PendingTeacherSetupCard from '@/components/student/PendingTeacherSetupCard';
 import TaskDetailModal from '@/components/student/TaskDetailModal';
 import Toast from '@/components/ui/Toast';
 import WeatherWidget from '@/components/ui/WeatherWidget';
@@ -477,6 +478,14 @@ function StudentContent() {
               このアカウントは現在、農園に所属していないか、退会手続きが完了しています。
             </p>
           </div>
+
+          {/* 講師登録フォームから登録し、農園の開設が未完了のアカウント向け */}
+          <PendingTeacherSetupCard
+            onMessage={(message) => {
+              setToastMessage(message);
+              setShowToast(true);
+            }}
+          />
 
           <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 text-left space-y-1 text-[11px] text-gray-600 font-semibold">
             <p className="font-bold text-gray-800">💡 再度利用したい場合:</p>
