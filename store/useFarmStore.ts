@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
 
 export interface FarmItem {
   id: string;
@@ -119,27 +118,28 @@ export const useFarmStore = create<FarmStoreState>()(
         try {
           const { data: authData } = await supabase.auth.getUser();
           const currentUserId = authData?.user?.id;
-          const newId =
-            typeof crypto !== 'undefined' && crypto.randomUUID
-              ? crypto.randomUUID()
-              : `farm_${Date.now()}`;
 
-          const payload: Database['public']['Tables']['farms']['Insert'] = {
-            id: newId,
-            name: cleanName,
-            created_at: new Date().toISOString(),
-          };
-          if (currentUserId) {
-            payload.owner_id = currentUserId;
-          }
-
-          const { data, error } = await supabase.from('farms').insert([payload]).select().single();
-          if (error) {
-            console.error('createNewFarm insert error:', error);
+          // farms への直接 INSERT は RLS で禁止されたため、register_teacher RPC を呼び出す
+          const { data: rpcData, error } = await supabase.rpc('register_teacher', {
+            farm_name: cleanName,
+          });
+          if (error || !rpcData) {
+            console.error('createNewFarm register_teacher error:', error);
             return null;
           }
 
-          const createdItem: FarmItem = data || payload;
+          const parsed = rpcData as { success?: boolean; farm_id?: string; farm_name?: string };
+          if (!parsed.success || !parsed.farm_id) {
+            console.error('createNewFarm RPC returned unsuccessful:', rpcData);
+            return null;
+          }
+
+          const createdItem: FarmItem = {
+            id: parsed.farm_id,
+            name: parsed.farm_name || cleanName,
+            created_at: new Date().toISOString(),
+            owner_id: currentUserId,
+          };
           const nextList = [...get().farms, createdItem];
           set({
             farms: nextList,
