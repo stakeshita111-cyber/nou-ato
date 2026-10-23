@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
+import {
+  TEACHER_SETUP_FAILED_PARAM,
+  completePendingTeacherSignup,
+  readPendingTeacherSignup,
+} from '@/lib/auth/pendingTeacherSignup';
 
 const userMetadataSchema = z.object({
   full_name: z.string().optional(),
@@ -93,13 +98,34 @@ export async function GET(request: Request) {
             targetNext = '/teacher/dashboard';
           }
 
+          // 講師登録フォームから来た未所属アカウント (メール確認後の初回ログイン)
+          const pendingTeacher =
+            userRole !== 'teacher' && !existingUser?.farm_id
+              ? readPendingTeacherSignup(user.user_metadata)
+              : null;
+
           // 2. 表示名の安全な設定 (既存の表示名がない場合のみ初期設定し、手動変更を上書きしない)
-          if (!existingUser?.display_name && lineName) {
+          //    講師登録の途中なら、フォームで入力された講師名を 3. で設定する
+          if (!pendingTeacher && !existingUser?.display_name && lineName) {
             await supabase.from('users').update({ display_name: lineName }).eq('id', user.id);
           }
 
-          // 3. 農園紐づけ (未所属受講生のみ join_farm RPC を使用して招待コードで安全に参加)
-          if (userRole !== 'teacher' && inviteCodeParam && !existingUser?.farm_id) {
+          // 3-A. 講師登録の完了 (農園開設 & 講師昇格。可否は register_teacher が判定する)
+          if (pendingTeacher) {
+            const setupResult = await completePendingTeacherSignup(
+              supabase,
+              user.id,
+              pendingTeacher
+            );
+            if (setupResult.ok) {
+              targetNext = '/teacher/dashboard';
+            } else {
+              console.error('register_teacher error in auth callback:', setupResult.message);
+              targetNext = `/student?${TEACHER_SETUP_FAILED_PARAM}=failed`;
+            }
+          }
+          // 3-B. 農園紐づけ (未所属受講生のみ join_farm RPC を使用して招待コードで安全に参加)
+          else if (userRole !== 'teacher' && inviteCodeParam && !existingUser?.farm_id) {
             const { error: joinErr } = await supabase.rpc('join_farm', {
               invite_code: inviteCodeParam.trim(),
             });

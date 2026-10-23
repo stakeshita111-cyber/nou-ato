@@ -6,6 +6,11 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
+import {
+  EMAIL_CONFIRMATION_SENT_MESSAGE,
+  buildPendingTeacherSignupMetadata,
+  completePendingTeacherSignup,
+} from '@/lib/auth/pendingTeacherSignup';
 
 export const teacherSignUpSchema = z.object({
   farmName: z.string().trim().min(1, '農場名を入力してください'),
@@ -17,8 +22,6 @@ export const teacherSignUpSchema = z.object({
     .email('有効なメールアドレスを入力してください'),
   password: z.string().min(6, 'パスワードは6文字以上で入力してください'),
 });
-
-type RpcResult = { farm_id?: string } | null;
 
 export default function TeacherSignUpPage() {
   const router = useRouter();
@@ -57,6 +60,12 @@ export default function TeacherSignUpPage() {
     }
 
     const validData = validation.data;
+    // メール確認が必要な環境では signUp 直後にセッションが無いため、農園名・講師名を
+    // user_metadata に保存し、確認後の /auth/callback で講師登録を完了させる
+    const pendingSignup = buildPendingTeacherSignupMetadata(
+      validData.farmName,
+      validData.teacherName
+    );
 
     setLoading(true);
 
@@ -66,6 +75,10 @@ export default function TeacherSignUpPage() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: validData.email,
         password: validData.password,
+        options: {
+          data: pendingSignup,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/teacher/dashboard`,
+        },
       });
 
       // 既存ユーザーの判定:
@@ -115,7 +128,7 @@ export default function TeacherSignUpPage() {
           password: validData.password,
         });
         if (signInError || !signInData?.user) {
-          const msg = '確認メールを送信しました。メール内のリンクからログインを完了してください。';
+          const msg = EMAIL_CONFIRMATION_SENT_MESSAGE;
           setToastMessage(msg);
           setShowToast(true);
           setLoading(false);
@@ -138,21 +151,17 @@ export default function TeacherSignUpPage() {
         return;
       }
 
-      // 2. 表示名の更新
-      await supabase.from('users').update({ display_name: validData.teacherName }).eq('id', userId);
+      // 2. 表示名の更新と register_teacher (SECURITY DEFINER) による講師昇格 & 農園開設
+      //    (メール確認後の /auth/callback と同じ処理を使う)
+      const signupResult = await completePendingTeacherSignup(supabase, userId, pendingSignup);
 
-      // 3. Postgres 関数 register_teacher (SECURITY DEFINER) を呼び出して講師昇格 & 農園開設
-      const { data: rpcResultRaw, error: rpcError } = await supabase.rpc('register_teacher', {
-        farm_name: validData.farmName,
-      });
-
-      if (rpcError) {
-        console.error('register_teacher error:', rpcError);
+      if (!signupResult.ok) {
+        console.error('register_teacher error:', signupResult.message);
         let rpcMsg = '農園の開設処理に失敗しました。';
-        if (rpcError.message.includes('Farm name')) {
+        if (signupResult.message.includes('Farm name')) {
           rpcMsg = '農園名は2文字以上で入力してください。';
         } else {
-          rpcMsg = `講師登録エラー: ${rpcError.message}`;
+          rpcMsg = `講師登録エラー: ${signupResult.message}`;
         }
         setFormError(rpcMsg);
         setToastMessage(rpcMsg);
@@ -161,8 +170,7 @@ export default function TeacherSignUpPage() {
         return;
       }
 
-      const rpcResult = rpcResultRaw as RpcResult;
-      const createdFarmId = rpcResult?.farm_id;
+      const createdFarmId = signupResult.farmId;
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('nouato_owner_name', validData.teacherName);
