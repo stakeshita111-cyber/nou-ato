@@ -194,23 +194,10 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       return Promise.resolve({ data: null, error: null });
     });
 
-    // journals DB クエリのモック
-    const mockJournalsSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        order: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue({
-            data: [{ content: '前回の質問', reply: '前回の回答', role: 'student' }],
-            error: null,
-          }),
-        }),
-      }),
-    });
-
+    const journalsMock = createChainableJournalsMock();
     mockFrom.mockImplementation((tableName: string) => {
       if (tableName === 'journals') {
-        return {
-          select: mockJournalsSelect,
-        };
+        return journalsMock;
       }
       return {};
     });
@@ -240,6 +227,7 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       p_content: 'キュウリのうどんこ病対策を教えて',
       p_reply: expect.stringContaining('水やりは朝の時間帯'),
       p_is_private: false,
+      p_is_memo: false,
     });
   });
 
@@ -271,17 +259,10 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       status: 'degraded',
     });
 
+    const journalsMock = createChainableJournalsMock([]);
     mockFrom.mockImplementation((tableName: string) => {
       if (tableName === 'journals') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
-            }),
-          }),
-        };
+        return journalsMock;
       }
       return {};
     });
@@ -307,6 +288,7 @@ describe('/api/chat/rag Route Handler (多層防御セキュリティ & 2フェ�
       p_content: '病気かもしれません',
       p_reply: undefined,
       p_is_private: true,
+      p_is_memo: false,
     });
   });
 

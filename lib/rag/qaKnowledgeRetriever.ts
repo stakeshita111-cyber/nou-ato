@@ -206,7 +206,25 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   );
   clean = clean.replace(/(?:^|\s)@[a-zA-Z0-9_]{3,15}(?=\s|$|[、,。!！])/g, ' [個人情報]');
 
-  // 7. 個人名呼びかけ・敬称（例: 「佐藤さん」「佐藤さんに聞いた」）のサニタイズ
+  // 7. 家庭・家族情報（例: うちの娘が、お母さんと、おじいちゃんの）
+  //    敬称置換（さん/ちゃん等）より前に実行し、「お母さん」「おじいちゃん」等を先に [ご家族] に変換
+  //    お母さん／お父さん／おじいちゃん／おばあちゃん／じいちゃん／ばあちゃん／お兄ちゃん／お姉ちゃん も [ご家族] にする
+  //    「大丈夫」「丈夫」「工夫」など家族を指さない「夫」を除外
+  clean = clean.replace(
+    /(?:うちの|私の|僕の|俺の|我が家の)?(?:お母さん|お父さん|おじいちゃん|おばあちゃん|じいちゃん|ばあちゃん|お兄ちゃん|お姉ちゃん|娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母)/g,
+    (match: string, offset: number, fullString: string) => {
+      if (match.includes('夫')) {
+        const indexInFull = offset + match.indexOf('夫');
+        const prevChar = indexInFull > 0 ? fullString[indexInFull - 1] : '';
+        if (prevChar === '丈' || prevChar === '工') {
+          return match;
+        }
+      }
+      return '[ご家族]';
+    }
+  );
+
+  // 8. 個人名呼びかけ・敬称（例: 「佐藤さん」「佐藤さんに聞いた」）のサニタイズ
   //    一般語（様子、様々、皆様、みなさん、お客様など）は除外し、個人名＋敬称を [個人名] に置換
   clean = clean.replace(/受講生の?[^ \n\r!！🌱〜]+(?:さん|様|くん|ちゃん)/g, '受講生の方');
   const generalHonorificTerms = [
@@ -220,6 +238,11 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
     'お客様',
     'お客さん',
     '神様',
+    '仏様',
+    'お日様',
+    'お天道様',
+    '赤ちゃん',
+    '王様',
     '模様',
     '同様',
     'お疲れ様',
@@ -227,8 +250,16 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   ];
 
   clean = clean.replace(
-    /([^ \n\r!！🌱〜,、。?？\(\)\[\]]{1,10})(さん|様|くん|ちゃん|氏)/g,
-    (match: string, prefix: string, suffix: string, offset: number, fullString: string) => {
+    /(昨日|きょう|今日|あした|明日|さっき|先ほど|先日)?([^ \n\r!！🌱〜,、。?？\(\)\[\]]{1,10})(さん|様|くん|ちゃん|氏)/g,
+    (
+      match: string,
+      timePrefix: string | undefined,
+      prefix: string,
+      suffix: string,
+      offset: number,
+      fullString: string
+    ) => {
+      const lead = timePrefix || '';
       const whole = prefix + suffix;
       const nextChar = fullString[offset + match.length] || '';
 
@@ -236,44 +267,42 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
       if (suffix === '様' && (nextChar === '子' || nextChar === '々')) {
         return match;
       }
-      // 2. 「皆様」「みなさん」「お客様」などの一般語
+
+      // 2. 敬称が「様」のときは、直前の文字が漢字かカタカナの場合だけマスク対象とする（「同じ様に」「この様な」を保護）
+      if (suffix === '様') {
+        const lastCharOfPrefix = prefix[prefix.length - 1];
+        const isKanjiOrKatakana = /[一-龠ァ-ヶー]/.test(lastCharOfPrefix);
+        if (!isKanjiOrKatakana) {
+          return match;
+        }
+      }
+
+      // 3. 一般語の保護（お日様、お天道様、仏様、赤ちゃん、王様など）
       if (generalHonorificTerms.some((term) => whole === term || whole.endsWith(term))) {
         return match;
       }
-      return '[個人名]';
+
+      return lead + '[個人名]';
     }
   );
 
-  // 8. 氏名・自己紹介名乗り（例: 山田太郎です、〜と申します）
+  // 9. 氏名・自己紹介名乗り（例: 山田太郎です、〜と申します）
   clean = clean.replace(/(?:[一-龠ぁ-んァ-ヶ]{1,10})と申します/g, '[受講生]と申します');
   clean = clean.replace(
     /(?:私|僕|俺|名前)(?:は|が)?\s*([一-龠ぁ-んァ-ヶ]{2,10})です/g,
     '[受講生]です'
   );
-  clean = clean.replace(/(?:[一-龠]{2,4}\s+[一-龠]{1,4}|[一-龠]{2,4}[一-龠]{2})です/g, (match) => {
-    if (
-      /(?:時期|方法|対策|栽培|管理|作業|状態|目安|結果|様子|予定|確認|報告|相談|質問|感謝|初心者|追肥|病気|害虫|水やり|野菜|農園|収穫|土作り)です$/.test(
-        match
-      )
-    ) {
-      return match;
-    }
-    return '[受講生]です';
-  });
-
-  // 9. 家庭・家族情報（例: うちの娘が、息子の〇〇が）
-  //    「大丈夫」「丈夫」「工夫」など家族を指さない「夫」を除外
   clean = clean.replace(
-    /(?:うちの|私の|僕の|俺の|我が家の)?(?:娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母|お父さん|お母さん)(?:の[^\s\n\r,。!！]{1,10})?/g,
-    (match, offset: number, fullString: string) => {
-      if (match.includes('夫')) {
-        const indexInFull = offset + match.indexOf('夫');
-        const prevChar = indexInFull > 0 ? fullString[indexInFull - 1] : '';
-        if (prevChar === '丈' || prevChar === '工') {
-          return match;
-        }
+    /(?:[一-龠]{2,4}\s+[一-龠]{1,4}|[一-龠]{2,4}[一-龠]{2})です/g,
+    (match: string) => {
+      if (
+        /(?:時期|方法|対策|栽培|管理|作業|状態|目安|結果|様子|予定|確認|報告|相談|質問|感謝|初心者|追肥|病気|害虫|水やり|野菜|農園|収穫|土作り)です$/.test(
+          match
+        )
+      ) {
+        return match;
       }
-      return '[ご家族]';
+      return '[受講生]です';
     }
   );
 

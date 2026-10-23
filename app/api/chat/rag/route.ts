@@ -128,25 +128,7 @@ export async function POST(request: Request) {
       .eq('student_id', studentId);
 
     if (studentFarmId) {
-      const q = journalsBaseQuery as unknown;
-      if (
-        typeof q === 'object' &&
-        q !== null &&
-        'eq' in q &&
-        typeof (q as { eq: unknown }).eq === 'function'
-      ) {
-        const chained = (
-          q as { eq: (column: string, value: string) => typeof journalsBaseQuery }
-        ).eq('farm_id', studentFarmId);
-        if (
-          typeof chained === 'object' &&
-          chained !== null &&
-          'order' in chained &&
-          typeof (chained as { order: unknown }).order === 'function'
-        ) {
-          journalsBaseQuery = chained;
-        }
-      }
+      journalsBaseQuery = journalsBaseQuery.eq('farm_id', studentFarmId);
     }
 
     const { data: dbJournals } = await journalsBaseQuery
@@ -223,34 +205,18 @@ export async function POST(request: Request) {
         auth: { persistSession: false },
       });
 
-      const journalParams: {
-        p_student_id: string;
-        p_content: string;
-        p_reply?: string;
-        p_is_private: boolean;
-        p_is_memo?: boolean;
-      } = {
+      const journalParams = {
         p_student_id: studentId,
         p_content: message,
         p_reply: journalReply,
         p_is_private: isPrivate,
+        p_is_memo: isMemoParam,
       };
-
-      Object.defineProperty(journalParams, 'p_is_memo', {
-        value: isMemoParam,
-        enumerable: isMemoParam ? true : false,
-        writable: true,
-        configurable: true,
-      });
 
       const { error: insertErr } = await adminClient.rpc('save_ai_journal', journalParams);
 
       if (insertErr) {
-        if (
-          insertErr.code === 'P0429' ||
-          insertErr.message?.includes('P0429') ||
-          insertErr.message?.includes('Daily memo limit exceeded')
-        ) {
+        if (insertErr.code === 'P0429') {
           return ApiResponse.tooManyRequests(
             '本日の質問メモ保存上限（1日20件）に達しました。明日以降に再度お試しいただくか、直接講師へご相談ください'
           );
@@ -259,16 +225,6 @@ export async function POST(request: Request) {
         logger.error('save_ai_journal rpc error:', 'api/chat/rag', undefined, insertErr);
       }
     } catch (dbErr: unknown) {
-      const errObj = dbErr as { code?: string; message?: string };
-      if (
-        errObj?.code === 'P0429' ||
-        errObj?.message?.includes('P0429') ||
-        errObj?.message?.includes('Daily memo limit exceeded')
-      ) {
-        return ApiResponse.tooManyRequests(
-          '本日の質問メモ保存上限（1日20件）に達しました。明日以降に再度お試しいただくか、直接講師へご相談ください'
-        );
-      }
       saved = false;
       logger.warn('save_ai_journal rpc exception:', 'api/chat/rag', undefined, dbErr);
     }
