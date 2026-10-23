@@ -209,7 +209,7 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
   // 7. 家庭・家族情報（例: うちの娘が、お母さんと、おじいちゃんの）
   //    敬称置換（さん/ちゃん等）より前に実行し、「お母さん」「おじいちゃん」等を先に [ご家族] に変換
   //    父・母・妻・夫・娘 の1文字の語は、直前または直後が漢字ならマスクしない（ただし「うちの/私の/僕の/俺の/我が家の」が前にある場合は常にマスク）
-  //    main にあった (?:の[^s\n\r,。!！]{1,10})? を復元し、息子の太郎などの個人名を保護
+  //    main にあった (?:の[^\s\n\r,。!！]{1,10})? を復元し、息子の太郎などの個人名を保護
   clean = clean.replace(
     /(うちの|私の|僕の|俺の|我が家の)?(お母さん|お父さん|おじいちゃん|おばあちゃん|じいちゃん|ばあちゃん|お兄ちゃん|お姉ちゃん|娘|息子|夫|妻|旦那|奥さん|子供|子ども|祖父|祖母|父|母)(?:の([^\s\n\r,。!！]{1,10}))?/g,
     (
@@ -257,7 +257,7 @@ export function sanitizePiiText(text: string, studentNames: string | string[] = 
           '水',
           'プランター',
         ];
-        if (farmCommonNouns.some((noun) => noSuffix.startsWith(noun))) {
+        if (!noSuffix.includes('の') && farmCommonNouns.some((noun) => noSuffix.startsWith(noun))) {
           return '[ご家族]の' + noSuffix;
         }
       }

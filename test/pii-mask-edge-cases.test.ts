@@ -174,6 +174,10 @@ describe('Phase 2: sanitizePiiText PII Masking & False-Positive Tests', () => {
       it('「さとうさんに聞きました」に「さとう」が含まれないこと', () => {
         expect(sanitizePiiText('さとうさんに聞きました')).not.toContain('さとう');
       });
+
+      it('「息子の畑の太郎が手伝いました」に「太郎」が含まれないこと', () => {
+        expect(sanitizePiiText('息子の畑の太郎が手伝いました')).not.toContain('太郎');
+      });
     });
   });
 });
