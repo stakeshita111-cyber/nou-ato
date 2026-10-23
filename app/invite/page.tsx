@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/ui/Toast';
 import Link from 'next/link';
+import { EMAIL_RATE_LIMIT_MESSAGE, isEmailRateLimitError } from '@/lib/auth/signUpErrors';
 
 export const inviteCodeSchema = z.string().trim().min(1, '招待コードを入力してください');
 
@@ -231,7 +232,11 @@ function InviteContent() {
         }
 
         if (signUpError) {
-          setToastMessage(`登録エラー: ${signUpError.message}`);
+          setToastMessage(
+            isEmailRateLimitError(signUpError)
+              ? EMAIL_RATE_LIMIT_MESSAGE
+              : `登録エラー: ${signUpError.message}`
+          );
           setShowToast(true);
           setLoading(false);
           return;

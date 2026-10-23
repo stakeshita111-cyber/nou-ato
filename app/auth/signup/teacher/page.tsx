@@ -11,6 +11,7 @@ import {
   buildPendingTeacherSignupMetadata,
   completePendingTeacherSignup,
 } from '@/lib/auth/pendingTeacherSignup';
+import { EMAIL_RATE_LIMIT_MESSAGE, isEmailRateLimitError } from '@/lib/auth/signUpErrors';
 
 export const teacherSignUpSchema = z.object({
   farmName: z.string().trim().min(1, '農場名を入力してください'),
@@ -106,7 +107,9 @@ export default function TeacherSignUpPage() {
 
       if (authError) {
         let userMsg = 'アカウントの作成に失敗しました。';
-        if (authError.message.includes('Password')) {
+        if (isEmailRateLimitError(authError)) {
+          userMsg = EMAIL_RATE_LIMIT_MESSAGE;
+        } else if (authError.message.includes('Password')) {
           userMsg = 'パスワードは6文字以上で入力してください。';
         } else if (authError.message.includes('email')) {
           userMsg = '有効なメールアドレスを入力してください。';
