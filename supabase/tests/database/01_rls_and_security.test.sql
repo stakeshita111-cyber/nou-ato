@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(153);
+SELECT plan(178);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1529,6 +1529,244 @@ SELECT throws_ok(
     '42501',
     'Forbidden: only the teacher of this farm can publish tasks',
     '153. [b3b_removed_teacher] 所属から外された講師 0004 は農園A のタスクを配信できなくなる'
+);
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-5 (a): 講師の招待・メンバー管理 RPC
+--   新規アカウント 0081 (role = student, farm_id = NULL) を管理者権限で作成する。
+--   発行したトークンは set_config('b5a.*', ..., true) でトランザクション内に保持する。
+-- ==============================================================================
+RESET ROLE;
+SET LOCAL "request.jwt.claims" = '{}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = '';
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000081', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'b5a_new@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now());
+
+-- Test 154-155: 講師でない・所属していないユーザーは招待を発行できない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000097", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000097';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+SELECT throws_ok(
+    'SELECT public.create_farm_invitation(''11111111-1111-1111-1111-111111111111'')',
+    '42501',
+    'Forbidden: only teachers of this farm can invite',
+    '154. [b5a_invite_student] 生徒は講師の招待を発行できない'
+);
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SELECT throws_ok(
+    'SELECT public.create_farm_invitation(''11111111-1111-1111-1111-111111111111'')',
+    '42501',
+    'Forbidden: only teachers of this farm can invite',
+    '155. [b5a_invite_other_farm] 所属していない講師 0004 は農園A の招待を発行できない'
+);
+
+-- Test 156-157: 講師 0001 は農園A の招待を発行でき、DB にはトークンのハッシュだけが保存される
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SELECT lives_ok(
+    $SELECT set_config('b5a.token1', public.create_farm_invitation('11111111-1111-1111-1111-111111111111')->>'token', true)$,
+    '156. [b5a_invite_create] 講師 0001 は農園A の招待を発行できる'
+);
+
+RESET ROLE;
+SELECT ok(
+    EXISTS (
+        SELECT 1 FROM public.farm_invitations
+        WHERE token_hash = encode(extensions.digest(current_setting('b5a.token1'), 'sha256'), 'hex')
+          AND token_hash <> current_setting('b5a.token1')
+          AND farm_id = '11111111-1111-1111-1111-111111111111'
+          AND created_by = '00000000-0000-0000-0000-000000000001'
+          AND expires_at > now() + interval '6 days'
+    ),
+    '157. [b5a_invite_hash] 招待はトークンのハッシュ・発行者・期限 7 日で保存される'
+);
+
+-- Test 158: 農園に所属している生徒は講師の招待を受けられない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000097", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000097';
+SELECT throws_ok(
+    $SELECT public.accept_farm_invitation(current_setting('b5a.token1'))$,
+    '42501',
+    'Students who belong to a farm cannot accept teacher invitations',
+    '158. [b5a_accept_student] 農園所属の生徒は講師の招待を受けられない'
+);
+
+-- Test 159-161: 別農園の講師 0004 は招待を受けて農園A の講師になる (招待は使用済みになる)
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SELECT lives_ok(
+    $SELECT public.accept_farm_invitation(current_setting('b5a.token1'))$,
+    '159. [b5a_accept_teacher] 講師 0004 は招待を受けて農園A に所属できる'
+);
+SELECT ok(
+    public.is_farm_teacher('11111111-1111-1111-1111-111111111111'),
+    '160. [b5a_accept_teacher] 招待を受けた講師 0004 は農園A の講師として判定される'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT accepted_by FROM public.farm_invitations
+     WHERE token_hash = encode(extensions.digest(current_setting('b5a.token1'), 'sha256'), 'hex')),
+    '00000000-0000-0000-0000-000000000004'::uuid,
+    '161. [b5a_accept_teacher] 招待を受けた講師が記録される'
+);
+
+-- Test 162-163: 使用済みの招待・存在しないトークンでは所属できない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000081", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000081';
+SELECT throws_ok(
+    $SELECT public.accept_farm_invitation(current_setting('b5a.token1'))$,
+    '22023',
+    'Invitation has already been used',
+    '162. [b5a_accept_reuse] 使用済みの招待は再利用できない'
+);
+SELECT throws_ok(
+    $SELECT public.accept_farm_invitation(repeat('0', 48))$,
+    '22023',
+    'Invalid invitation',
+    '163. [b5a_accept_invalid] 存在しないトークンでは所属できない'
+);
+
+-- Test 164-166: 農園未所属の新規アカウントは招待を受けると講師になる
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SELECT set_config('b5a.token2', public.create_farm_invitation('11111111-1111-1111-1111-111111111111')->>'token', true);
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000081", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000081';
+SELECT lives_ok(
+    $SELECT public.accept_farm_invitation(current_setting('b5a.token2'))$,
+    '164. [b5a_accept_new_account] 農園未所属の新規アカウントは招待を受けられる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT role || ':' || farm_id::text FROM public.users WHERE id = '00000000-0000-0000-0000-000000000081'),
+    'teacher:11111111-1111-1111-1111-111111111111',
+    '165. [b5a_accept_new_account] 新規アカウントは講師になり、既定の農園が農園A になる'
+);
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_members
+     WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+       AND user_id = '00000000-0000-0000-0000-000000000081'),
+    1,
+    '166. [b5a_accept_new_account] 新規アカウントが農園A の講師として登録される'
+);
+
+-- Test 167-169: 招待の取り消し (講師なら誰でも)・期限切れ
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SELECT set_config('b5a.token3', public.create_farm_invitation('11111111-1111-1111-1111-111111111111')->>'token', true);
+SELECT set_config('b5a.token4', public.create_farm_invitation('11111111-1111-1111-1111-111111111111')->>'token', true);
+
+RESET ROLE;
+SELECT set_config('b5a.inv3', (SELECT id::text FROM public.farm_invitations
+    WHERE token_hash = encode(extensions.digest(current_setting('b5a.token3'), 'sha256'), 'hex')), true);
+UPDATE public.farm_invitations SET expires_at = now() - interval '1 minute'
+WHERE token_hash = encode(extensions.digest(current_setting('b5a.token4'), 'sha256'), 'hex');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SELECT lives_ok(
+    $SELECT public.revoke_farm_invitation(current_setting('b5a.inv3')::uuid)$,
+    '167. [b5a_revoke] 共同講師 0004 は農園A の招待を取り消せる'
+);
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000081", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000081';
+SELECT throws_ok(
+    $SELECT public.accept_farm_invitation(current_setting('b5a.token3'))$,
+    '22023',
+    'Invitation has been revoked',
+    '168. [b5a_revoke] 取り消した招待は受けられない'
+);
+SELECT throws_ok(
+    $SELECT public.accept_farm_invitation(current_setting('b5a.token4'))$,
+    '22023',
+    'Invitation has expired',
+    '169. [b5a_expired] 期限切れの招待は受けられない'
+);
+
+-- Test 170: 講師でないユーザーは招待を取り消せない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000097", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000097';
+SELECT throws_ok(
+    $SELECT public.revoke_farm_invitation(current_setting('b5a.inv3')::uuid)$,
+    '42501',
+    'Forbidden: only teachers of this farm can revoke invitations',
+    '170. [b5a_revoke_forbidden] 講師でないユーザーは招待を取り消せない'
+);
+
+-- Test 171-172: 講師一覧は所属する講師だけが取得できる
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SELECT is(
+    (SELECT count(*)::int FROM public.list_farm_members('11111111-1111-1111-1111-111111111111')),
+    3,
+    '171. [b5a_list_members] 講師 0001 は農園A の講師 3 人 (0001・0004・0081) を取得できる'
+);
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000097", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000097';
+SELECT throws_ok(
+    $SELECT * FROM public.list_farm_members('11111111-1111-1111-1111-111111111111')$,
+    '42501',
+    'Forbidden: only teachers of this farm can list members',
+    '172. [b5a_list_forbidden] 生徒は講師一覧を取得できない'
+);
+
+-- Test 173-175: 講師なら誰でも他の講師を外せる。外した農園が既定の農園なら付け替える
+SELECT throws_ok(
+    $SELECT public.remove_farm_member('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000081')$,
+    '42501',
+    'Forbidden: only teachers of this farm can remove members',
+    '173. [b5a_remove_forbidden] 生徒は講師を外せない'
+);
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SELECT lives_ok(
+    $SELECT public.remove_farm_member('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000081')$,
+    '174. [b5a_remove] 共同講師 0004 は講師 0081 を農園A から外せる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT farm_id FROM public.users WHERE id = '00000000-0000-0000-0000-000000000081'),
+    NULL::uuid,
+    '175. [b5a_remove] 所属農園が無くなった講師の既定の農園は NULL になる'
+);
+
+-- Test 176-178: 最後の 1 人は外せない。自分で抜けても既定の農園 (users.farm_id) は変わらない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SELECT throws_ok(
+    $SELECT public.remove_farm_member('11111111-1111-1111-1111-111111111112', '00000000-0000-0000-0000-000000000004')$,
+    '42501',
+    'Cannot remove the last teacher of a farm',
+    '176. [b5a_remove_last] 農園B の最後の講師 0004 は外せない'
+);
+SELECT lives_ok(
+    $SELECT public.remove_farm_member('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004')$,
+    '177. [b5a_leave] 講師 0004 は自分で農園A から抜けられる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT farm_id FROM public.users WHERE id = '00000000-0000-0000-0000-000000000004'),
+    '11111111-1111-1111-1111-111111111112'::uuid,
+    '178. [b5a_leave] 農園A から抜けても講師 0004 の既定の農園は農園B のまま'
 );
 
 RESET ROLE;
