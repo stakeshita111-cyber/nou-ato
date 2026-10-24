@@ -27,8 +27,6 @@ import {
   fetchRawPlotsAndBedsDb,
   fetchPendingJournalsDb,
   savePlotsAndBedsToDb,
-  insertBedDb,
-  deleteBedDb,
 } from '@/lib/farm/farmDb';
 
 export {
@@ -444,160 +442,25 @@ export function useFarmManager() {
     return { x: finalX, y: finalY };
   };
 
-  const updatePlotPositionFree = (plotId: string, x: number, y: number) => {
-    const nextPlots = plots.map((plot) => {
-      if (plot.id === plotId) {
-        return {
-          ...plot,
-          position: { x, y },
-        };
-      }
-      return plot;
-    });
-    setPlots(nextPlots);
-    notifyBroadcast();
-  };
-
-  const { addBedToPlot, deleteBedFromPlot, reorderBedsInPlot, updatePlotBedsCount } =
-    usePlotBedOperations({
-      plots,
-      setPlots,
-      notifyBroadcast,
-    });
-
-  const updateAllUnassignedBedsCount = async (newCount: number) => {
-    setUnassignedBedsCount(newCount);
-    unassignedBedsRef.current = newCount;
-
-    const nextPlots = plots.map((plot) => {
-      if (!plot.is_vacant && !plot.student_id && !plot.student_name) {
-        const newBeds: FarmBed[] = [];
-        for (let i = 1; i <= newCount; i++) {
-          newBeds.push({
-            id: `${plot.id}_bed_${i}`,
-            plot_id: plot.id,
-            bed_number: i,
-            crop_name: '未確定 🌱',
-            is_updated: false,
-          });
-        }
-        return {
-          ...plot,
-          beds: newBeds,
-        };
-      }
-      return plot;
-    });
-
-    setPlots(nextPlots);
-    await savePlotsGridIndicesToSupabase(nextPlots, { unassigned_beds: newCount });
-
-    try {
-      for (const plot of nextPlots) {
-        if (
-          !plot.is_vacant &&
-          !plot.student_id &&
-          !plot.student_name &&
-          !plot.id.startsWith('plot_placeholder_')
-        ) {
-          const { data: existingBeds } = await supabase
-            .from('farm_beds')
-            .select('id')
-            .eq('plot_id', plot.id);
-          if (existingBeds) {
-            for (const eb of existingBeds) {
-              const bedNumMatch = eb.id.match(/_bed_(\d+)$/);
-              const num = bedNumMatch ? parseInt(bedNumMatch[1]) : 0;
-              if (num > newCount) {
-                await deleteBedDb(eb.id);
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('updateAllUnassignedBedsCount excess beds clean error:', e);
-    }
-  };
-
-  const addPlot = async (bedCount: number = 4) => {
-    const plotId = `plot_${Date.now()}`;
-    const farmPlots = currentFarmPlots;
-    const nextCodeNumber = farmPlots.length + 1;
-    const codeStr = String(nextCodeNumber);
-
-    const newBeds: FarmBed[] = [];
-    for (let i = 1; i <= bedCount; i++) {
-      newBeds.push({
-        id: `${plotId}_bed_${i}`,
-        plot_id: plotId,
-        bed_number: i,
-        is_updated: false,
-      });
-    }
-
-    const index = farmPlots.length;
-    const col = index % 3;
-    const row = Math.floor(index / 3);
-    const newX = 40 + col * 330;
-    const newY = 40 + row * 400;
-
-    const newPlot: FarmPlot = {
-      id: plotId,
-      farm_id: activeFarmId,
-      name: `区画 ${codeStr}`,
-      code: codeStr,
-      position: { x: newX, y: newY },
-      beds: newBeds,
-    };
-
-    const nextPlots = [...plots, newPlot];
-    setPlots(nextPlots);
-
-    try {
-      await supabase.from('farm_plots').insert({
-        id: plotId,
-        name: `区画 ${codeStr}`,
-        code: codeStr,
-      });
-      for (const b of newBeds) {
-        await insertBedDb({
-          id: b.id,
-          plot_id: plotId,
-          bed_number: String(b.bed_number),
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    notifyBroadcast();
-    return newPlot;
-  };
-
-  const deletePlot = async (plotId: string) => {
-    const targetPlot = plots.find(
-      (p) => p.id === plotId || p.code === plotId || p.name?.includes(plotId)
-    );
-    if (!targetPlot) return;
-
-    if (!confirm(`「${targetPlot.name || 'この区画'}」を本当に空き地にしますか？`)) return;
-
-    const nextPlots = plots.map((p) => {
-      if (p.id === targetPlot.id || p.code === targetPlot.code) {
-        return {
-          ...p,
-          is_vacant: true,
-          student_id: undefined,
-          student_name: undefined,
-        };
-      }
-      return p;
-    });
-
-    setPlots(nextPlots);
-    await savePlotsGridIndicesToSupabase(nextPlots);
-  };
+  const {
+    updatePlotPositionFree,
+    addPlot,
+    deletePlot,
+    addBedToPlot,
+    deleteBedFromPlot,
+    reorderBedsInPlot,
+    updatePlotBedsCount,
+    updateAllUnassignedBedsCount,
+  } = usePlotBedOperations({
+    plots,
+    setPlots,
+    activeFarmId,
+    currentFarmPlots,
+    setUnassignedBedsCount,
+    unassignedBedsRef,
+    savePlotsGridIndicesToSupabase,
+    notifyBroadcast,
+  });
 
   const assignStudentToPlot = async (plotId: string, studentId: string, studentName: string) => {
     const currentList = plotsRef.current.length > 0 ? plotsRef.current : plots;
