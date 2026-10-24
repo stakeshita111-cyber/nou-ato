@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { useFarmStore } from '@/store/useFarmStore';
 import type {
   HourlyPoint,
   DailyPoint,
@@ -114,6 +115,27 @@ export function fetchMunicipalityNameFromCoords(
     });
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveTargetFarmId(
+  role: string | null | undefined,
+  userFarmId: string | null | undefined
+): string | null {
+  if (role === 'teacher') {
+    const storeFarmId = useFarmStore.getState().activeFarmId;
+    if (storeFarmId && UUID_REGEX.test(storeFarmId)) {
+      return storeFarmId;
+    }
+    if (typeof window !== 'undefined') {
+      const savedFarmId = localStorage.getItem('nouato_active_farm_id');
+      if (savedFarmId && UUID_REGEX.test(savedFarmId)) {
+        return savedFarmId;
+      }
+    }
+  }
+  return userFarmId && UUID_REGEX.test(userFarmId) ? userFarmId : null;
+}
+
 export async function saveLocationToDBAndStorage(
   cityName: string,
   latitude: number,
@@ -137,7 +159,8 @@ export async function saveLocationToDBAndStorage(
       .eq('id', user.id)
       .maybeSingle();
 
-    if (uData?.role === 'teacher' && uData?.farm_id) {
+    const targetFarmId = resolveTargetFarmId(uData?.role, uData?.farm_id);
+    if (uData?.role === 'teacher' && targetFarmId) {
       await supabase
         .from('farms')
         .update({
@@ -145,7 +168,7 @@ export async function saveLocationToDBAndStorage(
           latitude: latitude,
           longitude: longitude,
         })
-        .eq('id', uData.farm_id);
+        .eq('id', targetFarmId);
     }
   } catch (e) {
     console.warn('Supabase farms location save sync notice:', e);
@@ -466,15 +489,16 @@ export function useWeatherLive() {
       if (user) {
         const { data: uData } = await supabase
           .from('users')
-          .select('farm_id')
+          .select('farm_id, role')
           .eq('id', user.id)
           .maybeSingle();
 
-        if (uData?.farm_id) {
+        const targetFarmId = resolveTargetFarmId(uData?.role, uData?.farm_id);
+        if (targetFarmId) {
           const { data: farmData } = await supabase
             .from('farms')
             .select('address, latitude, longitude')
-            .eq('id', uData.farm_id)
+            .eq('id', targetFarmId)
             .maybeSingle();
 
           if (farmData) {
@@ -516,6 +540,17 @@ export function useWeatherLive() {
     load().catch((err) => {
       console.error('loadSavedLocation error:', err);
     });
+
+    if (typeof window === 'undefined') return;
+    const handleFarmChanged = () => {
+      loadSavedLocation().catch((err) => {
+        console.error('loadSavedLocation on farm change error:', err);
+      });
+    };
+    window.addEventListener('nouato_active_farm_changed', handleFarmChanged);
+    return () => {
+      window.removeEventListener('nouato_active_farm_changed', handleFarmChanged);
+    };
   }, [loadSavedLocation]);
 
   return {

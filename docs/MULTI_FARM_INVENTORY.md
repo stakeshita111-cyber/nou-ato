@@ -112,10 +112,19 @@
 | `POST /api/tickets/grant` | 講師の `users.farm_id` と生徒の `users.farm_id` の一致                        | 生徒の農園に講師として所属しているか（`is_farm_teacher`）                                |
 | `GET /auth/callback`      | role / farm_id / 講師登録の意思で遷移先と処理を決定                           | 講師登録完了時に `farm_members` へ登録されることを確認（register_teacher 側で対応、B-1） |
 
-## 5. 要確認（B-1 着手前にユーザーと決める）
+## 5. 決定事項・完了ステータス（B-1〜B-6）
 
-- `fix/allow-geolocation-permission` ローカルの `183d74b`（tasks.farm_id NOT NULL 化）を B-2 (c) として取り込むか、作り直すか
-- 講師の `users.farm_id` を、B-6 で「既定の農園」として残すか NULL にするか（B-6 で提案）
+- `fix/allow-geolocation-permission` ローカルの `183d74b`（tasks.farm_id NOT NULL 化）は取り込まず、B-2 (c)（`20261024040000_b2c_tasks_rls.sql`, #219）で作り直して本番適用済み。
+- 役割は「講師」と「生徒」の2種類のみ。講師の所属・権限はすべて `farm_members`（`current_user_farm_ids()` / `is_farm_teacher(farm_id)`）で判定し、同じ農園の講師は全員同じ権限を持つ（最後の1人は削除不可）。生徒は従来どおり `users.farm_id` で1農園のみ。
+- **B-1〜B-5 本番適用・マージ完了**:
+  - B-1（#216, `20261024010000_b1_farm_members.sql`）: `farm_members` / `farm_invitations` テーブル、ヘルパー関数、整合性トリガー、既存講師の移行、`register_teacher` / `list_my_farms` / `create_farm`
+  - B-2（#217〜#220, `20261024020000`〜`20261024050000`）: 全テーブルの講師 RLS 分岐を `current_user_farm_ids()` に切り替え、`tasks.farm_id` を NOT NULL 化、`enforce_teacher_task_farm_id` / `journals_set_farm_id` を所属判定に対応
+  - B-3（#221〜#222, `20261024060000`〜`20261024070000`）: 区画・畝・生徒・タスク系 RPC 7本を `is_farm_teacher` に切り替え（旧シグネチャの互換オーバーロードなし）
+  - B-4（#223〜#226）: `/api/settings`・`/api/tickets/grant` の所属判定、`useFarmStore`（`list_my_farms` / `create_farm`）、各講師画面の `activeFarmId` スコープ統一
+  - B-5（#227〜#229, `20261024080000_b5a_farm_invitation_rpcs.sql`）: 講師招待・メンバー管理 RPC 5本、設定画面の「講師メンバー」セクション、`/invite/teacher` 招待受け入れ画面
+- **B-6 棚卸し結果と講師の `users.farm_id` の扱い**:
+  - 講師の権限判定（RLS・RPC・トリガー・API ルート）に `users.farm_id` および `farms.owner_id` の参照が残っていないことを確認済み。
+  - 講師の `users.farm_id` は権限判定には一切使われず、初期選択・未指定時のフォールバック用ポインタ（既定の農園）として `register_teacher` / `accept_farm_invitation` / `remove_farm_member` で安全に維持されているため、NULL 化は行わず「既定の農園」として残す。
 
 ## 再生成手順
 
