@@ -14,6 +14,7 @@ import { SproutLoader } from '@/components/SproutLoader';
 import ConfirmStudentSwapModal from '@/components/teacher/farm-canvas/ConfirmStudentSwapModal';
 import FarmOwnerSettingsModal from '@/components/teacher/farm-canvas/FarmOwnerSettingsModal';
 import FarmCanvasToolbar from '@/components/teacher/farm-canvas/FarmCanvasToolbar';
+import UnassignedStudentsSidebar from '@/components/teacher/farm-canvas/UnassignedStudentsSidebar';
 import { useStudentDrag, UnassignedStudent } from '@/hooks/farm/useStudentDrag';
 import { useBedTimelineRecords } from '@/hooks/farm/useBedTimelineRecords';
 import { supabase } from '@/lib/supabase';
@@ -135,7 +136,6 @@ export default function TeacherFarmCanvasView({
       }));
   }, [supabaseStudents, currentFarmPlots]);
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
   // キャンバス参照
@@ -144,10 +144,10 @@ export default function TeacherFarmCanvasView({
   // 🧑‍🌾 生徒カードのドラッグ＆ドロップ管理
   const {
     draggingStudent,
-    setDraggingStudent,
     confirmChangeStudentModal,
     setConfirmChangeStudentModal,
     handleStudentDragStart,
+    handleStudentDragEnd,
     handleDropStudentOnPlot,
     handleConfirmChangeStudent,
   } = useStudentDrag({
@@ -674,10 +674,23 @@ export default function TeacherFarmCanvasView({
     }
   };
 
-  // 検索フィルター
-  const filteredStudents = unassignedList.filter(
-    (s) => s.name.includes(searchQuery) || s.grade.includes(searchQuery)
-  );
+  // 未割り当て受講生の一括割り当て
+  const handleAssignAllUnassigned = () => {
+    if (
+      !confirm(
+        `未割り当ての受講生（${unassignedList.length}名）を空いている区画へ一括割り当てしますか？`
+      )
+    )
+      return;
+    void (async () => {
+      const res = await assignAllUnassignedStudents(unassignedList);
+      if (res && res.count > 0) {
+        notify(`⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`);
+      } else {
+        notify('⚠️ 割り当て可能な空き区画がありませんでした');
+      }
+    })();
+  };
 
   // スクロールホイールでの拡大縮小 (画面表示倍率 scale: 15% 〜 200%)
   useEffect(() => {
@@ -775,95 +788,13 @@ export default function TeacherFarmCanvasView({
       />
 
       {/* 🧑‍🌾 未割り当て受講生一覧 (D&Dで畑に配置) 🧑‍🌾 */}
-      <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-xs space-y-2.5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
-              <span>🧑‍🌾</span>
-              <span>未割り当て受講生</span>
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                {unassignedList.length} 名
-              </span>
-            </span>
-            <span className="text-[10px] text-gray-500 font-normal">
-              ※カードをマスにドラッグして割り当て。マス同士をドラッグ＆ドロップすると区画データを相互入れ替えできます
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {unassignedList.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (
-                    !confirm(
-                      `未割り当ての受講生（${unassignedList.length}名）を空いている区画へ一括割り当てしますか？`
-                    )
-                  )
-                    return;
-                  void (async () => {
-                    const res = await assignAllUnassignedStudents(unassignedList);
-                    if (res && res.count > 0) {
-                      notify(`⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`);
-                    } else {
-                      notify('⚠️ 割り当て可能な空き区画がありませんでした');
-                    }
-                  })();
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
-              >
-                <span>⚡</span>
-                <span>空き区画へ一括割り当て</span>
-              </button>
-            )}
-            {unassignedList.length > 5 && (
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="受講生を検索..."
-                className="text-xs border border-gray-200 rounded-xl px-2.5 py-1 w-36 focus:outline-emerald-500"
-              />
-            )}
-          </div>
-        </div>
-
-        {filteredStudents.length > 0 ? (
-          <div className="flex flex-wrap gap-2 items-center">
-            {filteredStudents.map((student) => (
-              <div
-                key={student.id}
-                draggable={true}
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/json', JSON.stringify(student));
-                  e.dataTransfer.effectAllowed = 'copyMove';
-                  handleStudentDragStart(student);
-                }}
-                onDragEnd={() => setDraggingStudent(null)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border border-gray-200 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-xs transition cursor-grab active:cursor-grabbing select-none ${
-                  draggingStudent?.id === student.id ? 'opacity-40 ring-2 ring-emerald-500' : ''
-                }`}
-              >
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white ${student.colorBg}`}
-                >
-                  {student.initials}
-                </div>
-                <span className="text-xs font-bold text-gray-800">{student.name}</span>
-                <span className="text-[9px] bg-white border border-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md font-bold">
-                  {student.grade}
-                </span>
-                <span className="text-[10px] text-gray-400">⠿</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-xs text-gray-400 py-1 font-medium">
-            {unassignedList.length === 0
-              ? '✨ すべての受講生が畑の区画に割り当てられています。'
-              : '検索条件に一致する受講生はいません。'}
-          </div>
-        )}
-      </div>
+      <UnassignedStudentsSidebar
+        unassignedList={unassignedList}
+        draggingStudent={draggingStudent}
+        onDragStart={handleStudentDragStart}
+        onDragEnd={handleStudentDragEnd}
+        onAssignAll={handleAssignAllUnassigned}
+      />
 
       {/* 🌟 2. メインのグリッド描画エリア 🌟 */}
       <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm overflow-x-auto">
