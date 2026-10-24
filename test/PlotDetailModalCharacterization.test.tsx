@@ -213,9 +213,7 @@ describe('B2a: PlotDetailModal 特性テスト (TeacherFarmCanvasView 経由)', 
     fireEvent.click(vacantBtn);
     await waitFor(() => {
       expect(updatePlotStatusMock).toHaveBeenCalledWith(`${FARM_ID}_A1`, 'vacant');
-      expect(
-        screen.getByText('🚧 区画 A1 を「空き地（管理外）」に設定しました')
-      ).toBeTruthy();
+      expect(screen.getByText('🚧 区画 A1 を「空き地（管理外）」に設定しました')).toBeTruthy();
     });
   });
 
@@ -225,9 +223,7 @@ describe('B2a: PlotDetailModal 特性テスト (TeacherFarmCanvasView 経由)', 
     fireEvent.click(unassignedBtn);
     await waitFor(() => {
       expect(updatePlotStatusMock).toHaveBeenCalledWith(`${FARM_ID}_A1`, 'unassigned');
-      expect(
-        screen.getByText('🌱 区画 A1 を「未割当（空き区画）」に設定しました')
-      ).toBeTruthy();
+      expect(screen.getByText('🌱 区画 A1 を「未割当（空き区画）」に設定しました')).toBeTruthy();
     });
   });
 
@@ -253,9 +249,7 @@ describe('B2a: PlotDetailModal 特性テスト (TeacherFarmCanvasView 経由)', 
         'student-2',
         '佐藤 次郎'
       );
-      expect(
-        screen.getByText('🎯 区画 A1 に 佐藤 次郎 さんを割り当てました！')
-      ).toBeTruthy();
+      expect(screen.getByText('🎯 区画 A1 に 佐藤 次郎 さんを割り当てました！')).toBeTruthy();
     });
   });
 
@@ -286,10 +280,7 @@ describe('B2a: PlotDetailModal 特性テスト (TeacherFarmCanvasView 経由)', 
     fireEvent.click(deleteBtn);
     await waitFor(() => {
       expect(confirmSpy).toHaveBeenCalled();
-      expect(deleteBedFromPlotMock).toHaveBeenCalledWith(
-        `${FARM_ID}_A1`,
-        `${FARM_ID}_A1_bed_1`
-      );
+      expect(deleteBedFromPlotMock).toHaveBeenCalledWith(`${FARM_ID}_A1`, `${FARM_ID}_A1_bed_1`);
       expect(screen.getByText('🗑️ 畝 #1 を削除しました')).toBeTruthy();
     });
     confirmSpy.mockRestore();
