@@ -5,6 +5,7 @@ import { z } from 'zod';
 import Toast from '@/components/ui/Toast';
 import { useThemeStore, ThemeSettings } from '@/store/useThemeStore';
 import { useFarmStore } from '@/store/useFarmStore';
+import FarmMembersSection from '@/components/teacher/FarmMembersSection';
 import { formatDate, formatNumber } from '@/lib/utils/formatHelper';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
@@ -876,6 +877,9 @@ export default function TeacherSettingsView() {
           </button>
         </div>
       </div>
+
+      {/* 👥 講師メンバー (招待・外す) */}
+      <FarmMembersSection />
 
       {/* 🌟 クイック質問チップ作成・編集モーダル 🌟 */}
       {isFaqModalOpen && editingFaq && (
