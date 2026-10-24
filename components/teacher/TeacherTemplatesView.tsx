@@ -167,19 +167,15 @@ export default function TeacherTemplatesView() {
     updatedList: TaskTemplate[],
     savedTemplate?: TaskTemplate,
     deleteId?: string
-  ) => {
-    setTemplates(updatedList);
-    const customOnly = updatedList.filter((t) => !t.id.startsWith('tpl_'));
-    try {
-      localStorage.setItem('nouato_custom_templates', JSON.stringify(customOnly));
-    } catch (e) {
-      console.error('Failed to save to localStorage:', e);
-    }
-
+  ): Promise<boolean> => {
     // 🌟 Supabase DB (tasks テーブル: is_template = true) へのクラウド完全永続同期 🌟
     try {
       if (deleteId && !deleteId.startsWith('tpl_')) {
-        await supabase.from('tasks').delete().eq('id', deleteId);
+        const { error } = await supabase.from('tasks').delete().eq('id', deleteId);
+        if (error) {
+          console.error('tasks template delete error:', error);
+          return false;
+        }
       } else if (savedTemplate && !savedTemplate.id.startsWith('tpl_')) {
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id;
@@ -187,7 +183,7 @@ export default function TeacherTemplatesView() {
 
         // tasks.farm_id は NOT NULL (B-2c)。農園を特定できなければ DB 同期は行わない
         if (userId && farmId) {
-          await supabase.from('tasks').upsert({
+          const { error } = await supabase.from('tasks').upsert({
             id: savedTemplate.id,
             title: savedTemplate.title,
             description: savedTemplate.description || '',
@@ -210,11 +206,25 @@ export default function TeacherTemplatesView() {
               badge_icon: savedTemplate.badge_icon,
             },
           });
+          if (error) {
+            console.error('tasks template upsert error:', error);
+            return false;
+          }
         }
       }
     } catch (err) {
       console.warn('tasks template db sync notice:', err);
+      return false;
     }
+
+    setTemplates(updatedList);
+    const customOnly = updatedList.filter((t) => !t.id.startsWith('tpl_'));
+    try {
+      localStorage.setItem('nouato_custom_templates', JSON.stringify(customOnly));
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+    }
+    return true;
   };
 
   // テンプレートから教材/タスクに追加する処理
@@ -346,7 +356,12 @@ export default function TeacherTemplatesView() {
       nextList = templates.map((t) => (t.id === editingTemplate.id ? finalTemplate : t));
     }
 
-    await saveTemplatesToStorage(nextList, finalTemplate);
+    const ok = await saveTemplatesToStorage(nextList, finalTemplate);
+    if (!ok) {
+      setToastMessage('⚠️ テンプレートの保存に失敗しました。時間をおいて再度お試しください');
+      setShowToast(true);
+      return;
+    }
     setEditingTemplate(null);
     setIsCreatingNew(false);
     setToastMessage(
@@ -363,7 +378,12 @@ export default function TeacherTemplatesView() {
     }
     if (!confirm(`テンプレート「${title}」を削除しますか？`)) return;
     const nextList = templates.filter((t) => t.id !== id);
-    await saveTemplatesToStorage(nextList, undefined, id);
+    const ok = await saveTemplatesToStorage(nextList, undefined, id);
+    if (!ok) {
+      setToastMessage('⚠️ テンプレートの削除に失敗しました。時間をおいて再度お試しください');
+      setShowToast(true);
+      return;
+    }
     setToastMessage('🗑 テンプレートを削除しました。');
     setShowToast(true);
   };

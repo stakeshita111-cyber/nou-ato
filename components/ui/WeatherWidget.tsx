@@ -106,11 +106,15 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
           setSelectedMapLat(latitude);
           setSelectedMapLon(longitude);
 
-          await saveLocationToDBAndStorage(cityName, latitude, longitude);
+          const saved = await saveLocationToDBAndStorage(cityName, latitude, longitude);
           await fetchLiveWeather(cityName, latitude, longitude);
           setIsLocationModalOpen(false);
 
-          setToastMessage(`✨ GPS現在地「${cityName}」の天気を取得し保存しました！`);
+          setToastMessage(
+            saved
+              ? `✨ GPS現在地「${cityName}」の天気を取得し保存しました！`
+              : '⚠️ 気象地点の保存に失敗しました。時間をおいて再度お試しください'
+          );
           setShowToast(true);
         };
 
@@ -139,8 +143,9 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     setLat(selectedMapLat);
     setLon(selectedMapLon);
 
+    let saved = true;
     if (!hideBroadcastButton) {
-      await saveLocationToDBAndStorage(selectedMapCityName, selectedMapLat, selectedMapLon);
+      saved = await saveLocationToDBAndStorage(selectedMapCityName, selectedMapLat, selectedMapLon);
     } else if (typeof window !== 'undefined') {
       localStorage.setItem('nouato_weather_city_name', selectedMapCityName);
       localStorage.setItem('nouato_weather_lat', selectedMapLat.toString());
@@ -150,7 +155,11 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
     await fetchLiveWeather(selectedMapCityName, selectedMapLat, selectedMapLon);
     setIsLocationModalOpen(false);
 
-    setToastMessage(`✨ 地域を「${selectedMapCityName}」に確定更新・保存しました！`);
+    setToastMessage(
+      saved
+        ? `✨ 地域を「${selectedMapCityName}」に確定更新・保存しました！`
+        : '⚠️ 気象地点の保存に失敗しました。時間をおいて再度お試しください'
+    );
     setShowToast(true);
   };
 

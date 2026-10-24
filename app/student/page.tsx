@@ -443,6 +443,8 @@ function StudentContent() {
       setToastMessage('既にこのイベントには参加予約を申し込んでいます');
     } else if (result) {
       setToastMessage('🙋‍♂️ イベントへの参加予約申込を送信しました！講師の承認をお待ちください。');
+    } else {
+      setToastMessage('⚠️ イベントの参加予約に失敗しました。時間をおいて再度お試しください');
     }
     setShowToast(true);
   };

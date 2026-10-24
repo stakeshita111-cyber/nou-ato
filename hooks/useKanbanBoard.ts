@@ -237,16 +237,16 @@ export function useKanbanBoard(columns: ColumnType[]) {
   };
 
   // 📋 タスクの複製（コピーして追加）
-  const duplicateTask = async (taskToDuplicate: Task) => {
+  const duplicateTask = async (taskToDuplicate: Task): Promise<Task | null> => {
     const copyTitle = `${taskToDuplicate.title} (コピー)`;
-    await addTask(copyTitle, {
+    return addTask(copyTitle, {
       ...taskToDuplicate,
       status: 'pool', // 複製されたものは教材ストックへ追加
     });
   };
 
   // タスクの更新（Update：詳細設定の保存）
-  const saveTaskDetails = async (updatedTask: Task) => {
+  const saveTaskDetails = async (updatedTask: Task): Promise<boolean> => {
     try {
       const existingTask = tasks.find((t) => t.id === updatedTask.id);
       const existingChecklist =
@@ -280,6 +280,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (error) {
         console.warn('saveTaskDetails DB保存警告:', error.message);
+        return false;
       }
 
       if (updatedTask.status === 'todo') {
@@ -292,17 +293,19 @@ export function useKanbanBoard(columns: ColumnType[]) {
         )
       );
       setEditingTask(null);
+      return true;
     } catch (e) {
       console.error('saveTaskDetails 実行中に例外が発生しました:', e);
+      return false;
     }
   };
 
   // 🗑️ タスクのゴミ箱移動（論理削除）
-  const deleteTask = async (id: string) => {
+  const deleteTask = async (id: string): Promise<boolean> => {
     const targetTask = tasks.find((t) => t.id === id);
-    if (!targetTask) return;
+    if (!targetTask) return false;
 
-    if (!confirm(`「${targetTask.title}」をゴミ箱へ移動しますか？`)) return;
+    if (!confirm(`「${targetTask.title}」をゴミ箱へ移動しますか？`)) return false;
 
     try {
       const deletedAtIso = new Date().toISOString();
@@ -313,50 +316,59 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (error) {
         console.warn('削除警告:', error.message);
+        return false;
       }
 
       setTasks(tasks.filter((task) => task.id !== id));
       setTrashTasks([{ ...targetTask, deleted_at: deletedAtIso }, ...trashTasks]);
       notifyTaskSync();
+      return true;
     } catch (e) {
       console.error('deleteTask 実行中に例外が発生しました:', e);
+      return false;
     }
   };
 
   // ♻️ ゴミ箱から復元（リストア）
-  const restoreTask = async (id: string) => {
+  const restoreTask = async (id: string): Promise<boolean> => {
     const targetTask = trashTasks.find((t) => t.id === id);
-    if (!targetTask) return;
+    if (!targetTask) return false;
 
     try {
       const { error } = await supabase.from('tasks').update({ deleted_at: null }).eq('id', id);
 
       if (error) {
         console.warn('復元警告:', error.message);
+        return false;
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
       setTasks([{ ...targetTask, deleted_at: null }, ...tasks]);
+      return true;
     } catch (e) {
       console.error('restoreTask 実行中に例外が発生しました:', e);
+      return false;
     }
   };
 
   // ❌ 永久削除
-  const permanentlyDeleteTask = async (id: string) => {
-    if (!confirm('本当に永久削除しますか？この操作は取り消せません。')) return;
+  const permanentlyDeleteTask = async (id: string): Promise<boolean> => {
+    if (!confirm('本当に永久削除しますか？この操作は取り消せません。')) return false;
 
     try {
       const { error } = await supabase.from('tasks').delete().eq('id', id);
 
       if (error) {
         console.warn('完全削除警告:', error.message);
+        return false;
       }
 
       setTrashTasks(trashTasks.filter((t) => t.id !== id));
       notifyTaskSync();
+      return true;
     } catch (e) {
       console.error('permanentlyDeleteTask 実行中に例外が発生しました:', e);
+      return false;
     }
   };
 
@@ -370,11 +382,11 @@ export function useKanbanBoard(columns: ColumnType[]) {
   };
 
   // ドラッグ終了（ステータス変更 ＆ カラム内並び替え対応）
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent): Promise<boolean> => {
     const { active, over } = event;
     setActiveTask(null);
 
-    if (!over) return;
+    if (!over) return true;
 
     const taskId = active.id as string;
     const overId = over.id as string;
@@ -386,11 +398,12 @@ export function useKanbanBoard(columns: ColumnType[]) {
     }
 
     const isValidColumn = columns.some((c) => c.id === newStatus);
-    if (!isValidColumn) return;
+    if (!isValidColumn) return true;
 
     const currentTask = tasks.find((t) => t.id === taskId);
-    if (!currentTask) return;
+    if (!currentTask) return true;
 
+    const previousTasks = tasks;
     setTasks((prevTasks) => {
       const oldIndex = prevTasks.findIndex((t) => t.id === taskId);
       const newIndex = prevTasks.findIndex((t) => t.id === overId);
@@ -411,14 +424,18 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
       if (error) {
         console.error('【デバッグ】ドラッグ更新失敗:', error);
-      } else {
-        if (newStatus === 'todo') {
-          await publishTaskToStudents(taskId);
-        }
-        notifyTaskSync();
+        setTasks(previousTasks);
+        return false;
       }
+      if (newStatus === 'todo') {
+        await publishTaskToStudents(taskId);
+      }
+      notifyTaskSync();
+      return true;
     } catch (e) {
       console.error('【デバッグ】handleDragEnd 例外:', e);
+      setTasks(previousTasks);
+      return false;
     }
   };
 

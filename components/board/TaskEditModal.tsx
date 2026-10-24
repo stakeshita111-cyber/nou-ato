@@ -80,28 +80,7 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
         phase: '育成・管理',
       };
 
-      // 1. LocalStorage (nouato_custom_templates) に追加保存
-      if (typeof window !== 'undefined') {
-        let currentList: TaskTemplate[] = [];
-        const saved = localStorage.getItem('nouato_custom_templates');
-        if (saved) {
-          try {
-            const parsed: unknown = JSON.parse(saved);
-            const parseResult = CustomTemplateListSchema.safeParse(parsed);
-            if (parseResult.success) {
-              currentList = parseResult.data;
-            } else {
-              console.error('Failed to parse custom templates with schema:', parseResult.error);
-            }
-          } catch (e) {
-            console.error('Failed to parse custom templates:', e);
-          }
-        }
-        currentList.unshift(newTemplate);
-        localStorage.setItem('nouato_custom_templates', JSON.stringify(currentList));
-      }
-
-      // 2. Supabase DB (tasks テーブル: is_template = true, status = 'template') に保存
+      // 1. Supabase DB (tasks テーブル: is_template = true, status = 'template') に保存
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id;
       const farmId = await resolveActiveFarmId();
@@ -140,10 +119,31 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
       ]);
 
       if (error) {
-        console.warn('Supabase insert template notice:', error);
+        console.error('Supabase insert template error:', error);
+        setToastMessage(`❌ テンプレートの追加に失敗しました: ${error.message}`);
+        setShowToast(true);
+        return;
       }
 
+      // 2. DB保存成功後に LocalStorage (nouato_custom_templates) に追加保存
       if (typeof window !== 'undefined') {
+        let currentList: TaskTemplate[] = [];
+        const saved = localStorage.getItem('nouato_custom_templates');
+        if (saved) {
+          try {
+            const parsed: unknown = JSON.parse(saved);
+            const parseResult = CustomTemplateListSchema.safeParse(parsed);
+            if (parseResult.success) {
+              currentList = parseResult.data;
+            } else {
+              console.error('Failed to parse custom templates with schema:', parseResult.error);
+            }
+          } catch (e) {
+            console.error('Failed to parse custom templates:', e);
+          }
+        }
+        currentList.unshift(newTemplate);
+        localStorage.setItem('nouato_custom_templates', JSON.stringify(currentList));
         window.dispatchEvent(new Event('nouato_tasks_updated'));
         window.dispatchEvent(new Event('nouato_custom_templates_updated'));
       }
