@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(88);
+SELECT plan(103);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1020,6 +1020,110 @@ SELECT is(
     1,
     '80. [b2a_student_farms] 生徒は farms で自分の農園のみ参照できる'
 );
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-2 (b): farm_plots / farm_beds / crop_records の RLS を farm_members 基準へ
+--   前提: 講師 0001 は農園A、講師 0004 は農園B のみに所属
+--   専用の区画・畝・記録を管理者権限で農園A に作成して検証する
+-- ==============================================================================
+RESET ROLE;
+INSERT INTO public.farm_plots (id, farm_id, name, code)
+VALUES ('b2b-plot-a', '11111111-1111-1111-1111-111111111111', 'B-2b 検証区画', 'Z9');
+INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, status, season)
+VALUES ('b2b-bed-a', 'b2b-plot-a', 1, 'B-2b 検証の畝', 'active', '2026年 秋冬');
+INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, harvest_amount, date)
+VALUES ('b2b-rec-a', 'b2b-bed-a', 'b2b-plot-a', 'B-2b 検証の記録', 1, '2026-10-24');
+
+-- Test 81: 単一農園の講師 0001 は自分の農園の区画・畝・記録を参照できる (従来どおり)
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.crop_records r
+     JOIN public.farm_beds b ON b.id = r.bed_id
+     JOIN public.farm_plots p ON p.id = b.plot_id
+     WHERE r.id = 'b2b-rec-a'),
+    1,
+    '81. [b2b_single_farm_teacher] 講師 0001 は自分の農園の区画・畝・記録をまとめて参照できる'
+);
+
+-- Test 82-85: 所属していない講師 0004 は農園A の区画・畝・記録を参照・追加できない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+
+SELECT is((SELECT count(*)::int FROM public.farm_plots WHERE id = 'b2b-plot-a'), 0,
+    '82. [b2b_plots_isolation] 講師 0004 は所属していない農園A の区画を参照できない');
+SELECT is((SELECT count(*)::int FROM public.farm_beds WHERE id = 'b2b-bed-a'), 0,
+    '83. [b2b_beds_isolation] 講師 0004 は所属していない農園A の畝を参照できない');
+SELECT is((SELECT count(*)::int FROM public.crop_records WHERE id = 'b2b-rec-a'), 0,
+    '84. [b2b_records_isolation] 講師 0004 は所属していない農園A の記録を参照できない');
+SELECT throws_ok(
+    'INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, status, season) VALUES (''b2b-bed-x'', ''b2b-plot-a'', 2, ''侵入'', ''active'', ''2026年 秋冬'')',
+    '42501',
+    NULL,
+    '85. [b2b_beds_insert_isolation] 講師 0004 は所属していない農園A に畝を追加できない'
+);
+
+-- Test 86-93: 講師 0004 を農園A に所属させると、参照・追加・更新・削除ができる
+RESET ROLE;
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.farm_plots WHERE id = 'b2b-plot-a'), 1,
+    '86. [b2b_co_teacher_plots] 農園A に所属した講師 0004 は農園A の区画を参照できる');
+SELECT is((SELECT count(*)::int FROM public.crop_records WHERE id = 'b2b-rec-a'), 1,
+    '87. [b2b_co_teacher_records] 農園A に所属した講師 0004 は農園A の記録を参照できる');
+SELECT lives_ok(
+    'INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, status, season) VALUES (''b2b-bed-co'', ''b2b-plot-a'', 2, ''共同講師の畝'', ''active'', ''2026年 秋冬'')',
+    '88. [b2b_co_teacher_bed_insert] 共同講師は農園A に畝を追加できる'
+);
+SELECT lives_ok(
+    'UPDATE public.farm_beds SET crop_name = ''共同講師が更新'' WHERE id = ''b2b-bed-co''',
+    '89. [b2b_co_teacher_bed_update] 共同講師は農園A の畝を更新できる'
+);
+SELECT lives_ok(
+    'INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, harvest_amount, date) VALUES (''b2b-rec-co'', ''b2b-bed-co'', ''b2b-plot-a'', ''共同講師の記録'', 2, ''2026-10-24'')',
+    '90. [b2b_co_teacher_record_insert] 共同講師は農園A の畝に記録を追加できる'
+);
+SELECT lives_ok(
+    'DELETE FROM public.crop_records WHERE id = ''b2b-rec-co''',
+    '91. [b2b_co_teacher_record_delete] 共同講師は農園A の記録を削除できる'
+);
+SELECT lives_ok(
+    'DELETE FROM public.farm_beds WHERE id = ''b2b-bed-co''',
+    '92. [b2b_co_teacher_bed_delete] 共同講師は農園A の畝を削除できる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_beds WHERE id = 'b2b-bed-co'),
+    0,
+    '93. [b2b_co_teacher_bed_delete] 共同講師による畝の削除が実際に反映されている'
+);
+
+-- Test 94-95: 所属から外すと、直後から参照できなくなる
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.farm_beds WHERE id = 'b2b-bed-a'), 0,
+    '94. [b2b_removed_teacher] 所属から外された講師 0004 は農園A の畝を参照できなくなる');
+SELECT is((SELECT count(*)::int FROM public.crop_records WHERE id = 'b2b-rec-a'), 0,
+    '95. [b2b_removed_teacher] 所属から外された講師 0004 は農園A の記録を参照できなくなる');
 
 RESET ROLE;
 
