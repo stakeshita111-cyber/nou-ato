@@ -920,7 +920,7 @@ SELECT is(
 );
 
 SELECT is(
-    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000002'),
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
     0,
     '68. [b2a_users_isolation] 講師 0004 は所属していない農園A の生徒を参照できない'
 );
@@ -954,7 +954,7 @@ SELECT is(
 );
 
 SELECT is(
-    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000002'),
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
     1,
     '72. [b2a_co_teacher_student] 農園A に所属した講師 0004 は農園A の生徒を参照できる'
 );
@@ -1000,14 +1000,14 @@ SELECT is(
 );
 
 SELECT is(
-    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000002'),
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
     0,
     '78. [b2a_removed_teacher] 所属から外された講師 0004 は農園A の生徒を参照できなくなる'
 );
 
 -- Test 79-80: 生徒の見え方は変わらない (本人の行と自分の農園のみ)
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000098", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000098';
 
 SELECT is(
     (SELECT count(*)::int FROM public.users),
