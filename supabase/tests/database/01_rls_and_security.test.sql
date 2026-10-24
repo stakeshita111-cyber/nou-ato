@@ -1135,6 +1135,10 @@ RESET ROLE;
 RESET ROLE;
 
 -- Test 96-97: tasks.farm_id は NOT NULL で、NULL の行は追加できない
+-- (講師のクレームが残っていると enforce_teacher_task_farm_id が farm_id を自動補完するため、クレームを消して検証する)
+SET LOCAL "request.jwt.claims" = '{}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = '';
 SELECT col_not_null('public', 'tasks', 'farm_id',
     '96. [b2c_tasks_farm_id_not_null] tasks.farm_id は NOT NULL');
 SELECT throws_ok(
