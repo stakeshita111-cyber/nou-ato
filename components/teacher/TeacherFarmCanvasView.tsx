@@ -14,6 +14,7 @@ import { SproutLoader } from '@/components/SproutLoader';
 import ConfirmStudentSwapModal from '@/components/teacher/farm-canvas/ConfirmStudentSwapModal';
 import FarmOwnerSettingsModal from '@/components/teacher/farm-canvas/FarmOwnerSettingsModal';
 import FarmCanvasToolbar from '@/components/teacher/farm-canvas/FarmCanvasToolbar';
+import { useStudentDrag, UnassignedStudent } from '@/hooks/farm/useStudentDrag';
 import { useBedTimelineRecords } from '@/hooks/farm/useBedTimelineRecords';
 import { supabase } from '@/lib/supabase';
 import { swapFarmPlotsInDb } from '@/lib/farm/farmDb';
@@ -35,14 +36,6 @@ const UnassignedStudentDropSchema = z.object({
   grade: z.string(),
   colorBg: z.string(),
 });
-
-interface UnassignedStudent {
-  id: string;
-  name: string;
-  initials: string;
-  grade: string;
-  colorBg: string;
-}
 
 interface TeacherFarmCanvasViewProps {
   initialPlotCode?: string;
@@ -148,14 +141,19 @@ export default function TeacherFarmCanvasView({
   // キャンバス参照
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // 生徒カードのドロップ State
-  const [draggingStudent, setDraggingStudent] = useState<UnassignedStudent | null>(null);
-
-  // 人変更時の確認モーダル State
-  const [confirmChangeStudentModal, setConfirmChangeStudentModal] = useState<{
-    plot: FarmPlot;
-    newStudent: UnassignedStudent;
-  } | null>(null);
+  // 🧑‍🌾 生徒カードのドラッグ＆ドロップ管理
+  const {
+    draggingStudent,
+    setDraggingStudent,
+    confirmChangeStudentModal,
+    setConfirmChangeStudentModal,
+    handleStudentDragStart,
+    handleDropStudentOnPlot,
+    handleConfirmChangeStudent,
+  } = useStudentDrag({
+    assignStudentToPlot,
+    notify,
+  });
 
   // 農園・代表者設定 Modal State (農園名・講師名・メールアドレス・住所)
   const [showFarmSettingsModal, setShowFarmSettingsModal] = useState(false);
@@ -699,49 +697,6 @@ export default function TeacherFarmCanvasView({
       canvasEl.removeEventListener('wheel', handleWheel);
     };
   }, []);
-
-  // 生徒カードドラッグ＆ドロップ
-  const handleStudentDragStart = (student: UnassignedStudent) => {
-    setDraggingStudent(student);
-  };
-
-  const handleDropStudentOnPlot = (plot: FarmPlot, droppedStudent?: UnassignedStudent) => {
-    const studentToAssign = droppedStudent || draggingStudent;
-    if (!studentToAssign) return;
-
-    if (plot.student_name && plot.student_name !== studentToAssign.name) {
-      setConfirmChangeStudentModal({
-        plot: plot,
-        newStudent: studentToAssign,
-      });
-      setDraggingStudent(null);
-      return;
-    }
-
-    void (async () => {
-      await assignStudentToPlot(plot.id, studentToAssign.id, studentToAssign.name);
-      setDraggingStudent(null);
-
-      notify(`🎯 ${plot.code}区画に ${studentToAssign.name} さんを割り当てました！`);
-    })();
-  };
-
-  const handleConfirmChangeStudent = () => {
-    if (!confirmChangeStudentModal) return;
-
-    const { plot, newStudent } = confirmChangeStudentModal;
-
-    void (async () => {
-      await assignStudentToPlot(plot.id, newStudent.id, newStudent.name);
-
-      setConfirmChangeStudentModal(null);
-      setDraggingStudent(null);
-
-      notify(
-        `✨ ${plot.code}区画の担当者を ${newStudent.name} さんに変更しました！ (${plot.code} - ${newStudent.name})`
-      );
-    })();
-  };
 
   // 🌟 農園設定モーダルオープン (DBから実際の講師農園名を取得) 🌟
   const openFarmSettingsModal = async () => {
