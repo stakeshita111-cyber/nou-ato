@@ -120,9 +120,7 @@ describe('B2b: FarmGridCanvas 特性テスト (TeacherFarmCanvasView 経由)', (
     };
 
     assignStudentToPlotMock = vi.fn().mockResolvedValue(undefined);
-    swapFarmPlotsInDbSpy = vi
-      .spyOn(farmDb, 'swapFarmPlotsInDb')
-      .mockResolvedValue(true);
+    swapFarmPlotsInDbSpy = vi.spyOn(farmDb, 'swapFarmPlotsInDb').mockResolvedValue(true);
 
     const defaultMockReturn = {
       isLoading: false,
@@ -356,10 +354,7 @@ describe('B2b: FarmGridCanvas 特性テスト (TeacherFarmCanvasView 経由)', (
     });
 
     await waitFor(() => {
-      expect(swapFarmPlotsInDbSpy).toHaveBeenCalledWith(
-        `${FARM_ID}_A1`,
-        `${FARM_ID}_B1`
-      );
+      expect(swapFarmPlotsInDbSpy).toHaveBeenCalledWith(`${FARM_ID}_A1`, `${FARM_ID}_B1`);
     });
   });
 });
