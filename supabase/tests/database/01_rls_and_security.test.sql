@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(144);
+SELECT plan(153);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1430,6 +1430,105 @@ SELECT throws_ok(
     '42501',
     'Target plot does not belong to your farm',
     '144. [b3a_removed_teacher] 所属から外された講師 0004 は農園A の区画に畝を追加できなくなる'
+);
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-3 (2): 生徒・タスクの RPC (publish_task_to_all_students / grant_ai_tickets / withdraw_student)
+--   前提: 講師 0001 は農園A、講師 0004 は農園B のみに所属。公開中タスク 221 は農園A
+--   退会処理の検証用に、専用の生徒 0093 を管理者権限で農園A に作成する
+-- ==============================================================================
+RESET ROLE;
+SET LOCAL "request.jwt.claims" = '{}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = '';
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES ('00000000-0000-0000-0000-000000000093', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'b3b_student@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now());
+UPDATE public.users SET farm_id = '11111111-1111-1111-1111-111111111111', display_name = 'B-3b 生徒'
+WHERE id = '00000000-0000-0000-0000-000000000093';
+
+-- Test 145-147: 所属していない講師 0004 は農園A のタスク配信・チケット付与・退会処理ができない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    'SELECT public.publish_task_to_all_students(''22222222-2222-2222-2222-222222222221'')',
+    '42501',
+    'Forbidden: only the teacher of this farm can publish tasks',
+    '145. [b3b_publish_isolation] 講師 0004 は所属していない農園A のタスクを配信できない'
+);
+SELECT throws_ok(
+    'SELECT public.grant_ai_tickets(''00000000-0000-0000-0000-000000000093'', 1)',
+    '42501',
+    'student not found in your farm',
+    '146. [b3b_grant_isolation] 講師 0004 は所属していない農園A の生徒にチケットを付与できない'
+);
+SELECT throws_ok(
+    'SELECT public.withdraw_student(''00000000-0000-0000-0000-000000000093'')',
+    '42501',
+    'Target student does not belong to your farm',
+    '147. [b3b_withdraw_isolation] 講師 0004 は所属していない農園A の生徒を退会させられない'
+);
+
+-- Test 148-152: 講師 0004 を農園A に所属させると、2 つ目の農園で配信・付与・退会処理ができる
+RESET ROLE;
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    'SELECT public.publish_task_to_all_students(''22222222-2222-2222-2222-222222222221'')',
+    '148. [b3b_co_teacher_publish] 共同講師は 2 つ目の農園 (農園A) のタスクを配信できる'
+);
+SELECT lives_ok(
+    'SELECT public.grant_ai_tickets(''00000000-0000-0000-0000-000000000093'', 1)',
+    '149. [b3b_co_teacher_grant] 共同講師は農園A の生徒にチケットを付与できる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT granted_count FROM public.ai_tickets
+     WHERE student_id = '00000000-0000-0000-0000-000000000093'
+       AND date = (now() AT TIME ZONE 'Asia/Tokyo')::date),
+    1,
+    '150. [b3b_co_teacher_grant] 共同講師による付与が生徒の当日分に反映されている'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT lives_ok(
+    'SELECT public.withdraw_student(''00000000-0000-0000-0000-000000000093'')',
+    '151. [b3b_co_teacher_withdraw] 共同講師は農園A の生徒を退会させられる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT farm_id FROM public.users WHERE id = '00000000-0000-0000-0000-000000000093'),
+    NULL::uuid,
+    '152. [b3b_co_teacher_withdraw] 退会処理で生徒の所属農園が外れている'
+);
+
+-- Test 153: 所属から外すと、直後から配信できなくなる
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    'SELECT public.publish_task_to_all_students(''22222222-2222-2222-2222-222222222221'')',
+    '42501',
+    'Forbidden: only the teacher of this farm can publish tasks',
+    '153. [b3b_removed_teacher] 所属から外された講師 0004 は農園A のタスクを配信できなくなる'
 );
 
 RESET ROLE;
