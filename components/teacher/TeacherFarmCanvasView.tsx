@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { z } from 'zod';
 import { useFarmManager } from '@/hooks/useFarmManager';
-import { FarmBed, FarmPlot, CropRecord } from '@/types/farm';
+import { FarmBed, FarmPlot } from '@/types/farm';
 import Toast from '@/components/ui/Toast';
-import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
+import { formatHarvestAmount } from '@/lib/utils/formatHelper';
 import BedApprovalNotificationBanner from '@/components/teacher/BedApprovalNotificationBanner';
 import BedApprovalModal from '@/components/farm/BedApprovalModal';
 import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import ConfirmStudentSwapModal from '@/components/teacher/farm-canvas/ConfirmStudentSwapModal';
 import FarmOwnerSettingsModal from '@/components/teacher/farm-canvas/FarmOwnerSettingsModal';
+import { useBedTimelineRecords } from '@/hooks/farm/useBedTimelineRecords';
 import { supabase } from '@/lib/supabase';
 import { swapFarmPlotsInDb } from '@/lib/farm/farmDb';
 import { buildPlotId } from '@/lib/farm/farmCalculations';
@@ -40,20 +41,6 @@ interface UnassignedStudent {
   initials: string;
   grade: string;
   colorBg: string;
-}
-
-interface BedTimelineRecord {
-  id?: string;
-  date?: string;
-  notes?: string;
-  content?: string;
-  photo_url?: string | null;
-  image_url?: string | null;
-  growth_stage?: string | null;
-  height_cm?: number | null;
-  work_types?: string[];
-  harvest_amount?: string | number | null;
-  created_at?: string | null;
 }
 
 interface TeacherFarmCanvasViewProps {
@@ -98,123 +85,11 @@ export default function TeacherFarmCanvasView({
   const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [archivedModalTargetPlotId, setArchivedModalTargetPlotId] = useState<string | null>(null);
 
-  // 🌟【新機能】講師による生徒の観察記録タイムライン閲覧 State 🌟
-  const [selectedBedForRecords, setSelectedBedForRecords] = useState<FarmBed | null>(null);
   const [approvalModalPlot, setApprovalModalPlot] = useState<FarmPlot | null>(null);
   const [approvalModalBed, setApprovalModalBed] = useState<FarmBed | null>(null);
-  const [bedRecords, setBedRecords] = useState<BedTimelineRecord[]>([]);
-  const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(false);
   const [isAddingBed, setIsAddingBed] = useState<boolean>(false);
   const isAddingBedRef = useRef<boolean>(false);
   const lastAddBedTimeRef = useRef<number>(0);
-
-  const fetchBedRecords = useCallback(
-    async (
-      plotCode: string,
-      bedNumber: number,
-      bedId?: string,
-      studentName?: string,
-      latestRec?: BedTimelineRecord | CropRecord | null,
-      cropName?: string
-    ) => {
-      await Promise.resolve();
-      setIsLoadingRecords(true);
-      try {
-        // 🌟 新しく追加された畝（未確定 🌱）で、新規記録がない場合は過去ログを完全除外 🌟
-        if (cropName === '未確定 🌱' && !latestRec) {
-          setBedRecords([]);
-          return;
-        }
-
-        // 1. crop_records から取得
-        const { data: cData } = await supabase
-          .from('crop_records')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        // 2. journals から取得
-        const { data: jData } = await supabase
-          .from('journals')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        const combined: BedTimelineRecord[] = [];
-
-        if (cData && cData.length > 0) {
-          cData.forEach((r) => {
-            // bed_id の完全一致を最優先
-            const isBedIdMatch = bedId && r.bed_id === bedId;
-            const rRecord = r as Record<string, unknown>;
-            const rPlotCode = (rRecord.plot_code as string | undefined) || '';
-            const matchCodeAndBed =
-              rPlotCode === plotCode &&
-              (r.bed_id?.includes(`bed_${bedNumber}`) || r.bed_id?.endsWith(`_${bedNumber}`));
-
-            if (isBedIdMatch || matchCodeAndBed) {
-              combined.push({
-                id: r.id,
-                date: r.date
-                  ? formatDate(r.date)
-                  : r.created_at
-                    ? formatDate(r.created_at)
-                    : '記録日',
-                notes: r.notes || '観察記録',
-                photo_url: (rRecord.photo_url as string | undefined) || r.image_url,
-                growth_stage: r.growth_stage || '作業記録',
-                height_cm: r.height_cm,
-                harvest_amount: r.harvest_amount != null ? String(r.harvest_amount) : undefined,
-                work_types: Array.isArray(r.work_types) ? (r.work_types as string[]) : undefined,
-                created_at: r.created_at,
-              });
-            }
-          });
-        }
-
-        if (jData && jData.length > 0) {
-          jData.forEach((j) => {
-            const content = j.content || '';
-            if (
-              content &&
-              !content.includes('を完了報告しました') &&
-              content !== '（コメントなし）'
-            ) {
-              const hasBedHint =
-                content.includes(`畝 ${bedNumber}`) || content.includes(`畝#${bedNumber}`);
-              if (hasBedHint) {
-                const jRecord = j as Record<string, unknown>;
-                combined.push({
-                  id: j.id,
-                  date: j.created_at ? formatDate(j.created_at) : '最近',
-                  notes: content,
-                  photo_url:
-                    (j.image_url as string | null) ||
-                    (jRecord.photo_url as string | null) ||
-                    undefined,
-                  growth_stage:
-                    typeof jRecord.task_title === 'string'
-                      ? jRecord.task_title
-                      : '💡 質問・相談日誌',
-                  created_at: j.created_at,
-                });
-              }
-            }
-          });
-        }
-
-        // latestRec があれば追加
-        if (latestRec && !combined.some((r) => r.notes === latestRec.notes)) {
-          combined.unshift(latestRec);
-        }
-
-        setBedRecords(combined);
-      } catch (e) {
-        console.error('fetchBedRecords error:', e);
-      } finally {
-        setIsLoadingRecords(false);
-      }
-    },
-    []
-  );
 
   const unassignedList = useMemo<UnassignedStudent[]>(() => {
     const assignedStudentIds = new Set(
@@ -283,6 +158,19 @@ export default function TeacherFarmCanvasView({
 
   // クリック時詳細確認・編集 Modal / Drawer State
   const [detailPlot, setDetailPlot] = useState<FarmPlot | null>(null);
+
+  const {
+    selectedBedForRecords,
+    setSelectedBedForRecords,
+    bedRecords,
+    isLoadingRecords,
+    fetchBedRecords,
+  } = useBedTimelineRecords({
+    detailPlot,
+    records,
+    plots,
+  });
+
   const handledInitialPlotRef = useRef<string | null>(null);
 
   // 外部(日誌スライダー等)からの対象農場・区画ジャンプ連携
@@ -344,25 +232,7 @@ export default function TeacherFarmCanvasView({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailPlot, showArchivedModal]);
-
-  // 🌟 開いている観察記録タイムラインを最新データとリアルタイム同期 (リロード不要) 🌟
-  useEffect(() => {
-    if (selectedBedForRecords && detailPlot) {
-      const displayNum = selectedBedForRecords.bed_number || 1;
-      const load = async () => {
-        await fetchBedRecords(
-          detailPlot.code,
-          displayNum,
-          selectedBedForRecords.id,
-          detailPlot.student_name,
-          selectedBedForRecords.latest_record,
-          selectedBedForRecords.crop_name
-        );
-      };
-      void load();
-    }
-  }, [records, plots, detailPlot, selectedBedForRecords, fetchBedRecords]);
+  }, [detailPlot, showArchivedModal, setSelectedBedForRecords]);
 
   // 🚚 D&D マス目への純粋スワップハンドラー (セルアドレス A1, B2 等の位置固定・中身データのみ1対1相互交換)
   const handleMovePlotToGridCell = async (
