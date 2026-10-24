@@ -9,6 +9,7 @@ import WeatherWidget from '@/components/ui/WeatherWidget';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { useFarmStore } from '@/store/useFarmStore';
 import { isRegularRecord } from '@/lib/utils/journalHelper';
+import { fetchFarmPlotBedIds, cropRecordsFarmFilter } from '@/lib/farm/farmScope';
 
 interface TeacherOverviewViewProps {
   onAddNewTaskClick: () => void;
@@ -88,10 +89,14 @@ export default function TeacherOverviewView({
 
       // 1. 本日以降のイベント・講習予約件数
       const todayStr = new Date().toISOString().split('T')[0];
-      const { count: eCount } = await supabase
-        .from('events')
-        .select('*', { count: 'exact' })
-        .gte('date', todayStr);
+      // 表示中の農園のイベントだけを数える (講師は複数農園に所属できるため)
+      const { count: eCount } = currentFid
+        ? await supabase
+            .from('events')
+            .select('*', { count: 'exact', head: true })
+            .eq('farm_id', currentFid)
+            .gte('date', todayStr)
+        : { count: 0 };
 
       if (eCount !== null && eCount !== undefined) {
         setEventsCount(eCount);
@@ -118,7 +123,21 @@ export default function TeacherOverviewView({
       }
 
       // 2. 本日の作業記録件数 (crop_records)
-      const { count: cCount } = await supabase.from('crop_records').select('*', { count: 'exact' });
+      // crop_records は farm_id を持たないため、表示中の農園の区画・畝で絞り込む
+      let cCount: number | null = 0;
+      if (currentFid) {
+        const scope = await fetchFarmPlotBedIds(supabase, currentFid);
+        const filter = scope.ok ? cropRecordsFarmFilter(scope.ids) : null;
+        if (!scope.ok) {
+          cCount = null;
+        } else if (filter) {
+          const { count } = await supabase
+            .from('crop_records')
+            .select('*', { count: 'exact', head: true })
+            .or(filter);
+          cCount = count;
+        }
+      }
 
       if (cCount !== null && cCount !== undefined) {
         setReportCount(cCount);
