@@ -1,85 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
 import type { Database } from '@/types/supabase';
 import type { CropRecord, Farm } from '@/types/farm';
-import { useFarmManager } from '@/hooks/useFarmManager';
-import * as farmDb from '@/lib/farm/farmDb';
-
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: 'teacher-1' } },
-        error: null,
-      }),
-    },
-    channel: vi.fn(() => ({
-      on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn().mockReturnThis(),
-    })),
-    removeChannel: vi.fn().mockResolvedValue('ok'),
-  },
-}));
+import { hydrateFarmPlots, type HydrateFarmPlotsInput } from '@/lib/farm/farmPlotHydrator';
 
 type PlotRow = Database['public']['Tables']['farm_plots']['Row'];
 type BedRow = Database['public']['Tables']['farm_beds']['Row'];
 
-interface HydrateTestInput {
-  effectiveActiveId: string;
-  targetFarm?: Farm;
-  dbPlots: PlotRow[];
-  dbBeds: BedRow[];
-  studentMap: Map<string, string>;
-  formattedRecords: CropRecord[];
-  pendingApprovalMap: Map<
-    string,
-    {
-      total_harvest?: string;
-      completion_notes?: string;
-      completion_image_url?: string;
-      season?: string;
-    }
-  >;
-}
-
-async function runHydratePlots(input: HydrateTestInput) {
-  const farmObj: Farm = input.targetFarm ?? {
-    id: input.effectiveActiveId,
-    name: 'テスト農園',
-  };
-
-  vi.spyOn(farmDb, 'fetchFarmsDb').mockResolvedValue({
-    farms: [farmObj],
-    teacherFarmId: input.effectiveActiveId,
-    teacherDisplayName: '講師',
-  });
-  vi.spyOn(farmDb, 'fetchStudentsDb').mockResolvedValue({
-    students: [],
-    studentMap: input.studentMap,
-  });
-  vi.spyOn(farmDb, 'fetchCropRecordsDb').mockResolvedValue(input.formattedRecords);
-  vi.spyOn(farmDb, 'fetchRawPlotsAndBedsDb').mockResolvedValue({
-    dbPlots: input.dbPlots,
-    dbBeds: input.dbBeds,
-  });
-  vi.spyOn(farmDb, 'fetchPendingJournalsDb').mockResolvedValue(input.pendingApprovalMap);
-
-  const { result, unmount } = renderHook(() => useFarmManager());
-
-  await waitFor(() => {
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  const output = {
-    plotsWithRecords: result.current.plots,
-    detectedCols: result.current.gridCols,
-    detectedRows: result.current.gridRows,
-    detectedDefaultBeds: result.current.unassignedBedsCount,
-  };
-
-  unmount();
-  return output;
+async function runHydratePlots(input: HydrateFarmPlotsInput) {
+  return hydrateFarmPlots(input);
 }
 
 const FARM_ID = '11111111-1111-4111-8111-111111111111';
