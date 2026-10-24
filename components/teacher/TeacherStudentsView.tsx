@@ -212,7 +212,7 @@ export default function TeacherStudentsView() {
             .eq('status', 'todo')
             .is('deleted_at', null);
           if (currentFarmId) {
-            pTasksQuery = pTasksQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+            pTasksQuery = pTasksQuery.eq('farm_id', currentFarmId);
           }
           const { data: ptData } = await pTasksQuery.order('created_at', { ascending: true });
           if (ptData && ptData.length > 0) {

@@ -79,11 +79,11 @@ export function useKanbanBoard(columns: ColumnType[]) {
         setFarmId(effectiveFarmId);
       }
 
-      // 1. 有効なタスク (自農園のもの、または共通テンプレート教材)
+      // 1. 有効なタスク (表示中の農園のもの)
       let tasksQuery = supabase.from('tasks').select('*').is('deleted_at', null);
 
       if (effectiveFarmId) {
-        tasksQuery = tasksQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
+        tasksQuery = tasksQuery.eq('farm_id', effectiveFarmId);
       }
 
       const { data: tasksData } = await tasksQuery.order('created_at', { ascending: false });
@@ -96,7 +96,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       let trashQuery = supabase.from('tasks').select('*').not('deleted_at', 'is', null);
 
       if (effectiveFarmId) {
-        trashQuery = trashQuery.or(`farm_id.eq.${effectiveFarmId},farm_id.is.null`);
+        trashQuery = trashQuery.eq('farm_id', effectiveFarmId);
       }
 
       const { data: trashData } = await trashQuery.order('deleted_at', { ascending: false });

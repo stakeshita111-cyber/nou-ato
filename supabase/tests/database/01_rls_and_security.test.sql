@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(103);
+SELECT plan(117);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1124,6 +1124,99 @@ SELECT is((SELECT count(*)::int FROM public.farm_beds WHERE id = 'b2b-bed-a'), 0
     '94. [b2b_removed_teacher] 所属から外された講師 0004 は農園A の畝を参照できなくなる');
 SELECT is((SELECT count(*)::int FROM public.crop_records WHERE id = 'b2b-rec-a'), 0,
     '95. [b2b_removed_teacher] 所属から外された講師 0004 は農園A の記録を参照できなくなる');
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-2 (c): tasks / student_tasks の RLS を farm_members 基準へ・tasks.farm_id NOT NULL
+--   前提: 講師 0001 は農園A、講師 0004 は農園B のみに所属
+--   公開中タスク 22222222-...-221 (農園A) と、その生徒タスク (生徒 0097 / 0098) を使う
+-- ==============================================================================
+RESET ROLE;
+
+-- Test 96-97: tasks.farm_id は NOT NULL で、NULL の行は追加できない
+SELECT col_not_null('public', 'tasks', 'farm_id',
+    '96. [b2c_tasks_farm_id_not_null] tasks.farm_id は NOT NULL');
+SELECT throws_ok(
+    'INSERT INTO public.tasks (id, farm_id, title, status, is_template) VALUES (''22222222-2222-2222-2222-2222222222c0'', NULL, ''農園なしタスク'', ''draft'', false)',
+    '23502',
+    NULL,
+    '97. [b2c_tasks_farm_id_not_null] farm_id が NULL のタスクは追加できない'
+);
+
+-- Test 98: 単一農園の講師 0001 は自分の農園のタスクを参照できる (従来どおり)
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'), 1,
+    '98. [b2c_single_farm_teacher] 講師 0001 は自分の農園のタスクを参照できる');
+
+-- Test 99-101: 所属していない講師 0004 は農園A のタスク・生徒タスクを参照・追加できない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+
+SELECT is((SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'), 0,
+    '99. [b2c_tasks_isolation] 講師 0004 は所属していない農園A のタスクを参照できない');
+SELECT is((SELECT count(*)::int FROM public.student_tasks WHERE base_task_id = '22222222-2222-2222-2222-222222222221'), 0,
+    '100. [b2c_student_tasks_isolation] 講師 0004 は所属していない農園A の生徒タスクを参照できない');
+SELECT throws_ok(
+    'INSERT INTO public.tasks (id, farm_id, title, status, is_template) VALUES (''22222222-2222-2222-2222-2222222222c1'', ''11111111-1111-1111-1111-111111111111'', ''侵入タスク'', ''draft'', false)',
+    '42501',
+    NULL,
+    '101. [b2c_tasks_insert_isolation] 講師 0004 は所属していない農園A にタスクを追加できない'
+);
+
+-- Test 102-107: 講師 0004 を農園A に所属させると、タスクの参照・追加・更新・削除と生徒タスクの参照ができる
+RESET ROLE;
+SELECT ok(
+    (SELECT count(*) FROM public.student_tasks WHERE base_task_id = '22222222-2222-2222-2222-222222222221') > 0,
+    '102. [b2c_fixture] 公開中タスク 221 の生徒タスクが存在する (以降の参照確認の前提)'
+);
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'), 1,
+    '103. [b2c_co_teacher_tasks] 農園A に所属した講師 0004 は農園A のタスクを参照できる');
+SELECT ok(
+    (SELECT count(*) FROM public.student_tasks WHERE base_task_id = '22222222-2222-2222-2222-222222222221') > 0,
+    '104. [b2c_co_teacher_student_tasks] 農園A に所属した講師 0004 は農園A の生徒タスクを参照できる'
+);
+SELECT lives_ok(
+    'INSERT INTO public.tasks (id, farm_id, title, status, is_template) VALUES (''22222222-2222-2222-2222-2222222222c1'', ''11111111-1111-1111-1111-111111111111'', ''共同講師のタスク'', ''draft'', false)',
+    '105. [b2c_co_teacher_task_insert] 共同講師は 2 つ目の農園 (農園A) にタスクを追加できる'
+);
+SELECT lives_ok(
+    'UPDATE public.tasks SET title = ''共同講師が更新'' WHERE id = ''22222222-2222-2222-2222-2222222222c1''',
+    '106. [b2c_co_teacher_task_update] 共同講師は農園A のタスクを更新できる'
+);
+SELECT lives_ok(
+    'DELETE FROM public.tasks WHERE id = ''22222222-2222-2222-2222-2222222222c1''',
+    '107. [b2c_co_teacher_task_delete] 共同講師は農園A のタスクを削除できる'
+);
+
+RESET ROLE;
+SELECT is((SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-2222222222c1'), 0,
+    '108. [b2c_co_teacher_task_delete] 共同講師によるタスクの削除が実際に反映されている');
+
+-- Test 109: 所属から外すと、直後から参照できなくなる
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'), 0,
+    '109. [b2c_removed_teacher] 所属から外された講師 0004 は農園A のタスクを参照できなくなる');
 
 RESET ROLE;
 
