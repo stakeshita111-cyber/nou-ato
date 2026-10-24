@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(134);
+SELECT plan(144);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1331,6 +1331,106 @@ SELECT is((SELECT count(*)::int FROM public.journals WHERE id = '33333333-3333-3
     '125. [b2d_removed_teacher] 所属から外された講師 0004 は農園A の日誌を参照できなくなる');
 SELECT is((SELECT count(*)::int FROM public.events WHERE id = 'b2d-event-a'), 0,
     '126. [b2d_removed_teacher] 所属から外された講師 0004 は農園A のイベントを参照できなくなる');
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-3 (1): 区画・畝の RPC (add_farm_bed / reorder_beds / delete_farm_bed / swap_farm_plots)
+--   前提: 講師 0001 は農園A、講師 0004 は農園B のみに所属
+--   専用の区画 2 つを管理者権限で農園A に作成して検証する
+-- ==============================================================================
+RESET ROLE;
+SET LOCAL "request.jwt.claims" = '{}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = '';
+INSERT INTO public.farm_plots (id, farm_id, name, code)
+VALUES ('b3a-plot-1', '11111111-1111-1111-1111-111111111111', 'B-3a 検証区画1', 'Y1'),
+       ('b3a-plot-2', '11111111-1111-1111-1111-111111111111', 'B-3a 検証区画2', 'Y2');
+
+-- Test 135-136: 所属していない講師 0004 は農園A の区画を操作できない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    'SELECT public.add_farm_bed(''b3a-plot-1'')',
+    '42501',
+    'Target plot does not belong to your farm',
+    '135. [b3a_add_bed_isolation] 講師 0004 は所属していない農園A の区画に畝を追加できない'
+);
+SELECT throws_ok(
+    'SELECT public.swap_farm_plots(''b3a-plot-1'', ''b3a-plot-2'')',
+    'P0002',
+    'Target plots not found in your farm',
+    '136. [b3a_swap_isolation] 講師 0004 は所属していない農園A の区画を入れ替えられない'
+);
+
+-- Test 137: 単一農園の講師 0001 は従来どおり畝を追加できる
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT lives_ok(
+    'SELECT public.add_farm_bed(''b3a-plot-1'')',
+    '137. [b3a_single_farm_teacher] 講師 0001 は自分の農園の区画に畝を追加できる'
+);
+
+-- Test 138-143: 講師 0004 を農園A に所属させると、2 つ目の農園でも区画・畝を操作できる
+RESET ROLE;
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    'SELECT public.add_farm_bed(''b3a-plot-1'')',
+    '138. [b3a_co_teacher_add_bed] 共同講師は 2 つ目の農園 (農園A) の区画に畝を追加できる'
+);
+
+RESET ROLE;
+SELECT is((SELECT count(*)::int FROM public.farm_beds WHERE plot_id = 'b3a-plot-1'), 2,
+    '139. [b3a_co_teacher_add_bed] 区画には講師 0001 と共同講師の畝が 1 つずつある');
+
+SET LOCAL ROLE authenticated;
+SELECT lives_ok(
+    'SELECT public.reorder_beds(''b3a-plot-1'', ARRAY(SELECT id FROM public.farm_beds WHERE plot_id = ''b3a-plot-1'' ORDER BY bed_number DESC))',
+    '140. [b3a_co_teacher_reorder] 共同講師は農園A の畝を並べ替えられる'
+);
+SELECT lives_ok(
+    'SELECT public.delete_farm_bed(''b3a-plot-1'', (SELECT id FROM public.farm_beds WHERE plot_id = ''b3a-plot-1'' ORDER BY bed_number LIMIT 1))',
+    '141. [b3a_co_teacher_delete] 共同講師は農園A の畝を削除できる'
+);
+
+RESET ROLE;
+SELECT is((SELECT count(*)::int FROM public.farm_beds WHERE plot_id = 'b3a-plot-1'), 1,
+    '142. [b3a_co_teacher_delete] 共同講師による畝の削除が反映されている');
+
+SET LOCAL ROLE authenticated;
+SELECT lives_ok(
+    'SELECT public.swap_farm_plots(''b3a-plot-1'', ''b3a-plot-2'')',
+    '143. [b3a_co_teacher_swap] 共同講師は農園A の 2 区画を入れ替えられる'
+);
+
+-- Test 144: 所属から外すと、直後から操作できなくなる
+RESET ROLE;
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    'SELECT public.add_farm_bed(''b3a-plot-2'')',
+    '42501',
+    'Target plot does not belong to your farm',
+    '144. [b3a_removed_teacher] 所属から外された講師 0004 は農園A の区画に畝を追加できなくなる'
+);
 
 RESET ROLE;
 
