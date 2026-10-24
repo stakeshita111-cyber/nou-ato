@@ -4,10 +4,13 @@ import { useState } from 'react';
 import Toast from '@/components/ui/Toast';
 import EventCalendar from '@/components/ui/EventCalendar';
 import { useEvents } from '@/hooks/useEvents';
+import { useFarmStore } from '@/store/useFarmStore';
 import { formatDate } from '@/lib/utils/formatHelper';
 
 export default function TeacherEventsView() {
-  const { events, addEvent, approveAttendee, deleteEvent } = useEvents();
+  // 表示中の農園のイベントを取得・作成する
+  const activeFarmId = useFarmStore((state) => state.activeFarmId);
+  const { events, addEvent, approveAttendee, deleteEvent } = useEvents(activeFarmId || undefined);
 
   const getTodayStr = () => {
     const d = new Date();

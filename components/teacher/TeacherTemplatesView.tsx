@@ -54,13 +54,18 @@ export default function TeacherTemplatesView() {
     const loadTemplates = async () => {
       let customTemplates: TaskTemplate[] = [];
 
-      // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元
+      // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元 (表示中の農園のテンプレートのみ)
       try {
-        const { data: dbTemplates } = await supabase
+        const templateFarmId = useFarmStore.getState().activeFarmId;
+        let templatesQuery = supabase
           .from('tasks')
           .select('*')
           .eq('is_template', true)
           .is('deleted_at', null);
+        if (templateFarmId) {
+          templatesQuery = templatesQuery.eq('farm_id', templateFarmId);
+        }
+        const { data: dbTemplates } = await templatesQuery;
 
         if (dbTemplates && dbTemplates.length > 0) {
           const fetchedTemplates: TaskTemplate[] = [];
