@@ -191,7 +191,8 @@ export default function TeacherTemplatesView() {
           if (userData?.farm_id) farmId = userData.farm_id;
         }
 
-        if (userId) {
+        // tasks.farm_id は NOT NULL (B-2c)。農園を特定できなければ DB 同期は行わない
+        if (userId && farmId) {
           await supabase.from('tasks').upsert({
             id: savedTemplate.id,
             title: savedTemplate.title,
@@ -207,7 +208,7 @@ export default function TeacherTemplatesView() {
             exp: savedTemplate.exp || 50,
             require_photo: Boolean(savedTemplate.require_photo),
             created_by: userId,
-            farm_id: farmId || null,
+            farm_id: farmId,
             checklist: {
               phase: savedTemplate.phase,
               season: savedTemplate.season,

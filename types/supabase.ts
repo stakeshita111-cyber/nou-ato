@@ -829,7 +829,7 @@ export type Database = {
           difficulty: number | null;
           estimated_time: string | null;
           exp: number | null;
-          farm_id: string | null;
+          farm_id: string;
           id: string;
           is_template: boolean | null;
           memo: string | null;
@@ -853,7 +853,7 @@ export type Database = {
           difficulty?: number | null;
           estimated_time?: string | null;
           exp?: number | null;
-          farm_id?: string | null;
+          farm_id: string;
           id?: string;
           is_template?: boolean | null;
           memo?: string | null;
@@ -877,7 +877,7 @@ export type Database = {
           difficulty?: number | null;
           estimated_time?: string | null;
           exp?: number | null;
-          farm_id?: string | null;
+          farm_id?: string;
           id?: string;
           is_template?: boolean | null;
           memo?: string | null;

@@ -47,10 +47,10 @@ describe('[マイグレーション健全性]', () => {
 });
 
 describe('[マルチテナント] 最終有効 RLS ポリシー', () => {
-  it('tasks_modify_policy は自農園限定 (farm_id IS NULL 許可なし)', () => {
+  it('tasks_modify_policy は講師が所属する農園に限定 (farm_id IS NULL 許可なし)', () => {
     const p = effectivePolicy('tasks', 'tasks_modify_policy');
     expect(p).not.toBeNull();
-    expect(p).toContain('farm_id = public.current_user_farm_id()');
+    expect(p).toMatch(/farm_id\s+IN\s*\(\s*SELECT\s+public\.current_user_farm_ids\(\)\s*\)/i);
     expect(p).not.toMatch(/farm_id IS NULL/i);
   });
 
