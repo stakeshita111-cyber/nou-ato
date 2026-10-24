@@ -131,7 +131,7 @@ export async function saveLocationToDBAndStorage(
   cityName: string,
   latitude: number,
   longitude: number
-): Promise<void> {
+): Promise<boolean> {
   if (typeof window !== 'undefined') {
     localStorage.setItem('nouato_weather_city_name', cityName);
     localStorage.setItem('nouato_weather_lat', latitude.toString());
@@ -142,7 +142,7 @@ export async function saveLocationToDBAndStorage(
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return true;
 
     const { data: uData } = await supabase
       .from('users')
@@ -152,7 +152,7 @@ export async function saveLocationToDBAndStorage(
 
     const targetFarmId = await resolveTargetFarmId(uData?.role, uData?.farm_id);
     if (uData?.role === 'teacher' && targetFarmId) {
-      await supabase
+      const { error } = await supabase
         .from('farms')
         .update({
           address: cityName,
@@ -160,9 +160,15 @@ export async function saveLocationToDBAndStorage(
           longitude: longitude,
         })
         .eq('id', targetFarmId);
+      if (error) {
+        console.warn('Supabase farms location save error:', error);
+        return false;
+      }
     }
+    return true;
   } catch (e) {
     console.warn('Supabase farms location save sync notice:', e);
+    return false;
   }
 }
 

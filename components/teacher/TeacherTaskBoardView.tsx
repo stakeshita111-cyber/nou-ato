@@ -103,34 +103,47 @@ export default function TeacherTaskBoardView({
   const handleSelectTemplate = async (template: TaskTemplate) => {
     // 1. タスク追加
     const newTask = await addTask(template.title);
-
-    if (newTask) {
-      // 2. テンプレートの各フィールドを自動セットして更新保存
-      const updated: Task = {
-        ...newTask,
-        title: template.title,
-        target_crop: template.target_crop,
-        estimated_time: template.estimated_time,
-        tools_needed: template.tools_needed,
-        description: template.description,
-        memo: template.memo,
-        exp: template.exp,
-        difficulty: template.difficulty,
-        require_photo: template.require_photo,
-        badge_name: template.badge_name,
-        badge_icon: template.badge_icon,
-      };
-      await saveTaskDetails(updated);
-      setToastMessage(`📝 テンプレート「${template.title}」からタスクを作成しました！`);
+    if (!newTask) {
+      setToastMessage('⚠️ テンプレートからのタスク作成に失敗しました');
       setShowToast(true);
+      return;
     }
+
+    // 2. テンプレートの各フィールドを自動セットして更新保存
+    const updated: Task = {
+      ...newTask,
+      title: template.title,
+      target_crop: template.target_crop,
+      estimated_time: template.estimated_time,
+      tools_needed: template.tools_needed,
+      description: template.description,
+      memo: template.memo,
+      exp: template.exp,
+      difficulty: template.difficulty,
+      require_photo: template.require_photo,
+      badge_name: template.badge_name,
+      badge_icon: template.badge_icon,
+    };
+    const ok = await saveTaskDetails(updated);
+    if (!ok) {
+      setToastMessage('⚠️ タスク詳細の保存に失敗しました');
+      setShowToast(true);
+      return;
+    }
+    setToastMessage(`📝 テンプレート「${template.title}」からタスクを作成しました！`);
+    setShowToast(true);
   };
 
   // ドラッグ終了時のトースト連動
   const handleDragEndWithToast = async (event: DragEndEvent) => {
     const overId = event.over?.id as string | undefined;
     const currentTask = tasks.find((t) => t.id === event.active.id);
-    await handleDragEnd(event);
+    const ok = await handleDragEnd(event);
+    if (!ok) {
+      setToastMessage('⚠️ タスクのステータス更新に失敗しました');
+      setShowToast(true);
+      return;
+    }
     if (overId && currentTask) {
       let targetStatus = overId;
       const overTask = tasks.find((t) => t.id === overId);
@@ -220,11 +233,17 @@ export default function TeacherTaskBoardView({
                 .then((task) => {
                   if (task) {
                     setToastMessage(`✨ タスク「${title}」を追加しました！`);
-                    setShowToast(true);
+                  } else {
+                    setToastMessage(
+                      '⚠️ タスクの追加に失敗しました。時間をおいて再度お試しください'
+                    );
                   }
+                  setShowToast(true);
                 })
                 .catch((err: unknown) => {
                   console.error('Failed to add task:', err);
+                  setToastMessage('⚠️ タスクの追加に失敗しました。時間をおいて再度お試しください');
+                  setShowToast(true);
                 });
               setShowQuickForm(false);
             }}
@@ -277,8 +296,12 @@ export default function TeacherTaskBoardView({
           task={editingTask}
           onClose={() => setEditingTask(null)}
           onSave={async (task) => {
-            await saveTaskDetails(task);
-            setToastMessage(`💾 タスク「${task.title}」の編集内容を保存しました！`);
+            const ok = await saveTaskDetails(task);
+            if (ok) {
+              setToastMessage(`💾 タスク「${task.title}」の編集内容を保存しました！`);
+            } else {
+              setToastMessage('⚠️ タスクの保存に失敗しました。時間をおいて再度お試しください');
+            }
             setShowToast(true);
           }}
         />

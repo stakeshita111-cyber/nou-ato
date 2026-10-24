@@ -127,7 +127,9 @@ export function useEvents(farmId?: string) {
   };
 
   // 講師: イベント新規登録
-  const addEvent = async (eventData: Omit<EventItem, 'id' | 'reservedCount' | 'attendees'>) => {
+  const addEvent = async (
+    eventData: Omit<EventItem, 'id' | 'reservedCount' | 'attendees'>
+  ): Promise<EventItem | null> => {
     const fid = await getEffectiveFarmId();
     const validFarmId = fid && /^[0-9a-fA-F-]{36}$/.test(fid) ? fid : null;
     const newEv: EventItem = {
@@ -136,9 +138,6 @@ export function useEvents(farmId?: string) {
       reservedCount: 0,
       attendees: [],
     };
-
-    const nextEvents = [newEv, ...events];
-    saveSharedEvents(nextEvents, fid);
 
     try {
       const { error: insErr } = await supabase.from('events').insert([
@@ -160,10 +159,15 @@ export function useEvents(farmId?: string) {
       ]);
       if (insErr) {
         console.error('addEvent DB error:', insErr);
+        return null;
       }
     } catch (e) {
       console.warn('addEvent DB warning:', e);
+      return null;
     }
+
+    const nextEvents = [newEv, ...events];
+    saveSharedEvents(nextEvents, fid);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('nouato_events_updated'));
@@ -176,7 +180,7 @@ export function useEvents(farmId?: string) {
     eventId: string,
     studentName: string,
     plotName: string = '受講区画'
-  ) => {
+  ): Promise<boolean | 'already_reserved'> => {
     const target = events.find((e) => e.id === eventId);
     if (!target) return false;
 
@@ -192,6 +196,23 @@ export function useEvents(farmId?: string) {
       status: 'pending' as const,
     };
 
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({
+          reserved_count: target.reservedCount + 1,
+          attendees: [...target.attendees, newAttendee],
+        })
+        .eq('id', eventId);
+      if (error) {
+        console.error('reserveEvent DB error:', error);
+        return false;
+      }
+    } catch (e) {
+      console.warn('reserveEvent DB warning:', e);
+      return false;
+    }
+
     const updatedEvents = events.map((ev) => {
       if (ev.id === eventId) {
         return {
@@ -206,23 +227,11 @@ export function useEvents(farmId?: string) {
     const fid = await getEffectiveFarmId();
     saveSharedEvents(updatedEvents, fid);
 
-    try {
-      await supabase
-        .from('events')
-        .update({
-          reserved_count: target.reservedCount + 1,
-          attendees: [...target.attendees, newAttendee],
-        })
-        .eq('id', eventId);
-    } catch (e) {
-      console.warn('reserveEvent DB warning:', e);
-    }
-
     return true;
   };
 
   // 講師: 参加予約の承認
-  const approveAttendee = async (eventId: string, attendeeName: string) => {
+  const approveAttendee = async (eventId: string, attendeeName: string): Promise<boolean> => {
     const updatedEvents = events.map((ev) => {
       if (ev.id === eventId) {
         return {
@@ -235,31 +244,44 @@ export function useEvents(farmId?: string) {
       return ev;
     });
 
-    const fid = await getEffectiveFarmId();
-    saveSharedEvents(updatedEvents, fid);
+    const target = updatedEvents.find((e) => e.id === eventId);
+    if (!target) return false;
 
     try {
-      const target = updatedEvents.find((e) => e.id === eventId);
-      if (target) {
-        await supabase.from('events').update({ attendees: target.attendees }).eq('id', eventId);
+      const { error } = await supabase
+        .from('events')
+        .update({ attendees: target.attendees })
+        .eq('id', eventId);
+      if (error) {
+        console.error('approveAttendee DB error:', error);
+        return false;
       }
     } catch (e) {
       console.warn('approveAttendee DB warning:', e);
+      return false;
     }
+
+    const fid = await getEffectiveFarmId();
+    saveSharedEvents(updatedEvents, fid);
     return true;
   };
 
   // イベント削除
-  const deleteEvent = async (eventId: string) => {
+  const deleteEvent = async (eventId: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', eventId);
+      if (error) {
+        console.error('deleteEvent DB error:', error);
+        return false;
+      }
+    } catch (e) {
+      console.warn('deleteEvent DB warning:', e);
+      return false;
+    }
+
     const nextEvents = events.filter((ev) => ev.id !== eventId);
     const fid = await getEffectiveFarmId();
     saveSharedEvents(nextEvents, fid);
-
-    try {
-      await supabase.from('events').delete().eq('id', eventId);
-    } catch (e) {
-      console.warn('deleteEvent DB warning:', e);
-    }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('nouato_events_updated'));

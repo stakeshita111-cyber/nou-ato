@@ -44,7 +44,7 @@ export default function TeacherEventsView() {
     e.preventDefault();
     if (!newTitle.trim() || !newDate.trim()) return;
 
-    await addEvent({
+    const created = await addEvent({
       title: newTitle,
       date: newDate,
       dateDisplay: `${formatDate(newDate)} 開催`,
@@ -56,6 +56,12 @@ export default function TeacherEventsView() {
       description: newDescription || '農園での体験イベントです。',
     });
 
+    if (!created) {
+      setToastMessage('⚠️ イベントの登録に失敗しました。時間をおいて再度お試しください');
+      setShowToast(true);
+      return;
+    }
+
     setShowAddModal(false);
     setNewTitle('');
     setNewDescription('');
@@ -65,14 +71,24 @@ export default function TeacherEventsView() {
 
   // 予約承認
   const handleApprove = async (eventId: string, attendeeName: string) => {
-    await approveAttendee(eventId, attendeeName);
+    const ok = await approveAttendee(eventId, attendeeName);
+    if (!ok) {
+      setToastMessage('⚠️ 参加予約の承認に失敗しました。時間をおいて再度お試しください');
+      setShowToast(true);
+      return;
+    }
     setToastMessage(`✅ ${attendeeName} さんのイベント参加予約を承認確定しました`);
     setShowToast(true);
   };
 
   // イベント削除
   const handleDelete = async (eventId: string) => {
-    await deleteEvent(eventId);
+    const ok = await deleteEvent(eventId);
+    if (!ok) {
+      setToastMessage('⚠️ イベントの削除に失敗しました。時間をおいて再度お試しください');
+      setShowToast(true);
+      return;
+    }
     setToastMessage('🗑️ イベントをカレンダーから削除しました');
     setShowToast(true);
   };
