@@ -12,6 +12,7 @@ export interface UseBedHarvestLifecycleParams {
     explicitDims?: { cols?: number; rows?: number; unassigned_beds?: number }
   ) => Promise<void>;
   notifyBroadcast: () => void;
+  onWriteError?: (message: string) => void;
 }
 
 export function useBedHarvestLifecycle({
@@ -20,6 +21,7 @@ export function useBedHarvestLifecycle({
   activeFarmId,
   savePlotsGridIndicesToSupabase,
   notifyBroadcast,
+  onWriteError,
 }: UseBedHarvestLifecycleParams) {
   const completeBedCrop = async (
     plotId: string,
@@ -98,6 +100,7 @@ export function useBedHarvestLifecycle({
       ]);
     } catch (e) {
       console.warn('journals completion insert notice:', e);
+      onWriteError?.('収穫完了報告の保存に失敗しました');
     }
 
     const targetPlot = plots.find((p) => p.code === targetPlotCode);
@@ -143,6 +146,7 @@ export function useBedHarvestLifecycle({
       }
     } catch (e) {
       console.warn('farm_beds status update notice:', e);
+      onWriteError?.('収穫完了報告の保存に失敗しました');
     }
 
     notifyBroadcast();
@@ -243,6 +247,7 @@ export function useBedHarvestLifecycle({
       }
     } catch (e) {
       console.warn('fetch latest completion journal notice:', e);
+      onWriteError?.('収穫完了報告の取得に失敗しました');
     }
 
     const archiveId = `archived_bed_${targetPlotCode}_${targetBedNumber}_${Date.now()}`;
@@ -312,6 +317,7 @@ export function useBedHarvestLifecycle({
       await crQuery;
     } catch (e) {
       console.warn('archive bed insert notice:', e);
+      onWriteError?.('アーカイブ畝の保存に失敗しました');
     }
 
     const targetPlot = finalPlots.find((p) => p.code === targetPlotCode);
@@ -343,6 +349,7 @@ export function useBedHarvestLifecycle({
         );
     } catch (e) {
       console.warn('farm_beds reset update error:', e);
+      onWriteError?.('新しい畝の初期化保存に失敗しました');
     }
 
     try {
@@ -352,6 +359,7 @@ export function useBedHarvestLifecycle({
         .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
     } catch (e) {
       console.warn('approveAndAddNewBed journals update notice:', e);
+      onWriteError?.('収穫完了報告の承認保存に失敗しました');
     }
 
     await savePlotsGridIndicesToSupabase(finalPlots);
@@ -414,6 +422,7 @@ export function useBedHarvestLifecycle({
         .or(`id.eq.${exactBedId},id.eq.${bedId}`);
     } catch (e) {
       console.warn('farm_beds reject update error:', e);
+      onWriteError?.('差し戻しの保存に失敗しました');
     }
 
     try {
@@ -421,7 +430,9 @@ export function useBedHarvestLifecycle({
         .from('journals')
         .update({ is_approved: true })
         .like('content', `%【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum}%`);
-    } catch {}
+    } catch {
+      onWriteError?.('差し戻しの保存に失敗しました');
+    }
 
     await savePlotsGridIndicesToSupabase(nextPlots);
     notifyBroadcast();

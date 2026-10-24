@@ -46,7 +46,7 @@ export const INITIAL_FARMS_LIST: Farm[] = [
   { id: 'farm_3', name: '第3農場 (温室ハウスエリア)' },
 ];
 
-export function useFarmManager() {
+export function useFarmManager(options?: { onWriteError?: (message: string) => void }) {
   const [farms, setFarms] = useState<Farm[]>(INITIAL_FARMS_LIST);
   const [activeFarmId, setActiveFarmId] = useState<string>('farm_1');
   const [plots, setPlots] = useState<FarmPlot[]>([]);
@@ -54,6 +54,7 @@ export function useFarmManager() {
   const [supabaseStudents, setSupabaseStudents] = useState<StudentProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const onWriteErrorRef = useRef(options?.onWriteError);
 
   // 畑サイズ（行列数）および未割当区画のデフォルト畝数
   const [gridCols, setGridCols] = useState<number>(6);
@@ -89,6 +90,10 @@ export function useFarmManager() {
   useEffect(() => {
     unassignedBedsRef.current = unassignedBedsCount;
   }, [unassignedBedsCount]);
+
+  useEffect(() => {
+    onWriteErrorRef.current = options?.onWriteError;
+  }, [options?.onWriteError]);
 
   const reloadAllFromSupabase = useCallback(async () => {
     lastReloadTimeRef.current = Date.now();
@@ -237,13 +242,17 @@ export function useFarmManager() {
           lastSavedBedsMapRef.current
         );
         if (result && result.ok === false) {
-          setSaveError(result.errorMessage || '保存処理に失敗しました。');
+          const msg = result.errorMessage || '保存処理に失敗しました。';
+          setSaveError(msg);
+          onWriteErrorRef.current?.(msg);
         } else {
           setSaveError(null);
         }
       } catch (err) {
         console.warn('savePlotsGridIndicesToSupabase info:', err);
-        setSaveError('保存処理中にエラーが発生しました。');
+        const msg = '保存処理中にエラーが発生しました。';
+        setSaveError(msg);
+        onWriteErrorRef.current?.(msg);
       } finally {
         isSavingRef.current = false;
       }
@@ -757,6 +766,7 @@ export function useFarmManager() {
     activeFarmId,
     savePlotsGridIndicesToSupabase,
     notifyBroadcast,
+    onWriteError: options?.onWriteError,
   });
 
   return {
