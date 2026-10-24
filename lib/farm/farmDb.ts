@@ -35,15 +35,11 @@ export async function fetchFarmsDb(
     }
   }
 
-  let farmsQuery = supabase.from('farms').select('*');
-  if (currentUserId) {
-    if (teacherFarmId) {
-      farmsQuery = farmsQuery.or(`owner_id.eq.${currentUserId},id.eq.${teacherFarmId}`);
-    } else {
-      farmsQuery = farmsQuery.eq('owner_id', currentUserId);
-    }
-  }
-  const { data: dbFarms } = await farmsQuery;
+  // 参照できる農園は RLS (farms_select_policy) が「生徒の自農園 / 講師の所属農園 (farm_members)」に限る。
+  // owner_id (作成者) で絞ると、共同講師として招待された農園が一覧から漏れる
+  const { data: dbFarms } = currentUserId
+    ? await supabase.from('farms').select('*').order('created_at', { ascending: true })
+    : { data: [] };
   const farms: Farm[] = dbFarms && dbFarms.length > 0 ? dbFarms : [];
 
   return { farms, teacherFarmId, teacherDisplayName };

@@ -772,15 +772,18 @@ export default function TeacherFarmCanvasView({
 
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user) {
-        await supabase
+        const { error: userErr } = await supabase
           .from('users')
           .update({ display_name: cleanOwner, email: cleanEmail })
           .eq('id', authData.user.id);
+        if (userErr) throw new Error(`代表者情報の保存に失敗しました: ${userErr.message}`);
 
-        await supabase
+        // owner_id は作成者を表す不変列 (トリガーで保護)。共同講師も農園名だけを更新する
+        const { error: farmErr } = await supabase
           .from('farms')
-          .update({ name: cleanFarm, owner_id: authData.user.id })
+          .update({ name: cleanFarm })
           .eq('id', activeFarmId);
+        if (farmErr) throw new Error(`農園名の保存に失敗しました: ${farmErr.message}`);
       }
 
       // 🌟 農園住所を Supabase DB (farm_plots の farm_meta) へ完全永続保存 🌟
@@ -793,6 +796,8 @@ export default function TeacherFarmCanvasView({
       setShowToast(true);
     } catch (err: unknown) {
       console.error('handleSaveFarmSettings error:', err);
+      setToastMessage(`⚠️ ${err instanceof Error ? err.message : '農園設定の保存に失敗しました'}`);
+      setShowToast(true);
     }
   };
 
