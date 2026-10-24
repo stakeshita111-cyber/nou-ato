@@ -59,9 +59,10 @@ describe('[マルチテナント] 最終有効 RLS ポリシー', () => {
     expect(p).not.toMatch(/OR\s*\(\s*student_id\s*=\s*auth\.uid\(\)\s*\)/i);
   });
 
-  it('events_modify_policy が自農園に限定されている', () => {
+  it('events_modify_policy が講師の所属農園に限定されている', () => {
     const p = effectivePolicy('events', 'events_modify_policy') ?? '';
-    expect(p).toMatch(/farm_id\s*=\s*public\.current_user_farm_id\(\)/i);
+    expect(p).toMatch(/farm_id\s+IN\s*\(\s*SELECT\s+public\.current_user_farm_ids\(\)\s*\)/i);
+    expect(p).not.toMatch(/farm_id IS NULL/i);
   });
 
   it('events_select_policy で講師が他農園イベントを閲覧できない', () => {
@@ -69,11 +70,14 @@ describe('[マルチテナント] 最終有効 RLS ポリシー', () => {
     expect(p).not.toMatch(/OR\s+public\.current_user_role\(\)\s*=\s*'teacher'/i);
   });
 
-  it('reservations_select/modify_policy が自農園の生徒に限定されている', () => {
+  it('reservations_select/modify_policy が本人または講師の所属農園の生徒・イベントに限定されている', () => {
     const sel = effectivePolicy('reservations', 'reservations_select_policy') ?? '';
     const mod = effectivePolicy('reservations', 'reservations_modify_policy') ?? '';
-    expect(sel).toMatch(/farm_id\s*=\s*public\.current_user_farm_id\(\)/i);
-    expect(mod).toMatch(/farm_id\s*=\s*public\.current_user_farm_id\(\)/i);
+    for (const p of [sel, mod]) {
+      expect(p).toMatch(/auth\.uid\(\)\s*=\s*student_id/i);
+      expect(p).toMatch(/u\.farm_id\s+IN\s*\(\s*SELECT\s+public\.current_user_farm_ids\(\)\s*\)/i);
+      expect(p).toMatch(/e\.farm_id\s+IN\s*\(\s*SELECT\s+public\.current_user_farm_ids\(\)\s*\)/i);
+    }
   });
 
   it('journals の生徒 UPDATE で reply / is_approved / is_private / farm_id を改ざんできない', () => {

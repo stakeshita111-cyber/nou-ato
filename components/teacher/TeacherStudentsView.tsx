@@ -257,7 +257,7 @@ export default function TeacherStudentsView() {
             )
             .order('created_at', { ascending: false });
           if (currentFarmId) {
-            jDataQuery = jDataQuery.or(`farm_id.eq.${currentFarmId},farm_id.is.null`);
+            jDataQuery = jDataQuery.eq('farm_id', currentFarmId);
           }
           const { data: jData } = await jDataQuery;
           if (jData && jData.length > 0) {
