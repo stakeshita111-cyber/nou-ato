@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(117);
+SELECT plan(134);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1221,6 +1221,116 @@ SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is((SELECT count(*)::int FROM public.tasks WHERE id = '22222222-2222-2222-2222-222222222221'), 0,
     '109. [b2c_removed_teacher] 所属から外された講師 0004 は農園A のタスクを参照できなくなる');
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-2 (d): journals / events / announcements / payments / reservations を farm_members 基準へ
+--   前提: 講師 0001 は農園A、講師 0004 は農園B のみに所属。生徒 0098 は農園A
+--   専用のイベント・お知らせ・日誌・予約・支払いを管理者権限で農園A に作成して検証する
+-- ==============================================================================
+RESET ROLE;
+SET LOCAL "request.jwt.claims" = '{}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = '';
+
+INSERT INTO public.events (id, farm_id, title, date)
+VALUES ('b2d-event-a', '11111111-1111-1111-1111-111111111111', 'B-2d 検証イベント', '2026-11-01');
+INSERT INTO public.announcements (id, farm_id, author_id, title, body)
+VALUES ('33333333-3333-3333-3333-3333333333d1', '11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000001', 'B-2d', 'B-2d 検証のお知らせ');
+INSERT INTO public.journals (id, student_id, user_id, role, content, is_private)
+VALUES ('33333333-3333-3333-3333-3333333333d2', '00000000-0000-0000-0000-000000000098', '00000000-0000-0000-0000-000000000098', 'student', 'B-2d 検証の日誌', false);
+INSERT INTO public.reservations (id, event_id, student_id)
+VALUES ('33333333-3333-3333-3333-3333333333d3', 'b2d-event-a', '00000000-0000-0000-0000-000000000098');
+INSERT INTO public.payments (id, student_id, amount, fee_type)
+VALUES ('33333333-3333-3333-3333-3333333333d4', '00000000-0000-0000-0000-000000000098', 1000, 'B-2d 検証');
+
+-- Test 110: 生徒の日誌は生徒の農園 (A) に紐づく (journals_set_farm_id)
+SELECT is(
+    (SELECT farm_id FROM public.journals WHERE id = '33333333-3333-3333-3333-3333333333d2'),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    '110. [b2d_journal_farm] 生徒の日誌は生徒の農園に紐づく'
+);
+
+-- Test 111-115: 所属していない講師 0004 は農園A のデータを参照できない
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.journals WHERE id = '33333333-3333-3333-3333-3333333333d2'), 0,
+    '111. [b2d_journals_isolation] 講師 0004 は所属していない農園A の日誌を参照できない');
+SELECT is((SELECT count(*)::int FROM public.events WHERE id = 'b2d-event-a'), 0,
+    '112. [b2d_events_isolation] 講師 0004 は所属していない農園A のイベントを参照できない');
+SELECT is((SELECT count(*)::int FROM public.announcements WHERE id = '33333333-3333-3333-3333-3333333333d1'), 0,
+    '113. [b2d_announcements_isolation] 講師 0004 は所属していない農園A のお知らせを参照できない');
+SELECT is((SELECT count(*)::int FROM public.reservations WHERE id = '33333333-3333-3333-3333-3333333333d3'), 0,
+    '114. [b2d_reservations_isolation] 講師 0004 は所属していない農園A の予約を参照できない');
+SELECT is((SELECT count(*)::int FROM public.payments WHERE id = '33333333-3333-3333-3333-3333333333d4'), 0,
+    '115. [b2d_payments_isolation] 講師 0004 は所属していない農園A の支払いを参照できない');
+
+-- Test 116-123: 講師 0004 を農園A に所属させると、参照・更新・作成ができる
+RESET ROLE;
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.journals WHERE id = '33333333-3333-3333-3333-3333333333d2'), 1,
+    '116. [b2d_co_teacher_journals] 農園A に所属した講師 0004 は農園A の生徒の日誌を参照できる');
+SELECT is((SELECT count(*)::int FROM public.events WHERE id = 'b2d-event-a'), 1,
+    '117. [b2d_co_teacher_events] 農園A に所属した講師 0004 は農園A のイベントを参照できる');
+SELECT is((SELECT count(*)::int FROM public.reservations WHERE id = '33333333-3333-3333-3333-3333333333d3'), 1,
+    '118. [b2d_co_teacher_reservations] 農園A に所属した講師 0004 は農園A の予約を参照できる');
+SELECT is((SELECT count(*)::int FROM public.payments WHERE id = '33333333-3333-3333-3333-3333333333d4'), 1,
+    '119. [b2d_co_teacher_payments] 農園A に所属した講師 0004 は農園A の生徒の支払いを参照できる');
+SELECT lives_ok(
+    'UPDATE public.events SET title = ''共同講師が更新'' WHERE id = ''b2d-event-a''',
+    '120. [b2d_co_teacher_event_update] 共同講師は農園A のイベントを更新できる'
+);
+SELECT lives_ok(
+    'INSERT INTO public.announcements (id, farm_id, author_id, title, body) VALUES (''33333333-3333-3333-3333-3333333333d5'', ''11111111-1111-1111-1111-111111111111'', ''00000000-0000-0000-0000-000000000004'', ''共同'', ''共同講師のお知らせ'')',
+    '121. [b2d_co_teacher_announcement_insert] 共同講師は農園A にお知らせを作成できる'
+);
+SELECT lives_ok(
+    'INSERT INTO public.journals (id, user_id, role, content, farm_id) VALUES (''33333333-3333-3333-3333-3333333333d6'', ''00000000-0000-0000-0000-000000000004'', ''broadcast'', ''共同講師の一斉連絡'', ''11111111-1111-1111-1111-111111111111'')',
+    '122. [b2d_co_teacher_broadcast] 共同講師は 2 つ目の農園 (農園A) に一斉連絡を書ける'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT farm_id FROM public.journals WHERE id = '33333333-3333-3333-3333-3333333333d6'),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    '123. [b2d_co_teacher_broadcast] 講師が書いた一斉連絡は講師自身の users.farm_id (農園B) ではなく指定した農園A に残る'
+);
+
+-- Test 124: 生徒 0098 には自分の農園の一斉連絡が見える (生徒の見え方は従来どおり)
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000098", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000098';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.journals WHERE id = '33333333-3333-3333-3333-3333333333d6'), 1,
+    '124. [b2d_student_broadcast] 生徒は自分の農園の一斉連絡を参照できる');
+
+-- Test 125-126: 所属から外すと、直後から参照できなくなる
+RESET ROLE;
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is((SELECT count(*)::int FROM public.journals WHERE id = '33333333-3333-3333-3333-3333333333d2'), 0,
+    '125. [b2d_removed_teacher] 所属から外された講師 0004 は農園A の日誌を参照できなくなる');
+SELECT is((SELECT count(*)::int FROM public.events WHERE id = 'b2d-event-a'), 0,
+    '126. [b2d_removed_teacher] 所属から外された講師 0004 は農園A のイベントを参照できなくなる');
 
 RESET ROLE;
 
