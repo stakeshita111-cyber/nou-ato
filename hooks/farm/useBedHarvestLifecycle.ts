@@ -88,7 +88,7 @@ export function useBedHarvestLifecycle({
       const journalContent =
         details.imageUrl && !hasHttpImg ? `${baseContent}\n[IMG:${details.imageUrl}]` : baseContent;
 
-      await supabase.from('journals').insert([
+      const { error: insertErr } = await supabase.from('journals').insert([
         {
           student_id: validStudentId,
           farm_id: validFarmId,
@@ -98,6 +98,10 @@ export function useBedHarvestLifecycle({
           is_approved: false,
         },
       ]);
+      if (insertErr) {
+        console.warn('journals completion insert notice:', insertErr);
+        onWriteError?.('収穫完了報告の保存に失敗しました');
+      }
     } catch (e) {
       console.warn('journals completion insert notice:', e);
       onWriteError?.('収穫完了報告の保存に失敗しました');
@@ -131,7 +135,7 @@ export function useBedHarvestLifecycle({
           targetBed?.id && targetBed.id !== exactBedId
             ? `id.eq.${exactBedId},id.eq.${targetBed.id}`
             : `id.eq.${exactBedId}`;
-        await supabase
+        const { error: updateErr } = await supabase
           .from('farm_beds')
           .update({
             status: 'completed_pending',
@@ -141,6 +145,10 @@ export function useBedHarvestLifecycle({
             completion_image_url: details.imageUrl || null,
           })
           .or(bedFilter);
+        if (updateErr) {
+          console.warn('farm_beds status update notice:', updateErr);
+          onWriteError?.('収穫完了報告の保存に失敗しました');
+        }
 
         await savePlotsGridIndicesToSupabase(nextPlots);
       }
@@ -219,12 +227,16 @@ export function useBedHarvestLifecycle({
     });
 
     try {
-      const { data: pendingJournals } = await supabase
+      const { data: pendingJournals, error: selectErr } = await supabase
         .from('journals')
         .select('*')
         .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`)
         .order('created_at', { ascending: false })
         .limit(1);
+      if (selectErr) {
+        console.warn('fetch latest completion journal notice:', selectErr);
+        onWriteError?.('収穫完了報告の取得に失敗しました');
+      }
 
       if (pendingJournals && pendingJournals.length > 0) {
         const pj = pendingJournals[0];
@@ -314,7 +326,11 @@ export function useBedHarvestLifecycle({
       if (resolvedPlotId) {
         crQuery = crQuery.eq('plot_id', resolvedPlotId);
       }
-      await crQuery;
+      const { error: crErr } = await crQuery;
+      if (crErr) {
+        console.warn('archive bed insert notice:', crErr);
+        onWriteError?.('アーカイブ畝の保存に失敗しました');
+      }
     } catch (e) {
       console.warn('archive bed insert notice:', e);
       onWriteError?.('アーカイブ畝の保存に失敗しました');
@@ -330,7 +346,7 @@ export function useBedHarvestLifecycle({
         ? `${targetPlot.id}_bed_${targetBedNumber}`
         : `plot_cell_${targetPlotCode}_bed_${targetBedNumber}`);
     try {
-      await supabase
+      const { error: updateErr } = await supabase
         .from('farm_beds')
         .update({
           crop_name: newCropName || '未確定 🌱',
@@ -347,16 +363,24 @@ export function useBedHarvestLifecycle({
             ? `id.eq.${exactBedId},id.eq.${bedId}`
             : `id.eq.${exactBedId}`
         );
+      if (updateErr) {
+        console.warn('farm_beds reset update error:', updateErr);
+        onWriteError?.('新しい畝の初期化保存に失敗しました');
+      }
     } catch (e) {
       console.warn('farm_beds reset update error:', e);
       onWriteError?.('新しい畝の初期化保存に失敗しました');
     }
 
     try {
-      await supabase
+      const { error: journalErr } = await supabase
         .from('journals')
         .update({ is_approved: true })
         .like('content', `%【収穫完了報告】%${targetPlotCode}%${targetBedNumber}%`);
+      if (journalErr) {
+        console.warn('approveAndAddNewBed journals update notice:', journalErr);
+        onWriteError?.('収穫完了報告の承認保存に失敗しました');
+      }
     } catch (e) {
       console.warn('approveAndAddNewBed journals update notice:', e);
       onWriteError?.('収穫完了報告の承認保存に失敗しました');
@@ -413,24 +437,33 @@ export function useBedHarvestLifecycle({
         ? `${targetPlot.id}_bed_${targetBedNum}`
         : `plot_cell_${targetPlotCode}_bed_${targetBedNum}`);
     try {
-      await supabase
+      const { error: rejectBedErr } = await supabase
         .from('farm_beds')
         .update({
           status: 'rejected',
           completion_notes: rejectReason,
         })
         .or(`id.eq.${exactBedId},id.eq.${bedId}`);
+      if (rejectBedErr) {
+        console.warn('farm_beds reject update error:', rejectBedErr);
+        onWriteError?.('差し戻しの保存に失敗しました');
+      }
     } catch (e) {
       console.warn('farm_beds reject update error:', e);
       onWriteError?.('差し戻しの保存に失敗しました');
     }
 
     try {
-      await supabase
+      const { error: rejectJournalErr } = await supabase
         .from('journals')
         .update({ is_approved: true })
         .like('content', `%【収穫完了報告】区画 ${targetPlotCode} / 畝 ${targetBedNum}%`);
-    } catch {
+      if (rejectJournalErr) {
+        console.warn('journals reject update notice:', rejectJournalErr);
+        onWriteError?.('差し戻しの保存に失敗しました');
+      }
+    } catch (e) {
+      console.warn('journals reject update notice:', e);
       onWriteError?.('差し戻しの保存に失敗しました');
     }
 
