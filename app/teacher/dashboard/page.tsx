@@ -15,41 +15,48 @@ import { useUrlTabState } from '@/hooks/useUrlTabState';
 
 // 🌟 重量級・特定API依存コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
 // これにより、初回アクセス時の React 19 Hydration クラッシュやモバイル端末での初期化エラーを 100% 防止します
+// 🌟 遅延読み込み中のフォールバックを各ビューの中央配置と完全に一致させ、画面遷移時の位置ズレ（CLS）を防止 🌟
+const ViewLoadingFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-[460px] py-20 animate-fade-in">
+    <SproutLoader size={80} />
+  </div>
+);
+
 const TeacherOverviewView = dynamic(() => import('@/components/teacher/TeacherOverviewView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherTaskBoardView = dynamic(() => import('@/components/teacher/TeacherTaskBoardView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherFarmCanvasView = dynamic(() => import('@/components/teacher/TeacherFarmCanvasView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherStudentsView = dynamic(() => import('@/components/teacher/TeacherStudentsView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherJournalsView = dynamic(() => import('@/components/teacher/TeacherJournalsView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherTemplatesView = dynamic(() => import('@/components/teacher/TeacherTemplatesView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherPaymentsView = dynamic(() => import('@/components/teacher/TeacherPaymentsView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherEventsView = dynamic(() => import('@/components/teacher/TeacherEventsView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 const TeacherSettingsView = dynamic(() => import('@/components/teacher/TeacherSettingsView'), {
   ssr: false,
-  loading: () => <SproutLoader />,
+  loading: () => <ViewLoadingFallback />,
 });
 
 const VALID_TEACHER_MENUS = [
