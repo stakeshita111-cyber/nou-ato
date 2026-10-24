@@ -2,9 +2,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { Database } from '@/types/supabase';
-import type { Farm, FarmBed } from '@/types/farm';
+import type { Farm, FarmBed, FarmPlot } from '@/types/farm';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import * as farmDb from '@/lib/farm/farmDb';
+
+const mockSupabase = vi.hoisted(() => ({
+  farmPlotsInsert: vi.fn().mockResolvedValue({ error: null }),
+  farmBedsSelectEq: vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -19,11 +24,25 @@ vi.mock('@/lib/supabase', () => ({
       subscribe: vi.fn().mockReturnThis(),
     })),
     removeChannel: vi.fn().mockResolvedValue('ok'),
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-    })),
+    from: vi.fn((table: string) => {
+      if (table === 'farm_plots') {
+        return {
+          insert: mockSupabase.farmPlotsInsert,
+        };
+      }
+      if (table === 'farm_beds') {
+        return {
+          select: vi.fn(() => ({
+            eq: mockSupabase.farmBedsSelectEq,
+          })),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      };
+    }),
   },
 }));
 
@@ -37,7 +56,7 @@ const BED_1_ID = `${PLOT_A1_ID}_bed_1`;
 const BED_2_ID = `${PLOT_A1_ID}_bed_2`;
 const ARCHIVED_BED_ID = `archived_bed_A1_1_1700000000000`;
 
-function setupPlotBedMocks() {
+function setupPlotBedMocks(customPlots?: PlotRow[]) {
   const farmObj: Farm = {
     id: FARM_ID,
     name: 'テスト農園',
@@ -45,7 +64,7 @@ function setupPlotBedMocks() {
     grid_rows: 1,
   };
 
-  const dbPlots: PlotRow[] = [
+  const dbPlots: PlotRow[] = customPlots ?? [
     {
       id: PLOT_A1_ID,
       code: 'A1',
@@ -139,6 +158,8 @@ function setupPlotBedMocks() {
 describe('A1a: usePlotBedOperations 特性テスト（useFarmManager 経由）', () => {
   beforeEach(() => {
     localStorage.clear();
+    mockSupabase.farmPlotsInsert = vi.fn().mockResolvedValue({ error: null });
+    mockSupabase.farmBedsSelectEq = vi.fn().mockResolvedValue({ data: [], error: null });
   });
 
   afterEach(() => {
@@ -333,6 +354,167 @@ describe('A1a: usePlotBedOperations 特性テスト（useFarmManager 経由）',
       );
     });
     expect(result.current.plots[0].beds).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('5. updatePlotPositionFree（正常系・異常系）：指定 plotId の position が更新され、存在しない ID では変化しない', async () => {
+    setupPlotBedMocks();
+
+    const { result, unmount } = renderHook(() => useFarmManager());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => {
+      result.current.updatePlotPositionFree(PLOT_A1_ID, 250, 360);
+    });
+
+    expect(result.current.plots[0].position).toEqual({ x: 250, y: 360 });
+
+    // 異常系: 存在しない plotId の場合は plots の position が変わらない
+    act(() => {
+      result.current.updatePlotPositionFree('non_existent_plot', 999, 999);
+    });
+    expect(result.current.plots[0].position).toEqual({ x: 250, y: 360 });
+
+    unmount();
+  });
+
+  it('6. updateAllUnassignedBedsCount（正常系・異常系）：未割当区画の畝数が一括更新され、savePlotsAndBedsToDb と超過分 deleteBedDb が呼ばれる（DB例外時は握りつぶし）', async () => {
+    setupPlotBedMocks([
+      {
+        id: PLOT_A1_ID,
+        code: 'A1',
+        name: '区画 A1',
+        farm_id: FARM_ID,
+        student_id: null,
+        is_vacant: false,
+        description: null,
+        created_at: '2026-04-01T00:00:00Z',
+        updated_at: null,
+      },
+    ]);
+    const saveSpy = vi.spyOn(farmDb, 'savePlotsAndBedsToDb').mockResolvedValue({ ok: true });
+    const deleteSpy = vi.spyOn(farmDb, 'deleteBedDb').mockResolvedValue(undefined);
+    mockSupabase.farmBedsSelectEq.mockResolvedValueOnce({
+      data: [{ id: `${PLOT_A1_ID}_bed_1` }, { id: `${PLOT_A1_ID}_bed_5` }],
+      error: null,
+    });
+
+    const { result, unmount } = renderHook(() => useFarmManager());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateAllUnassignedBedsCount(2);
+    });
+
+    expect(result.current.unassignedBedsCount).toBe(2);
+    expect(result.current.plots[0].beds).toHaveLength(2);
+    expect(result.current.plots[0].beds[0].id).toBe(`${PLOT_A1_ID}_bed_1`);
+    expect(result.current.plots[0].beds[1].id).toBe(`${PLOT_A1_ID}_bed_2`);
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    expect(saveSpy).toHaveBeenCalledWith(
+      expect.any(Array),
+      FARM_ID,
+      expect.objectContaining({ unassigned_beds: 2 }),
+      expect.any(Object),
+      expect.any(Map),
+      expect.any(Map)
+    );
+    expect(deleteSpy).toHaveBeenCalledTimes(1);
+    expect(deleteSpy).toHaveBeenCalledWith(`${PLOT_A1_ID}_bed_5`);
+
+    // 異常系: farm_beds select が例外を投げても console.error で握りつぶされ完了する
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockSupabase.farmBedsSelectEq.mockRejectedValueOnce(new Error('select excess beds failed'));
+
+    await act(async () => {
+      await expect(result.current.updateAllUnassignedBedsCount(3)).resolves.toBeUndefined();
+    });
+    expect(result.current.unassignedBedsCount).toBe(3);
+    expect(result.current.plots[0].beds).toHaveLength(3);
+    expect(errSpy).toHaveBeenCalledWith(
+      'updateAllUnassignedBedsCount excess beds clean error:',
+      expect.any(Error)
+    );
+
+    unmount();
+  });
+
+  it('7. addPlot（正常系・異常系）：新規区画と指定数の畝が plots に追加され farm_plots.insert と insertBedDb が呼ばれる（DB例外時も握りつぶして newPlot を返す）', async () => {
+    setupPlotBedMocks();
+    const insertBedSpy = vi.spyOn(farmDb, 'insertBedDb').mockResolvedValue(null);
+
+    const { result, unmount } = renderHook(() => useFarmManager());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let createdPlot: FarmPlot | undefined;
+    await act(async () => {
+      createdPlot = await result.current.addPlot(2);
+    });
+
+    expect(createdPlot).toBeDefined();
+    expect(createdPlot?.farm_id).toBe(FARM_ID);
+    expect(createdPlot?.code).toBe('2');
+    expect(createdPlot?.name).toBe('区画 2');
+    expect(createdPlot?.beds).toHaveLength(2);
+    expect(result.current.plots).toHaveLength(2);
+    expect(mockSupabase.farmPlotsInsert).toHaveBeenCalledWith({
+      id: createdPlot?.id,
+      name: '区画 2',
+      code: '2',
+    });
+    expect(insertBedSpy).toHaveBeenCalledTimes(2);
+
+    // 異常系: farm_plots.insert が例外を投げても握りつぶされて新しい区画が返る
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockSupabase.farmPlotsInsert.mockRejectedValueOnce(new Error('farm_plots insert failed'));
+
+    let createdOnError: FarmPlot | undefined;
+    await act(async () => {
+      createdOnError = await result.current.addPlot(1);
+    });
+    expect(createdOnError).toBeDefined();
+    expect(result.current.plots).toHaveLength(3);
+    expect(errSpy).toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('8. deletePlot（正常系・異常系）：confirm 承認時に DB DELETE ではなく is_vacant: true, student_id/student_name: undefined に論理空き地化して保存する。キャンセル時は変更しない', async () => {
+    setupPlotBedMocks();
+    const saveSpy = vi.spyOn(farmDb, 'savePlotsAndBedsToDb').mockResolvedValue({ ok: true });
+    const confirmSpy = vi.spyOn(window, 'confirm');
+
+    const { result, unmount } = renderHook(() => useFarmManager());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // キャンセル時は何もしない
+    confirmSpy.mockReturnValueOnce(false);
+    await act(async () => {
+      await result.current.deletePlot(PLOT_A1_ID);
+    });
+    expect(result.current.plots[0].is_vacant).toBe(false);
+    expect(result.current.plots[0].student_id).toBe(STUDENT_1);
+    expect(saveSpy).not.toHaveBeenCalled();
+
+    // 承認時は論理空き地化（is_vacant: true）され savePlotsAndBedsToDb が呼ばれる
+    confirmSpy.mockReturnValueOnce(true);
+    await act(async () => {
+      await result.current.deletePlot(PLOT_A1_ID);
+    });
+    expect(result.current.plots[0].is_vacant).toBe(true);
+    expect(result.current.plots[0].student_id).toBeUndefined();
+    expect(result.current.plots[0].student_name).toBeUndefined();
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+
+    // 異常系: savePlotsAndBedsToDb が ok: false を返した場合、論理空き地化 state は維持され saveError が設定される
+    confirmSpy.mockReturnValueOnce(true);
+    saveSpy.mockResolvedValueOnce({ ok: false, errorMessage: 'deletePlot save failed' });
+    await act(async () => {
+      await result.current.deletePlot(PLOT_A1_ID);
+    });
+    expect(result.current.plots[0].is_vacant).toBe(true);
+    expect(result.current.saveError).toBe('deletePlot save failed');
 
     unmount();
   });
