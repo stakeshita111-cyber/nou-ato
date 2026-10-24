@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "NOU-ATO (のうあと) API Specification",
-    "description": "体験農業経営支援アプリ「NOU-ATO」のバックエンド API 仕様書です。\n農園特化型 AI ナレッジ検索（RAG）、AI しるべぇ対話相談、システム設定、チケット付与などのエンドポイントを提供します。\nエラーレスポンスは RFC 7807 (Problem Details for HTTP APIs) に準拠しています。",
+    "description": "体験農業経営支援アプリ「NOU-ATO」のバックエンド API 仕様書です。\n農園特化型 AI ナレッジ検索（RAG）、AI しるべぇ対話相談、システム設定、チケット付与などのエンドポイントを提供します。\nエラーレスポンスは RFC 7807 (Problem Details for HTTP APIs) に準拠しています。\n",
     "version": "1.0.0",
     "contact": {
       "name": "NOU-ATO Development Team"
@@ -22,7 +22,7 @@
     "/api/chat/rag": {
       "post": {
         "summary": "AI しるべぇ (農園特化型 RAG) チャット相談",
-        "description": "受講生の農業に関する質問を受け付け、Gemini (gemini-flash-lite-latest / gemini-2.5-flash) と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。\n1日3回のチケット制に対応し、サーバー側でのアトミック台帳管理（consume_ai_ticket / refund_ai_ticket）やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。",
+        "description": "受講生の農業に関する質問を受け付け、Gemini (gemini-flash-lite-latest / gemini-2.5-flash) と農園蓄積ナレッジ（過去日誌・承認済みノウハウ）を組み合わせた回答を生成します。\n1日3回のチケット制に対応し、サーバー側でのアトミック台帳管理（consume_ai_ticket / refund_ai_ticket）やメモ専用モードもサポートします。対話履歴は Supabase の journals テーブルに自動記録されます。\n",
         "operationId": "postChatRag",
         "requestBody": {
           "required": true,
@@ -132,8 +132,8 @@
     },
     "/api/chat/check-knowledge": {
       "post": {
-        "summary": "入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合",
-        "description": "受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。",
+        "summary": "入力中の質問と農園ナレッジ・FAQ のリアルタイム類似照合および自己解決保存",
+        "description": "受講生が質問入力フォームに入力中のテキストから作物品種・キーワードを解析し、即答可能なプリセットFAQおよび過去の承認済み日誌Q&Aから類似度の高いノウハウを最大3件抽出して返却します。\nまた、`saveOnly: true` 指定時は自己解決したQ&Aをチケット消費なしで `journals` テーブルへ保存します。\n",
         "operationId": "postCheckKnowledge",
         "requestBody": {
           "required": true,
@@ -170,6 +170,17 @@
                       }
                     }
                   }
+                },
+                "example": {
+                  "matches": [
+                    {
+                      "id": "faq_yellow_leaf",
+                      "question": "葉っぱが黄色くなってきました。どうすればいいですか？",
+                      "answer": "【農園アドバイス：葉の黄変について】一番下の古い葉が黄色い場合は自然な老化ですので切り取って大丈夫です。",
+                      "matchedKeywords": ["黄色", "葉が黄色"],
+                      "score": 20
+                    }
+                  ]
                 }
               }
             }
@@ -210,7 +221,7 @@
     "/api/settings": {
       "get": {
         "summary": "システム・機能設定の取得",
-        "description": "講師および受講生画面の機能フラグ（生徒用AI相談タブの表示/非表示）および農園別カスタムFAQプリセットを取得します。",
+        "description": "講師および受講生画面の機能フラグ（生徒用AI相談タブの表示/非表示）および農園別カスタムFAQプリセットを取得します。\n",
         "operationId": "getSettings",
         "parameters": [
           {
@@ -248,6 +259,14 @@
                       }
                     }
                   }
+                },
+                "example": {
+                  "settings": {
+                    "showStudentTalkTab": true,
+                    "presetFaqs": []
+                  },
+                  "showStudentTalkTab": true,
+                  "presetFaqs": []
                 }
               }
             }
@@ -276,7 +295,7 @@
       },
       "post": {
         "summary": "システム・機能設定の更新",
-        "description": "講師による機能フラグ設定およびカスタムFAQプリセットの動的更新を受け付けます。",
+        "description": "講師による機能フラグ設定およびカスタムFAQプリセットの動的更新を受け付けます。\n",
         "operationId": "updateSettings",
         "requestBody": {
           "required": true,
@@ -492,6 +511,287 @@
           }
         }
       }
+    },
+    "/rest/v1/rpc/create_farm_invitation": {
+      "post": {
+        "summary": "共同講師招待リンク用トークン発行 (create_farm_invitation)",
+        "description": "農園の講師が共同講師招待用のトークンを発行します。\n平文トークン（24バイト/48文字の16進数）は呼び出し元に1度だけ返却され、DBにはSHA-256ハッシュのみ保存されます。\n有効期限は7日間（1回限り有効）。同一農園で未使用・有効な招待が20件以上ある場合はエラーとなります。",
+        "operationId": "createFarmInvitation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["p_farm_id"],
+                "properties": {
+                  "p_farm_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "招待対象の農園ID（呼び出し元講師が所属している農園）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "招待トークン発行成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["invitation_id", "token", "expires_at"],
+                  "properties": {
+                    "invitation_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "招待URL用トークン（48文字hex）"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未認証 (Not authenticated)"
+          },
+          "403": {
+            "description": "所属講師以外の実行不可 (Forbidden)"
+          }
+        }
+      }
+    },
+    "/rest/v1/rpc/accept_farm_invitation": {
+      "post": {
+        "summary": "共同講師招待の受け入れ・所属登録 (accept_farm_invitation)",
+        "description": "招待トークンを検証し、講師として対象農園（farm_members）に所属します（1回限り・期限7日）。\n農園に所属している受講生は受け入れ不可。農園未所属アカウント（role = 'student', farm_id = null）は講師（role = 'teacher'）に昇格します。",
+        "operationId": "acceptFarmInvitation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["p_token"],
+                "properties": {
+                  "p_token": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{48}$",
+                    "description": "招待URLに含まれる48文字hexトークン"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "招待受け入れ成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "farm_id", "farm_name", "already_member"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "farm_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "farm_name": {
+                      "type": "string"
+                    },
+                    "already_member": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "無効・期限切れ・取り消し済み招待 (Invalid / Expired / Revoked)"
+          },
+          "401": {
+            "description": "未認証 (Not authenticated)"
+          },
+          "403": {
+            "description": "受講生による受け入れ禁止 (Forbidden)"
+          }
+        }
+      }
+    },
+    "/rest/v1/rpc/revoke_farm_invitation": {
+      "post": {
+        "summary": "未使用の招待取り消し (revoke_farm_invitation)",
+        "description": "農園の講師が未使用の招待リンクを取り消します。使用済みの招待は取り消せません。",
+        "operationId": "revokeFarmInvitation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["p_invitation_id"],
+                "properties": {
+                  "p_invitation_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "取り消し対象の招待ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "招待取り消し成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "invitation_id"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "invitation_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未認証 (Not authenticated)"
+          },
+          "403": {
+            "description": "所属講師以外の実行不可 (Forbidden)"
+          }
+        }
+      }
+    },
+    "/rest/v1/rpc/list_farm_members": {
+      "post": {
+        "summary": "農園の講師一覧取得 (list_farm_members)",
+        "description": "農園に所属する講師一覧を取得します。個人情報保護のためメールアドレスは返却せず、表示名・参加日時・本人フラグのみを返します。",
+        "operationId": "listFarmMembers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["p_farm_id"],
+                "properties": {
+                  "p_farm_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "対象農園ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "講師一覧返却成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FarmMemberItem"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未認証 (Not authenticated)"
+          },
+          "403": {
+            "description": "所属講師以外の実行不可 (Forbidden)"
+          }
+        }
+      }
+    },
+    "/rest/v1/rpc/remove_farm_member": {
+      "post": {
+        "summary": "農園から講師を外す (remove_farm_member)",
+        "description": "農園の講師が他の講師をメンバーから外す、または自身が退出します。最後の1人の講師は削除できません。",
+        "operationId": "removeFarmMember",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["p_farm_id", "p_user_id"],
+                "properties": {
+                  "p_farm_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "対象農園ID"
+                  },
+                  "p_user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "削除対象の講師ユーザーID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "講師削除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "farm_id", "user_id"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "farm_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未認証 (Not authenticated)"
+          },
+          "403": {
+            "description": "所属講師以外の実行不可 または 最後の1人の削除防止 (Forbidden)"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -667,6 +967,76 @@
                 }
               }
             }
+          }
+        }
+      },
+      "FarmInvitation": {
+        "type": "object",
+        "description": "講師招待レコード（トークンのハッシュのみ保存、有効期限7日、1回限り、取り消し可）",
+        "required": ["id", "farm_id", "token_hash", "expires_at", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "farm_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token_hash": {
+            "type": "string",
+            "description": "SHA-256ハッシュ値"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accepted_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "FarmMemberItem": {
+        "type": "object",
+        "description": "農園所属講師メンバー情報（氏名・メール非公開、表示名のみ）",
+        "required": ["user_id", "display_name", "joined_at", "is_self"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "講師表示名（未設定時は「講師」）"
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "is_self": {
+            "type": "boolean",
+            "description": "呼び出し元ユーザー自身であるか否か"
           }
         }
       }
