@@ -1,26 +1,26 @@
 # リファクタリング計画書（R-3）：`useFarmManager.ts` ＆ `TeacherFarmCanvasView.tsx`
 
-> **対象コミット**: `main`（方式B B-0〜B-6 完了・R-1/R-2 適用後）  
-> **方針**: 本ドキュメントは巨大ファイル2本の責務棚卸しと段階的分割計画をまとめたものであり、本 PR（R-3）ではプロダクションコード・テストコードの変更は一切行わない。
+> **対象コミット**: `main`（方式B B-0〜B-6 完了・R-1/R-2 適用、および Step 1 PR #234 マージ後）  
+> **進捗メモ**: Step 1（PR #234）完了により、`hooks/useFarmManager.ts` は 1,955 行 → 1,644 行（-311 行）に削減済み。以下の表の行番号は Step 1 完了時点の `main` の値に更新している。
 
 ---
 
 ## 1. 責務ごとの内訳（行番号つき）
 
-### 1-1. `hooks/useFarmManager.ts`（全 1,956 行）
+### 1-1. `hooks/useFarmManager.ts`（Step 1 完了後：全 1,644 行）
 
-| 行範囲      | 行数 | 責務カテゴリ                                                         | 主な関数・State・処理内容                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------- | ---: | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L1–L54      |   54 | 型定義・外部ヘルパー import・定数                                    | `FarmPlot`, `FarmBed`, `CropRecord` 等の型、`farmCalculations` / `farmDb` からの import、デフォルト畝数定数 (`DEFAULT_UNASSIGNED_BEDS = 4`)                                                                                                                                                                                                                                                                                                                    |
-| L55–L98     |   44 | フック内 State・Ref 宣言と参照同期                                   | `plots`, `records`, `unassignedStudents`, `isLoading`, `unassignedBedsCount`, `gridDims` State および Realtime/非同期ハンドラ用の最新値 `useRef` 同期 (`plotsRef`, `gridDimsRef`, `unassignedBedsCountRef`)                                                                                                                                                                                                                                                    |
-| L99–L503    |  405 | **責務A：Supabase 全件ロード＆状態再構築** (`reloadAllFromSupabase`) | 認証ユーザー確認 → `fetchFarmsFromDb` と `nouato_active_farm_id` 同期（L109–L141）→ `fetchPlotsAndBedsFromDb` / `fetchStudentsFromDb` / `fetchCropRecordsFromDb` 並列取得（L145–L149）→ DB 区画メタデータ（`description` JSON の `is_vacant`, `grid_dimensions`, `farm_meta`）復元（L162–L284）→ 固定グリッド区画 (`buildFixedPlots`) と DB 区画のマージ・畝リスト構築（L286–L429）→ 未割当生徒リスト算出（L431–L468）→ 観察記録 (`records`) 整形（L470–L502） |
-| L504–L570   |   67 | **責務B：グリッド座標・区画メタデータの DB 一括保存**                | `notifyBroadcast`（BroadcastChannel 通知、L504–L511）、`savePlotsGridIndicesToSupabase`（`savePlotsAndBedsToDb` 呼び出し＋キャッシュ同期、L513–L570）                                                                                                                                                                                                                                                                                                          |
-| L571–L759   |  189 | **責務C：初期ロード・Realtime 購読・タブ間/農園切替イベント同期**    | 初回 `reloadAllFromSupabase` 実行、保存直後ガード (`shouldSkipSync` / `lastSaveTimeRef`)、`BroadcastChannel('nouato_farm_sync_channel')` 購読、カスタムイベント (`nouato_sync_event`, `nouato_active_farm_changed`) 購読、タブ復帰 (`focus` / `visibilitychange`) 再同期、Supabase Realtime (`farm_plots`, `farm_beds`, `crop_records`, `users`) 購読                                                                                                          |
-| L760–L1068  |  309 | **責務D：区画・畝のレイアウト＆構造編集操作**                        | `updatePlotPositionFree`（自由配置座標更新、L761–L774）、`addBedToPlot`（RPC `add_farm_bed` 経由の畝追加、L776–L827）、`deleteBedFromPlot`（RPC `delete_farm_bed` 経由の畝削除、L829–L861）、`reorderBedsInPlot`（RPC `reorder_beds` 経由の畝並び替え、L863–L895）、`updatePlotBedsCount`（区画単位の畝数増減、L897–L933）、`updateAllUnassignedBedsCount`（未割当区画の一括畝数変更、L935–L988）、`addPlot` / `deletePlot`（区画追加・空き地化、L990–L1067）  |
-| L1069–L1340 |  272 | **責務E：受講生の区画割当・解除・一括割当・区画ステータス変更**      | `assignStudentToPlot`（既存割当区画からの畝・観察記録マイグレーションを含む受講生割当、L1069–L1216）、`unassignStudentFromPlot`（割当解除、L1218–L1247）、`assignAllUnassignedStudents`（未割当受講生の自動一括割当、L1249–L1289）、`updatePlotStatus`（`vacant` / `unassigned` 切替、L1291–L1340）                                                                                                                                                            |
-| L1341–L1440 |  100 | **責務F：観察記録（`crop_records`）CRUD ＆ 畝の作物名更新**          | `addCropRecord`（`insertCropRecordDb` 呼び出し＋ローカル反映、L1342–L1382）、`updateCropRecord`（`updateCropRecordDb` 呼び出し、L1384–L1405）、`deleteCropRecord`（`deleteCropRecordDb` 呼び出し、L1407–L1414）、`updateBedCrop`（`farm_beds.crop_name` 更新、L1416–L1440）                                                                                                                                                                                    |
-| L1441–L1920 |  480 | **責務G：収穫完了申請・承認・アーカイブ・差し戻しライフサイクル**    | `completeBedCrop`（生徒の収穫完了報告・`journals` 連携・`completed_pending` 更新、L1442–L1567）、`confirmBedArchived` / `approveAndAddNewBed`（講師による収穫承認・アーカイブ畝生成・`crop_records` 移管・次期作付け初期化、L1569–L1777）、`rejectBedCompletion`（講師による差し戻し・理由通知、L1779–L1846）、`unarchiveBed`（アーカイブ復元、L1848–L1868）、`addNewBedForPlot`（新規畝追加ラッパー、L1870–L1919）                                            |
-| L1921–L1956 |   36 | 戻り値オブジェクト組み立て                                           | State・操作関数群の公開インターフェース定義                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 行範囲      | 行数 | 責務カテゴリ                                                         | 主な関数・State・処理内容                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------- | ---: | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L1–L53      |   53 | 型定義・外部ヘルパー import・定数                                    | `FarmPlot`, `FarmBed`, `CropRecord` 等の型、`farmPlotHydrator` / `farmCalculations` / `farmDb` からの import、初期農場リスト定数 (`INITIAL_FARMS_LIST`)                                                                                                                                                                                                                                                                                                    |
+| L54–L97     |   44 | フック内 State・Ref 宣言と参照同期                                   | `farms`, `activeFarmId`, `plots`, `records`, `supabaseStudents`, `isLoading`, `saveError`, `gridCols`, `gridRows`, `unassignedBedsCount` State および Realtime/非同期ハンドラ用の最新値 `useRef` 同期 (`plotsRef`, `gridColsRef`, `gridRowsRef`, `unassignedBedsRef`, `lastSavedPlotsMapRef`, `lastSavedBedsMapRef`)                                                                                                                                       |
+| L98–L191    |   94 | **責務A：Supabase 全件ロード＆状態再構築** (`reloadAllFromSupabase`) | 認証ユーザー確認 → `fetchFarmsDb` と `nouato_active_farm_id` 同期（L102–L135）→ `fetchStudentsDb` / `fetchCropRecordsDb` / `fetchRawPlotsAndBedsDb` / `fetchPendingJournalsDb` 取得（L138–L153）→ `hydrateFarmPlots`（`lib/farm/farmPlotHydrator.ts`、PR #234 にて切り出し済み）による区画・畝・グリッド寸法・保存スナップショット構築と State 反映（L155–L185）                                                                                           |
+| L193–L259   |   67 | **責務B：グリッド座標・区画メタデータの DB 一括保存**                | `notifyBroadcast`（BroadcastChannel 通知、L193–L199）、`savePlotsGridIndicesToSupabase`（`savePlotsAndBedsToDb` 呼び出し＋キャッシュ同期、L202–L259）                                                                                                                                                                                                                                                                                                      |
+| L261–L374   |  114 | **責務C：初期ロード・Realtime 購読・タブ間/農園切替イベント同期**    | 初回 `reloadAllFromSupabase` 実行、保存直後ガード (`shouldSkipSync` / `lastSaveTimeRef`)、`BroadcastChannel('nouato_farm_sync_channel')` 購読、カスタムイベント (`nouato_sync_event`, `nouato_active_farm_changed`) 購読、タブ復帰 (`focus` / `visibilitychange`) 再同期、Supabase Realtime (`crop_records`, `farm_beds`, `farm_plots`, `journals`) 購読                                                                                                   |
+| L376–L756   |  381 | **責務D：区画・畝のレイアウト＆構造編集操作**                        | `currentFarmPlots` / `snapToNonCollidingPosition`（L376–L448）、`updatePlotPositionFree`（自由配置座標更新、L450–L462）、`addBedToPlot`（RPC `add_farm_bed` 経由の畝追加、L465–L515）、`deleteBedFromPlot`（RPC `delete_farm_bed` 経由の畝削除、L518–L549）、`reorderBedsInPlot`（RPC `reorder_beds` 経由の畝並び替え、L552–L584）、`updatePlotBedsCount`（L586–L622）、`updateAllUnassignedBedsCount`（L624–L677）、`addPlot` / `deletePlot`（L679–L756） |
+| L758–L1029  |  272 | **責務E：受講生の区画割当・解除・一括割当・区画ステータス変更**      | `assignStudentToPlot`（既存割当区画からの畝・観察記録マイグレーションを含む受講生割当、L758–L905）、`unassignStudentFromPlot`（割当解除、L907–L936）、`assignAllUnassignedStudents`（未割当受講生の自動一括割当、L938–L978）、`updatePlotStatus`（`vacant` / `unassigned` / `assigned` 切替、L980–L1029）                                                                                                                                                  |
+| L1031–L1129 |   99 | **責務F：観察記録（`crop_records`）CRUD ＆ 畝の作物名更新**          | `addCropRecord`（`insertCropRecordDb` 呼び出し＋ローカル反映、L1031–L1071）、`updateCropRecord`（`updateCropRecordDb` 呼び出し、L1073–L1094）、`deleteCropRecord`（`deleteCropRecordDb` 呼び出し、L1096–L1103）、`updateBedCrop`（`farm_beds.crop_name` 更新、L1105–L1129）                                                                                                                                                                                |
+| L1131–L1598 |  468 | **責務G：収穫完了申請・承認・アーカイブ・差し戻しライフサイクル**    | `completeBedCrop`（生徒の収穫完了報告・`journals` 連携・`completed_pending` 更新、L1131–L1256）、`confirmBedArchived` / `approveAndAddNewBed`（講師による収穫承認・アーカイブ畝生成・`crop_records` 移管・次期作付け初期化、L1258–L1466）、`rejectBedCompletion`（講師による差し戻し・理由通知、L1468–L1535）、`unarchiveBed`（アーカイブ復元、L1537–L1557）、`addNewBedForPlot`（新規畝追加ラッパー、L1559–L1598）                                        |
+| L1600–L1644 |   45 | 戻り値オブジェクト組み立て                                           | State・操作関数群の公開インターフェース定義                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ---
 
@@ -45,15 +45,15 @@
 
 ### 2-1. `hooks/useFarmManager.ts` の分割候補
 
-| 切り出し先ファイル（候補）                   | 移管する元行範囲      | 役割・責務                                                                                                                                                                                                  |
-| -------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/farm/farmPlotHydrator.ts`（純粋関数群） | L162–L498             | DB から取得した `farm_plots` / `farm_beds` / `users` / `crop_records` 行データを、`FarmPlot[]`・`UnassignedStudent[]`・`CropRecord[]`・グリッド寸法へ変換する純粋データ変換モジュール（React State 非依存） |
-| `hooks/farm/useFarmRealtimeSync.ts`          | L504–L759             | `BroadcastChannel`・カスタムイベント (`nouato_sync_event`, `nouato_active_farm_changed`)・タブ復帰・Supabase Realtime 購読と `shouldSkipSync` デバウンス制御を担当する同期専用フック                        |
-| `hooks/farm/usePlotBedOperations.ts`         | L760–L1068            | 区画・畝の追加・削除・並び替え・畝数一括変更・自由座標変更を担当するフック                                                                                                                                  |
-| `hooks/farm/useStudentPlotAssignment.ts`     | L1069–L1340           | 受講生の区画割当（畝・記録引き継ぎ含む）・解除・一括自動割当・空き地/未割当ステータス変更を担当するフック                                                                                                   |
-| `hooks/farm/useCropRecordOperations.ts`      | L1341–L1440           | `addCropRecord` / `updateCropRecord` / `deleteCropRecord` / `updateBedCrop` を担当するフック                                                                                                                |
-| `hooks/farm/useBedHarvestLifecycle.ts`       | L1441–L1920           | 収穫完了申請 (`completeBedCrop`)・講師承認＆次期畝生成 (`approveAndAddNewBed`)・差し戻し (`rejectBedCompletion`)・アーカイブ復元 (`unarchiveBed`) を担当するフック                                          |
-| `hooks/useFarmManager.ts`（ファサード）      | L55–L161, L1921–L1956 | 上記サブフックを束ね、既存呼び出し元（`TeacherFarmCanvasView`, `TeacherOverviewView`, `StudentFarmRecordView` 等）に対して**同一の戻り値インターフェース**を維持するファサードフック（約 200 行以下）       |
+| 切り出し先ファイル（候補）               | 移管する元行範囲        | 役割・責務                                                                                                                                                                                                                                          |
+| ---------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/farm/farmPlotHydrator.ts`（済）     | 旧 L152–L493（PR #234） | DB から取得した `farm_plots` / `farm_beds` / `users` / `crop_records` 行データを、`FarmPlot[]`・グリッド寸法・保存スナップショットへ変換するモジュール（React と Supabase に依存しないが、localStorage を読み書きする（農園住所・天気の観測地点）） |
+| `hooks/farm/useFarmRealtimeSync.ts`      | L193–L374               | `BroadcastChannel`・カスタムイベント (`nouato_sync_event`, `nouato_active_farm_changed`)・タブ復帰・Supabase Realtime 購読と `shouldSkipSync` デバウンス制御を担当する同期専用フック                                                                |
+| `hooks/farm/usePlotBedOperations.ts`     | L376–L756               | 区画・畝の追加・削除・並び替え・畝数一括変更・自由座標変更を担当するフック                                                                                                                                                                          |
+| `hooks/farm/useStudentPlotAssignment.ts` | L758–L1029              | 受講生の区画割当（畝・記録引き継ぎ含む）・解除・一括自動割当・空き地/未割当ステータス変更を担当するフック                                                                                                                                           |
+| `hooks/farm/useCropRecordOperations.ts`  | L1031–L1129             | `addCropRecord` / `updateCropRecord` / `deleteCropRecord` / `updateBedCrop` を担当するフック                                                                                                                                                        |
+| `hooks/farm/useBedHarvestLifecycle.ts`   | L1131–L1598             | 収穫完了申請 (`completeBedCrop`)・講師承認＆次期畝生成 (`approveAndAddNewBed`)・差し戻し (`rejectBedCompletion`)・アーカイブ復元 (`unarchiveBed`)・新規畝追加 (`addNewBedForPlot`) を担当するフック                                                 |
+| `hooks/useFarmManager.ts`（ファサード）  | L54–L191, L1600–L1644   | 上記サブフックを束ね、既存呼び出し元（`TeacherFarmCanvasView`, `TeacherOverviewView`, `StudentFarmRecordView` 等）に対して**同一の戻り値インターフェース**を維持するファサードフック（約 200 行以下）                                               |
 
 ### 2-2. `components/teacher/TeacherFarmCanvasView.tsx` の分割候補
 
@@ -72,10 +72,10 @@
 
 ## 3. 分割の順序と依存関係
 
-既存の呼び出し元インターフェースおよび動作を一切壊さずに段階的 PR として進めるため、**「副作用のない純粋関数 → 末端サブモーダル/Hook → コア操作Hook → 親コンテナ整理」** の順で分割する。
+既存の呼び出し元インターフェースおよび動作を一切壊さずに段階的 PR として進めるため、**「React と Supabase に依存しない変換関数 → 末端サブモーダル/Hook → コア操作Hook → 親コンテナ整理」** の順で分割する。
 
 ```
-[Step 1] lib/farm/farmPlotHydrator.ts（純粋関数切り出し・DB/React非依存）
+[Step 1] lib/farm/farmPlotHydrator.ts（完了：PR #234、React と Supabase に依存しないが、localStorage を読み書きする（農園住所・天気の観測地点））
    ↓
 [Step 2] hooks/farm/useCropRecordOperations.ts & useBedHarvestLifecycle.ts
    ↓
@@ -90,7 +90,7 @@
 
 ### 各ステップの依存関係と理由
 
-1. **Step 1（`farmPlotHydrator.ts`）**: `reloadAllFromSupabase` 内の約 340 行を占めるデータ変換処理を純粋関数として切り出す。React や Supabase クライアントに依存しないため最も安全に単体テストを書ける。
+1. **Step 1（`farmPlotHydrator.ts`、PR #234 にて完了）**: `reloadAllFromSupabase` 内のデータ変換処理を切り出した（`useFarmManager.ts` は 1,955 行 → 1,644 行）。React と Supabase に依存しないが、localStorage を読み書きする（農園住所・天気の観測地点）。
 2. **Step 2〜3（操作系サブフック群）**: `savePlotsGridIndicesToSupabase` と `notifyBroadcast` を共通コールバックとして受け取る形で、観察記録・収穫ライフサイクル・畝操作・受講生割当をそれぞれ独立フックへ分離する。`useFarmManager` の戻り値シグネチャは変えない。
 3. **Step 4（Realtime 同期フック）**: ロード関数と保存タイムスタンプ Ref を受け取る形で `useFarmRealtimeSync` を分離し、`useFarmManager.ts` を 200 行以下のファサードにする。
 4. **Step 5〜6（`TeacherFarmCanvasView` の UI 分割）**: まず独立性の高いタイムライン取得フック (`useBedTimelineRecords`) と確認・設定モーダルを切り出し、最後に `PlotDetailModal` とグリッド本体 (`FarmGridCanvas`) を分離する。
@@ -108,16 +108,16 @@
 | `test/farm-lifecycle-and-companion-crops.test.ts` | 畝のアーカイブ判定・連作障害チェック (`checkContinuousCropWarning`)・コンパニオンプランツ提案 (`getCompanionCropSuggestions`) のロジック                                                                                                                                                                      |
 | `test/companion-crops-ui-tabs.test.ts`            | 野菜相性・タブ分類ヘルパーの単体テスト                                                                                                                                                                                                                                                                        |
 | `test/farmDb.fetchFarms.test.ts`                  | `fetchFarmsFromDb` の農園取得・フォーマット処理                                                                                                                                                                                                                                                               |
+| `test/farmPlotHydrator.test.ts`                   | `lib/farm/farmPlotHydrator.ts`（`hydrateFarmPlots` による区画・畝・観察記録・承認待ち日誌・`farm_meta` 変換の 7 ケース、PR #234 にて追加済み）                                                                                                                                                                |
 
 ### 4-2. 既存テストで未カバーの範囲と、分割前に追加すべきテスト
 
-1. **Step 1 着手前に追加すべきテスト（`test/farmPlotHydrator.test.ts`）**:
+1. **Step 1 着手前に追加すべきテスト（`test/farmPlotHydrator.test.ts`、PR #234 にて追加済み）**:
    - DB の `farm_plots.description` JSON（`is_vacant`, `grid_dimensions`, `farm_meta`）が破損・未設定・正常の各ケースで、固定グリッド (`buildFixedPlots`) と DB 区画・畝・受講生が正しくマージされること。
-   - 割当済み受講生と未割当受講生 (`unassignedStudents`) の振り分けが正しく計算されること。
-2. **Step 2 着手前に追加すべきテスト（`test/useBedHarvestLifecycle.test.ts`）**:
+2. **Step 2 着手前に追加すべきテスト（`test/useCropRecordOperations.test.ts` / `test/useBedHarvestLifecycle.test.ts`）**:
+   - `addCropRecord` / `updateCropRecord` / `deleteCropRecord` / `updateBedCrop` の正常系・DBエラー時の挙動固定。
    - `completeBedCrop`（生徒の収穫完了申請時に `farm_beds.status = 'completed_pending'` と `journals` 投稿が行われること）。
    - `approveAndAddNewBed`（講師の収穫承認時にアーカイブ畝作成・`crop_records.bed_id` の移管・新畝の `active` 初期化が行われること）および `rejectBedCompletion`（差し戻し時に `status = 'rejected'` になること）。
-   - R-2 で留保した `useFarmManager.ts` 内の書き込み失敗時のエラー通知・ロールバック挙動の検証。
 3. **Step 3 着手前に追加すべきテスト（`test/useStudentPlotAssignment.test.ts`）**:
    - `assignStudentToPlot` で既に別区画を担当していた受講生を移動した際、元の区画が空きに戻り、畝と観察記録が移動先区画へ引き継がれること。
 4. **Step 5〜6 着手前に追加すべきテスト（`test/TeacherFarmCanvasView.test.tsx`）**:
