@@ -175,7 +175,7 @@ CREATE POLICY "crop_records_modify_policy" ON public.crop_records
                       AND p.farm_id IN (SELECT public.current_user_farm_ids())
                       AND (crop_records.plot_id IS NULL OR crop_records.plot_id = b.plot_id)
                 ))
-                OR (bed_id IS NULL AND plot_id IS NOT NULL AND EXISTS (
+                OR (crop_records.bed_id IS NULL AND crop_records.plot_id IS NOT NULL AND EXISTS (
                     SELECT 1 FROM public.farm_plots p
                     WHERE p.id = crop_records.plot_id
                       AND p.farm_id IN (SELECT public.current_user_farm_ids())
@@ -197,7 +197,7 @@ CREATE POLICY "crop_records_modify_policy" ON public.crop_records
                           )
                           AND (crop_records.plot_id IS NULL OR b.plot_id = crop_records.plot_id)
                     ))
-                    OR (bed_id IS NULL AND plot_id IS NOT NULL AND EXISTS (
+                    OR (crop_records.bed_id IS NULL AND crop_records.plot_id IS NOT NULL AND EXISTS (
                         SELECT 1 FROM public.farm_plots p
                         WHERE p.id = crop_records.plot_id AND p.student_id = auth.uid()
                     ))
@@ -216,7 +216,7 @@ CREATE POLICY "crop_records_modify_policy" ON public.crop_records
                       AND p.farm_id IN (SELECT public.current_user_farm_ids())
                       AND (crop_records.plot_id IS NULL OR crop_records.plot_id = b.plot_id)
                 ))
-                OR (bed_id IS NULL AND plot_id IS NOT NULL AND EXISTS (
+                OR (crop_records.bed_id IS NULL AND crop_records.plot_id IS NOT NULL AND EXISTS (
                     SELECT 1 FROM public.farm_plots p
                     WHERE p.id = crop_records.plot_id
                       AND p.farm_id IN (SELECT public.current_user_farm_ids())
@@ -237,7 +237,7 @@ CREATE POLICY "crop_records_modify_policy" ON public.crop_records
                           )
                           AND (crop_records.plot_id IS NULL OR b.plot_id = crop_records.plot_id)
                     ))
-                    OR (bed_id IS NULL AND plot_id IS NOT NULL AND EXISTS (
+                    OR (crop_records.bed_id IS NULL AND crop_records.plot_id IS NOT NULL AND EXISTS (
                         SELECT 1 FROM public.farm_plots p
                         WHERE p.id = crop_records.plot_id AND p.student_id = auth.uid()
                     ))
