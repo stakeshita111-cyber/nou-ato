@@ -53,6 +53,10 @@ export default function TeacherFarmCanvasView({
   initialPlotCode,
   initialFarmId,
 }: TeacherFarmCanvasViewProps = {}) {
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const hasWriteErrorRef = useRef(false);
+
   const {
     isLoading,
     farms,
@@ -80,7 +84,13 @@ export default function TeacherFarmCanvasView({
     approveAndAddNewBed,
     rejectBedCompletion,
     unarchiveBed,
-  } = useFarmManager();
+  } = useFarmManager({
+    onWriteError: (msg) => {
+      hasWriteErrorRef.current = true;
+      setToastMessage(`⚠️ ${msg}`);
+      setShowToast(true);
+    },
+  });
 
   const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [archivedModalTargetPlotId, setArchivedModalTargetPlotId] = useState<string | null>(null);
@@ -141,9 +151,6 @@ export default function TeacherFarmCanvasView({
     plot: FarmPlot;
     newStudent: UnassignedStudent;
   } | null>(null);
-
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
 
   // 農園・代表者設定 Modal State (農園名・講師名・メールアドレス・住所)
   const [showFarmSettingsModal, setShowFarmSettingsModal] = useState(false);
@@ -1687,9 +1694,12 @@ export default function TeacherFarmCanvasView({
           const targetPlot = plots.find((p) => (p.beds || []).some((b) => b.id === bedId));
           if (targetPlot) {
             void (async () => {
+              hasWriteErrorRef.current = false;
               await unarchiveBed(targetPlot.id, bedId);
-              setToastMessage('↺ アーカイブから畝を通常状態に復帰しました');
-              setShowToast(true);
+              if (!hasWriteErrorRef.current) {
+                setToastMessage('↺ アーカイブから畝を通常状態に復帰しました');
+                setShowToast(true);
+              }
             })();
           }
         }}
@@ -1705,17 +1715,23 @@ export default function TeacherFarmCanvasView({
         plot={approvalModalPlot}
         bed={approvalModalBed}
         onApprove={async (plotId, bedId) => {
+          hasWriteErrorRef.current = false;
           await approveAndAddNewBed(plotId, bedId, '未確定 🌱', '2026年 秋冬');
-          setToastMessage('✅ 収穫完了を承認し、新しい畝を準備しました！');
-          setShowToast(true);
+          if (!hasWriteErrorRef.current) {
+            setToastMessage('✅ 収穫完了を承認し、新しい畝を準備しました！');
+            setShowToast(true);
+          }
           setApprovalModalPlot(null);
           setApprovalModalBed(null);
           setDetailPlot(null);
         }}
         onReject={async (plotId, bedId, reason) => {
+          hasWriteErrorRef.current = false;
           await rejectBedCompletion(plotId, bedId, reason);
-          setToastMessage('↩️ 収穫完了報告を差し戻しました。生徒画面に通知されます。');
-          setShowToast(true);
+          if (!hasWriteErrorRef.current) {
+            setToastMessage('↩️ 収穫完了報告を差し戻しました。生徒画面に通知されます。');
+            setShowToast(true);
+          }
           setApprovalModalPlot(null);
           setApprovalModalBed(null);
         }}

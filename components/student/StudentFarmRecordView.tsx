@@ -51,6 +51,10 @@ export default function StudentFarmRecordView({
   setNewJournal,
   onAddJournal,
 }: StudentFarmRecordViewProps) {
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const hasWriteErrorRef = useRef(false);
+
   const {
     isLoading,
     plots,
@@ -60,7 +64,13 @@ export default function StudentFarmRecordView({
     deleteCropRecord,
     completeBedCrop,
     updateBedCrop,
-  } = useFarmManager();
+  } = useFarmManager({
+    onWriteError: (msg) => {
+      hasWriteErrorRef.current = true;
+      setToastMessage(`⚠️ ${msg}`);
+      setShowToast(true);
+    },
+  });
 
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -182,9 +192,6 @@ export default function StudentFarmRecordView({
   const [selectedWorks, setSelectedWorks] = useState<WorkType[]>(['水やり', '追肥']);
   const [notes, setNotes] = useState('');
   const [harvestAmount, setHarvestAmount] = useState('');
-
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
 
   // 🌟 講師返信タイムラインの質問全文トグル State 🌟
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<Set<string>>(new Set());
@@ -1713,11 +1720,14 @@ export default function StudentFarmRecordView({
           if (currentBed && myPlot) {
             // 即時ローカルロック（UI即座切り替え）
 
+            hasWriteErrorRef.current = false;
             await completeBedCrop(myPlot.id || myPlot.code, currentBed.id, details);
-            setToastMessage(
-              `🎉 畝 ${currentBed.bed_number} の収穫完了報告を講師へ送信しました！講師の承認をお待ちください。`
-            );
-            setShowToast(true);
+            if (!hasWriteErrorRef.current) {
+              setToastMessage(
+                `🎉 畝 ${currentBed.bed_number} の収穫完了報告を講師へ送信しました！講師の承認をお待ちください。`
+              );
+              setShowToast(true);
+            }
           }
         }}
       />
