@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import {
   useWeatherLive,
   saveLocationToDBAndStorage,
@@ -168,16 +168,7 @@ export default function WeatherWidget({ hideBroadcastButton = false }: WeatherWi
         return;
       }
 
-      const storeFarmId = useFarmStore.getState().activeFarmId;
-      const { data: uRow } = await supabase
-        .from('users')
-        .select('farm_id')
-        .eq('id', user.id)
-        .maybeSingle();
-      const farmId =
-        (storeFarmId && /^[0-9a-fA-F-]{36}$/.test(storeFarmId) ? storeFarmId : null) ||
-        uRow?.farm_id ||
-        null;
+      const farmId = await resolveActiveFarmId();
 
       if (!farmId) {
         setToastMessage('⚠️ 所属農園を特定できなかったため配信できませんでした');

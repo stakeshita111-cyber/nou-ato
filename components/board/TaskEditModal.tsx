@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Task } from '@/types/task';
 import Toast from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import { TaskTemplate, TaskCategory } from '@/lib/taskTemplates';
 
 const TaskCategorySchema = z.enum(['果菜', '根菜', '葉菜', '共通', '土作り']);
@@ -104,18 +104,7 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
       // 2. Supabase DB (tasks テーブル: is_template = true, status = 'template') に保存
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id;
-      let farmId =
-        useFarmStore.getState().activeFarmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-
-      if (!farmId && userId) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('farm_id')
-          .eq('id', userId)
-          .maybeSingle();
-        if (userData?.farm_id) farmId = userData.farm_id;
-      }
+      const farmId = await resolveActiveFarmId();
 
       // tasks.farm_id は NOT NULL (B-2c)。農園を特定できなければ DB には保存しない
       if (!farmId) {

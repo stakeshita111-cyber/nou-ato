@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import type {
   HourlyPoint,
   DailyPoint,
@@ -117,21 +117,12 @@ export function fetchMunicipalityNameFromCoords(
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function resolveTargetFarmId(
+async function resolveTargetFarmId(
   role: string | null | undefined,
   userFarmId: string | null | undefined
-): string | null {
+): Promise<string | null> {
   if (role === 'teacher') {
-    const storeFarmId = useFarmStore.getState().activeFarmId;
-    if (storeFarmId && UUID_REGEX.test(storeFarmId)) {
-      return storeFarmId;
-    }
-    if (typeof window !== 'undefined') {
-      const savedFarmId = localStorage.getItem('nouato_active_farm_id');
-      if (savedFarmId && UUID_REGEX.test(savedFarmId)) {
-        return savedFarmId;
-      }
-    }
+    return resolveActiveFarmId();
   }
   return userFarmId && UUID_REGEX.test(userFarmId) ? userFarmId : null;
 }
@@ -159,7 +150,7 @@ export async function saveLocationToDBAndStorage(
       .eq('id', user.id)
       .maybeSingle();
 
-    const targetFarmId = resolveTargetFarmId(uData?.role, uData?.farm_id);
+    const targetFarmId = await resolveTargetFarmId(uData?.role, uData?.farm_id);
     if (uData?.role === 'teacher' && targetFarmId) {
       await supabase
         .from('farms')
@@ -493,7 +484,7 @@ export function useWeatherLive() {
           .eq('id', user.id)
           .maybeSingle();
 
-        const targetFarmId = resolveTargetFarmId(uData?.role, uData?.farm_id);
+        const targetFarmId = await resolveTargetFarmId(uData?.role, uData?.farm_id);
         if (targetFarmId) {
           const { data: farmData } = await supabase
             .from('farms')

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import type { Database } from '@/types/supabase';
 import type { EventItem } from '@/types/event';
 
@@ -17,19 +18,16 @@ export function useEvents(farmId?: string) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const getEffectiveFarmId = useCallback(() => {
+  const getEffectiveFarmId = useCallback(async (): Promise<string | null> => {
     if (farmId) return farmId;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('nouato_active_farm_id') || null;
-    }
-    return null;
+    return resolveActiveFarmId();
   }, [farmId]);
 
   // Supabase / LocalStorage からイベントデータを取得して同期
   const fetchEvents = useCallback(async () => {
     await Promise.resolve();
     setLoading(true);
-    const fid = getEffectiveFarmId();
+    const fid = await getEffectiveFarmId();
     const eventKey = fid ? `nouato_shared_events_${fid}` : 'nouato_shared_events';
 
     try {
@@ -116,9 +114,9 @@ export function useEvents(farmId?: string) {
   }, [farmId, fetchEvents]);
 
   // ローカル更新・共有保存ヘルパー
-  const saveSharedEvents = (newEvents: EventItem[]) => {
+  const saveSharedEvents = (newEvents: EventItem[], resolvedFarmId?: string | null) => {
     setEvents(newEvents);
-    const fid = getEffectiveFarmId();
+    const fid = resolvedFarmId ?? farmId ?? null;
     const eventKey = fid ? `nouato_shared_events_${fid}` : 'nouato_shared_events';
     try {
       localStorage.setItem(eventKey, JSON.stringify(newEvents));
@@ -130,7 +128,7 @@ export function useEvents(farmId?: string) {
 
   // 講師: イベント新規登録
   const addEvent = async (eventData: Omit<EventItem, 'id' | 'reservedCount' | 'attendees'>) => {
-    const fid = getEffectiveFarmId();
+    const fid = await getEffectiveFarmId();
     const validFarmId = fid && /^[0-9a-fA-F-]{36}$/.test(fid) ? fid : null;
     const newEv: EventItem = {
       ...eventData,
@@ -140,7 +138,7 @@ export function useEvents(farmId?: string) {
     };
 
     const nextEvents = [newEv, ...events];
-    saveSharedEvents(nextEvents);
+    saveSharedEvents(nextEvents, fid);
 
     try {
       const { error: insErr } = await supabase.from('events').insert([
@@ -205,7 +203,8 @@ export function useEvents(farmId?: string) {
       return ev;
     });
 
-    saveSharedEvents(updatedEvents);
+    const fid = await getEffectiveFarmId();
+    saveSharedEvents(updatedEvents, fid);
 
     try {
       await supabase
@@ -236,7 +235,8 @@ export function useEvents(farmId?: string) {
       return ev;
     });
 
-    saveSharedEvents(updatedEvents);
+    const fid = await getEffectiveFarmId();
+    saveSharedEvents(updatedEvents, fid);
 
     try {
       const target = updatedEvents.find((e) => e.id === eventId);
@@ -252,7 +252,8 @@ export function useEvents(farmId?: string) {
   // イベント削除
   const deleteEvent = async (eventId: string) => {
     const nextEvents = events.filter((ev) => ev.id !== eventId);
-    saveSharedEvents(nextEvents);
+    const fid = await getEffectiveFarmId();
+    saveSharedEvents(nextEvents, fid);
 
     try {
       await supabase.from('events').delete().eq('id', eventId);

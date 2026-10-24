@@ -10,6 +10,7 @@ import StudentPreviewModal from '@/components/teacher/StudentPreviewModal';
 import QRCodeModal from '@/components/ui/QRCodeModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import { fetchFarmPlotBedIds } from '@/lib/farm/farmScope';
 import { formatDate } from '@/lib/utils/formatHelper';
 
@@ -96,12 +97,7 @@ export default function TeacherStudentsView() {
   const [origin] = useState(() =>
     typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
   );
-  const [farmId, setFarmId] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('nouato_active_farm_id') || '';
-    }
-    return '';
-  });
+  const [farmId, setFarmId] = useState<string>('');
   const [farmName, setFarmName] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('nouato_current_farm_name') || '農園';
@@ -115,10 +111,10 @@ export default function TeacherStudentsView() {
 
   const fetchStudents = useCallback(
     async (targetFarmId?: string) => {
-      const currentFarmId =
-        targetFarmId ||
-        effectiveFarmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+      const currentFarmId = targetFarmId || effectiveFarmId || (await resolveActiveFarmId());
+      if (currentFarmId) {
+        setFarmId(currentFarmId);
+      }
       if (typeof window !== 'undefined') {
         try {
           localStorage.removeItem('nouato_student_task_statuses');

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import { fetchFarmPlotBedIds, cropRecordsFarmFilter } from '@/lib/farm/farmScope';
 import Toast from '@/components/ui/Toast';
 import SlideSettingsModal, { SlideSettings } from '@/components/teacher/SlideSettingsModal';
@@ -175,159 +176,140 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     'forward'
   );
 
-  const fetchJournals = useCallback(
-    async (isInitial: boolean = false) => {
-      await Promise.resolve();
-      if (isInitial) {
-        setLoading(true);
+  const fetchJournals = useCallback(async (isInitial: boolean = false) => {
+    await Promise.resolve();
+    if (isInitial) {
+      setLoading(true);
+    }
+    try {
+      // ログイン講師の現在選択中農園IDを取得
+      const farmId = await resolveActiveFarmId();
+
+      // 自農園に所属する生徒のID一覧を取得
+      let myStudentIds: string[] = [];
+      if (farmId) {
+        const { data: farmStudents } = await supabase
+          .from('users')
+          .select('id')
+          .eq('farm_id', farmId)
+          .eq('role', 'student');
+        if (farmStudents) {
+          myStudentIds = farmStudents.map((s) => s.id);
+        }
       }
-      try {
-        // ログイン講師の現在選択中農園IDを取得
-        let farmId =
-          activeFarmId ||
-          useFarmStore.getState().activeFarmId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-        if (!farmId) {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (user) {
-            const { data: userData } = await supabase
-              .from('users')
-              .select('farm_id')
-              .eq('id', user.id)
-              .maybeSingle();
-            if (userData?.farm_id) farmId = userData.farm_id;
-          }
+
+      let jDataQuery = supabase.from('journals').select('*');
+
+      if (farmId) {
+        if (myStudentIds.length > 0) {
+          jDataQuery = jDataQuery.or(
+            `farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(',')})`
+          );
+        } else {
+          jDataQuery = jDataQuery.eq('farm_id', farmId);
         }
+      }
 
-        // 自農園に所属する生徒のID一覧を取得
-        let myStudentIds: string[] = [];
-        if (farmId) {
-          const { data: farmStudents } = await supabase
-            .from('users')
-            .select('id')
-            .eq('farm_id', farmId)
-            .eq('role', 'student');
-          if (farmStudents) {
-            myStudentIds = farmStudents.map((s) => s.id);
-          }
-        }
+      const { data: journalData, error: journalError } = await jDataQuery.order('created_at', {
+        ascending: false,
+      });
 
-        let jDataQuery = supabase.from('journals').select('*');
-
-        if (farmId) {
-          if (myStudentIds.length > 0) {
-            jDataQuery = jDataQuery.or(
-              `farm_id.eq.${farmId},student_id.in.(${myStudentIds.join(',')})`
-            );
-          } else {
-            jDataQuery = jDataQuery.eq('farm_id', farmId);
-          }
-        }
-
-        const { data: journalData, error: journalError } = await jDataQuery.order('created_at', {
-          ascending: false,
-        });
-
-        if (journalError) {
-          console.warn('Journals fetch info:', journalError.message || journalError);
-          setJournals([]);
-          return;
-        }
-
-        if (!journalData || journalData.length === 0) {
-          setJournals([]);
-          return;
-        }
-
-        const studentIds = Array.from(
-          new Set(journalData.map((j) => j.student_id).filter((id): id is string => Boolean(id)))
-        );
-        const userMap: { [key: string]: string } = {};
-
-        if (studentIds.length > 0) {
-          const { data: usersData } = await supabase
-            .from('users')
-            .select('id, email, display_name')
-            .in('id', studentIds);
-
-          if (usersData) {
-            usersData.forEach((u) => {
-              if (u.id) {
-                userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
-              }
-            });
-          }
-        }
-
-        // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
-        const filteredData = journalData.filter((j) => {
-          const content = (j.content || '').trim();
-          if (!content) return false;
-          if (
-            content.includes('【収穫完了報告】') ||
-            content.includes('【差し戻し通知】') ||
-            content.includes('を完了報告しました') ||
-            content === '（コメントなし）'
-          ) {
-            return false;
-          }
-          return true;
-        });
-
-        const formatted: JournalItem[] = filteredData.map((j) => {
-          const name = (j.student_id ? userMap[j.student_id] : undefined) || '受講生徒';
-          let cleanContent = j.content || '';
-          let imgUrl = j.image_url || undefined;
-          const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
-          if (imgMatch) {
-            imgUrl = imgMatch[1];
-            cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
-          }
-
-          const isPrivate =
-            Boolean(j.is_private) ||
-            cleanContent.includes('【非公開メモ】') ||
-            cleanContent.includes('【個人メモ】') ||
-            cleanContent.includes('完全個別相談');
-
-          return {
-            id: j.id,
-            student_id: j.student_id || '',
-            studentName: name,
-            studentAvatar: name.slice(0, 2).toUpperCase(),
-            created_at: j.created_at
-              ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString('ja-JP', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}`
-              : '最近',
-            taskTitle: isFarmJournal(cleanContent)
-              ? isRegularRecord(cleanContent)
-                ? '🌱 畝の観察記録'
-                : '📍 畑からの相談・質問'
-              : '🤖 AI相談 (しるべぇ)',
-            content: cleanContent,
-            imageUrl: imgUrl,
-            reply: j.reply || '',
-            is_approved: j.is_approved || false,
-            is_private: isPrivate,
-          };
-        });
-
-        setJournals(formatted);
-      } catch (e) {
-        console.error('Journals error exception:', e);
+      if (journalError) {
+        console.warn('Journals fetch info:', journalError.message || journalError);
         setJournals([]);
-      } finally {
-        if (isInitial) {
-          setLoading(false);
+        return;
+      }
+
+      if (!journalData || journalData.length === 0) {
+        setJournals([]);
+        return;
+      }
+
+      const studentIds = Array.from(
+        new Set(journalData.map((j) => j.student_id).filter((id): id is string => Boolean(id)))
+      );
+      const userMap: { [key: string]: string } = {};
+
+      if (studentIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('id, email, display_name')
+          .in('id', studentIds);
+
+        if (usersData) {
+          usersData.forEach((u) => {
+            if (u.id) {
+              userMap[u.id] = u.display_name || (u.email ? u.email.split('@')[0] : '受講生');
+            }
+          });
         }
       }
-    },
-    [activeFarmId]
-  );
+
+      // 🌟 単なるシステムのタスク完了報告や収穫完了報告を除外し、「生徒からの手入力気づきメモ・相談」のみを厳選抽出 🌟
+      const filteredData = journalData.filter((j) => {
+        const content = (j.content || '').trim();
+        if (!content) return false;
+        if (
+          content.includes('【収穫完了報告】') ||
+          content.includes('【差し戻し通知】') ||
+          content.includes('を完了報告しました') ||
+          content === '（コメントなし）'
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      const formatted: JournalItem[] = filteredData.map((j) => {
+        const name = (j.student_id ? userMap[j.student_id] : undefined) || '受講生徒';
+        let cleanContent = j.content || '';
+        let imgUrl = j.image_url || undefined;
+        const imgMatch = cleanContent.match(/\n?\[IMG:([\s\S]+?)\]/);
+        if (imgMatch) {
+          imgUrl = imgMatch[1];
+          cleanContent = cleanContent.replace(/\n?\[IMG:[\s\S]+?\]/, '').trim();
+        }
+
+        const isPrivate =
+          Boolean(j.is_private) ||
+          cleanContent.includes('【非公開メモ】') ||
+          cleanContent.includes('【個人メモ】') ||
+          cleanContent.includes('完全個別相談');
+
+        return {
+          id: j.id,
+          student_id: j.student_id || '',
+          studentName: name,
+          studentAvatar: name.slice(0, 2).toUpperCase(),
+          created_at: j.created_at
+            ? `${formatDate(j.created_at)} ${new Date(j.created_at).toLocaleTimeString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}`
+            : '最近',
+          taskTitle: isFarmJournal(cleanContent)
+            ? isRegularRecord(cleanContent)
+              ? '🌱 畝の観察記録'
+              : '📍 畑からの相談・質問'
+            : '🤖 AI相談 (しるべぇ)',
+          content: cleanContent,
+          imageUrl: imgUrl,
+          reply: j.reply || '',
+          is_approved: j.is_approved || false,
+          is_private: isPrivate,
+        };
+      });
+
+      setJournals(formatted);
+    } catch (e) {
+      console.error('Journals error exception:', e);
+      setJournals([]);
+    } finally {
+      if (isInitial) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   // 返信送信＆再編集保存 (返信と同時にナレッジ承認も保存可能)
   const handleSendReply = async (id: string) => {
@@ -353,10 +335,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       try {
         const isUuid = (str?: string | null) =>
           !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-        const effectiveFarmId =
-          activeFarmId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-        const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+        const validFarmId = await resolveActiveFarmId();
         const validStudentId =
           targetJournal?.student_id && isUuid(targetJournal.student_id)
             ? targetJournal.student_id
@@ -480,12 +459,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
           try {
             const isUuid = (str?: string | null) =>
               !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-            const effectiveFarmId =
-              activeFarmId ||
-              (typeof window !== 'undefined'
-                ? localStorage.getItem('nouato_active_farm_id')
-                : null);
-            const validFarmId = effectiveFarmId && isUuid(effectiveFarmId) ? effectiveFarmId : null;
+            const validFarmId = await resolveActiveFarmId();
             const validStudentId =
               journal.student_id && isUuid(journal.student_id) ? journal.student_id : null;
 
@@ -712,23 +686,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const fetchCropRecords = useCallback(async () => {
     try {
       // ログイン講師の現在選択中農園IDを取得
-      let farmId =
-        activeFarmId ||
-        useFarmStore.getState().activeFarmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-      if (!farmId) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('farm_id')
-            .eq('id', user.id)
-            .maybeSingle();
-          if (userData?.farm_id) farmId = userData.farm_id;
-        }
-      }
+      const farmId = await resolveActiveFarmId();
 
       // 自農園に所属する生徒のID一覧を取得
       let myStudentIds: string[] = [];
@@ -1142,7 +1100,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       console.error('fetchCropRecords error:', err);
       setSlideColumns([]);
     }
-  }, [slideSettings, activeFarmId]);
+  }, [slideSettings]);
 
   useEffect(() => {
     const load = async () => {
