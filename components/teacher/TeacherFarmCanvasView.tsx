@@ -57,6 +57,11 @@ export default function TeacherFarmCanvasView({
   const [toastMessage, setToastMessage] = useState('');
   const hasWriteErrorRef = useRef(false);
 
+  const notify = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+  };
+
   const {
     isLoading,
     farms,
@@ -87,8 +92,7 @@ export default function TeacherFarmCanvasView({
   } = useFarmManager({
     onWriteError: (msg) => {
       hasWriteErrorRef.current = true;
-      setToastMessage(`⚠️ ${msg}`);
-      setShowToast(true);
+      notify(`⚠️ ${msg}`);
     },
   });
 
@@ -348,15 +352,13 @@ export default function TeacherFarmCanvasView({
     const swappedOk = await swapFarmPlotsInDb(fromPlot.id, toPlot.id);
     if (!swappedOk) {
       setPlots(previousPlots);
-      setToastMessage('⚠️ 区画の入れ替え保存に失敗しました。通信環境をご確認ください。');
-      setShowToast(true);
+      notify('⚠️ 区画の入れ替え保存に失敗しました。通信環境をご確認ください。');
       setDraggedPlotCode(null);
       setDragOverPlotCode(null);
       return;
     }
 
-    setToastMessage(`🚚 マス「${fromAddr}」と「${toAddr}」の区画データを入れ替えました！`);
-    setShowToast(true);
+    notify(`🚚 マス「${fromAddr}」と「${toAddr}」の区画データを入れ替えました！`);
     setDraggedPlotCode(null);
     setDragOverPlotCode(null);
   };
@@ -463,13 +465,12 @@ export default function TeacherFarmCanvasView({
     });
 
     if (releasedStudentCount > 0) {
-      setToastMessage(
+      notify(
         `🎯 盤面を ${newCols} 列に変更し、非表示になった受講生（${releasedStudentCount}名）を未割り当て一覧に戻しました`
       );
     } else {
-      setToastMessage(`🎯 盤面の列数を ${newCols} 列に変更しました！`);
+      notify(`🎯 盤面の列数を ${newCols} 列に変更しました！`);
     }
-    setShowToast(true);
   };
 
   const handleGridRowsChange = async (newRows: number) => {
@@ -568,13 +569,12 @@ export default function TeacherFarmCanvasView({
     });
 
     if (releasedStudentCount > 0) {
-      setToastMessage(
+      notify(
         `🎯 盤面を ${newRows} 行に変更し、非表示になった受講生（${releasedStudentCount}名）を未割り当て一覧に戻しました`
       );
     } else {
-      setToastMessage(`🎯 盤面の行数を ${newRows} 行に変更しました！`);
+      notify(`🎯 盤面の行数を ${newRows} 行に変更しました！`);
     }
-    setShowToast(true);
   };
 
   useEffect(() => {
@@ -635,8 +635,7 @@ export default function TeacherFarmCanvasView({
   const handleSaveFarmSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!farmSettingsName.trim() || !ownerNameInput.trim()) {
-      setToastMessage('農園名と代表者氏名を入力してください');
-      setShowToast(true);
+      notify('農園名と代表者氏名を入力してください');
       return;
     }
 
@@ -669,14 +668,10 @@ export default function TeacherFarmCanvasView({
       await savePlotsGridIndicesToSupabase(plots);
 
       setShowFarmSettingsModal(false);
-      setToastMessage(
-        '✨ 農園設定（農園名・代表者氏名・メールアドレス・住所）を確定保存しました！'
-      );
-      setShowToast(true);
+      notify('✨ 農園設定（農園名・代表者氏名・メールアドレス・住所）を確定保存しました！');
     } catch (err: unknown) {
       console.error('handleSaveFarmSettings error:', err);
-      setToastMessage(`⚠️ ${err instanceof Error ? err.message : '農園設定の保存に失敗しました'}`);
-      setShowToast(true);
+      notify(`⚠️ ${err instanceof Error ? err.message : '農園設定の保存に失敗しました'}`);
     }
   };
 
@@ -726,8 +721,7 @@ export default function TeacherFarmCanvasView({
       await assignStudentToPlot(plot.id, studentToAssign.id, studentToAssign.name);
       setDraggingStudent(null);
 
-      setToastMessage(`🎯 ${plot.code}区画に ${studentToAssign.name} さんを割り当てました！`);
-      setShowToast(true);
+      notify(`🎯 ${plot.code}区画に ${studentToAssign.name} さんを割り当てました！`);
     })();
   };
 
@@ -742,10 +736,9 @@ export default function TeacherFarmCanvasView({
       setConfirmChangeStudentModal(null);
       setDraggingStudent(null);
 
-      setToastMessage(
+      notify(
         `✨ ${plot.code}区画の担当者を ${newStudent.name} さんに変更しました！ (${plot.code} - ${newStudent.name})`
       );
-      setShowToast(true);
     })();
   };
 
@@ -814,8 +807,7 @@ export default function TeacherFarmCanvasView({
                   await setActiveFarmId(selectedId);
                   useFarmStore.getState().setActiveFarmId(selectedId);
                   const f = farms.find((farm) => farm.id === selectedId);
-                  setToastMessage(`農園「${f?.name || selectedId}」に切り替えました`);
-                  setShowToast(true);
+                  notify(`農園「${f?.name || selectedId}」に切り替えました`);
                 })();
               }}
               className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-emerald-900 focus:outline-none cursor-pointer"
@@ -890,10 +882,9 @@ export default function TeacherFarmCanvasView({
                   setUnassignedBedsCount(count);
                   void (async () => {
                     await updateAllUnassignedBedsCount(count);
-                    setToastMessage(
+                    notify(
                       `✨ すべての未割り当て区画の畝数を一括で「${count} 畝」に変更しました！`
                     );
-                    setShowToast(true);
                   })();
                 }
               }}
@@ -958,13 +949,9 @@ export default function TeacherFarmCanvasView({
                   void (async () => {
                     const res = await assignAllUnassignedStudents(unassignedList);
                     if (res && res.count > 0) {
-                      setToastMessage(
-                        `⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`
-                      );
-                      setShowToast(true);
+                      notify(`⚡ ${res.count}名の受講生を空き区画へ一括割り当てしました！`);
                     } else {
-                      setToastMessage('⚠️ 割り当て可能な空き区画がありませんでした');
-                      setShowToast(true);
+                      notify('⚠️ 割り当て可能な空き区画がありませんでした');
                     }
                   })();
                 }}
@@ -1290,10 +1277,7 @@ export default function TeacherFarmCanvasView({
                           }
                         : prev
                     );
-                    setToastMessage(
-                      `🚧 区画 ${detailPlot.code} を「空き地（管理外）」に設定しました`
-                    );
-                    setShowToast(true);
+                    notify(`🚧 区画 ${detailPlot.code} を「空き地（管理外）」に設定しました`);
                   }}
                   className={`py-2.5 px-3 rounded-2xl font-bold text-xs transition border cursor-pointer flex flex-col items-center justify-center gap-1 ${
                     detailPlot.is_vacant
@@ -1322,10 +1306,7 @@ export default function TeacherFarmCanvasView({
                           }
                         : prev
                     );
-                    setToastMessage(
-                      `🌱 区画 ${detailPlot.code} を「未割当（空き区画）」に設定しました`
-                    );
-                    setShowToast(true);
+                    notify(`🌱 区画 ${detailPlot.code} を「未割当（空き区画）」に設定しました`);
                   }}
                   className={`py-2.5 px-3 rounded-2xl font-bold text-xs transition border cursor-pointer flex flex-col items-center justify-center gap-1 ${
                     !detailPlot.is_vacant && !detailPlot.student_id
@@ -1367,10 +1348,9 @@ export default function TeacherFarmCanvasView({
                                 }
                               : prev
                           );
-                          setToastMessage(
+                          notify(
                             `区画 ${detailPlot.code} の受講生割り当てを解除し、「空き区画」にしました`
                           );
-                          setShowToast(true);
                         }}
                         className="text-[10px] text-red-600 hover:underline cursor-pointer font-bold"
                       >
@@ -1401,10 +1381,9 @@ export default function TeacherFarmCanvasView({
                               }
                             : prev
                         );
-                        setToastMessage(
+                        notify(
                           `🎯 区画 ${detailPlot.code} に ${selectedStudent.full_name} さんを割り当てました！`
                         );
-                        setShowToast(true);
                       }
                     }}
                     className="w-full bg-white border border-gray-300 rounded-xl px-2 py-1 text-xs font-bold text-gray-800 cursor-pointer"
@@ -1450,8 +1429,7 @@ export default function TeacherFarmCanvasView({
                               }
                             : prev
                         );
-                        setToastMessage('✨ 新しい畝を追加しました！');
-                        setShowToast(true);
+                        notify('✨ 新しい畝を追加しました！');
                       }
                     } finally {
                       setTimeout(() => {
@@ -1535,8 +1513,7 @@ export default function TeacherFarmCanvasView({
                                         }
                                       : prev
                                   );
-                                  setToastMessage(`🗑️ 畝 #${displayNum} を削除しました`);
-                                  setShowToast(true);
+                                  notify(`🗑️ 畝 #${displayNum} を削除しました`);
                                 }
                               }}
                               className="px-2.5 py-1.5 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 hover:border-rose-300 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs flex items-center gap-1"
@@ -1697,8 +1674,7 @@ export default function TeacherFarmCanvasView({
               hasWriteErrorRef.current = false;
               await unarchiveBed(targetPlot.id, bedId);
               if (!hasWriteErrorRef.current) {
-                setToastMessage('↺ アーカイブから畝を通常状態に復帰しました');
-                setShowToast(true);
+                notify('↺ アーカイブから畝を通常状態に復帰しました');
               }
             })();
           }
@@ -1718,8 +1694,7 @@ export default function TeacherFarmCanvasView({
           hasWriteErrorRef.current = false;
           await approveAndAddNewBed(plotId, bedId, '未確定 🌱', '2026年 秋冬');
           if (!hasWriteErrorRef.current) {
-            setToastMessage('✅ 収穫完了を承認し、新しい畝を準備しました！');
-            setShowToast(true);
+            notify('✅ 収穫完了を承認し、新しい畝を準備しました！');
           }
           setApprovalModalPlot(null);
           setApprovalModalBed(null);
@@ -1729,8 +1704,7 @@ export default function TeacherFarmCanvasView({
           hasWriteErrorRef.current = false;
           await rejectBedCompletion(plotId, bedId, reason);
           if (!hasWriteErrorRef.current) {
-            setToastMessage('↩️ 収穫完了報告を差し戻しました。生徒画面に通知されます。');
-            setShowToast(true);
+            notify('↩️ 収穫完了報告を差し戻しました。生徒画面に通知されます。');
           }
           setApprovalModalPlot(null);
           setApprovalModalBed(null);
