@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import Toast from '@/components/ui/Toast';
 import { useThemeStore, ThemeSettings } from '@/store/useThemeStore';
+import { useFarmStore } from '@/store/useFarmStore';
 import { formatDate, formatNumber } from '@/lib/utils/formatHelper';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
@@ -22,6 +23,7 @@ const settingsApiResponseSchema = z.object({
 
 export default function TeacherSettingsView() {
   const { settings, updateSettings, resetSettings } = useThemeStore();
+  const { activeFarmId } = useFarmStore();
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -31,11 +33,15 @@ export default function TeacherSettingsView() {
   const [editingFaq, setEditingFaq] = useState<PresetFaqItem | null>(null);
   const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
 
-  // DBから最新の設定値を同期取得
+  // DBから表示中の農園の設定値を同期取得
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('/api/settings');
+        const res = await fetch(
+          activeFarmId
+            ? `/api/settings?farm_id=${encodeURIComponent(activeFarmId)}`
+            : '/api/settings'
+        );
         if (res.ok) {
           const rawData: unknown = await res.json();
           const parsed = settingsApiResponseSchema.safeParse(rawData);
@@ -55,15 +61,29 @@ export default function TeacherSettingsView() {
     fetchSettings().catch((err) => {
       console.error('Failed to fetch settings in effect:', err);
     });
-  }, [updateSettings]);
+  }, [updateSettings, activeFarmId]);
+
+  // 表示中の農園の設定を保存する (farmId 未指定ならサーバー側で講師の users.farm_id)
+  const postSettings = (body: Record<string, unknown>) =>
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(activeFarmId ? { ...body, farmId: activeFarmId } : body),
+    });
+
+  const saveTalkTabToDb = async (show: boolean) => {
+    try {
+      const res = await postSettings({ showStudentTalkTab: show });
+      if (!res.ok) throw new Error('保存に失敗しました');
+    } catch {
+      setToastMessage('⚠️ 相談画面の表示設定の保存に失敗しました');
+      setShowToast(true);
+    }
+  };
 
   const handleSaveFaqsToDb = async (updatedList: PresetFaqItem[]) => {
     try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presetFaqs: updatedList }),
-      });
+      const res = await postSettings({ presetFaqs: updatedList });
       if (!res.ok) throw new Error('保存に失敗しました');
       setPresetFaqs(updatedList);
       setToastMessage('✨ 生徒向けクイック質問チップを保存しました！');
@@ -695,11 +715,7 @@ export default function TeacherSettingsView() {
                       } catch {}
                     });
                     // サーバー共有APIへの保存（全端末リアルタイム同期）
-                    fetch('/api/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ showStudentTalkTab: true }),
-                    }).catch(() => {});
+                    void saveTalkTabToDb(true);
                   }
                   setToastMessage('💬 生徒の相談画面を「表示 (ON)」に設定しました');
                   setShowToast(true);
@@ -744,11 +760,7 @@ export default function TeacherSettingsView() {
                       } catch {}
                     });
                     // サーバー共有APIへの保存（全端末リアルタイム同期）
-                    fetch('/api/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ showStudentTalkTab: false }),
-                    }).catch(() => {});
+                    void saveTalkTabToDb(false);
                   }
                   setToastMessage('💬 生徒の相談画面を「非表示 (OFF)」に設定しました');
                   setShowToast(true);

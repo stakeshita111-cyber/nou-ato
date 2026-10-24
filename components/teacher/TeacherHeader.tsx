@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useFarmStore } from '@/store/useFarmStore';
+import { useFarmStore, isMultiFarmEnabled } from '@/store/useFarmStore';
 import Toast from '@/components/ui/Toast';
 
-// 2つ目以降の農園の作成は、所属テーブル (farm_members) 導入後に create_farm RPC で提供する
+// NEXT_PUBLIC_MULTI_FARM_ENABLED が true でない環境では、2つ目以降の農園の作成を案内だけにする
 export const MULTI_FARM_NOT_READY_MESSAGE = '🏡 複数農園の作成は近日対応予定です';
 
 interface TeacherHeaderProps {
@@ -18,14 +18,43 @@ export default function TeacherHeader({
   onSearch,
   onToggleMobileMenu,
 }: TeacherHeaderProps) {
-  const { farms, activeFarmId, setActiveFarmId } = useFarmStore();
+  const { farms, activeFarmId, setActiveFarmId, createFarm } = useFarmStore();
 
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newFarmName, setNewFarmName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleAddFarmClick = () => {
-    setToastMessage(MULTI_FARM_NOT_READY_MESSAGE);
-    setShowToast(true);
+    if (!isMultiFarmEnabled()) {
+      setToastMessage(MULTI_FARM_NOT_READY_MESSAGE);
+      setShowToast(true);
+      return;
+    }
+    setNewFarmName('');
+    setIsCreateOpen(true);
+  };
+
+  const handleCreateFarm = async () => {
+    setIsCreating(true);
+    try {
+      const result = await createFarm(newFarmName);
+      if (!result.ok) {
+        setToastMessage(`⚠️ ${result.message}`);
+        setShowToast(true);
+        return;
+      }
+      setIsCreateOpen(false);
+      setToastMessage(`🏡 農園「${newFarmName.trim()}」を作成して切り替えました`);
+      setShowToast(true);
+    } catch (err) {
+      console.error('createFarm error:', err);
+      setToastMessage('⚠️ 農園の作成に失敗しました');
+      setShowToast(true);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleSelectFarm = (farmId: string) => {
@@ -38,6 +67,55 @@ export default function TeacherHeader({
   return (
     <>
       <Toast message={toastMessage} isOpen={showToast} onClose={() => setShowToast(false)} />
+
+      {isCreateOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-farm-title"
+        >
+          <form
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleCreateFarm();
+            }}
+          >
+            <h3 id="create-farm-title" className="text-base font-black text-gray-900">
+              新しい農園を追加
+            </h3>
+            <label className="block text-xs font-bold text-gray-700">
+              農園名
+              <input
+                type="text"
+                value={newFarmName}
+                onChange={(e) => setNewFarmName(e.target.value)}
+                maxLength={255}
+                required
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                disabled={isCreating}
+                className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                disabled={isCreating || !newFarmName.trim()}
+                className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black cursor-pointer"
+              >
+                {isCreating ? '作成中…' : '作成して切り替える'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <header className="h-16 app-bg-card border-b app-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20 transition-colors duration-300">
         <div className="flex items-center space-x-3">

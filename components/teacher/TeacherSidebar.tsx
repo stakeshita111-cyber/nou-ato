@@ -52,7 +52,7 @@ export default function TeacherSidebar({
         if (authData?.user) {
           const { data: userData } = await supabase
             .from('users')
-            .select('display_name, farm_id')
+            .select('display_name')
             .eq('id', authData.user.id)
             .maybeSingle();
 
@@ -64,19 +64,7 @@ export default function TeacherSidebar({
             setTeacherName(fallback);
           }
 
-          // 農園名を取得 (所有または所属する農園を安全に取得)
-          let farmQuery = supabase.from('farms').select('name');
-          if (userData?.farm_id) {
-            farmQuery = farmQuery.or(`owner_id.eq.${authData.user.id},id.eq.${userData.farm_id}`);
-          } else {
-            farmQuery = farmQuery.eq('owner_id', authData.user.id);
-          }
-          const { data: teacherFarm } = await farmQuery.limit(1).maybeSingle();
-
-          if (teacherFarm?.name) {
-            setFarmName(teacherFarm.name);
-            localStorage.setItem('nouato_current_farm_name', teacherFarm.name);
-          }
+          // 農園名は表示中の農園 (useFarmStore の activeFarmName) を使う
           return;
         }
       } catch (err) {
