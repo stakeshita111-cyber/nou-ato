@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(74);
+SELECT plan(88);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -43,6 +43,11 @@ BEGIN
     UPDATE public.users SET role = 'student', farm_id = v_farm_id, display_name = '生徒B' WHERE id = v_student_b_id;
     UPDATE public.users SET role = 'teacher', farm_id = v_farm_b_id, display_name = '講師B' WHERE id = v_teacher_b_id;
     UPDATE public.users SET role = 'student', farm_id = v_farm_b_id, display_name = '生徒C' WHERE id = v_student_c_id;
+
+    -- 講師の農園所属 (B-1: farm_members。本番では既存講師を移行済み)
+    INSERT INTO public.farm_members (farm_id, user_id)
+    VALUES (v_farm_id, v_teacher_id), (v_farm_b_id, v_teacher_b_id)
+    ON CONFLICT (farm_id, user_id) DO NOTHING;
 
     -- farm_plots 登録
     INSERT INTO public.farm_plots (id, farm_id, name, code, student_id)
@@ -893,6 +898,127 @@ SELECT is(
      WHERE NOT EXISTS (SELECT 1 FROM public.farms f WHERE f.id = m.farm_id)),
     0,
     '66. [farm_delete_cascade] 削除した農園の所属は残らない'
+);
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-2 (a): farms / users の RLS を farm_members 基準へ
+--   前提: 講師 0001 は農園A、講師 0004 は農園B に所属 (前準備で farm_members に登録)
+-- ==============================================================================
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+-- Test 67-68: 所属していない農園 (A) とその生徒は見えない
+SELECT is(
+    (SELECT count(*)::int FROM public.farms WHERE id = '11111111-1111-1111-1111-111111111111'),
+    0,
+    '67. [b2a_farms_isolation] 講師 0004 は所属していない農園A を参照できない'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
+    0,
+    '68. [b2a_users_isolation] 講師 0004 は所属していない農園A の生徒を参照できない'
+);
+
+-- Test 69-70: 所属していない農園は更新できない (0 行更新)
+SELECT lives_ok(
+    'UPDATE public.farms SET name = ''乗っ取り農園'' WHERE id = ''11111111-1111-1111-1111-111111111111''',
+    '69. [b2a_farms_update_isolation] 所属していない農園への UPDATE はエラーにならず 0 行更新になる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT name FROM public.farms WHERE id = '11111111-1111-1111-1111-111111111111'),
+    '名称変更テスト農園',
+    '70. [b2a_farms_update_isolation] 所属していない講師による農園名の変更は反映されない'
+);
+
+-- Test 71-75: 講師 0004 を農園A にも所属させると、農園A・その生徒・同じ農園の講師が見え、更新できる
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000004');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farms WHERE id = '11111111-1111-1111-1111-111111111111'),
+    1,
+    '71. [b2a_co_teacher_farm] 農園A に所属した講師 0004 は農園A を参照できる'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
+    1,
+    '72. [b2a_co_teacher_student] 農園A に所属した講師 0004 は農園A の生徒を参照できる'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000001'),
+    1,
+    '73. [b2a_co_teacher_peer] 農園A に所属した講師 0004 は同じ農園の講師 0001 を参照できる'
+);
+
+SELECT lives_ok(
+    'UPDATE public.farms SET name = ''共同運営テスト農園'' WHERE id = ''11111111-1111-1111-1111-111111111111''',
+    '74. [b2a_co_teacher_update] 農園A に所属した講師 0004 は農園A を更新できる'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farms),
+    2,
+    '75. [b2a_multi_farm] 2 つの農園に所属する講師 0004 は両方の農園を参照できる'
+);
+
+RESET ROLE;
+SELECT is(
+    (SELECT name FROM public.farms WHERE id = '11111111-1111-1111-1111-111111111111'),
+    '共同運営テスト農園',
+    '76. [b2a_co_teacher_update] 共同講師による農園名の変更が反映されている'
+);
+
+-- Test 77-78: 所属から外すと、直後から見えなくなる
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farms WHERE id = '11111111-1111-1111-1111-111111111111'),
+    0,
+    '77. [b2a_removed_teacher] 所属から外された講師 0004 は農園A を参照できなくなる'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users WHERE id = '00000000-0000-0000-0000-000000000098'),
+    0,
+    '78. [b2a_removed_teacher] 所属から外された講師 0004 は農園A の生徒を参照できなくなる'
+);
+
+-- Test 79-80: 生徒の見え方は変わらない (本人の行と自分の農園のみ)
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000098", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000098';
+
+SELECT is(
+    (SELECT count(*)::int FROM public.users),
+    1,
+    '79. [b2a_student_users] 生徒は users で本人の行のみ参照できる'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farms),
+    1,
+    '80. [b2a_student_farms] 生徒は farms で自分の農園のみ参照できる'
 );
 
 RESET ROLE;
