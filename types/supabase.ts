@@ -357,6 +357,107 @@ export type Database = {
           },
         ];
       };
+      farm_invitations: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string;
+          farm_id: string;
+          id: string;
+          revoked_at: string | null;
+          token_hash: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at: string;
+          farm_id: string;
+          id?: string;
+          revoked_at?: string | null;
+          token_hash: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string;
+          farm_id?: string;
+          id?: string;
+          revoked_at?: string | null;
+          token_hash?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'farm_invitations_accepted_by_fkey';
+            columns: ['accepted_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'farm_invitations_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'farm_invitations_farm_id_fkey';
+            columns: ['farm_id'];
+            isOneToOne: false;
+            referencedRelation: 'farms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      farm_members: {
+        Row: {
+          created_at: string;
+          farm_id: string;
+          invited_by: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          farm_id: string;
+          invited_by?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          farm_id?: string;
+          invited_by?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'farm_members_farm_id_fkey';
+            columns: ['farm_id'];
+            isOneToOne: false;
+            referencedRelation: 'farms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'farm_members_invited_by_fkey';
+            columns: ['invited_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'farm_members_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       farm_plots: {
         Row: {
           code: string;
@@ -902,7 +1003,9 @@ export type Database = {
         Args: { p_base_task_id: string; p_task_title?: string };
         Returns: Json;
       };
+      create_farm: { Args: { p_farm_name: string }; Returns: Json };
       current_user_farm_id: { Args: never; Returns: string };
+      current_user_farm_ids: { Args: never; Returns: string[] };
       current_user_role: { Args: never; Returns: string };
       delete_farm_bed: {
         Args: { p_bed_id: string; p_plot_id: string };
@@ -925,11 +1028,20 @@ export type Database = {
         Args: { p_count?: number; p_student_id: string };
         Returns: Json;
       };
+      is_farm_teacher: { Args: { p_farm_id: string }; Returns: boolean };
       join_farm: { Args: { invite_code: string }; Returns: Json };
       list_farm_member_names: {
         Args: never;
         Returns: {
           display_name: string;
+        }[];
+      };
+      list_my_farms: {
+        Args: never;
+        Returns: {
+          farm_id: string;
+          invite_code: string;
+          name: string;
         }[];
       };
       publish_task_to_all_students: {
