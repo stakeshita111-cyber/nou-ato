@@ -187,3 +187,42 @@ APIキーが外部に漏洩した疑いがある場合、即座にキーを無�
 | **毎月 1 日**  | GCP Billing コンソールで前月の Gemini API 利用実績額を確認                         | インフラ担当 |
 | **四半期ごと** | 予算アラートの設定金額（5,000円）が現在のユーザー規模に対して適正か見直し          | 運営責任者   |
 | **リリース前** | API 呼出ロジックの修正時、ループ処理や不要な再取得が含まれていないかコードレビュー | 開発チーム   |
+
+---
+
+## 7. 講師招待・農園メンバー管理のセキュリティ仕様（B-5）
+
+根拠ファイル: `supabase/migrations/20261024080000_b5a_farm_invitation_rpcs.sql`
+
+農園の講師招待およびメンバー管理は、RLS バイパスや特権昇格を防ぐため、テーブルへの直接アクセスを遮断し、5つの `SECURITY DEFINER` RPC 経由でのみ操作を許可しています。
+
+### 7.1 `farm_invitations` テーブルの保護仕様
+
+- **トークン保護**: 平文の招待トークン（24バイト/48文字の16進数）は発行元に1度だけ返却され、DB には SHA-256 のハッシュ値 (`token_hash`) のみを保存。
+- **有効期限**: 発行日時から 7 日間 (`expires_at = now() + interval '7 days'`)。
+- **利用制限**: 1 回限り有効 (`accepted_at` による消費判定)。
+- **取り消し可能性**: 未使用の招待は同農園の講師により取り消し可能 (`revoke_farm_invitation` による `revoked_at` 設定)。
+- **権限分離**: authenticated ロールからの直接の INSERT / UPDATE / DELETE 権限は剥奪済み。
+
+### 7.2 招待・メンバー管理 RPC 群
+
+1. **`create_farm_invitation(p_farm_id UUID)`**:
+   - 呼び出し元が認証済みかつ `is_farm_teacher(p_farm_id)` であることを検証。
+   - 未使用・有効な招待が 20 件以上ある場合は大量発行防止のため例外 (`54000`) を送出。
+   - ランダムトークンを生成し、SHA-256 ハッシュを `farm_invitations` に保存して平文トークンを呼び出し元に返却。
+2. **`accept_farm_invitation(p_token TEXT)`**:
+   - トークン形式 (`^[0-9a-f]{48}$`) を検証し、ハッシュ値で `FOR UPDATE` ロック取得。
+   - 取り消し済み (`revoked_at IS NOT NULL`)、使用済み (`accepted_at IS NOT NULL`)、期限切れ (`expires_at <= now()`) を検証。
+   - 農園に所属している受講生 (`role != 'teacher' AND farm_id IS NOT NULL`) の招待受け入れは拒否 (`42501`)。
+   - 未所属アカウントは `role = 'teacher'` へ昇格し、`farm_members` への所属登録と `accepted_at` / `accepted_by` の更新を実行。
+3. **`revoke_farm_invitation(p_invitation_id UUID)`**:
+   - 対象招待の農園の講師 (`is_farm_teacher`) のみ取り消し可能。
+   - 存在しない招待と他農園の招待は同一のエラー (`42501`) を返却して招待の存在推測を遮断。
+   - 使用済み招待の取り消しは拒否 (`22023`)。
+4. **`list_farm_members(p_farm_id UUID)`**:
+   - 同農園の講師のみ閲覧可能。
+   - 連絡先（email 等の PII）は返却せず、`user_id`, `display_name`, `joined_at`, `is_self` のみを返却。
+5. **`remove_farm_member(p_farm_id UUID, p_user_id UUID)`**:
+   - 同農園の講師のみ実行可能（自分自身の退出を含む）。
+   - 農園の最後の 1 人の講師を削除しようとした場合、整合性トリガー (`trg_prevent_last_farm_teacher_removal`) により拒否。
+   - 削除対象ユーザーの既定農園 (`users.farm_id`) が対象農園だった場合、残りの所属農園へポインタを安全に付け替え。

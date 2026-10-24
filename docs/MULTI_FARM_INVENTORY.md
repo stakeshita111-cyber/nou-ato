@@ -25,9 +25,11 @@
 
 | 関数                                 | 最新定義のファイル                                                 | 本番との比較     | 農園・ロール判定を含む |
 | ------------------------------------ | ------------------------------------------------------------------ | ---------------- | ---------------------- |
+| accept_farm_invitation               | 20261024080000_b5a_farm_invitation_rpcs.sql                        | 一致             | ○                      |
 | add_farm_bed                         | 20261023010000_phase1_security_and_integrity_fixes.sql             | 一致             | ○                      |
 | check_and_increment_ai_usage         | 20261010060000_ai_usage_atomic_and_ticket_hardening.sql            | 一致（削除済み） |                        |
 | complete_student_task                | 20261016000000_harden_crop_records_and_student_tasks_and_beds.sql  | 一致             | ○                      |
+| create_farm_invitation               | 20261024080000_b5a_farm_invitation_rpcs.sql                        | 一致             | ○                      |
 | current_user_farm_id                 | 20261009040000_prevent_privilege_escalation.sql                    | 一致             | ○                      |
 | current_user_role                    | 20261009040000_prevent_privilege_escalation.sql                    | 一致             |                        |
 | delete_farm_bed                      | 20261011025000_security_and_data_boundary_hardening.sql            | 一致             | ○                      |
@@ -43,6 +45,7 @@
 | join_farm                            | 20261023010000_phase1_security_and_integrity_fixes.sql             | 一致             | ○                      |
 | journals_set_farm_id                 | 20261011010000_rag_knowledge_and_journal_triggers.sql              | 一致             | ○                      |
 | list_farm_member_names               | 20261011010000_rag_knowledge_and_journal_triggers.sql              | 一致             | ○                      |
+| list_farm_members                    | 20261024080000_b5a_farm_invitation_rpcs.sql                        | 一致             | ○                      |
 | prevent_immutable_farm_fields_update | 20261023010000_phase1_security_and_integrity_fixes.sql             | 一致             | ○                      |
 | prevent_student_farm_bed_tampering   | 20261016000000_harden_crop_records_and_student_tasks_and_beds.sql  | 一致             | ○                      |
 | prevent_student_journal_tampering    | 20261014040000_fix_add_farm_bed_signature_and_trigger.sql          | 一致             | ○                      |
@@ -50,8 +53,10 @@
 | prevent_user_role_and_farm_id_update | 20261009040000_prevent_privilege_escalation.sql                    | 一致             | ○                      |
 | publish_task_to_all_students         | 20261023010000_phase1_security_and_integrity_fixes.sql             | 一致             | ○                      |
 | register_teacher                     | 20261023010000_phase1_security_and_integrity_fixes.sql             | 一致             | ○                      |
+| remove_farm_member                   | 20261024080000_b5a_farm_invitation_rpcs.sql                        | 一致             | ○                      |
 | reorder_beds                         | 20261010070000_harden_farm_beds_and_broadcast_rls.sql              | 一致             | ○                      |
 | reserve_ai_usage                     | 20261011020000_ai_usage_ledger_and_register_teacher_idempotent.sql | 一致             |                        |
+| revoke_farm_invitation               | 20261024080000_b5a_farm_invitation_rpcs.sql                        | 一致             | ○                      |
 | save_ai_journal                      | 20261023030000_phase2_ai_journal_memo_hardening.sql                | 一致             | ○                      |
 | search_knowledge_candidates          | 20261011010000_rag_knowledge_and_journal_triggers.sql              | 一致             | ○                      |
 | swap_farm_plots                      | 20261021000000_farm_scoped_plot_and_bed_ids.sql                    | 一致             | ○                      |
