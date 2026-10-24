@@ -834,8 +834,11 @@ export default function TeacherFarmCanvasView({
           <div className="flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-2xl border border-emerald-200 text-emerald-950">
             <span className="text-xs font-black">🌱 畑サイズ:</span>
             <div className="flex items-center space-x-1">
-              <label className="text-[10px] text-gray-500 font-bold">列 (A-L):</label>
+              <label htmlFor="farm-grid-cols" className="text-[10px] text-gray-500 font-bold">
+                列 (A-L):
+              </label>
               <select
+                id="farm-grid-cols"
                 value={gridCols}
                 onChange={(e) => handleGridColsChange(Number(e.target.value))}
                 className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-emerald-900"
@@ -851,8 +854,11 @@ export default function TeacherFarmCanvasView({
             <span className="text-gray-400 font-bold">×</span>
 
             <div className="flex items-center space-x-1">
-              <label className="text-[10px] text-gray-500 font-bold">行 (1-12):</label>
+              <label htmlFor="farm-grid-rows" className="text-[10px] text-gray-500 font-bold">
+                行 (1-12):
+              </label>
               <select
+                id="farm-grid-rows"
                 value={gridRows}
                 onChange={(e) => handleGridRowsChange(Number(e.target.value))}
                 className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-emerald-900"
