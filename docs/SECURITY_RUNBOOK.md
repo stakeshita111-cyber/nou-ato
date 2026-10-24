@@ -171,9 +171,10 @@ APIキーが外部に漏洩した疑いがある場合、即座にキーを無�
 - **操作方法**: 講師ダッシュボードの [農園設定] (`/teacher/settings`) 画面で「受講生ポータルでAI相談タブを表示する」のトグルスイッチを **OFF** に変更します。
 - **API 経由での緊急実行**:
   ```bash
+  # farmId には対象農園の UUID を指定する（省略時はログイン中講師の既定農園 users.farm_id）
   curl -X POST https://nou-ato.vercel.app/api/settings \
     -H "Content-Type: application/json" \
-    -d '{"showStudentTalkTab": false}'
+    -d '{"farmId": "<対象農園UUID>", "showStudentTalkTab": false}'
   ```
 - **効果**: 受講生の画面から「AI相談」タブが消え、UIレベルでリクエストが完全に送信できなくなります。
 

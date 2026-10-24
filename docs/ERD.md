@@ -1,6 +1,6 @@
 # NOU-ATO (のうあと) データベース ER図 & スキーマ仕様
 
-体験農業経営支援アプリ「NOU-ATO」の PostgreSQL / Supabase リレーショナルデータベース完全設計仕様書です（全14テーブル + 1複合VIEW + 21 RPC関数）。
+体験農業経営支援アプリ「NOU-ATO」の PostgreSQL / Supabase リレーショナルデータベース完全設計仕様書です（全16テーブル + 1複合VIEW + 30 RPC関数）。
 
 ---
 
@@ -8,7 +8,11 @@
 
 ```mermaid
 erDiagram
-    users ||--o{ farms : "owns"
+    users ||--o{ farms : "creates (owner_id)"
+    users ||--o{ farm_members : "belongs_to"
+    farms ||--o{ farm_members : "has_members"
+    users ||--o{ farm_invitations : "creates_or_accepts"
+    farms ||--o{ farm_invitations : "issues"
     users ||--o{ farm_plots : "assigned_to"
     users ||--o{ farm_beds : "assigned_to"
     users ||--o{ tasks : "created_by"
@@ -35,7 +39,7 @@ erDiagram
         varchar display_name "氏名・ニックネーム"
         varchar email "メールアドレス"
         varchar line_user_id "LINE連携ID"
-        uuid farm_id FK "所属農園ID"
+        uuid farm_id FK "生徒の所属農園ID / 講師の既定農園ID"
         timestamptz created_at
         timestamptz updated_at
         timestamptz deleted_at "論理削除・退会日時"
@@ -44,7 +48,7 @@ erDiagram
     farms {
         uuid id PK
         varchar name "農園名"
-        uuid owner_id FK "管理者 (teacher) の users.id"
+        uuid owner_id FK "作成者 (teacher) の users.id (不変記録・認可には不使用)"
         boolean show_student_talk_tab "生徒相談タブ表示フラグ"
         jsonb preset_faqs "農園プリセットFAQ配列"
         varchar invite_code "招待コード (UNIQUE INDEX)"
@@ -56,6 +60,25 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         timestamptz deleted_at
+    }
+
+    farm_members {
+        uuid farm_id PK,FK "所属農園 farms.id"
+        uuid user_id PK,FK "所属講師 users.id (role=teacherのみ)"
+        uuid invited_by FK "招待した講師 users.id (作成者はNULL)"
+        timestamptz created_at "参加日時"
+    }
+
+    farm_invitations {
+        uuid id PK
+        uuid farm_id FK "対象農園 farms.id"
+        text token_hash UK "招待トークンのSHA-256ハッシュ(hex)"
+        timestamptz expires_at "有効期限 (発行から7日)"
+        uuid created_by FK "発行した講師 users.id"
+        timestamptz created_at
+        uuid accepted_by FK "受け入れた講師 users.id"
+        timestamptz accepted_at "使用日時"
+        timestamptz revoked_at "取消日時"
     }
 
     farm_plots {
@@ -236,27 +259,29 @@ erDiagram
 
 ## 2. Row Level Security (RLS) ポリシー方針 & View セキュリティ
 
-| テーブル / ビュー                  | 受講生 (student) 権限                                                                                             | 講師 (teacher) 権限                           | サービスロール | セキュリティ設定                 |
-| :--------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :-------------------------------------------- | :------------- | :------------------------------- |
-| **users**                          | 自身のアカウントのみ SELECT / UPDATE                                                                              | 同一農園内の全受講生 SELECT / UPDATE / DELETE | ALL            | RLS Enabled                      |
-| **farms**                          | 所属農園のみ SELECT                                                                                               | 自身が所有する農園の ALL                      | ALL            | RLS Enabled                      |
-| **farm_plots**                     | 所属農園内の区画を SELECT                                                                                         | 同一農園内の区画の ALL                        | ALL            | RLS Enabled                      |
-| **farm_beds**                      | 自身の割当畝または担当区画の畝を SELECT / UPDATE (トリガーにより区画・畝番・生徒割当・ステータス改ざんを物理遮断) | 農園内の全畝の ALL                            | ALL            | RLS Enabled                      |
-| **crop_records**                   | 自身および割当畝/担当区画の記録 SELECT / INSERT / UPDATE / DELETE (親区画フォールバック・畝区画整合を厳格検証)    | 農園内の全記録の ALL                          | ALL            | RLS Enabled                      |
-| **tasks**                          | 公開テンプレートを SELECT                                                                                         | 農園内のタスクテンプレート ALL                | ALL            | RLS Enabled                      |
-| **student_tasks**                  | 自身のタスクのみ SELECT / UPDATE (親タスクが自農園・公開中・未削除・非テンプレートの場合のみ UPDATE 可)           | 農園内受講生のタスク ALL                      | ALL            | RLS Enabled                      |
-| **journals**                       | 自身の日誌 SELECT / INSERT / UPDATE / 共有済日誌 SELECT                                                           | 全生徒の日誌 SELECT / 返信 UPDATE / 承認      | ALL            | RLS Enabled                      |
-| **ai_tickets**                     | 自身のチケット残数 SELECT                                                                                         | 同農園生徒のチケット SELECT / 付与 RPC 経由   | ALL            | RLS Enabled                      |
-| **ai_usage_events**                | 自身の利用履歴 SELECT / RPC経由予約                                                                               | 同農園生徒の利用履歴 SELECT                   | ALL            | RLS Enabled                      |
-| **announcements**                  | 所属農園のアナウンス SELECT                                                                                       | 自身が作成したアナウンスの ALL                | ALL            | RLS Enabled                      |
-| **events**                         | 公開イベントの SELECT / 参加申込 UPDATE                                                                           | イベント作成・更新・削除 ALL                  | ALL            | RLS Enabled                      |
-| **reservations**                   | 自身の予約 SELECT / INSERT / DELETE                                                                               | 農園イベントの予約一覧 SELECT / 管理          | ALL            | RLS Enabled                      |
-| **payments**                       | 自身の請求 SELECT                                                                                                 | 農園内全生徒の請求 SELECT / ステータス UPDATE | ALL            | RLS Enabled                      |
-| **farm_beds_with_students (VIEW)** | Invoker 権限で参照 (RLSにより機密情報遮断)                                                                        | Invoker 権限で参照                            | ALL            | `WITH (security_invoker = true)` |
+| テーブル / ビュー                  | 受講生 (student) 権限                                                                                             | 講師 (teacher) 権限                              | サービスロール | セキュリティ設定                 |
+| :--------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :----------------------------------------------- | :------------- | :------------------------------- |
+| **users**                          | 自身のアカウントのみ SELECT / UPDATE                                                                              | 自身・所属農園の受講生および共同講師を SELECT    | ALL            | RLS Enabled                      |
+| **farms**                          | 所属農園のみ SELECT                                                                                               | 所属する農園 (`farm_members`) の SELECT / UPDATE | ALL            | RLS Enabled                      |
+| **farm_members**                   | アクセス不可                                                                                                      | 所属農園のメンバー一覧 SELECT (更新はRPCのみ)    | ALL            | RLS Enabled                      |
+| **farm_invitations**               | アクセス不可                                                                                                      | 所属農園の招待一覧 SELECT (更新はRPCのみ)        | ALL            | RLS Enabled                      |
+| **farm_plots**                     | 所属農園内の区画を SELECT                                                                                         | 同一農園内の区画の ALL                           | ALL            | RLS Enabled                      |
+| **farm_beds**                      | 自身の割当畝または担当区画の畝を SELECT / UPDATE (トリガーにより区画・畝番・生徒割当・ステータス改ざんを物理遮断) | 農園内の全畝の ALL                               | ALL            | RLS Enabled                      |
+| **crop_records**                   | 自身および割当畝/担当区画の記録 SELECT / INSERT / UPDATE / DELETE (親区画フォールバック・畝区画整合を厳格検証)    | 農園内の全記録の ALL                             | ALL            | RLS Enabled                      |
+| **tasks**                          | 公開テンプレートを SELECT                                                                                         | 農園内のタスクテンプレート ALL                   | ALL            | RLS Enabled                      |
+| **student_tasks**                  | 自身のタスクのみ SELECT / UPDATE (親タスクが自農園・公開中・未削除・非テンプレートの場合のみ UPDATE 可)           | 農園内受講生のタスク ALL                         | ALL            | RLS Enabled                      |
+| **journals**                       | 自身の日誌 SELECT / INSERT / UPDATE / 共有済日誌 SELECT                                                           | 全生徒の日誌 SELECT / 返信 UPDATE / 承認         | ALL            | RLS Enabled                      |
+| **ai_tickets**                     | 自身のチケット残数 SELECT                                                                                         | 同農園生徒のチケット SELECT / 付与 RPC 経由      | ALL            | RLS Enabled                      |
+| **ai_usage_events**                | 自身の利用履歴 SELECT / RPC経由予約                                                                               | 同農園生徒の利用履歴 SELECT                      | ALL            | RLS Enabled                      |
+| **announcements**                  | 所属農園のアナウンス SELECT                                                                                       | 所属農園のアナウンスの ALL                       | ALL            | RLS Enabled                      |
+| **events**                         | 公開イベントの SELECT / 参加申込 UPDATE                                                                           | イベント作成・更新・削除 ALL                     | ALL            | RLS Enabled                      |
+| **reservations**                   | 自身の予約 SELECT / INSERT / DELETE                                                                               | 農園イベントの予約一覧 SELECT / 管理             | ALL            | RLS Enabled                      |
+| **payments**                       | 自身の請求 SELECT                                                                                                 | 農園内全生徒の請求 SELECT / ステータス UPDATE    | ALL            | RLS Enabled                      |
+| **farm_beds_with_students (VIEW)** | Invoker 権限で参照 (RLSにより機密情報遮断)                                                                        | Invoker 権限で参照                               | ALL            | `WITH (security_invoker = true)` |
 
 ---
 
-## 3. 主要 SSOT 保護 Postgres RPC 関数一覧 (21本)
+## 3. 主要 SSOT 保護 Postgres RPC 関数一覧 (30本)
 
 直接のテーブル更新を物理的に遮断し、整合性と認可を保証するストアドプロシージャ群：
 
@@ -281,6 +306,15 @@ erDiagram
 19. **`sync_student_published_tasks`**: 公開済みタスク（status = 'todo'）に対する受講生の student_tasks レコード先行配備・安全同期。
 20. **`current_user_farm_id`**: ログインユーザーの所属農園UUIDを取得する認可ヘルパー関数。
 21. **`current_user_role`**: ログインユーザーのロール（teacher/student）を取得する認可ヘルパー関数。
+22. **`current_user_farm_ids`**: ログイン中の講師が所属する全農園UUID集合（`farm_members`）を返す RLS 認可ヘルパー関数。
+23. **`is_farm_teacher`**: 指定農園にログイン中の講師が所属しているかを判定する認可ヘルパー関数。
+24. **`list_my_farms`**: ログイン中の講師が所属する農園一覧（ID・農園名・生徒招待コード）を取得する。
+25. **`create_farm`**: 講師が新しい農園を作成し、作成者自身を `farm_members` に登録する。
+26. **`create_farm_invitation`**: 農園の講師が共同講師招待用の1回限りトークン（7日間有効、DBにはSHA-256ハッシュのみ保存）を発行する。
+27. **`accept_farm_invitation`**: 招待トークンを検証・ロックし、講師として `farm_members` に参加する（農園所属済みの受講生は拒否、未所属アカウントは講師へ昇格）。
+28. **`revoke_farm_invitation`**: 農園の講師が未使用の招待リンクを取り消す。
+29. **`list_farm_members`**: 農園の講師一覧（表示名・参加日時・本人フラグ。メールアドレスは非公開）を取得する。
+30. **`remove_farm_member`**: 農園の講師が共同講師を外す、または自身が退出する（最後の1人はトリガーにより削除不可）。
 
 ---
 

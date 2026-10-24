@@ -125,9 +125,6 @@ export function useFarmManager() {
       if (!targetFarm && teacherFarmId) {
         targetFarm = currentFarms.find((f: Farm) => f.id === teacherFarmId);
       }
-      if (!targetFarm && currentUserId) {
-        targetFarm = currentFarms.find((f: Farm) => f.owner_id === currentUserId);
-      }
 
       const effectiveActiveId = targetFarm ? targetFarm.id : currentFarms[0]?.id || 'farm_1';
       setActiveFarmId(effectiveActiveId);
