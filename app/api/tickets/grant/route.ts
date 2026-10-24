@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
+import { checkFarmTeacher } from '@/lib/auth/farmMembership';
 
 const grantTicketRequestBodySchema = z.object({
   studentId: z
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       return ApiResponse.unauthorized('チケットの付与にはログインが必要です');
     }
 
-    // 2. 講師権限チェック（農園に所属する teacher でなければ 403）
+    // 2. 講師権限チェック（teacher でなければ 403。農園の所属は 3. で生徒の農園について確認する）
     const userResult = await supabase
       .from('users')
       .select('role, farm_id')
@@ -60,13 +61,13 @@ export async function POST(request: Request) {
       .maybeSingle();
     const dbUser = userResult?.data;
 
-    if (!dbUser || dbUser.role !== 'teacher' || !dbUser.farm_id) {
+    if (!dbUser || dbUser.role !== 'teacher') {
       return ApiResponse.forbidden(
         'チケットの追加付与権限は農園に所属する講師のみに付与されています'
       );
     }
 
-    // 3. 同一農園チェック（他農園の受講生には付与不可）
+    // 3. 所属農園チェック（講師として所属していない農園の受講生には付与不可）
     const studentResult = await supabase
       .from('users')
       .select('farm_id, role')
@@ -78,7 +79,21 @@ export async function POST(request: Request) {
       return ApiResponse.notFound('対象の受講生が見つかりません');
     }
 
-    if (targetStudent.farm_id !== dbUser.farm_id) {
+    if (!targetStudent.farm_id) {
+      return ApiResponse.forbidden('他農園の受講生にチケットを付与することはできません');
+    }
+
+    const membership = await checkFarmTeacher(supabase, sessionUser.id, targetStudent.farm_id);
+    if (!membership.ok) {
+      logger.error(
+        'farm_members lookup failure:',
+        'api/tickets/grant',
+        undefined,
+        membership.message
+      );
+      return ApiResponse.internalError('農園の所属確認に失敗しました');
+    }
+    if (!membership.isTeacher) {
       return ApiResponse.forbidden('他農園の受講生にチケットを付与することはできません');
     }
 
