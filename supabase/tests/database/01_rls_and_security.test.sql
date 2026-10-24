@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(61);
+SELECT plan(74);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -779,6 +779,120 @@ SELECT throws_ok(
     '42501',
     NULL,
     '53. [storage_other_folder_denied] 他人のフォルダへのアップロードは RLS で拒否される'
+);
+
+RESET ROLE;
+
+-- ==============================================================================
+-- B-1: farm_members / 講師の農園所属
+-- ==============================================================================
+RESET ROLE;
+
+-- Test 54: [farm_members_rls] farm_members は RLS が有効
+SELECT ok(
+    (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.farm_members'::regclass),
+    '54. [farm_members_rls] farm_members は RLS が有効になっている'
+);
+
+-- Test 55: [register_teacher_membership] register_teacher で講師になったユーザー (Test 39 の 0099) は自分の農園に所属している
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_members m
+     JOIN public.users u ON u.id = m.user_id AND u.farm_id = m.farm_id
+     WHERE m.user_id = '00000000-0000-0000-0000-000000000099'),
+    1,
+    '55. [register_teacher_membership] register_teacher で開設した農園に作成者が講師として所属する'
+);
+
+-- Test 56-57: [create_farm] 講師は 2 つ目の農園を作成でき、list_my_farms に表示される
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000099", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000099';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    'SELECT public.create_farm(''第二農園99'')',
+    '56. [create_farm] 講師は create_farm で新しい農園を作成できる'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.list_my_farms()),
+    2,
+    '57. [list_my_farms] 講師 0099 には自分が所属する 2 農園が返る'
+);
+
+-- Test 58: [create_farm_student_denied] 生徒は農園を作成できない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000005", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000005';
+
+SELECT throws_ok(
+    'SELECT public.create_farm(''生徒の農園'')',
+    '42501',
+    'Only teachers can create farms',
+    '58. [create_farm_student_denied] 生徒による create_farm は 42501 で拒否される'
+);
+
+-- Test 59: [list_my_farms_isolated] 所属のないユーザーには農園が返らない
+SELECT is(
+    (SELECT count(*)::int FROM public.list_my_farms()),
+    0,
+    '59. [list_my_farms_isolated] 所属のない生徒には list_my_farms が 0 件を返す'
+);
+
+-- Test 60: [farm_members_no_direct_write] 認証ユーザーは farm_members に直接書き込めない
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000099", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000099';
+
+SELECT throws_ok(
+    'INSERT INTO public.farm_members (farm_id, user_id) VALUES (''11111111-1111-1111-1111-111111111111'', ''00000000-0000-0000-0000-000000000099'')',
+    '42501',
+    NULL,
+    '60. [farm_members_no_direct_write] 講師でも farm_members への直接 INSERT は拒否される'
+);
+
+-- Test 61: [farm_members_select_scope] 講師は自分の農園の所属だけを参照できる
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_members),
+    2,
+    '61. [farm_members_select_scope] 講師 0099 が参照できる所属は自分の 2 農園分のみ'
+);
+
+-- Test 62: [farm_members_teacher_only] 生徒アカウントは所属できない (管理者権限でもトリガーで拒否)
+RESET ROLE;
+SELECT throws_ok(
+    'INSERT INTO public.farm_members (farm_id, user_id) SELECT id, ''00000000-0000-0000-0000-000000000005'' FROM public.farms WHERE name = ''第二農園99''',
+    '42501',
+    'Only teacher accounts can belong to farm_members',
+    '62. [farm_members_teacher_only] 生徒アカウントの所属登録はトリガーで拒否される'
+);
+
+-- Test 63: [last_teacher_protected] 最後の 1 人の講師は外せない
+SELECT throws_ok(
+    'DELETE FROM public.farm_members WHERE user_id = ''00000000-0000-0000-0000-000000000099'' AND farm_id = (SELECT id FROM public.farms WHERE name = ''第二農園99'')',
+    '42501',
+    'Cannot remove the last teacher of a farm',
+    '63. [last_teacher_protected] 農園の最後の講師の削除は拒否される'
+);
+
+-- Test 64: [second_teacher_removable] 講師が 2 人いれば 1 人を外せる (講師 0004 を追加してから外す)
+INSERT INTO public.farm_members (farm_id, user_id)
+SELECT id, '00000000-0000-0000-0000-000000000004' FROM public.farms WHERE name = '第二農園99';
+
+SELECT lives_ok(
+    'DELETE FROM public.farm_members WHERE user_id = ''00000000-0000-0000-0000-000000000004'' AND farm_id = (SELECT id FROM public.farms WHERE name = ''第二農園99'')',
+    '64. [second_teacher_removable] 講師が複数いる農園では 1 人を外せる'
+);
+
+-- Test 65: [farm_delete_cascade] 農園を削除すると所属も削除される (最後の講師の保護で止まらない)
+SELECT lives_ok(
+    'DELETE FROM public.farms WHERE name = ''第二農園99''',
+    '65. [farm_delete_cascade] 農園の削除は最後の講師の保護に妨げられず成功する'
+);
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_members m
+     WHERE NOT EXISTS (SELECT 1 FROM public.farms f WHERE f.id = m.farm_id)),
+    0,
+    '66. [farm_delete_cascade] 削除した農園の所属は残らない'
 );
 
 RESET ROLE;
