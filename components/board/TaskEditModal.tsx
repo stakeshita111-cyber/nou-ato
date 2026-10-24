@@ -117,6 +117,13 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
         if (userData?.farm_id) farmId = userData.farm_id;
       }
 
+      // tasks.farm_id は NOT NULL (B-2c)。農園を特定できなければ DB には保存しない
+      if (!farmId) {
+        setToastMessage('❌ 農園を特定できないため、テンプレートを保存できませんでした');
+        setShowToast(true);
+        return;
+      }
+
       const { error } = await supabase.from('tasks').insert([
         {
           id: newTemplate.id,
@@ -133,7 +140,7 @@ export default function TaskEditModal({ task, onClose, onSave }: TaskEditModalPr
           exp: newTemplate.exp || 50,
           require_photo: Boolean(newTemplate.require_photo),
           created_by: userId || null,
-          farm_id: farmId || null,
+          farm_id: farmId,
           checklist: {
             phase: newTemplate.phase,
             season: newTemplate.season,
