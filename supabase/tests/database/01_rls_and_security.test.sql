@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(57);
+SELECT plan(61);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -736,6 +736,52 @@ SELECT lives_ok(
     $$ SELECT public.save_ai_journal('00000000-0000-0000-0000-000000000095'::uuid, '通常のAI相談質問', 'AIによる回答', false, false) $$,
     '49. [save_ai_journal_non_memo] is_memo = false (通常AI相談) の保存は日次メモ件数に関わらず正常に成功する'
 );
+
+-- Test 50: [storage_no_anon_write] crop-photos に対して anon に書き込みを許すポリシーが存在しない
+RESET ROLE;
+SELECT is(
+    (SELECT count(*)::int FROM pg_policies
+     WHERE schemaname = 'storage' AND tablename = 'objects'
+       AND roles && ARRAY['anon']::name[]
+       AND cmd IN ('ALL', 'INSERT', 'UPDATE', 'DELETE')),
+    0,
+    '50. [storage_no_anon_write] storage.objects に anon の書き込みを許すポリシーが存在しない'
+);
+
+-- Test 51: [storage_anon_upload_denied] 未ログイン (anon) は crop-photos にアップロードできない
+SET LOCAL ROLE anon;
+SET LOCAL "request.jwt.claims" = '{"role": "anon"}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = 'anon';
+
+SELECT throws_ok(
+    'INSERT INTO storage.objects (bucket_id, name) VALUES (''crop-photos'', ''anon-upload.jpg'')',
+    '42501',
+    NULL,
+    '51. [storage_anon_upload_denied] anon による crop-photos へのアップロードは RLS で拒否される'
+);
+
+-- Test 52: [storage_own_folder_upload] 認証済みユーザーは自分のフォルダ (<user_id>/...) にアップロードできる
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    'INSERT INTO storage.objects (bucket_id, name) VALUES (''crop-photos'', ''00000000-0000-0000-0000-000000000001/own-photo.jpg'')',
+    '52. [storage_own_folder_upload] 認証済みユーザーは自分のフォルダへのアップロードに成功する'
+);
+
+-- Test 53: [storage_other_folder_denied] 認証済みユーザーでも他人のフォルダにはアップロードできない
+SELECT throws_ok(
+    'INSERT INTO storage.objects (bucket_id, name) VALUES (''crop-photos'', ''00000000-0000-0000-0000-000000000002/not-mine.jpg'')',
+    '42501',
+    NULL,
+    '53. [storage_other_folder_denied] 他人のフォルダへのアップロードは RLS で拒否される'
+);
+
+RESET ROLE;
 
 SELECT * FROM finish();
 ROLLBACK;
