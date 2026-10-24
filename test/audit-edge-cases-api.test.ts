@@ -67,6 +67,21 @@ vi.mock('@/utils/supabase/server', () => ({
           }),
         };
       }
+      if (table === 'farm_members') {
+        // 講師 teacher-1 は farm-A にだけ所属している
+        return {
+          select: () => ({
+            eq: (_userCol: string, userId: string) => ({
+              eq: (_farmCol: string, farmId: string) => ({
+                maybeSingle: async () => ({
+                  data: userId === 'teacher-1' && farmId === 'farm-A' ? { farm_id: farmId } : null,
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
       if (table === 'farms') {
         return {
           select: () => ({

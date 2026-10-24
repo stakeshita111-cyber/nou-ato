@@ -15,6 +15,8 @@ let mockTargetStudent: { role: string; farm_id?: string | null } | null = {
 };
 let mockRpcData: unknown = [{ count: 4 }];
 let mockRpcError: unknown = null;
+// ログイン中の講師が farm_members で所属している農園
+let mockTeacherFarmIds: string[] = ['farm-123'];
 
 vi.mock('@/utils/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -57,6 +59,20 @@ vi.mock('@/utils/supabase/server', () => ({
           upsert: vi.fn(async () => ({ data: null, error: null })),
         };
       }
+      if (table === 'farm_members') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn((_col: string, farmId: string) => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: mockTeacherFarmIds.includes(farmId) ? { farm_id: farmId } : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        };
+      }
       return {
         select: vi.fn(() => ({ eq: vi.fn(() => ({})) })),
       };
@@ -91,6 +107,7 @@ describe('/api/tickets/grant Route Handler', () => {
     mockTargetStudent = { role: 'student', farm_id: 'farm-123' };
     mockRpcData = [{ count: 4 }];
     mockRpcError = null;
+    mockTeacherFarmIds = ['farm-123'];
   });
 
   it('POST validates studentId and returns 400 when missing', async () => {
@@ -205,5 +222,30 @@ describe('/api/tickets/grant Route Handler', () => {
     const body = await res.json();
     expect(body.title).toBe('Internal Server Error');
     expect(body.detail).toContain('チケット付与結果の取得に失敗しました');
+  });
+
+  it('POST grants tickets to a student in another farm the teacher belongs to (co-teacher)', async () => {
+    mockTargetStudent = { role: 'student', farm_id: 'farm-456' };
+    mockTeacherFarmIds = ['farm-123', 'farm-456'];
+    const request = new Request('http://localhost/api/tickets/grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId: '00000000-0000-0000-0000-000000000001', amount: 1 }),
+    });
+
+    const res = await POST(request);
+    expect(res.status).toBe(200);
+  });
+
+  it('POST returns 403 when the student has no farm', async () => {
+    mockTargetStudent = { role: 'student', farm_id: null };
+    const request = new Request('http://localhost/api/tickets/grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId: '00000000-0000-0000-0000-000000000001', amount: 1 }),
+    });
+
+    const res = await POST(request);
+    expect(res.status).toBe(403);
   });
 });

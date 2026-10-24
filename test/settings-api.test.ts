@@ -4,6 +4,9 @@ import { GET, POST } from '@/app/api/settings/route';
 let mockUser: { id: string; email?: string } | null = null;
 let mockUserData: { farm_id?: string | null; role?: string } | null = null;
 let mockFarmsData: Array<{ id: string; show_student_talk_tab?: boolean | null }> = [];
+// ログイン中の講師が farm_members で所属している農園と、farms の UPDATE で指定された農園
+let mockTeacherFarmIds: string[] = ['farm-123'];
+let mockUpdatedFarmIds: string[] = [];
 
 vi.mock('@/utils/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -11,6 +14,20 @@ vi.mock('@/utils/supabase/server', () => ({
       getUser: vi.fn(async () => ({ data: { user: mockUser } })),
     },
     from: vi.fn((table: string) => {
+      if (table === 'farm_members') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn((_col: string, farmId: string) => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: mockTeacherFarmIds.includes(farmId) ? { farm_id: farmId } : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        };
+      }
       if (table === 'users') {
         return {
           select: vi.fn(() => ({
@@ -47,7 +64,10 @@ vi.mock('@/utils/supabase/server', () => ({
           })),
           update: vi.fn(() => ({
             in: vi.fn(async () => ({ error: null })),
-            eq: vi.fn(async () => ({ error: null })),
+            eq: vi.fn(async (_field: string, value: string) => {
+              mockUpdatedFarmIds.push(value);
+              return { error: null };
+            }),
           })),
           upsert: vi.fn(async () => ({ error: null })),
         };
@@ -68,6 +88,8 @@ describe('/api/settings Route Handler', () => {
     mockUser = null;
     mockUserData = null;
     mockFarmsData = [];
+    mockTeacherFarmIds = ['farm-123'];
+    mockUpdatedFarmIds = [];
   });
 
   it('GET returns default settings with 200 status when no farm is found', async () => {
@@ -221,5 +243,67 @@ describe('/api/settings Route Handler', () => {
     const body = await res.json();
     expect(body.title).toBe('Bad Request');
     expect(body.detail).toBe('リクエストボディが不正です');
+  });
+
+  it('GET does not fall back to another farm when the user has no farm', async () => {
+    // 未ログインで農園が特定できない場合、DB 上の他の農園の設定を代わりに返さない
+    mockFarmsData = [{ id: 'farm-other', show_student_talk_tab: false }];
+
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.showStudentTalkTab).toBe(true);
+  });
+
+  it('POST updates the farm given by farmId when the teacher belongs to it', async () => {
+    const otherFarmId = '22222222-2222-4222-8222-222222222222';
+    mockUser = { id: 'teacher-1' };
+    mockUserData = { farm_id: 'farm-123', role: 'teacher' };
+    mockTeacherFarmIds = ['farm-123', otherFarmId];
+
+    const request = new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showStudentTalkTab: false, farmId: otherFarmId }),
+    });
+
+    const res = await POST(request);
+    expect(res.status).toBe(200);
+    expect(mockUpdatedFarmIds).toEqual([otherFarmId]);
+    const body = await res.json();
+    expect(body.settings).not.toHaveProperty('farmId');
+  });
+
+  it('POST returns 403 for a farm the teacher does not belong to', async () => {
+    mockUser = { id: 'teacher-1' };
+    mockUserData = { farm_id: 'farm-123', role: 'teacher' };
+
+    const request = new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        showStudentTalkTab: false,
+        farmId: '33333333-3333-4333-8333-333333333333',
+      }),
+    });
+
+    const res = await POST(request);
+    expect(res.status).toBe(403);
+    expect(mockUpdatedFarmIds).toEqual([]);
+  });
+
+  it('POST returns 400 when the teacher has no farm and no farmId is given', async () => {
+    mockUser = { id: 'teacher-1' };
+    mockUserData = { farm_id: null, role: 'teacher' };
+
+    const request = new Request('http://localhost/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showStudentTalkTab: false }),
+    });
+
+    const res = await POST(request);
+    expect(res.status).toBe(400);
+    expect(mockUpdatedFarmIds).toEqual([]);
   });
 });

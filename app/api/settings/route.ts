@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/utils/supabase/server';
+import { checkFarmTeacher } from '@/lib/auth/farmMembership';
 import { PresetFaqItem } from '@/types/farm';
 import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
 import { Database } from '@/types/supabase';
@@ -44,6 +45,8 @@ const settingsRequestBodySchema = z
       .array(presetFaqItemSchema)
       .max(50, 'プリセットFAQは50件以内で設定してください')
       .optional(),
+    // 更新する農園。未指定なら講師の users.farm_id (B-4 で画面から表示中の農園を渡す)
+    farmId: z.string().uuid('farmId は農園のIDを指定してください').optional(),
   })
   .passthrough();
 
@@ -57,32 +60,21 @@ export async function GET(request?: Request) {
     const supabase = await createClient();
     let targetFarmId: string | null = requestedFarmId;
 
-    // 認証ユーザーから所属農園を特定
+    // 農園の指定がなければ、ログインユーザーの users.farm_id を使う
+    // (指定された農園も含め、取得は RLS により「生徒の自農園 / 講師の所属農園」だけに限られる)
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user) {
-        if (!targetFarmId) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('farm_id, role')
-            .eq('id', user.id)
-            .maybeSingle();
+      if (user && !targetFarmId) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('farm_id, role')
+          .eq('id', user.id)
+          .maybeSingle();
 
-          if (userData?.farm_id) {
-            targetFarmId = userData.farm_id;
-          } else if (userData?.role === 'teacher') {
-            const { data: ownedFarm } = await supabase
-              .from('farms')
-              .select('id')
-              .eq('owner_id', user.id)
-              .limit(1)
-              .maybeSingle();
-            if (ownedFarm) {
-              targetFarmId = ownedFarm.id;
-            }
-          }
+        if (userData?.farm_id) {
+          targetFarmId = userData.farm_id;
         }
       }
     } catch (authErr) {
@@ -112,28 +104,8 @@ export async function GET(request?: Request) {
           presetFaqs = parsed.data;
         }
       }
-    } else {
-      // フォールバック: DB全体の先頭農園の設定を取得
-      const { data: defaultFarm } = await supabase
-        .from('farms')
-        .select('show_student_talk_tab, preset_faqs')
-        .limit(1)
-        .maybeSingle();
-
-      if (
-        defaultFarm &&
-        defaultFarm.show_student_talk_tab !== null &&
-        defaultFarm.show_student_talk_tab !== undefined
-      ) {
-        showStudentTalkTab = defaultFarm.show_student_talk_tab !== false;
-      }
-      if (defaultFarm?.preset_faqs) {
-        const parsed = z.array(presetFaqItemSchema).safeParse(defaultFarm.preset_faqs);
-        if (parsed.success && parsed.data.length > 0) {
-          presetFaqs = parsed.data;
-        }
-      }
     }
+    // 農園を特定できない場合は既定値を返す (他農園の設定を代わりに返すことはしない)
 
     return ApiResponse.success({
       settings: {
@@ -164,7 +136,7 @@ export async function POST(request: Request) {
       return ApiResponse.badRequest(issue?.message || 'リクエストボディが不正です');
     }
 
-    const { showStudentTalkTab, presetFaqs, ...extraSettings } = parseResult.data;
+    const { showStudentTalkTab, presetFaqs, farmId, ...extraSettings } = parseResult.data;
 
     const supabase = await createClient();
     const {
@@ -187,11 +159,26 @@ export async function POST(request: Request) {
       return ApiResponse.forbidden('設定の変更権限は講師のみに付与されています');
     }
 
-    // ログイン中講師が所有/所属する農園を取得・更新
-    const { data: ownedFarms } = await supabase
-      .from('farms')
-      .select('id')
-      .or(`owner_id.eq.${user.id}${userData?.farm_id ? `,id.eq.${userData.farm_id}` : ''}`);
+    // 更新する農園: 指定があればその農園、なければ講師の users.farm_id
+    const targetFarmId = farmId ?? userData.farm_id;
+    if (!targetFarmId) {
+      return ApiResponse.badRequest('設定を変更する農園を指定してください');
+    }
+
+    // 講師としてその農園に所属しているか (farm_members)
+    const membership = await checkFarmTeacher(supabase, user.id, targetFarmId);
+    if (!membership.ok) {
+      logger.error(
+        'farm_members lookup failed in /api/settings',
+        'api/settings',
+        undefined,
+        membership.message
+      );
+      return ApiResponse.internalError('農園の所属確認に失敗しました');
+    }
+    if (!membership.isTeacher) {
+      return ApiResponse.forbidden('所属していない農園の設定は変更できません');
+    }
 
     type FarmUpdate = Database['public']['Tables']['farms']['Update'];
     const updateFields: FarmUpdate = {
@@ -204,45 +191,13 @@ export async function POST(request: Request) {
       updateFields.preset_faqs = presetFaqs;
     }
 
-    let targetFarmId = userData.farm_id;
-
-    if (!targetFarmId) {
-      // 農園レコードが未登録の場合は register_teacher RPC 経由で安全に作成
-      const { data: regData, error: regErr } = await supabase.rpc('register_teacher', {
-        farm_name: 'マイ農園',
-      });
-      if (regErr) {
-        logger.error(
-          'register_teacher RPC failed in /api/settings',
-          'api/settings',
-          undefined,
-          regErr
-        );
-        return ApiResponse.internalError('農園の初期作成に失敗しました: ' + regErr.message);
-      }
-      const parsedReg = regData as { farm_id?: string } | null;
-      targetFarmId = parsedReg?.farm_id || null;
-    }
-
-    if (targetFarmId) {
-      const { error: updateErr } = await supabase
-        .from('farms')
-        .update(updateFields)
-        .eq('id', targetFarmId);
-      if (updateErr) {
-        logger.error('Failed to update farm settings', 'api/settings', undefined, updateErr);
-        return ApiResponse.internalError('設定の保存に失敗しました: ' + updateErr.message);
-      }
-    } else if (ownedFarms && ownedFarms.length > 0) {
-      const farmIds = ownedFarms.map((f) => f.id);
-      const { error: updateErr } = await supabase
-        .from('farms')
-        .update(updateFields)
-        .in('id', farmIds);
-      if (updateErr) {
-        logger.error('Failed to update farms settings', 'api/settings', undefined, updateErr);
-        return ApiResponse.internalError('設定の保存に失敗しました: ' + updateErr.message);
-      }
+    const { error: updateErr } = await supabase
+      .from('farms')
+      .update(updateFields)
+      .eq('id', targetFarmId);
+    if (updateErr) {
+      logger.error('Failed to update farm settings', 'api/settings', undefined, updateErr);
+      return ApiResponse.internalError('設定の保存に失敗しました: ' + updateErr.message);
     }
 
     const settings: ServerSettings = {
