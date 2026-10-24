@@ -995,6 +995,7 @@ export type Database = {
       };
     };
     Functions: {
+      accept_farm_invitation: { Args: { p_token: string }; Returns: Json };
       add_farm_bed: {
         Args: { p_crop_name?: string; p_plot_id: string; p_season?: string };
         Returns: Json;
@@ -1004,6 +1005,7 @@ export type Database = {
         Returns: Json;
       };
       create_farm: { Args: { p_farm_name: string }; Returns: Json };
+      create_farm_invitation: { Args: { p_farm_id: string }; Returns: Json };
       current_user_farm_id: { Args: never; Returns: string };
       current_user_farm_ids: { Args: never; Returns: string[] };
       current_user_role: { Args: never; Returns: string };
@@ -1036,6 +1038,15 @@ export type Database = {
           display_name: string;
         }[];
       };
+      list_farm_members: {
+        Args: { p_farm_id: string };
+        Returns: {
+          display_name: string;
+          is_self: boolean;
+          joined_at: string;
+          user_id: string;
+        }[];
+      };
       list_my_farms: {
         Args: never;
         Returns: {
@@ -1049,11 +1060,19 @@ export type Database = {
         Returns: undefined;
       };
       register_teacher: { Args: { farm_name: string }; Returns: Json };
+      remove_farm_member: {
+        Args: { p_farm_id: string; p_user_id: string };
+        Returns: Json;
+      };
       reorder_beds: {
         Args: { p_bed_ids: string[]; p_plot_id: string };
         Returns: undefined;
       };
       reserve_ai_usage: { Args: never; Returns: string };
+      revoke_farm_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: Json;
+      };
       save_ai_journal: {
         Args: {
           p_content: string;
