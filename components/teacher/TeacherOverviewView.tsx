@@ -8,6 +8,7 @@ import QRCodeModal from '@/components/ui/QRCodeModal';
 import WeatherWidget from '@/components/ui/WeatherWidget';
 import { useFarmManager } from '@/hooks/useFarmManager';
 import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import { isRegularRecord } from '@/lib/utils/journalHelper';
 import { fetchFarmPlotBedIds, cropRecordsFarmFilter } from '@/lib/farm/farmScope';
 
@@ -31,9 +32,8 @@ export default function TeacherOverviewView({
   const { plots } = useFarmManager();
   const { activeFarmId, activeFarmName } = useFarmStore();
 
-  const farmId =
-    activeFarmId ||
-    (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') || '' : '');
+  const [resolvedFarmId, setResolvedFarmId] = useState<string>('');
+  const farmId = activeFarmId || resolvedFarmId;
   const farmName =
     activeFarmName ||
     (typeof window !== 'undefined'
@@ -69,10 +69,10 @@ export default function TeacherOverviewView({
 
   const fetchCounts = useCallback(
     async (targetFarmId?: string) => {
-      const currentFid =
-        targetFarmId ||
-        farmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
+      const currentFid = targetFarmId || farmId || (await resolveActiveFarmId());
+      if (currentFid) {
+        setResolvedFarmId(currentFid);
+      }
 
       if (currentFid) {
         try {

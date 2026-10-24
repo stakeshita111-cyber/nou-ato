@@ -12,7 +12,7 @@ import {
 import Toast from '@/components/ui/Toast';
 import StudentTaskPreviewModal from '@/components/templates/StudentTaskPreviewModal';
 import { supabase } from '@/lib/supabase';
-import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import type { Database } from '@/types/supabase';
 
 // 公式テンプレートとカスタムテンプレートを安全にマージする関数
@@ -56,7 +56,7 @@ export default function TeacherTemplatesView() {
 
       // 1. Supabase DB (tasks テーブル: is_template = true) から完全復元 (表示中の農園のテンプレートのみ)
       try {
-        const templateFarmId = useFarmStore.getState().activeFarmId;
+        const templateFarmId = await resolveActiveFarmId();
         let templatesQuery = supabase
           .from('tasks')
           .select('*')
@@ -183,18 +183,7 @@ export default function TeacherTemplatesView() {
       } else if (savedTemplate && !savedTemplate.id.startsWith('tpl_')) {
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id;
-        let farmId =
-          useFarmStore.getState().activeFarmId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-
-        if (!farmId && userId) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('farm_id')
-            .eq('id', userId)
-            .maybeSingle();
-          if (userData?.farm_id) farmId = userData.farm_id;
-        }
+        const farmId = await resolveActiveFarmId();
 
         // tasks.farm_id は NOT NULL (B-2c)。農園を特定できなければ DB 同期は行わない
         if (userId && farmId) {
@@ -236,18 +225,7 @@ export default function TeacherTemplatesView() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      let farmId =
-        useFarmStore.getState().activeFarmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-
-      if (!farmId && user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('farm_id')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (userData?.farm_id) farmId = userData.farm_id;
-      }
+      const farmId = await resolveActiveFarmId();
 
       const memoContent = [
         tpl.memo || '',

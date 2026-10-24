@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { useFarmStore } from '@/store/useFarmStore';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import Toast from '@/components/ui/Toast';
 import { formatMoney } from '@/lib/utils/formatHelper';
 
@@ -41,22 +41,7 @@ export default function TeacherPaymentsView() {
   useEffect(() => {
     const fetchStudentCount = async () => {
       try {
-        let fid =
-          useFarmStore.getState().activeFarmId ||
-          (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-        if (!fid) {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (user) {
-            const { data: userData } = await supabase
-              .from('users')
-              .select('farm_id')
-              .eq('id', user.id)
-              .maybeSingle();
-            if (userData?.farm_id) fid = userData.farm_id;
-          }
-        }
+        const fid = await resolveActiveFarmId();
 
         let query = supabase.from('users').select('*', { count: 'exact' }).eq('role', 'student');
 

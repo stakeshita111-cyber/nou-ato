@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { Task, ColumnType } from '../types/task';
-import { useFarmStore } from '../store/useFarmStore';
+import { resolveActiveFarmId } from '../lib/farm/activeFarm';
 import type { Database } from '../types/supabase';
 
 type TaskRow = Database['public']['Tables']['tasks']['Row'];
@@ -64,17 +64,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
       if (!user) return;
       setUserId(user.id);
 
-      let effectiveFarmId =
-        useFarmStore.getState().activeFarmId ||
-        (typeof window !== 'undefined' ? localStorage.getItem('nouato_active_farm_id') : null);
-      if (!effectiveFarmId) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('farm_id')
-          .eq('id', user.id)
-          .maybeSingle();
-        effectiveFarmId = userData?.farm_id || '';
-      }
+      const effectiveFarmId = (await resolveActiveFarmId()) || '';
       if (effectiveFarmId) {
         setFarmId(effectiveFarmId);
       }
@@ -183,10 +173,7 @@ export function useKanbanBoard(columns: ColumnType[]) {
 
   // タスクの追加（Create: 実DBへ保存し、作成された Task を返却）
   const addTask = async (title: string, options?: Partial<Task>): Promise<Task | null> => {
-    let effectiveFarmId = farmId;
-    if (!effectiveFarmId && typeof window !== 'undefined') {
-      effectiveFarmId = localStorage.getItem('nouato_active_farm_id') || '';
-    }
+    const effectiveFarmId = farmId || (await resolveActiveFarmId()) || '';
 
     if (!userId || !effectiveFarmId) {
       console.warn('addTask: ユーザーIDまたは農園IDが未特定のためタスクを作成できません');
