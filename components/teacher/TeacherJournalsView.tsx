@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import { supabase } from '@/lib/supabase';
 import { useFarmStore } from '@/store/useFarmStore';
+import { fetchFarmPlotBedIds, cropRecordsFarmFilter } from '@/lib/farm/farmScope';
 import Toast from '@/components/ui/Toast';
 import SlideSettingsModal, { SlideSettings } from '@/components/teacher/SlideSettingsModal';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
@@ -742,11 +743,22 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         }
       }
 
-      // 1. crop_records から生徒の観察ノート・現場報告を取得（全件取得し、メモリ上で自農園・自生徒へ安全マッピング）
-      const { data: recData, error: recError } = await supabase
-        .from('crop_records')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 1. crop_records から生徒の観察ノート・現場報告を取得
+      //    (crop_records は farm_id を持たないため、表示中の農園の区画・畝で絞り込む)
+      const scope = farmId ? await fetchFarmPlotBedIds(supabase, farmId) : null;
+      if (scope && !scope.ok) {
+        console.warn('fetchCropRecords farm scope query error:', scope.message);
+      }
+      const farmIds = scope?.ok ? scope.ids : { plotIds: [], bedIds: [] };
+      const recFilter = cropRecordsFarmFilter(farmIds);
+
+      const { data: recData, error: recError } = recFilter
+        ? await supabase
+            .from('crop_records')
+            .select('*')
+            .or(recFilter)
+            .order('created_at', { ascending: false })
+        : { data: [], error: null };
 
       if (recError) {
         console.warn('fetchCropRecords crop_records query error:', recError);
@@ -765,10 +777,14 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
       const { data: jData } = await jQuery.order('created_at', { ascending: false });
 
-      // 3. 畝情報 (farm_beds) を取得して bed_id -> 生徒情報のマッピングを作成
-      const { data: bedsData } = await supabase
-        .from('farm_beds')
-        .select('id, student_name, student_id, plot_id');
+      // 3. 畝情報 (farm_beds) を取得して bed_id -> 生徒情報のマッピングを作成 (表示中の農園の区画のみ)
+      const { data: bedsData } =
+        farmIds.plotIds.length > 0
+          ? await supabase
+              .from('farm_beds')
+              .select('id, student_name, student_id, plot_id')
+              .in('plot_id', farmIds.plotIds)
+          : { data: [] };
 
       const bedMap: {
         [id: string]: {
@@ -789,10 +805,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         });
       }
 
-      // 4. 区画情報 (farm_plots) を取得
-      const { data: plotsData } = await supabase
-        .from('farm_plots')
-        .select('id, code, student_id, farm_id');
+      // 4. 区画情報 (farm_plots) を取得 (表示中の農園のみ)
+      const { data: plotsData } = farmId
+        ? await supabase
+            .from('farm_plots')
+            .select('id, code, student_id, farm_id')
+            .eq('farm_id', farmId)
+        : { data: [] };
 
       const plotMap: {
         [id: string]: {

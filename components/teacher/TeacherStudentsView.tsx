@@ -10,6 +10,7 @@ import StudentPreviewModal from '@/components/teacher/StudentPreviewModal';
 import QRCodeModal from '@/components/ui/QRCodeModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { useFarmStore } from '@/store/useFarmStore';
+import { fetchFarmPlotBedIds } from '@/lib/farm/farmScope';
 import { formatDate } from '@/lib/utils/formatHelper';
 
 type UserRow = Database['public']['Tables']['users']['Row'];
@@ -151,10 +152,13 @@ export default function TeacherStudentsView() {
         // 2. 農地・区画・畝 (farm_plots / farm_beds) からユーザーの割り当て区画を取得
         const plotMap: Record<string, string> = {};
         try {
-          // ① farm_plots (主たる区画割り当てテーブル) から取得
-          const { data: dbPlots } = await supabase
-            .from('farm_plots')
-            .select('id, code, student_id, name, description');
+          // ① farm_plots (主たる区画割り当てテーブル) から取得 (表示中の農園のみ)
+          const { data: dbPlots } = currentFarmId
+            ? await supabase
+                .from('farm_plots')
+                .select('id, code, student_id, name, description')
+                .eq('farm_id', currentFarmId)
+            : { data: [] };
           if (dbPlots && dbPlots.length > 0) {
             dbPlots.forEach((p) => {
               const sid = String(p.student_id || '');
@@ -168,10 +172,18 @@ export default function TeacherStudentsView() {
         }
 
         try {
-          // ② farm_beds (畝レベルの割当) からも取得して補完
-          const { data: dbBeds } = await supabase
-            .from('farm_beds')
-            .select('id, student_id, student_name, plot_id, bed_number');
+          // ② farm_beds (畝レベルの割当) からも取得して補完 (表示中の農園の区画の畝のみ)
+          const farmPlotIds = currentFarmId
+            ? await fetchFarmPlotBedIds(supabase, currentFarmId)
+            : null;
+          const plotIdsForBeds = farmPlotIds?.ok ? farmPlotIds.ids.plotIds : [];
+          const { data: dbBeds } =
+            plotIdsForBeds.length > 0
+              ? await supabase
+                  .from('farm_beds')
+                  .select('id, student_id, student_name, plot_id, bed_number')
+                  .in('plot_id', plotIdsForBeds)
+              : { data: [] };
           if (dbBeds && dbBeds.length > 0) {
             dbBeds.forEach((b) => {
               const assignedUser = String(b.student_id || '');
@@ -228,9 +240,15 @@ export default function TeacherStudentsView() {
           'id' | 'student_id' | 'status' | 'base_task_id' | 'title'
         >[] = [];
         try {
-          const { data: stData, error: stErr } = await supabase
-            .from('student_tasks')
-            .select('id, student_id, status, base_task_id, title');
+          // 表示中の農園の受講生のタスクだけを取得する
+          const farmStudentIds = (usersData ?? []).map((u) => u.id);
+          const { data: stData, error: stErr } =
+            farmStudentIds.length > 0
+              ? await supabase
+                  .from('student_tasks')
+                  .select('id, student_id, status, base_task_id, title')
+                  .in('student_id', farmStudentIds)
+              : { data: [], error: null };
           if (stErr) {
             console.warn('fetchStudents student_tasks query notice:', stErr);
           } else if (stData) {
