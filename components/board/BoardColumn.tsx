@@ -54,7 +54,7 @@ export default function BoardColumn({
       </div>
 
       {/* タスクリスト */}
-      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={visibleTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex-1 space-y-3">
           {visibleTasks.map((task) => (
             <TaskCard
