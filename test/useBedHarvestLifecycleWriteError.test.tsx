@@ -11,16 +11,13 @@ import StudentFarmRecordView from '@/components/student/StudentFarmRecordView';
 
 const mockDb = vi.hoisted(() => ({
   userRole: 'teacher' as string,
-  journalsInsert: vi.fn().mockResolvedValue({ error: null }),
-  journalsSelectLimit: vi.fn().mockResolvedValue({ data: [], error: null }),
-  journalsUpdateLike: vi.fn().mockResolvedValue({ error: null }),
-  farmBedsUpdateOr: vi.fn().mockResolvedValue({ error: null }),
-  cropRecordsUpdateEq: vi.fn().mockResolvedValue({ error: null }),
-  cropRecordsUpdateOr: vi.fn(),
+  rpc: vi.fn(),
+  fromTablesCalled: [] as string[],
 }));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    rpc: mockDb.rpc,
     auth: {
       getUser: vi.fn().mockResolvedValue({
         data: { user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } },
@@ -33,6 +30,7 @@ vi.mock('@/lib/supabase', () => ({
     })),
     removeChannel: vi.fn().mockResolvedValue('ok'),
     from: vi.fn((table: string) => {
+      mockDb.fromTablesCalled.push(table);
       if (table === 'users') {
         return {
           select: vi.fn(() => ({
@@ -45,50 +43,12 @@ vi.mock('@/lib/supabase', () => ({
           })),
         };
       }
-      if (table === 'journals') {
-        return {
-          insert: mockDb.journalsInsert,
-          select: vi.fn(() => ({
-            like: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: mockDb.journalsSelectLimit,
-              })),
-            })),
-            eq: vi.fn(() => ({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
-          })),
-          update: vi.fn(() => ({
-            like: mockDb.journalsUpdateLike,
-          })),
-        };
-      }
-      if (table === 'farm_beds') {
-        return {
-          update: vi.fn(() => ({
-            or: mockDb.farmBedsUpdateOr,
-          })),
-        };
-      }
-      if (table === 'crop_records') {
-        return {
-          update: vi.fn(() => ({
-            or: mockDb.cropRecordsUpdateOr,
-          })),
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
-            in: vi.fn(() => ({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
-          })),
-        };
-      }
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockResolvedValue({ error: null }),
       };
     }),
   },
@@ -162,24 +122,17 @@ function setupLifecycleMocks(customBeds?: BedRow[]) {
     dbPlots,
     dbBeds: customBeds ?? defaultBeds,
   });
-  vi.spyOn(farmDb, 'fetchPendingJournalsDb').mockResolvedValue(new Map());
   vi.spyOn(farmDb, 'savePlotsAndBedsToDb').mockResolvedValue({ ok: true });
   vi.spyOn(farmDb, 'insertBedDb').mockResolvedValue(null);
 }
 
-describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError 通知とトースト制御', () => {
+describe('R-1: 収穫ライフサイクル操作エラー時の onWriteError 通知とトースト表示', () => {
   beforeEach(() => {
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
     mockDb.userRole = 'teacher';
-    mockDb.journalsInsert = vi.fn().mockResolvedValue({ error: null });
-    mockDb.journalsSelectLimit = vi.fn().mockResolvedValue({ data: [], error: null });
-    mockDb.journalsUpdateLike = vi.fn().mockResolvedValue({ error: null });
-    mockDb.farmBedsUpdateOr = vi.fn().mockResolvedValue({ error: null });
-    mockDb.cropRecordsUpdateEq = vi.fn().mockResolvedValue({ error: null });
-    mockDb.cropRecordsUpdateOr = vi.fn(() => ({
-      eq: mockDb.cropRecordsUpdateEq,
-    }));
+    mockDb.rpc.mockReset();
+    mockDb.fromTablesCalled = [];
   });
 
   afterEach(() => {
@@ -187,7 +140,7 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
     localStorage.clear();
   });
 
-  it('1. useFarmManager({ onWriteError }): 8箇所の catch ブロックおよび savePlotsGridIndicesToSupabase 失敗時に onWriteError が呼ばれ、成功時には呼ばれない', async () => {
+  it('1. useFarmManager({ onWriteError }): RPC エラー時および savePlotsAndBedsToDb 失敗時に onWriteError が呼ばれ、成功時には呼ばれない', async () => {
     setupLifecycleMocks([
       {
         id: BED_1_ID,
@@ -233,10 +186,24 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const onWriteError = vi.fn();
 
+    // (A) すべて成功時は onWriteError が1度も呼ばれない
+    mockDb.rpc
+      .mockResolvedValueOnce({
+        data: { status: 'submitted', bed_id: BED_1_ID, journal_id: 'j1' },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { bed_id: BED_1_ID, archived_bed_id: ARCHIVED_BED_ID, moved_records: 1 },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { bed_id: BED_1_ID, status: 'rejected' },
+        error: null,
+      });
+
     const { result, unmount } = renderHook(() => useFarmManager({ onWriteError }));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    // (A) すべて成功時は onWriteError が1度も呼ばれない
     await act(async () => {
       await result.current.completeBedCrop(PLOT_A1_ID, BED_1_ID, { totalHarvest: '1kg' });
       await result.current.approveAndAddNewBed(PLOT_A1_ID, BED_1_ID, 'ダイコン', '2026年 秋冬');
@@ -246,41 +213,37 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
     });
     expect(onWriteError).not.toHaveBeenCalled();
 
-    // (B) completeBedCrop の2箇所の catch (journals.insert / farm_beds.update)
-    mockDb.journalsInsert.mockRejectedValueOnce(new Error('err1'));
-    mockDb.farmBedsUpdateOr.mockRejectedValueOnce(new Error('err2'));
+    // (B) completeBedCrop の RPC エラー
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'DB submit error' },
+    });
     await act(async () => {
       await result.current.completeBedCrop(PLOT_A1_ID, BED_1_ID, { totalHarvest: '2kg' });
     });
-    expect(onWriteError).toHaveBeenCalledTimes(2);
-    expect(onWriteError).toHaveBeenNthCalledWith(1, '収穫完了報告の保存に失敗しました');
-    expect(onWriteError).toHaveBeenNthCalledWith(2, '収穫完了報告の保存に失敗しました');
+    expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の保存に失敗しました');
 
-    // (C) approveAndAddNewBed の4箇所の catch (journals.select / insertBedDb / farm_beds.update / journals.update)
+    // (C) approveAndAddNewBed の RPC エラー
     onWriteError.mockClear();
-    mockDb.journalsSelectLimit.mockRejectedValueOnce(new Error('err3'));
-    vi.spyOn(farmDb, 'insertBedDb').mockRejectedValueOnce(new Error('err4'));
-    mockDb.farmBedsUpdateOr.mockRejectedValueOnce(new Error('err5'));
-    mockDb.journalsUpdateLike.mockRejectedValueOnce(new Error('err6'));
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'DB approve error' },
+    });
     await act(async () => {
       await result.current.approveAndAddNewBed(PLOT_A1_ID, BED_1_ID, 'ニンジン', '2026年 秋冬');
     });
-    expect(onWriteError).toHaveBeenCalledTimes(4);
-    expect(onWriteError).toHaveBeenNthCalledWith(1, '収穫完了報告の取得に失敗しました');
-    expect(onWriteError).toHaveBeenNthCalledWith(2, 'アーカイブ畝の保存に失敗しました');
-    expect(onWriteError).toHaveBeenNthCalledWith(3, '新しい畝の初期化保存に失敗しました');
-    expect(onWriteError).toHaveBeenNthCalledWith(4, '収穫完了報告の承認保存に失敗しました');
+    expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の承認保存に失敗しました');
 
-    // (D) rejectBedCompletion の2箇所の catch (farm_beds.update / 空 catch だった journals.update)
+    // (D) rejectBedCompletion の RPC エラー
     onWriteError.mockClear();
-    mockDb.farmBedsUpdateOr.mockRejectedValueOnce(new Error('err7'));
-    mockDb.journalsUpdateLike.mockRejectedValueOnce(new Error('err8'));
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'DB reject error' },
+    });
     await act(async () => {
       await result.current.rejectBedCompletion(PLOT_A1_ID, BED_1_ID, '差し戻しテスト');
     });
-    expect(onWriteError).toHaveBeenCalledTimes(2);
-    expect(onWriteError).toHaveBeenNthCalledWith(1, '差し戻しの保存に失敗しました');
-    expect(onWriteError).toHaveBeenNthCalledWith(2, '差し戻しの保存に失敗しました');
+    expect(onWriteError).toHaveBeenCalledWith('差し戻しの保存に失敗しました');
 
     // (E) unarchiveBed / addNewBedForPlot で savePlotsAndBedsToDb が失敗したとき
     onWriteError.mockClear();
@@ -303,8 +266,12 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
     mockDb.userRole = 'student';
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    // 失敗ケース
-    mockDb.journalsInsert.mockRejectedValueOnce(new Error('journals insert failed'));
+    // 失敗ケース: submit_bed_completion RPC エラー
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'submit failed' },
+    });
+
     const { unmount } = render(
       <StudentFarmRecordView studentId={STUDENT_1} studentName="山田 太郎" />
     );
@@ -327,8 +294,13 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
 
     unmount();
 
-    // 成功ケース
+    // 成功ケース: submit_bed_completion RPC 成功
     setupLifecycleMocks();
+    mockDb.rpc.mockResolvedValueOnce({
+      data: { status: 'submitted', bed_id: BED_1_ID, journal_id: 'j1' },
+      error: null,
+    });
+
     const { unmount: unmount2 } = render(
       <StudentFarmRecordView studentId={STUDENT_1} studentName="山田 太郎" />
     );
@@ -351,7 +323,7 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
     unmount2();
   });
 
-  it('3. TeacherFarmCanvasView (approveAndAddNewBed / rejectBedCompletion / unarchiveBed): 失敗時はエラートーストが出て成功トーストは出ず、成功時は成功トーストが出る', async () => {
+  it('3. TeacherFarmCanvasView (approveAndAddNewBed / rejectBedCompletion): 失敗時はエラートーストが出て成功トーストは出ず、成功時は成功トーストが出る', async () => {
     setupLifecycleMocks([
       {
         id: BED_1_ID,
@@ -369,26 +341,6 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
         harvested_at: '2026/08/20',
         completion_notes: 'たくさん採れました',
         total_harvest: '4kg',
-        completion_image_url: null,
-        created_at: '2026-04-01T00:00:00Z',
-        updated_at: null,
-      },
-      {
-        id: ARCHIVED_BED_ID,
-        plot_id: PLOT_A1_ID,
-        bed_number: '1',
-        crop_name: 'キュウリ',
-        crop_icon: null,
-        dimensions: null,
-        planted_date: null,
-        status: 'archived',
-        season: '2026年 春夏',
-        progress_percent: 100,
-        student_id: STUDENT_1,
-        student_name: '山田 太郎',
-        harvested_at: '2026/08/01',
-        completion_notes: '完了',
-        total_harvest: '3kg',
         completion_image_url: null,
         created_at: '2026-04-01T00:00:00Z',
         updated_at: null,
@@ -400,12 +352,15 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
 
     await waitFor(() => expect(screen.getByText('📖 記録を確認する')).toBeTruthy());
 
-    // (1) 差し戻し失敗ケース: journals.update (旧空 catch) が失敗したとき
+    // (1) 差し戻し失敗ケース: reject_bed_completion がエラーのとき
     fireEvent.click(screen.getByText('📖 記録を確認する'));
     await waitFor(() => expect(screen.getByText('↩️ 差し戻し')).toBeTruthy());
     fireEvent.click(screen.getByText('↩️ 差し戻し'));
 
-    mockDb.journalsUpdateLike.mockRejectedValueOnce(new Error('journals reject update error'));
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'reject RPC error' },
+    });
     fireEvent.click(screen.getByText('差し戻しを実行する'));
 
     await waitFor(() => {
@@ -417,7 +372,7 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
 
     unmount();
 
-    // (2) 承認失敗ケース: insertBedDb が失敗したとき
+    // (2) 承認失敗ケース: approve_bed_harvest がエラーのとき
     setupLifecycleMocks([
       {
         id: BED_1_ID,
@@ -440,7 +395,10 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
         updated_at: null,
       },
     ]);
-    vi.spyOn(farmDb, 'insertBedDb').mockRejectedValueOnce(new Error('archive insert failed'));
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'approve RPC error' },
+    });
 
     const { unmount: unmount2 } = render(<TeacherFarmCanvasView />);
     await waitFor(() => expect(screen.getByText('📖 記録を確認する')).toBeTruthy());
@@ -452,10 +410,53 @@ describe('A2: 収穫ライフサイクル書き込み失敗時の onWriteError �
     fireEvent.click(screen.getAllByText('✅ 承認して新畝を追加')[0]);
 
     await waitFor(() => {
-      expect(screen.getByText('⚠️ アーカイブ畝の保存に失敗しました')).toBeTruthy();
+      expect(screen.getByText('⚠️ 収穫完了報告の承認保存に失敗しました')).toBeTruthy();
     });
     expect(screen.queryByText('✅ 収穫完了を承認し、新しい畝を準備しました！')).toBeNull();
 
     unmount2();
+
+    // (3) 承認成功ケース: approve_bed_harvest が成功したとき
+    setupLifecycleMocks([
+      {
+        id: BED_1_ID,
+        plot_id: PLOT_A1_ID,
+        bed_number: '1',
+        crop_name: 'ミニトマト 🍅',
+        crop_icon: null,
+        dimensions: null,
+        planted_date: null,
+        status: 'completed_pending',
+        season: '2026年 春夏',
+        progress_percent: 100,
+        student_id: STUDENT_1,
+        student_name: '山田 太郎',
+        harvested_at: '2026/08/20',
+        completion_notes: 'たくさん採れました',
+        total_harvest: '4kg',
+        completion_image_url: null,
+        created_at: '2026-04-01T00:00:00Z',
+        updated_at: null,
+      },
+    ]);
+    mockDb.rpc.mockResolvedValueOnce({
+      data: { bed_id: BED_1_ID, archived_bed_id: ARCHIVED_BED_ID, moved_records: 1 },
+      error: null,
+    });
+
+    const { unmount: unmount3 } = render(<TeacherFarmCanvasView />);
+    await waitFor(() => expect(screen.getByText('📖 記録を確認する')).toBeTruthy());
+    fireEvent.click(screen.getByText('📖 記録を確認する'));
+
+    await waitFor(() =>
+      expect(screen.getAllByText('✅ 承認して新畝を追加').length).toBeGreaterThan(0)
+    );
+    fireEvent.click(screen.getAllByText('✅ 承認して新畝を追加')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('✅ 収穫完了を承認し、新しい畝を準備しました！')).toBeTruthy();
+    });
+
+    unmount3();
   });
 });

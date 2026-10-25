@@ -26,7 +26,6 @@ import {
   fetchStudentsDb,
   fetchCropRecordsDb,
   fetchRawPlotsAndBedsDb,
-  fetchPendingJournalsDb,
   savePlotsAndBedsToDb,
 } from '@/lib/farm/farmDb';
 
@@ -151,9 +150,6 @@ export function useFarmManager(options?: { onWriteError?: (message: string) => v
       const formattedRecords = await fetchCropRecordsDb(effectiveActiveId, targetPlotIds);
       setRecords(formattedRecords);
 
-      // journals からの未承認の収穫完了報告マップ (自農園スコープ & 50件拡張)
-      const pendingApprovalMap = await fetchPendingJournalsDb(effectiveActiveId);
-
       const {
         plotsWithRecords,
         detectedCols,
@@ -168,7 +164,6 @@ export function useFarmManager(options?: { onWriteError?: (message: string) => v
         dbBeds,
         studentMap,
         formattedRecords,
-        pendingApprovalMap,
       });
 
       setGridCols(detectedCols);
@@ -508,6 +503,7 @@ export function useFarmManager(options?: { onWriteError?: (message: string) => v
     savePlotsGridIndicesToSupabase,
     notifyBroadcast,
     onWriteError: options?.onWriteError,
+    reloadFromDb: reloadAllFromSupabase,
   });
 
   return {

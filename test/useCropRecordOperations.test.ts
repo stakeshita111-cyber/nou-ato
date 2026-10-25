@@ -117,7 +117,6 @@ function setupDefaultDbMocks(initialRecords: CropRecord[] = [INITIAL_RECORD]) {
   });
   vi.spyOn(farmDb, 'fetchCropRecordsDb').mockResolvedValue(initialRecords);
   vi.spyOn(farmDb, 'fetchRawPlotsAndBedsDb').mockResolvedValue({ dbPlots, dbBeds });
-  vi.spyOn(farmDb, 'fetchPendingJournalsDb').mockResolvedValue(new Map());
 }
 
 describe('Step 2a: useCropRecordOperations 特性テスト（useFarmManager 経由）', () => {
