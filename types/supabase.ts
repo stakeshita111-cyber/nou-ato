@@ -571,6 +571,7 @@ export type Database = {
       journals: {
         Row: {
           audio_url: string | null;
+          bed_id: string | null;
           content: string | null;
           created_at: string;
           deleted_at: string | null;
@@ -590,6 +591,7 @@ export type Database = {
         };
         Insert: {
           audio_url?: string | null;
+          bed_id?: string | null;
           content?: string | null;
           created_at?: string;
           deleted_at?: string | null;
@@ -609,6 +611,7 @@ export type Database = {
         };
         Update: {
           audio_url?: string | null;
+          bed_id?: string | null;
           content?: string | null;
           created_at?: string;
           deleted_at?: string | null;
@@ -627,6 +630,20 @@ export type Database = {
           user_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'journals_bed_id_fkey';
+            columns: ['bed_id'];
+            isOneToOne: false;
+            referencedRelation: 'farm_beds';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'journals_bed_id_fkey';
+            columns: ['bed_id'];
+            isOneToOne: false;
+            referencedRelation: 'farm_beds_with_students';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'journals_farm_id_fkey';
             columns: ['farm_id'];
@@ -1000,6 +1017,15 @@ export type Database = {
         Args: { p_crop_name?: string; p_plot_id: string; p_season?: string };
         Returns: Json;
       };
+      approve_bed_harvest: {
+        Args: {
+          p_bed_id: string;
+          p_next_crop_name?: string;
+          p_next_season?: string;
+          p_plot_id: string;
+        };
+        Returns: Json;
+      };
       complete_student_task: {
         Args: { p_base_task_id: string; p_task_title?: string };
         Returns: Json;
@@ -1060,6 +1086,10 @@ export type Database = {
         Returns: undefined;
       };
       register_teacher: { Args: { farm_name: string }; Returns: Json };
+      reject_bed_completion: {
+        Args: { p_bed_id: string; p_plot_id: string; p_reason?: string };
+        Returns: Json;
+      };
       remove_farm_member: {
         Args: { p_farm_id: string; p_user_id: string };
         Returns: Json;
@@ -1090,6 +1120,16 @@ export type Database = {
           id: string;
           reply: string;
         }[];
+      };
+      submit_bed_completion: {
+        Args: {
+          p_bed_id: string;
+          p_completion_image_url?: string;
+          p_completion_notes?: string;
+          p_season?: string;
+          p_total_harvest?: string;
+        };
+        Returns: Json;
       };
       swap_farm_plots: {
         Args: { p_from_plot_id: string; p_to_plot_id: string };
