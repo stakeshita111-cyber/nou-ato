@@ -8,6 +8,7 @@ import {
 import { ApiResponse } from '@/lib/apiResponse';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/utils/supabase/server';
+import { DEFAULT_PRESET_FAQS } from '@/lib/presetFaqs';
 
 const checkKnowledgeRequestBodySchema = z.object({
   question: z.string().optional(),
@@ -20,38 +21,6 @@ interface KnowledgeMatch {
   matchedKeywords: string[];
   score: number;
 }
-
-// プリセットFAQデータ (明確な事象キーワードでのみヒット)
-const PRESET_FAQS = [
-  {
-    id: 'faq_fertilizer',
-    question: '追肥のタイミングやおすすめのやり方を教えてください',
-    answer:
-      '【農園アドバイス：追肥の基本】🌱\n\n植え付けから2〜3週間後、または一番果（最初の実）がついた頃が1回目の追肥タイミングです！\n株元から少し離れた場所に肥料を一握り施し、土と軽く混ぜてあげてくださいね。有機ぼかし肥や油かすを使うと根を傷めず元気に育ちます✨',
-    keywords: ['追肥', '肥料', 'ぼかし肥', '油かす', '元肥', '施肥'],
-  },
-  {
-    id: 'faq_yellow_leaf',
-    question: '葉っぱが黄色くなってきました。どうすればいいですか？',
-    answer:
-      '【農園アドバイス：葉の黄変について】🍅\n\n・一番下の古い葉が黄色い場合：自然な老化ですので、風通しを良くするため根本からハサミで切り取って大丈夫です。\n・株全体や上部が黄色い場合：水切れ、または肥料切れ（チッソ不足）の可能性があります。土の乾き具合を確認し、必要に応じて追肥を行ってみてくださいね！',
-    keywords: ['黄色', '葉が黄色', '黄変', '下葉が黄色'],
-  },
-  {
-    id: 'faq_pest',
-    question: '害虫（ハダニやアブラムシ）を見つけました。無農薬での対策は？',
-    answer:
-      '【農園アドバイス：安心な害虫対策】🐛\n\n・アブラムシ・ハダニ：葉の裏に勢いよく水をかける「葉水」がとても効果的です。水で薄めたお酢や牛乳スプレーも窒息効果があります。\n・アオムシ等：見つけたら割り箸などで優しく捕殺するのが確実です。早めの発見が大切ですので、葉の裏をこまめに観察してくださいね！',
-    keywords: ['害虫', 'ハダニ', 'アブラムシ', 'アオムシ', '虫退治', '無農薬', '駆除', '葉水'],
-  },
-  {
-    id: 'faq_watering',
-    question: '夏の水やりのタイミングや頻度を教えてください',
-    answer:
-      '【農園アドバイス：水やりのコツ】💧\n\n基本は「朝の涼しい時間帯（早朝〜8時頃）」にたっぷりとあげるのがベストです！\n日中の暑い時間に水をあげるとお湯のようになって根を傷める原因になります。土の表面が乾いて白っぽくなったら、株元にしっかりあげてくださいね🌱',
-    keywords: ['水やり', '水遣り', '水やり頻度', '水やりの時間', '乾燥気味', '散水'],
-  },
-];
 
 export async function POST(request: Request) {
   try {
@@ -96,8 +65,9 @@ export async function POST(request: Request) {
     const queryCrops = CROPS_LIST.filter((crop) => qClean.includes(crop));
 
     // 1. プリセットFAQとのキーワード一致判定
-    for (const faq of PRESET_FAQS) {
-      const hitKeywords = faq.keywords.filter((kw) => qClean.includes(kw));
+    for (const faq of DEFAULT_PRESET_FAQS) {
+      const keywords = faq.keywords ?? [];
+      const hitKeywords = keywords.filter((kw) => qClean.includes(kw));
       if (hitKeywords.length > 0) {
         matches.push({
           id: faq.id,
@@ -161,6 +131,6 @@ export async function POST(request: Request) {
     return ApiResponse.success({ matches: topMatches });
   } catch (err: unknown) {
     logger.error('check-knowledge processing error', 'api/chat/check-knowledge', undefined, err);
-    return ApiResponse.success({ matches: [] });
+    return ApiResponse.internalError('ナレッジ検索中にエラーが発生しました');
   }
 }
