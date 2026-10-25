@@ -34,6 +34,8 @@ export default function BedApprovalModal({
     try {
       await onApprove(plot.id, bed.id);
       onClose();
+    } catch (err) {
+      console.error('Approval modal error:', err);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -48,6 +50,8 @@ export default function BedApprovalModal({
     try {
       await onReject(plot.id, bed.id, rejectReason || '内容の再確認をお願いします');
       onClose();
+    } catch (err) {
+      console.error('Approval modal error:', err);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -159,7 +163,9 @@ export default function BedApprovalModal({
                 src={bed.completion_image_url}
                 alt="収穫記念写真"
                 className="w-full h-full object-cover cursor-pointer group-hover:scale-102 transition duration-300"
-                onClick={() => window.open(bed.completion_image_url, '_blank')}
+                onClick={() =>
+                  window.open(bed.completion_image_url, '_blank', 'noopener,noreferrer')
+                }
               />
               <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                 クリックで拡大 🔍
