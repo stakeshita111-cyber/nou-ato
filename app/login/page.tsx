@@ -74,9 +74,9 @@ export default function UnifiedLoginPage() {
       setShowToast(true);
 
       setTimeout(() => {
-        router.push(destination);
         router.refresh();
-      }, 500);
+        router.push(destination);
+      }, 400);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       setToastMessage(`エラーが発生しました: ${message}`);
@@ -153,8 +153,9 @@ export default function UnifiedLoginPage() {
       setShowToast(true);
 
       setTimeout(() => {
+        router.refresh();
         router.push(destination);
-      }, 800);
+      }, 400);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       setToastMessage(`エラーが発生しました: ${message}`);
