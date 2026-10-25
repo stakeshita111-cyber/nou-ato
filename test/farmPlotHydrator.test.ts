@@ -72,7 +72,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds: [],
       studentMap: new Map(),
       formattedRecords: [],
-      pendingApprovalMap: new Map(),
     });
 
     expect(res.detectedCols).toBe(6);
@@ -136,7 +135,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds: [],
       studentMap: new Map(),
       formattedRecords: [],
-      pendingApprovalMap: new Map(),
     });
 
     expect(res.detectedCols).toBe(2);
@@ -222,7 +220,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds,
       studentMap,
       formattedRecords: [],
-      pendingApprovalMap: new Map(),
     });
 
     const [plotA1, plotB1, plotC1] = res.plotsWithRecords;
@@ -322,7 +319,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds,
       studentMap: new Map([[STUDENT_1, '山田 太郎']]),
       formattedRecords,
-      pendingApprovalMap: new Map(),
     });
 
     const plotA1 = res.plotsWithRecords[0];
@@ -339,7 +335,7 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
     expect(plotA1.beds[1].crop_name).toBe('レタス 🥬');
   });
 
-  it('5. archived の畝と承認待ち日誌：active 畝の後ろに archived 畝が並び、pendingApprovalMap が反映される', async () => {
+  it('5. archived の畝と承認待ちの畝：active 枠の後ろに archived 畝が並び、farm_beds.status の承認待ちと申請内容が反映される', async () => {
     const targetFarm: Farm = {
       id: FARM_ID,
       name: 'テスト農園',
@@ -377,22 +373,13 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
         plot_id: plotId,
         bed_number: '1',
         crop_name: 'エダマメ 🫛',
-        status: 'active',
+        status: 'completed_pending',
         season: '2026年 秋冬',
+        total_harvest: '300g',
+        completion_notes: '収穫完了しました',
+        completion_image_url: 'https://example.com/edamame.jpg',
       }),
     ];
-
-    const pendingApprovalMap = new Map([
-      [
-        'A1_1',
-        {
-          total_harvest: '300g',
-          completion_notes: '収穫完了しました',
-          completion_image_url: 'https://example.com/edamame.jpg',
-          season: '2026年 春夏',
-        },
-      ],
-    ]);
 
     const res = await runHydratePlots({
       effectiveActiveId: FARM_ID,
@@ -401,13 +388,12 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds,
       studentMap: new Map([[STUDENT_1, '山田 太郎']]),
       formattedRecords: [],
-      pendingApprovalMap,
     });
 
     const beds = res.plotsWithRecords[0].beds;
     expect(beds).toHaveLength(2);
 
-    // 先頭は active 枠（pendingApprovalMap により completed_pending に昇格）
+    // 先頭は active 枠（farm_beds.status = completed_pending と申請内容がそのまま反映される）
     expect(beds[0].id).toBe(activeBedId);
     expect(beds[0].status).toBe('completed_pending');
     expect(beds[0].total_harvest).toBe('300g');
@@ -462,7 +448,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds: [],
       studentMap: new Map(),
       formattedRecords: [],
-      pendingApprovalMap: new Map(),
     });
 
     expect(resWithMeta.detectedCols).toBe(3);
@@ -491,7 +476,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds: [],
       studentMap: new Map(),
       formattedRecords: [],
-      pendingApprovalMap: new Map(),
     });
 
     expect(resWithoutMeta.detectedCols).toBe(7); // G = 7列目
@@ -555,7 +539,6 @@ describe('farmPlotHydrator 特性テスト（現状の動作固定）', () => {
       dbBeds,
       studentMap: new Map(),
       formattedRecords: [],
-      pendingApprovalMap: new Map(),
     });
 
     // 別農園の 10×10・12畝は無視され、自農園の 2×1・4畝が採用される
