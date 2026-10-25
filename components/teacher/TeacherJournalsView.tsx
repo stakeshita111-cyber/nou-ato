@@ -323,6 +323,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     if (!text?.trim()) return;
 
     const targetJournal = journals.find((j) => j.id === id);
+    const isPreviouslyApproved = targetJournal?.is_approved ?? false;
 
     const shouldApprove = approveOnReply[id] || false;
 
@@ -332,12 +333,17 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       return;
     }
 
-    const { error } = await supabase
-      .from('journals')
-      .update({
-        reply: text.trim(),
-      })
-      .eq('id', id);
+    // 🌟 既存の承認済みナレッジであっても、モーダルを通さずに通常返信が修正された場合は、
+    // 生徒の個人情報(PII)が生テキストでナレッジ検索に混入する事故を物理防止するため、
+    // is_approved を false に安全にリセットする
+    const updatePayload: { reply: string; is_approved?: boolean } = {
+      reply: text.trim(),
+    };
+    if (isPreviouslyApproved) {
+      updatePayload.is_approved = false;
+    }
+
+    const { error } = await supabase.from('journals').update(updatePayload).eq('id', id);
 
     if (error) {
       setToastMessage('返信の保存に失敗しました: ' + error.message);
@@ -386,7 +392,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       setJournals(
         journals.map((j) =>
           j.id === id
-            ? { ...j, reply: text.trim(), ...(shouldApprove ? { is_approved: true } : {}) }
+            ? {
+                ...j,
+                reply: text.trim(),
+                is_approved: shouldApprove ? true : isPreviouslyApproved ? false : j.is_approved,
+              }
             : j
         )
       );
@@ -394,7 +404,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       setToastMessage(
         shouldApprove
           ? '💬 回答を送信し、★ AIナレッジとして承認保存しました！'
-          : '💬 生徒への回答メッセージを更新・保存しました！'
+          : isPreviouslyApproved
+            ? '💬 返信内容が変更されたため、安全のためAIナレッジ承認を取り消しました。再度ナレッジ共有する場合は☆ボタンから承認してください。'
+            : '💬 生徒への回答メッセージを更新・保存しました！'
       );
     }
     setShowToast(true);

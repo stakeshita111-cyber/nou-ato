@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { StudentData } from '@/components/teacher/TeacherStudentsView';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/supabase';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 
 export type StudentPreviewData = StudentData;
 
@@ -55,17 +56,21 @@ export default function StudentPreviewModal({
           setCompletedTasks(tasksData);
         }
 
-        // 2. 生徒の区画・畝を取得
-        const { data: plots } = await supabase
-          .from('farm_plots')
-          .select('id')
-          .eq('student_id', studentId);
+        const farmId = await resolveActiveFarmId();
+
+        // 2. 生徒の区画・畝を取得 (自農園スコープを徹底)
+        let plotsQuery = supabase.from('farm_plots').select('id').eq('student_id', studentId);
+        if (farmId) {
+          plotsQuery = plotsQuery.eq('farm_id', farmId);
+        }
+        const { data: plots } = await plotsQuery;
         const plotIds = (plots || []).map((p) => p.id);
 
-        const { data: beds } = await supabase
-          .from('farm_beds')
-          .select('id')
-          .eq('student_id', studentId);
+        let bedsQuery = supabase.from('farm_beds').select('id').eq('student_id', studentId);
+        if (plotIds.length > 0) {
+          bedsQuery = bedsQuery.in('plot_id', plotIds);
+        }
+        const { data: beds } = await bedsQuery;
         const bedIds = (beds || []).map((b) => b.id);
 
         if (plotIds.length === 0 && bedIds.length === 0) {
