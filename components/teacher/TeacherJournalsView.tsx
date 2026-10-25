@@ -724,7 +724,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         console.warn('fetchCropRecords farm scope query error:', scope.message);
       }
       const farmIds = scope?.ok ? scope.ids : { plotIds: [], bedIds: [] };
-      const recFilter = cropRecordsFarmFilter(farmIds);
+      // 🌟 畝数が膨大な場合（>50）、URL長上限（HTTP 400 Bad Request）を防ぐため区画(plot_id)を主軸としてフィルタ 🌟
+      const safeBedIds =
+        farmIds.plotIds.length > 0 && farmIds.bedIds.length > 50 ? [] : farmIds.bedIds;
+      const recFilter = cropRecordsFarmFilter({
+        plotIds: farmIds.plotIds,
+        bedIds: safeBedIds,
+      });
 
       const { data: recData, error: recError } = recFilter
         ? await supabase

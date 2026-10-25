@@ -127,7 +127,16 @@ export default function TeacherOverviewView({
       let cCount: number | null = 0;
       if (currentFid) {
         const scope = await fetchFarmPlotBedIds(supabase, currentFid);
-        const filter = scope.ok ? cropRecordsFarmFilter(scope.ids) : null;
+        // 🌟 畝数が膨大な場合（>50）、URL長上限（HTTP 400 Bad Request）を防ぐため区画(plot_id)を主軸としてフィルタ 🌟
+        const safeBedIds =
+          scope.ok && scope.ids.plotIds.length > 0 && scope.ids.bedIds.length > 50
+            ? []
+            : scope.ok
+              ? scope.ids.bedIds
+              : [];
+        const filter = scope.ok
+          ? cropRecordsFarmFilter({ plotIds: scope.ids.plotIds, bedIds: safeBedIds })
+          : null;
         if (!scope.ok) {
           cCount = null;
         } else if (filter) {
