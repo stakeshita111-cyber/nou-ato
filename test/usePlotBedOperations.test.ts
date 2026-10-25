@@ -152,7 +152,6 @@ function setupPlotBedMocks(customPlots?: PlotRow[]) {
   });
   vi.spyOn(farmDb, 'fetchCropRecordsDb').mockResolvedValue([]);
   vi.spyOn(farmDb, 'fetchRawPlotsAndBedsDb').mockResolvedValue({ dbPlots, dbBeds });
-  vi.spyOn(farmDb, 'fetchPendingJournalsDb').mockResolvedValue(new Map());
 }
 
 describe('A1a: usePlotBedOperations 特性テスト（useFarmManager 経由）', () => {

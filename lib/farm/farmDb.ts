@@ -167,54 +167,6 @@ export async function fetchRawPlotsAndBedsDb(activeFarmId?: string) {
   return { dbPlots: dbPlots || [], dbBeds: dbBeds || [] };
 }
 
-export async function fetchPendingJournalsDb(activeFarmId?: string) {
-  const pendingApprovalMap = new Map<
-    string,
-    {
-      total_harvest?: string;
-      completion_notes?: string;
-      completion_image_url?: string;
-      season?: string;
-    }
-  >();
-
-  try {
-    let jq = supabase.from('journals').select('*');
-    if (activeFarmId) {
-      jq = jq.eq('farm_id', activeFarmId);
-    }
-    const { data: pendingJournals } = await jq.order('created_at', { ascending: false }).limit(50);
-
-    if (pendingJournals && pendingJournals.length > 0) {
-      type JournalRow = Database['public']['Tables']['journals']['Row'];
-      (pendingJournals as JournalRow[]).forEach((j: JournalRow) => {
-        if (j.content && j.content.includes('【収穫完了報告】') && !j.is_approved) {
-          const bedMatch = j.content.match(/畝\s*([0-9]+)/);
-          const harvestMatch = j.content.match(/収穫量:\s*([^\n]+)/);
-          const notesMatch = j.content.match(/振り返り:\s*([^\n]+)/);
-          const codeMatch = j.content.match(/区画\s*([A-Za-z0-9]+)/);
-
-          if (codeMatch && bedMatch) {
-            const plotCode = codeMatch[1].toUpperCase();
-            const bedNum = parseInt(bedMatch[1]);
-            const key = `${plotCode}_${bedNum}`;
-            pendingApprovalMap.set(key, {
-              total_harvest: harvestMatch ? harvestMatch[1].trim() : undefined,
-              completion_notes: notesMatch ? notesMatch[1].trim() : j.content,
-              completion_image_url: j.image_url || undefined,
-              season: '2026年 春夏',
-            });
-          }
-        }
-      });
-    }
-  } catch (e) {
-    console.warn('fetchPendingJournalsDb notice:', e);
-  }
-
-  return pendingApprovalMap;
-}
-
 export async function savePlotsAndBedsToDb(
   updatedPlots: FarmPlot[],
   activeFarmId: string,

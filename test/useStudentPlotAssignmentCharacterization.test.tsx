@@ -185,7 +185,6 @@ function setupAssignmentMocks(options?: { customPlots?: PlotRow[]; customBeds?: 
   });
   vi.spyOn(farmDb, 'fetchCropRecordsDb').mockResolvedValue([]);
   vi.spyOn(farmDb, 'fetchRawPlotsAndBedsDb').mockResolvedValue({ dbPlots, dbBeds });
-  vi.spyOn(farmDb, 'fetchPendingJournalsDb').mockResolvedValue(new Map());
   vi.spyOn(farmDb, 'savePlotsAndBedsToDb').mockResolvedValue({ ok: true });
 }
 

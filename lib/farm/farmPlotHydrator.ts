@@ -14,7 +14,7 @@ export interface HydrateFarmPlotsInput {
   dbBeds: Database['public']['Tables']['farm_beds']['Row'][];
   studentMap: Map<string, string>;
   formattedRecords: CropRecord[];
-  pendingApprovalMap: Map<
+  pendingApprovalMap?: Map<
     string,
     {
       total_harvest?: string;
@@ -247,7 +247,7 @@ export function hydrateFarmPlots({
     for (let bedNum = 1; bedNum <= activeCount; bedNum++) {
       const dbB = rawActiveBeds[bedNum - 1];
       const bedId = dbB?.id || `${plot.id}_bed_${bedNum}`;
-      const pendingData = pendingApprovalMap.get(`${plotCode}_${bedNum}`);
+      const pendingData = pendingApprovalMap?.get(`${plotCode}_${bedNum}`);
 
       let status: BedStatus = 'active';
       if (dbB?.status === 'completed_pending' || dbB?.status === 'rejected') {
@@ -259,16 +259,18 @@ export function hydrateFarmPlots({
 
       const total_harvest =
         pendingData?.total_harvest ||
-        (status === 'completed_pending' || status === 'rejected' ? dbB?.total_harvest : undefined);
+        (status === 'completed_pending' || status === 'rejected'
+          ? (dbB?.total_harvest ?? undefined)
+          : undefined);
       const completion_notes =
         pendingData?.completion_notes ||
         (status === 'completed_pending' || status === 'rejected'
-          ? dbB?.completion_notes
+          ? (dbB?.completion_notes ?? undefined)
           : undefined);
       const completion_image_url =
         pendingData?.completion_image_url ||
         (status === 'completed_pending' || status === 'rejected'
-          ? dbB?.completion_image_url
+          ? (dbB?.completion_image_url ?? undefined)
           : undefined);
       const season = dbB?.season || '2026年 秋冬';
 

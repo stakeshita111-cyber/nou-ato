@@ -888,7 +888,7 @@ export default function TeacherFarmCanvasView({
         bed={approvalModalBed}
         onApprove={async (plotId, bedId) => {
           hasWriteErrorRef.current = false;
-          await approveAndAddNewBed(plotId, bedId, '未確定 🌱', '2026年 秋冬');
+          await approveAndAddNewBed(plotId, bedId, '未確定 🌱');
           if (!hasWriteErrorRef.current) {
             notify('✅ 収穫完了を承認し、新しい畝を準備しました！');
           }

@@ -8,16 +8,13 @@ import * as farmDb from '@/lib/farm/farmDb';
 
 const mockDb = vi.hoisted(() => ({
   userRole: 'teacher' as string,
-  journalsInsert: vi.fn(),
-  journalsSelectLimit: vi.fn(),
-  journalsUpdateLike: vi.fn(),
-  farmBedsUpdateOr: vi.fn(),
-  cropRecordsUpdateEq: vi.fn(),
-  cropRecordsUpdateOr: vi.fn(),
+  rpc: vi.fn(),
+  fromTablesCalled: [] as string[],
 }));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    rpc: mockDb.rpc,
     auth: {
       getUser: vi.fn().mockResolvedValue({
         data: { user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } },
@@ -30,6 +27,7 @@ vi.mock('@/lib/supabase', () => ({
     })),
     removeChannel: vi.fn().mockResolvedValue('ok'),
     from: vi.fn((table: string) => {
+      mockDb.fromTablesCalled.push(table);
       if (table === 'users') {
         return {
           select: vi.fn(() => ({
@@ -42,50 +40,12 @@ vi.mock('@/lib/supabase', () => ({
           })),
         };
       }
-      if (table === 'journals') {
-        return {
-          insert: mockDb.journalsInsert,
-          select: vi.fn(() => ({
-            like: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: mockDb.journalsSelectLimit,
-              })),
-            })),
-            eq: vi.fn(() => ({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
-          })),
-          update: vi.fn(() => ({
-            like: mockDb.journalsUpdateLike,
-          })),
-        };
-      }
-      if (table === 'farm_beds') {
-        return {
-          update: vi.fn(() => ({
-            or: mockDb.farmBedsUpdateOr,
-          })),
-        };
-      }
-      if (table === 'crop_records') {
-        return {
-          update: vi.fn(() => ({
-            or: mockDb.cropRecordsUpdateOr,
-          })),
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
-            in: vi.fn(() => ({
-              order: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
-          })),
-        };
-      }
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: [], error: null }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockResolvedValue({ error: null }),
       };
     }),
   },
@@ -158,7 +118,6 @@ function setupLifecycleMocks() {
     dbPlots,
     dbBeds: defaultBeds,
   });
-  vi.spyOn(farmDb, 'fetchPendingJournalsDb').mockResolvedValue(new Map());
   vi.spyOn(farmDb, 'savePlotsAndBedsToDb').mockResolvedValue({ ok: true });
   vi.spyOn(farmDb, 'insertBedDb').mockResolvedValue(null);
 }
@@ -168,15 +127,8 @@ describe('F1: DB write failure detected via resolved { error }', () => {
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
     mockDb.userRole = 'teacher';
-    mockDb.journalsInsert = vi.fn().mockResolvedValue({ error: null });
-    mockDb.journalsSelectLimit = vi.fn().mockResolvedValue({ data: [], error: null });
-    mockDb.journalsUpdateLike = vi.fn().mockResolvedValue({ error: null });
-    mockDb.farmBedsUpdateOr = vi.fn().mockResolvedValue({ error: null });
-    mockDb.cropRecordsUpdateEq = vi.fn().mockResolvedValue({ error: null });
-    mockDb.cropRecordsUpdateOr = vi.fn().mockReturnValue({
-      eq: mockDb.cropRecordsUpdateEq,
-    });
-
+    mockDb.rpc.mockReset();
+    mockDb.fromTablesCalled = [];
     setupLifecycleMocks();
   });
 
@@ -184,8 +136,11 @@ describe('F1: DB write failure detected via resolved { error }', () => {
     vi.restoreAllMocks();
   });
 
-  it('1. completeBedCrop: journals.insert が { error: { message: "RLS denied" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.journalsInsert.mockResolvedValue({ error: { message: 'RLS denied' } });
+  it('1. completeBedCrop: submit_bed_completion が { data: null, error: { message: "RLS denied" } } を返したとき onWriteError が呼ばれ画面が変わらないこと', async () => {
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'RLS denied' },
+    });
     const onWriteError = vi.fn();
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
@@ -199,10 +154,11 @@ describe('F1: DB write failure detected via resolved { error }', () => {
     });
 
     expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の保存に失敗しました');
+    expect(result.current.plots[0].beds[0].status).toBe('active');
   });
 
-  it('2. completeBedCrop: farm_beds.update が { error: { message: "Constraint error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.farmBedsUpdateOr.mockResolvedValue({ error: { message: 'Constraint error' } });
+  it('2. completeBedCrop: submit_bed_completion が通信例外 (network error) で reject されたとき onWriteError が呼ばれること', async () => {
+    mockDb.rpc.mockRejectedValueOnce(new Error('network'));
     const onWriteError = vi.fn();
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
@@ -216,10 +172,34 @@ describe('F1: DB write failure detected via resolved { error }', () => {
     });
 
     expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の保存に失敗しました');
+    expect(result.current.plots[0].beds[0].status).toBe('active');
   });
 
-  it('3. approveAndAddNewBed: journals.select が { data: null, error: { message: "Read error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.journalsSelectLimit.mockResolvedValue({ data: null, error: { message: 'Read error' } });
+  it('3. completeBedCrop: submit_bed_completion の応答形式が不正なとき onWriteError が呼ばれること', async () => {
+    mockDb.rpc.mockResolvedValueOnce({
+      data: { invalid_field: true },
+      error: null,
+    });
+    const onWriteError = vi.fn();
+
+    const { result } = renderHook(() => useFarmManager({ onWriteError }));
+    await waitFor(() => expect(result.current.plots.length).toBeGreaterThan(0));
+
+    await act(async () => {
+      await result.current.completeBedCrop(PLOT_A1_ID, BED_1_ID, {
+        totalHarvest: '5kg',
+      });
+    });
+
+    expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の保存に失敗しました');
+    expect(result.current.plots[0].beds[0].status).toBe('active');
+  });
+
+  it('4. approveAndAddNewBed: approve_bed_harvest が { data: null, error: { message: "Approval error" } } を返したとき onWriteError が呼ばれ画面が変わらないこと', async () => {
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Approval error' },
+    });
     const onWriteError = vi.fn();
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
@@ -229,39 +209,13 @@ describe('F1: DB write failure detected via resolved { error }', () => {
       await result.current.approveAndAddNewBed(PLOT_A1_ID, BED_1_ID, '新トマト', '2026秋');
     });
 
-    expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の取得に失敗しました');
+    expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の承認保存に失敗しました');
+    expect(result.current.plots[0].beds).toHaveLength(1);
+    expect(result.current.plots[0].beds[0].status).toBe('active');
   });
 
-  it('4. approveAndAddNewBed: crop_records.update (crQuery) が { error: { message: "Update error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.cropRecordsUpdateEq.mockResolvedValue({ error: { message: 'Update error' } });
-    const onWriteError = vi.fn();
-
-    const { result } = renderHook(() => useFarmManager({ onWriteError }));
-    await waitFor(() => expect(result.current.plots.length).toBeGreaterThan(0));
-
-    await act(async () => {
-      await result.current.approveAndAddNewBed(PLOT_A1_ID, BED_1_ID, '新トマト', '2026秋');
-    });
-
-    expect(onWriteError).toHaveBeenCalledWith('アーカイブ畝の保存に失敗しました');
-  });
-
-  it('5. approveAndAddNewBed: farm_beds.update (リセット更新) が { error: { message: "Reset error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.farmBedsUpdateOr.mockResolvedValue({ error: { message: 'Reset error' } });
-    const onWriteError = vi.fn();
-
-    const { result } = renderHook(() => useFarmManager({ onWriteError }));
-    await waitFor(() => expect(result.current.plots.length).toBeGreaterThan(0));
-
-    await act(async () => {
-      await result.current.approveAndAddNewBed(PLOT_A1_ID, BED_1_ID, '新トマト', '2026秋');
-    });
-
-    expect(onWriteError).toHaveBeenCalledWith('新しい畝の初期化保存に失敗しました');
-  });
-
-  it('6. approveAndAddNewBed: journals.update (承認) が { error: { message: "Approval error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.journalsUpdateLike.mockResolvedValue({ error: { message: 'Approval error' } });
+  it('5. approveAndAddNewBed: approve_bed_harvest が通信例外で reject されたとき onWriteError が呼ばれること', async () => {
+    mockDb.rpc.mockRejectedValueOnce(new Error('network'));
     const onWriteError = vi.fn();
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
@@ -274,8 +228,26 @@ describe('F1: DB write failure detected via resolved { error }', () => {
     expect(onWriteError).toHaveBeenCalledWith('収穫完了報告の承認保存に失敗しました');
   });
 
-  it('7. rejectBedCompletion: farm_beds.update が { error: { message: "Reject error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.farmBedsUpdateOr.mockResolvedValue({ error: { message: 'Reject error' } });
+  it('6. rejectBedCompletion: reject_bed_completion が { data: null, error: { message: "Reject error" } } を返したとき onWriteError が呼ばれ画面が変わらないこと', async () => {
+    mockDb.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Reject error' },
+    });
+    const onWriteError = vi.fn();
+
+    const { result } = renderHook(() => useFarmManager({ onWriteError }));
+    await waitFor(() => expect(result.current.plots.length).toBeGreaterThan(0));
+
+    await act(async () => {
+      await result.current.rejectBedCompletion(PLOT_A1_ID, BED_1_ID, 'やり直してください');
+    });
+
+    expect(onWriteError).toHaveBeenCalledWith('差し戻しの保存に失敗しました');
+    expect(result.current.plots[0].beds[0].status).toBe('active');
+  });
+
+  it('7. rejectBedCompletion: reject_bed_completion が通信例外で reject されたとき onWriteError が呼ばれること', async () => {
+    mockDb.rpc.mockRejectedValueOnce(new Error('network'));
     const onWriteError = vi.fn();
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
@@ -288,34 +260,70 @@ describe('F1: DB write failure detected via resolved { error }', () => {
     expect(onWriteError).toHaveBeenCalledWith('差し戻しの保存に失敗しました');
   });
 
-  it('8. rejectBedCompletion: journals.update が { error: { message: "Journal error" } } を返したとき onWriteError が呼ばれること', async () => {
-    mockDb.journalsUpdateLike.mockResolvedValue({ error: { message: 'Journal error' } });
+  it('8. rejectBedCompletion: 差し戻し理由のバリデーション超過時に rpc を呼ばず onWriteError が呼ばれること', async () => {
     const onWriteError = vi.fn();
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
     await waitFor(() => expect(result.current.plots.length).toBeGreaterThan(0));
 
     await act(async () => {
-      await result.current.rejectBedCompletion(PLOT_A1_ID, BED_1_ID, 'やり直してください');
+      await result.current.rejectBedCompletion(PLOT_A1_ID, BED_1_ID, 'x'.repeat(1001));
     });
 
+    expect(mockDb.rpc).not.toHaveBeenCalled();
     expect(onWriteError).toHaveBeenCalledWith('差し戻しの保存に失敗しました');
   });
 
-  it('9. 正常系: 全ての操作で { error: null } が返ったとき onWriteError は呼ばれないこと', async () => {
+  it('9. 正常系: 全ての操作で RPC が正しい引数で呼ばれ、journals/crop_records/farm_beds が直接呼ばれず onWriteError は呼ばれないこと', async () => {
     const onWriteError = vi.fn();
+
+    // 1. completeBedCrop
+    mockDb.rpc.mockResolvedValueOnce({
+      data: { status: 'submitted', bed_id: BED_1_ID, journal_id: 'journal-uuid-1' },
+      error: null,
+    });
 
     const { result } = renderHook(() => useFarmManager({ onWriteError }));
     await waitFor(() => expect(result.current.plots.length).toBeGreaterThan(0));
+
+    mockDb.fromTablesCalled = [];
 
     await act(async () => {
       await result.current.completeBedCrop(PLOT_A1_ID, BED_1_ID, {
         totalHarvest: '5kg',
       });
+    });
+
+    expect(mockDb.rpc).toHaveBeenCalledWith('submit_bed_completion', expect.any(Object));
+    expect(mockDb.fromTablesCalled).not.toContain('journals');
+    expect(mockDb.fromTablesCalled).not.toContain('crop_records');
+    expect(mockDb.fromTablesCalled).not.toContain('farm_beds');
+    expect(onWriteError).not.toHaveBeenCalled();
+
+    // 2. approveAndAddNewBed
+    mockDb.rpc.mockResolvedValueOnce({
+      data: { bed_id: BED_1_ID, archived_bed_id: 'archived-uuid-1', moved_records: 1 },
+      error: null,
+    });
+
+    await act(async () => {
       await result.current.approveAndAddNewBed(PLOT_A1_ID, BED_1_ID, '新トマト', '2026秋');
+    });
+
+    expect(mockDb.rpc).toHaveBeenCalledWith('approve_bed_harvest', expect.any(Object));
+    expect(onWriteError).not.toHaveBeenCalled();
+
+    // 3. rejectBedCompletion
+    mockDb.rpc.mockResolvedValueOnce({
+      data: { bed_id: BED_1_ID, status: 'rejected' },
+      error: null,
+    });
+
+    await act(async () => {
       await result.current.rejectBedCompletion(PLOT_A1_ID, BED_1_ID, '理由');
     });
 
+    expect(mockDb.rpc).toHaveBeenCalledWith('reject_bed_completion', expect.any(Object));
     expect(onWriteError).not.toHaveBeenCalled();
   });
 });
