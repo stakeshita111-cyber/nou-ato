@@ -30,6 +30,61 @@ export default function UnifiedLoginPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
+  // デモアカウント用ワンクリックログイン
+  const handleQuickLogin = async (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setLoading(true);
+
+    try {
+      clearNouatoSessionStorage();
+
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: demoEmail,
+        password: demoPass,
+      });
+
+      if (authError) {
+        setToastMessage(`❌ ログインに失敗しました (${authError.message})`);
+        setShowToast(true);
+        setLoading(false);
+        return;
+      }
+
+      const userId = authData?.user?.id;
+      let destination = '/student';
+      if (userId) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role, display_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (userData?.role === 'teacher') {
+          destination = '/teacher/dashboard';
+          setToastMessage(`🎉 講師「${userData.display_name || '先生'}」としてログインしました！`);
+        } else {
+          destination = '/student';
+          setToastMessage(`🎉 受講生「${userData?.display_name || '様'}」としてログインしました！`);
+        }
+      } else {
+        setToastMessage('🎉 ログインしました！');
+      }
+
+      setShowToast(true);
+
+      setTimeout(() => {
+        router.push(destination);
+        router.refresh();
+      }, 500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      setToastMessage(`エラーが発生しました: ${message}`);
+      setShowToast(true);
+      setLoading(false);
+    }
+  };
+
   // メールアドレス ＋ パスワード ログイン (自動ロール判定付き)
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,21 +269,19 @@ export default function UnifiedLoginPage() {
                   <span>📖</span> README
                 </Link>
                 <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded-full border border-emerald-200">
-                  PW自動入力
+                  ワンクリックログイン
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setEmail('test01@example.com');
-                  setPassword('test01');
-                }}
-                className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer"
+                disabled={loading}
+                onClick={() => handleQuickLogin('test01@example.com', 'test01')}
+                className="px-3 py-2 bg-white hover:bg-emerald-100/60 active:scale-98 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer disabled:opacity-50"
               >
                 <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
-                  <span>👨‍🌾</span> 講師
+                  <span>👨‍🌾</span> 講師（即ログイン）
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   test01@example.com
@@ -236,14 +289,12 @@ export default function UnifiedLoginPage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setEmail('test11@example.com');
-                  setPassword('test11');
-                }}
-                className="px-3 py-2 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer"
+                disabled={loading}
+                onClick={() => handleQuickLogin('test11@example.com', 'test11')}
+                className="px-3 py-2 bg-white hover:bg-emerald-100/60 active:scale-98 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer disabled:opacity-50"
               >
                 <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
-                  <span>👨‍🎓</span> 受講生
+                  <span>👨‍🎓</span> 受講生（即ログイン）
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   test11@example.com
