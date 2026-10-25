@@ -9,7 +9,8 @@ const sampleJournals = [
     id: 'journal-ai-markdown-1',
     student_id: 'student-1',
     farm_id: 'farm-1',
-    content: 'トマトの葉に白い斑点が出ています。どうすればいいですか？',
+    content:
+      '【相談トピック: レタスの虫食い対策】\n大切なレタスです。\n🥦 **簡単！お酢スプレー**\n・水: 500ml',
     reply: '【しるべぇ】それは**うどんこ病**の可能性があります。早めに**重曹水**を散布しましょう。',
     is_approved: false,
     is_private: false,
@@ -77,33 +78,36 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-describe('TeacherJournalsView - AI回答のMarkdown整形表示', () => {
+describe('TeacherJournalsView - 提出ノートおよびAI回答のMarkdown整形表示', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('AI回答(reply)内のアスタリスク太字記法(**太字**)がFormattedChatMessageによりstrong要素として整形されること', async () => {
+  it('提出ノート(content)とAI回答(reply)内の太字記法(**太字**)が両方ともstrong要素として整形されること', async () => {
     await act(async () => {
       render(<TeacherJournalsView />);
     });
 
-    // 「📜 すべて」タブに切り替えて回答済み日誌を表示
+    // 「📜 すべて」タブに切り替えて日誌を表示
     const allTabBtn = screen.getByText(/📜 すべて/);
     await act(async () => {
       fireEvent.click(allTabBtn);
     });
 
-    // 質問内容が表示されること
-    expect(await screen.findAllByText(/トマトの葉に白い斑点が出ています/)).toBeDefined();
+    // 質問トピックが表示されること
+    expect(await screen.findAllByText(/レタスの虫食い対策/)).toBeDefined();
 
-    // 生の **うどんこ病** というアスタリスク文字列のままではなく、strong タグとしてレンダリングされていることを確認
+    // strong タグとしてレンダリングされているテキストを検証
     const strongElements = screen.getAllByRole('strong');
     const boldTexts = strongElements.map((el) => el.textContent);
 
+    // 1. 生徒提出ノート (content) 内の **簡単！お酢スプレー** が strong 化されていること
+    expect(boldTexts).toContain('簡単！お酢スプレー');
+    expect(screen.queryByText('**簡単！お酢スプレー**')).toBeNull();
+
+    // 2. 回答 (reply) 内の **うどんこ病** や **重曹水** が strong 化されていること
     expect(boldTexts).toContain('うどんこ病');
     expect(boldTexts).toContain('重曹水');
-
-    // 生のアスタリスク "**うどんこ病**" は画面上のテキストに露出していないこと
     expect(screen.queryByText('**うどんこ病**')).toBeNull();
   });
 });

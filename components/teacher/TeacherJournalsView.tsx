@@ -1652,8 +1652,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   <span className="text-[11px] font-extrabold text-gray-500 block">
                     📝 生徒からの提出・質問ノート:
                   </span>
-                  <div className="text-sm text-gray-800 leading-relaxed bg-amber-50/40 p-5 rounded-2xl border border-amber-100 shadow-inner font-medium whitespace-pre-wrap">
-                    {currentJournal.content}
+                  <div className="text-sm text-gray-800 leading-relaxed bg-amber-50/40 p-5 rounded-2xl border border-amber-100 shadow-inner font-medium">
+                    <FormattedChatMessage text={currentJournal.content} />
                   </div>
                   {currentJournal.imageUrl && (
                     <div className="mt-3 max-w-sm rounded-2xl overflow-hidden border border-emerald-200 shadow-sm">
