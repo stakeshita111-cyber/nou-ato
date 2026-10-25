@@ -87,6 +87,30 @@ describe('Security & Authorization Suite (本番コード直撃セキュリテ�
       expect(redirectLocation).toBe('http://localhost:3000/login');
     });
 
+    it('ログイン済みの講師ユーザーがトップページ (/) にアクセスした場合、/teacher/dashboard へ即座にリダイレクトされること', async () => {
+      mockUser = { id: 'teacher-uuid-001', email: 'teacher@example.com' };
+      mockRole = 'teacher';
+
+      const request = new NextRequest('http://localhost:3000/');
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      const redirectLocation = response.headers.get('location');
+      expect(redirectLocation).toBe('http://localhost:3000/teacher/dashboard');
+    });
+
+    it('ログイン済みの生徒ユーザーがトップページ (/) にアクセスした場合、/student へ即座にリダイレクトされること', async () => {
+      mockUser = { id: 'student-uuid-001', email: 'student@example.com' };
+      mockRole = 'student';
+
+      const request = new NextRequest('http://localhost:3000/');
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      const redirectLocation = response.headers.get('location');
+      expect(redirectLocation).toBe('http://localhost:3000/student');
+    });
+
     it('生徒ロールのユーザーが講師画面 (/teacher/dashboard) へ不正アクセスを試みた場合、即座に /student へ強制送還されること (TC-AUTH-003)', async () => {
       mockUser = { id: 'student-uuid-001', email: 'student@example.com' };
       mockRole = 'student';

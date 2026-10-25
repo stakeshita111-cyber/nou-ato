@@ -86,10 +86,51 @@ function StudentContent() {
   const [rejoinInviteCode, setRejoinInviteCode] = useState('');
   const [isRejoining, setIsRejoining] = useState(false);
 
-  // 講師からの返信がついた未読日誌の有無
-  const hasUnreadReplies = journals.some(
-    (j: Record<string, unknown>) => Boolean(j.reply) && j.role !== 'ai'
-  );
+  // 既読返信IDリストの管理 (localStorage 永続化)
+  const [readReplyIds, setReadReplyIds] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('nouato_read_reply_ids');
+        return stored ? (JSON.parse(stored) as string[]) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // 講師からの返信がついた未読日誌の有無 (現在相談タブを開いておらず、かつ未読の返信がある場合)
+  const hasUnreadReplies =
+    activeTab !== 'talk' &&
+    journals.some(
+      (j: Record<string, unknown>) =>
+        Boolean(j.reply) &&
+        j.role !== 'ai' &&
+        typeof j.id === 'string' &&
+        !readReplyIds.includes(j.id)
+    );
+
+  // 相談タブの返信既読化処理 (イベント駆動)
+  const markRepliesAsRead = useCallback(() => {
+    const repliedIds = journals
+      .filter(
+        (j: Record<string, unknown>) =>
+          Boolean(j.reply) && j.role !== 'ai' && typeof j.id === 'string'
+      )
+      .map((j: Record<string, unknown>) => j.id as string);
+
+    if (repliedIds.length > 0) {
+      setReadReplyIds((prev) => {
+        const updated = Array.from(new Set([...prev, ...repliedIds]));
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('nouato_read_reply_ids', JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+    }
+  }, [journals]);
 
   // 招待コード入力による農園参加・再参加処理
   const handleRejoinFarm = async (e: React.FormEvent) => {
@@ -189,9 +230,12 @@ function StudentContent() {
     (newTab: string) => {
       if (VALID_STUDENT_TABS.includes(newTab as StudentTab)) {
         setActiveTab(newTab as StudentTab);
+        if (newTab === 'talk') {
+          markRepliesAsRead();
+        }
       }
     },
-    [setActiveTab]
+    [setActiveTab, markRepliesAsRead]
   );
 
   // 🌟 クライアント初期化時に即座にLocalStorageから判定 🌟

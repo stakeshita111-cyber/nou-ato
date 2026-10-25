@@ -86,11 +86,32 @@ export async function fetchStudentsDb(
   return { students, studentMap };
 }
 
-export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
-  const { data: cropRecs } = await supabase
-    .from('crop_records')
-    .select('*')
-    .order('created_at', { ascending: false });
+export async function fetchCropRecordsDb(
+  activeFarmId?: string,
+  targetPlotIds?: string[]
+): Promise<CropRecord[]> {
+  let plotIdsToFilter = targetPlotIds;
+
+  // activeFarmId があり、かつ targetPlotIds が未渡しの場合は farm_plots から取得
+  if (activeFarmId && !plotIdsToFilter) {
+    const { data: plots } = await supabase
+      .from('farm_plots')
+      .select('id')
+      .eq('farm_id', activeFarmId);
+    plotIdsToFilter = (plots || []).map((p) => p.id);
+  }
+
+  // activeFarmId が指定されているが区画が0件の場合は即時空配列
+  if (activeFarmId && plotIdsToFilter && plotIdsToFilter.length === 0) {
+    return [];
+  }
+
+  let crQuery = supabase.from('crop_records').select('*');
+  if (plotIdsToFilter && plotIdsToFilter.length > 0) {
+    crQuery = crQuery.in('plot_id', plotIdsToFilter);
+  }
+
+  const { data: cropRecs } = await crQuery.order('created_at', { ascending: false });
 
   if (!cropRecs || cropRecs.length === 0) return [];
 
@@ -124,13 +145,28 @@ export async function fetchCropRecordsDb(): Promise<CropRecord[]> {
   });
 }
 
-export async function fetchRawPlotsAndBedsDb() {
-  const { data: dbPlots } = await supabase.from('farm_plots').select('*');
-  const { data: dbBeds } = await supabase.from('farm_beds').select('*');
+export async function fetchRawPlotsAndBedsDb(activeFarmId?: string) {
+  let plotsQuery = supabase.from('farm_plots').select('*');
+  if (activeFarmId) {
+    plotsQuery = plotsQuery.eq('farm_id', activeFarmId);
+  }
+  const { data: dbPlots } = await plotsQuery;
+
+  if (activeFarmId && (!dbPlots || dbPlots.length === 0)) {
+    return { dbPlots: [], dbBeds: [] };
+  }
+
+  let bedsQuery = supabase.from('farm_beds').select('*');
+  if (activeFarmId && dbPlots && dbPlots.length > 0) {
+    const plotIds = dbPlots.map((p) => p.id);
+    bedsQuery = bedsQuery.in('plot_id', plotIds);
+  }
+  const { data: dbBeds } = await bedsQuery;
+
   return { dbPlots: dbPlots || [], dbBeds: dbBeds || [] };
 }
 
-export async function fetchPendingJournalsDb() {
+export async function fetchPendingJournalsDb(activeFarmId?: string) {
   const pendingApprovalMap = new Map<
     string,
     {
@@ -142,11 +178,11 @@ export async function fetchPendingJournalsDb() {
   >();
 
   try {
-    const { data: pendingJournals } = await supabase
-      .from('journals')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20);
+    let jq = supabase.from('journals').select('*');
+    if (activeFarmId) {
+      jq = jq.eq('farm_id', activeFarmId);
+    }
+    const { data: pendingJournals } = await jq.order('created_at', { ascending: false }).limit(50);
 
     if (pendingJournals && pendingJournals.length > 0) {
       type JournalRow = Database['public']['Tables']['journals']['Row'];

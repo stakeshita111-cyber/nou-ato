@@ -120,13 +120,25 @@ export function processChatHistory(targetList: ChatJournalSourceItem[]): ChatMes
   (targetList || []).forEach((j) => {
     const c = String(j.content || '').trim();
 
+    // 🌟 畝起点の相談（❗ [相談]）または講師返信（reply）があるものはチャット履歴として救出 🌟
+    const isConsultationOrHasReply =
+      c.includes('❗ [相談]') ||
+      c.includes('[相談]') ||
+      (Boolean(j.reply) &&
+        j.reply !== '講師からの返信' &&
+        !String(j.reply).startsWith('講師配信') &&
+        !String(j.reply).startsWith('講師個別連絡'));
+
+    // 単なる畝の日常作業・観察記録（返信も相談フラグもないもの）は相談タブから除外
+    const isRoutineBedLog =
+      (c.startsWith('【畝') || c.includes('【畝 ') || c.includes('【畝')) &&
+      !isConsultationOrHasReply;
+
     if (
       !c ||
       c === 'テスト' ||
       c === '○○困ってます' ||
-      c.startsWith('【畝') ||
-      c.includes('【畝 ') ||
-      c.includes('【畝') ||
+      isRoutineBedLog ||
       c.startsWith('【収穫') ||
       c.includes('【収穫完了報告】') ||
       c.startsWith('【差し戻し') ||

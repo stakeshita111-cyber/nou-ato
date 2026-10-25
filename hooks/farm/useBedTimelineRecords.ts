@@ -52,17 +52,33 @@ export function useBedTimelineRecords({
           return;
         }
 
-        // 1. crop_records から取得
-        const { data: cData } = await supabase
-          .from('crop_records')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // 1. crop_records から取得 (bed_id または plot_id でDB側絞り込み & limit 50)
+        let crQuery = supabase.from('crop_records').select('*');
+        if (bedId && typeof crQuery.eq === 'function') {
+          crQuery = crQuery.eq('bed_id', bedId);
+        } else if (detailPlot?.id && typeof crQuery.eq === 'function') {
+          crQuery = crQuery.eq('plot_id', detailPlot.id);
+        }
+        if (typeof crQuery.order === 'function') {
+          crQuery = crQuery.order('created_at', { ascending: false });
+        }
+        if (typeof crQuery.limit === 'function') {
+          crQuery = crQuery.limit(50);
+        }
+        const { data: cData } = await crQuery;
 
-        // 2. journals から取得
-        const { data: jData } = await supabase
-          .from('journals')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // 2. journals から取得 (farm_id でDB側絞り込み & limit 50)
+        let jq = supabase.from('journals').select('*');
+        if (detailPlot?.farm_id && typeof jq.eq === 'function') {
+          jq = jq.eq('farm_id', detailPlot.farm_id);
+        }
+        if (typeof jq.order === 'function') {
+          jq = jq.order('created_at', { ascending: false });
+        }
+        if (typeof jq.limit === 'function') {
+          jq = jq.limit(50);
+        }
+        const { data: jData } = await jq;
 
         const combined: BedTimelineRecord[] = [];
 
@@ -139,7 +155,7 @@ export function useBedTimelineRecords({
         setIsLoadingRecords(false);
       }
     },
-    []
+    [detailPlot]
   );
 
   // 🌟 開いている観察記録タイムラインを最新データとリアルタイム同期 (リロード不要) 🌟

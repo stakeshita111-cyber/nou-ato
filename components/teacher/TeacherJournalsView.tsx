@@ -326,11 +326,16 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
     const shouldApprove = approveOnReply[id] || false;
 
+    // ナレッジ登録がONの場合は、個人情報チェック用のモーダルを必ず経由させる
+    if (shouldApprove && targetJournal) {
+      openKnowledgeModal(targetJournal, text.trim(), true);
+      return;
+    }
+
     const { error } = await supabase
       .from('journals')
       .update({
         reply: text.trim(),
-        ...(shouldApprove ? { is_approved: true } : {}),
       })
       .eq('id', id);
 
@@ -372,6 +377,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         window.dispatchEvent(new Event('nouato_sync_event'));
         try {
           const bc = new BroadcastChannel('nouato_farm_sync_channel');
+          // eslint-disable-next-line react-hooks/purity
           bc.postMessage({ type: 'BROADCAST_UPDATED', timestamp: Date.now() });
           bc.close();
         } catch {}
@@ -446,13 +452,16 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
     setIsSavingKnowledge(true);
     try {
-      const finalReply = isFromReplyAction
-        ? replyText.trim() || publicReply.trim()
-        : journal.reply || publicReply.trim();
+      // モーダルで推敲・匿名化された publicReply と publicTitle を最優先で永続化
+      const titlePrefix = publicTitle.trim() ? `【相談トピック: ${publicTitle.trim()}】\n` : '';
+      const sanitizedReply = publicReply.trim() || replyText.trim() || journal.reply || '';
+      const finalReply = titlePrefix + sanitizedReply;
+
       const { error } = await supabase
         .from('journals')
         .update({
           reply: finalReply,
+          text: publicTitle.trim() || undefined,
           is_approved: true,
         })
         .eq('id', journal.id);
