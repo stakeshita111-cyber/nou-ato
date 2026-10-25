@@ -14,15 +14,6 @@ export interface HydrateFarmPlotsInput {
   dbBeds: Database['public']['Tables']['farm_beds']['Row'][];
   studentMap: Map<string, string>;
   formattedRecords: CropRecord[];
-  pendingApprovalMap?: Map<
-    string,
-    {
-      total_harvest?: string;
-      completion_notes?: string;
-      completion_image_url?: string;
-      season?: string;
-    }
-  >;
 }
 
 export interface HydrateFarmPlotsResult {
@@ -41,7 +32,6 @@ export function hydrateFarmPlots({
   dbBeds,
   studentMap,
   formattedRecords,
-  pendingApprovalMap,
 }: HydrateFarmPlotsInput): HydrateFarmPlotsResult {
   let loadedBasePlots: FarmPlot[] = [];
 
@@ -247,31 +237,18 @@ export function hydrateFarmPlots({
     for (let bedNum = 1; bedNum <= activeCount; bedNum++) {
       const dbB = rawActiveBeds[bedNum - 1];
       const bedId = dbB?.id || `${plot.id}_bed_${bedNum}`;
-      const pendingData = pendingApprovalMap?.get(`${plotCode}_${bedNum}`);
-
+      // 承認待ち・差し戻しの状態は farm_beds.status だけを正とする
       let status: BedStatus = 'active';
       if (dbB?.status === 'completed_pending' || dbB?.status === 'rejected') {
         status = dbB.status;
       }
-      if (pendingData) {
-        status = 'completed_pending';
-      }
 
-      const total_harvest =
-        pendingData?.total_harvest ||
-        (status === 'completed_pending' || status === 'rejected'
-          ? (dbB?.total_harvest ?? undefined)
-          : undefined);
-      const completion_notes =
-        pendingData?.completion_notes ||
-        (status === 'completed_pending' || status === 'rejected'
-          ? (dbB?.completion_notes ?? undefined)
-          : undefined);
-      const completion_image_url =
-        pendingData?.completion_image_url ||
-        (status === 'completed_pending' || status === 'rejected'
-          ? (dbB?.completion_image_url ?? undefined)
-          : undefined);
+      const hasCompletionData = status === 'completed_pending' || status === 'rejected';
+      const total_harvest = hasCompletionData ? (dbB?.total_harvest ?? undefined) : undefined;
+      const completion_notes = hasCompletionData ? (dbB?.completion_notes ?? undefined) : undefined;
+      const completion_image_url = hasCompletionData
+        ? (dbB?.completion_image_url ?? undefined)
+        : undefined;
       const season = dbB?.season || '2026年 秋冬';
 
       let latest: CropRecord | undefined = undefined;
