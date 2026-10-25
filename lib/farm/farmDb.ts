@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/supabase';
 import { FarmPlot, CropRecord, Farm, GrowthStage, WorkType } from '@/types/farm';
@@ -510,4 +511,138 @@ export async function deleteCropRecordDb(recordId: string) {
   } catch (e) {
     console.error('deleteCropRecordDb error:', e);
   }
+}
+
+// ==============================================================================
+// 収穫完了申請・承認・差し戻し RPC ラッパー (S2)
+// ==============================================================================
+
+export type DbResult<T> = { ok: true; data: T } | { ok: false; message: string };
+
+const submitBedCompletionArgsSchema = z.object({
+  p_bed_id: z.string().min(1),
+  p_total_harvest: z.string().max(200).optional(),
+  p_completion_notes: z.string().max(2000).optional(),
+  p_completion_image_url: z.string().max(2048).optional(),
+  p_season: z.string().max(50).optional(),
+});
+
+const submitBedCompletionResultSchema = z.object({
+  status: z.enum(['submitted', 'already_pending']),
+  bed_id: z.string(),
+  journal_id: z.string().nullable(),
+});
+
+export type SubmitBedCompletionResult = z.infer<typeof submitBedCompletionResultSchema>;
+
+export async function submitBedCompletionDb(input: {
+  bedId: string;
+  totalHarvest?: string;
+  completionNotes?: string;
+  imageUrl?: string;
+  season?: string;
+}): Promise<DbResult<SubmitBedCompletionResult>> {
+  const parsedArgs = submitBedCompletionArgsSchema.safeParse({
+    p_bed_id: input.bedId,
+    p_total_harvest: input.totalHarvest,
+    p_completion_notes: input.completionNotes,
+    p_completion_image_url: input.imageUrl,
+    p_season: input.season,
+  });
+  if (!parsedArgs.success) {
+    return { ok: false, message: '入力内容が不正です' };
+  }
+
+  const { data, error } = await supabase.rpc('submit_bed_completion', parsedArgs.data);
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  const parsedResult = submitBedCompletionResultSchema.safeParse(data);
+  if (!parsedResult.success) {
+    return { ok: false, message: '応答の形式が不正です' };
+  }
+  return { ok: true, data: parsedResult.data };
+}
+
+const approveBedHarvestArgsSchema = z.object({
+  p_plot_id: z.string().min(1),
+  p_bed_id: z.string().min(1),
+  p_next_crop_name: z.string().min(1).optional(),
+  p_next_season: z.string().max(50).optional(),
+});
+
+const approveBedHarvestResultSchema = z.object({
+  bed_id: z.string(),
+  archived_bed_id: z.string(),
+  moved_records: z.number(),
+});
+
+export type ApproveBedHarvestResult = z.infer<typeof approveBedHarvestResultSchema>;
+
+export async function approveBedHarvestDb(
+  plotId: string,
+  bedId: string,
+  nextCropName?: string,
+  nextSeason?: string
+): Promise<DbResult<ApproveBedHarvestResult>> {
+  const parsedArgs = approveBedHarvestArgsSchema.safeParse({
+    p_plot_id: plotId,
+    p_bed_id: bedId,
+    p_next_crop_name: nextCropName,
+    p_next_season: nextSeason,
+  });
+  if (!parsedArgs.success) {
+    return { ok: false, message: '入力内容が不正です' };
+  }
+
+  const { data, error } = await supabase.rpc('approve_bed_harvest', parsedArgs.data);
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  const parsedResult = approveBedHarvestResultSchema.safeParse(data);
+  if (!parsedResult.success) {
+    return { ok: false, message: '応答の形式が不正です' };
+  }
+  return { ok: true, data: parsedResult.data };
+}
+
+const rejectBedCompletionArgsSchema = z.object({
+  p_plot_id: z.string().min(1),
+  p_bed_id: z.string().min(1),
+  p_reason: z.string().max(1000).optional(),
+});
+
+const rejectBedCompletionResultSchema = z.object({
+  bed_id: z.string(),
+  status: z.literal('rejected'),
+});
+
+export type RejectBedCompletionResult = z.infer<typeof rejectBedCompletionResultSchema>;
+
+export async function rejectBedCompletionDb(
+  plotId: string,
+  bedId: string,
+  reason?: string
+): Promise<DbResult<RejectBedCompletionResult>> {
+  const parsedArgs = rejectBedCompletionArgsSchema.safeParse({
+    p_plot_id: plotId,
+    p_bed_id: bedId,
+    p_reason: reason,
+  });
+  if (!parsedArgs.success) {
+    return { ok: false, message: '入力内容が不正です' };
+  }
+
+  const { data, error } = await supabase.rpc('reject_bed_completion', parsedArgs.data);
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  const parsedResult = rejectBedCompletionResultSchema.safeParse(data);
+  if (!parsedResult.success) {
+    return { ok: false, message: '応答の形式が不正です' };
+  }
+  return { ok: true, data: parsedResult.data };
 }
