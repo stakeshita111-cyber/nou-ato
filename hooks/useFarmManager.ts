@@ -143,15 +143,16 @@ export function useFarmManager(options?: { onWriteError?: (message: string) => v
       );
       setSupabaseStudents(students);
 
-      // 3. 観察記録 (crop_records DB)
-      const formattedRecords = await fetchCropRecordsDb();
+      // 4. 区画 & 畝ベッド (自農園の farm_id に厳格スコープ化して1,000件上限を防御)
+      const { dbPlots, dbBeds } = await fetchRawPlotsAndBedsDb(effectiveActiveId);
+
+      // 3. 観察記録 (自農園の区画 plot_id に絞り込んで他農園混入を防止)
+      const targetPlotIds = dbPlots.map((p) => p.id);
+      const formattedRecords = await fetchCropRecordsDb(effectiveActiveId, targetPlotIds);
       setRecords(formattedRecords);
 
-      // 4. 区画 & 畝ベッド (Supabase DB を唯一の正とし、localStorageフォールバック依存を全廃)
-      const { dbPlots, dbBeds } = await fetchRawPlotsAndBedsDb();
-
-      // journals からの未承認の収穫完了報告マップ
-      const pendingApprovalMap = await fetchPendingJournalsDb();
+      // journals からの未承認の収穫完了報告マップ (自農園スコープ & 50件拡張)
+      const pendingApprovalMap = await fetchPendingJournalsDb(effectiveActiveId);
 
       const {
         plotsWithRecords,

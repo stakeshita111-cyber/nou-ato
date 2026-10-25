@@ -175,4 +175,58 @@ describe('useBedTimelineRecords Hook', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('fetchBedRecords error:', expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
+
+  it('6. DBクエリ最適化: bedId 指定時に crop_records に対して .eq("bed_id", bedId) および .limit(50) を適用すること', async () => {
+    const mockCrEq = vi.fn().mockReturnThis();
+    const mockCrLimit = vi.fn().mockResolvedValue({ data: [] });
+    const mockCrOrder = vi.fn(() => ({ limit: mockCrLimit }));
+
+    const mockJEq = vi.fn().mockReturnThis();
+    const mockJLimit = vi.fn().mockResolvedValue({ data: [] });
+    const mockJOrder = vi.fn(() => ({ limit: mockJLimit }));
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'crop_records') {
+        return {
+          select: () => ({
+            eq: mockCrEq.mockReturnValue({
+              order: mockCrOrder,
+            }),
+          }),
+        };
+      }
+      if (table === 'journals') {
+        return {
+          select: () => ({
+            eq: mockJEq.mockReturnValue({
+              order: mockJOrder,
+            }),
+          }),
+        };
+      }
+      return { select: () => ({ order: () => Promise.resolve({ data: [] }) }) };
+    });
+
+    const { result } = renderHook(() =>
+      useBedTimelineRecords({
+        detailPlot: samplePlot,
+      })
+    );
+
+    await act(async () => {
+      await result.current.fetchBedRecords(
+        'A1',
+        1,
+        'bed-target-uuid',
+        '田中 太郎',
+        null,
+        'トマト 🍅'
+      );
+    });
+
+    expect(mockCrEq).toHaveBeenCalledWith('bed_id', 'bed-target-uuid');
+    expect(mockCrLimit).toHaveBeenCalledWith(50);
+    expect(mockJEq).toHaveBeenCalledWith('farm_id', 'farm-1');
+    expect(mockJLimit).toHaveBeenCalledWith(50);
+  });
 });

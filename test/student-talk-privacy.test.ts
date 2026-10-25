@@ -173,4 +173,55 @@ describe('StudentTalkView Privacy Features', () => {
     expect(patternBMessage).toBe('トマトの連作障害について');
     expect(patternBMessage.startsWith('【全体共有不可】')).toBe(false);
   });
+
+  it('includes bed consultations with ❗ [相談] or teacher replies in chat history while excluding routine bed logs', () => {
+    const dbJournals = [
+      {
+        id: 'j_routine',
+        role: 'student',
+        content: '【畝 1 (トマト 🍅)】水やりと草むしりを行いました。',
+      },
+      {
+        id: 'j_bed_consultation',
+        role: 'student',
+        content: '【畝 1 (トマト 🍅)】❗ [相談] 葉の裏に斑点が出てきました',
+        reply: '斑点細菌病の可能性があります。該当の葉を取り除いて風通しを良くしてください。',
+      },
+      {
+        id: 'j_bed_replied_without_tag',
+        role: 'student',
+        content: '【畝 2 (ナス 🍆)】成長が遅い気がします',
+        reply: '一番花の下のわき芽を摘み取り、追肥を一握りあげてください。',
+      },
+    ];
+
+    const messages = processChatHistory(dbJournals);
+
+    // Routine log is excluded, but both consultations with replies are preserved
+    expect(messages).toHaveLength(4);
+
+    // Consultation 1
+    expect(messages[0]).toMatchObject({
+      id: 'q_j_bed_consultation',
+      sender: 'student',
+      text: '【畝 1 (トマト 🍅)】❗ [相談] 葉の裏に斑点が出てきました',
+    });
+    expect(messages[1]).toMatchObject({
+      id: 'a_j_bed_consultation',
+      sender: 'teacher',
+      text: '斑点細菌病の可能性があります。該当の葉を取り除いて風通しを良くしてください。',
+    });
+
+    // Consultation 2 (no explicit tag, but has teacher reply)
+    expect(messages[2]).toMatchObject({
+      id: 'q_j_bed_replied_without_tag',
+      sender: 'student',
+      text: '【畝 2 (ナス 🍆)】成長が遅い気がします',
+    });
+    expect(messages[3]).toMatchObject({
+      id: 'a_j_bed_replied_without_tag',
+      sender: 'teacher',
+      text: '一番花の下のわき芽を摘み取り、追肥を一握りあげてください。',
+    });
+  });
 });

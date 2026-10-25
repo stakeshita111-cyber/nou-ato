@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 
@@ -10,10 +11,12 @@ const userRoleSchema = z.object({
 });
 
 export default function RootPage() {
+  const router = useRouter();
   const [statusText, setStatusText] = useState('ログイン状態を確認しています...');
 
   useEffect(() => {
     let isMounted = true;
+    let timer: NodeJS.Timeout | null = null;
 
     const checkAuthAndRedirect = async () => {
       try {
@@ -36,42 +39,47 @@ export default function RootPage() {
 
           const parsedUser = userRoleSchema.safeParse(userData);
 
+          if (timer) clearTimeout(timer);
+
           if (parsedUser.success && parsedUser.data.role === 'teacher') {
-            window.location.replace('/teacher/dashboard');
+            router.replace('/teacher/dashboard');
           } else {
-            window.location.replace('/student');
+            router.replace('/student');
           }
         } else {
+          if (timer) clearTimeout(timer);
           setStatusText('ログイン画面へ移動中...');
-          window.location.replace('/login');
+          router.replace('/login');
         }
       } catch (err) {
         console.error('RootPage auth check error:', err);
+        if (timer) clearTimeout(timer);
         if (isMounted) {
-          window.location.replace('/login');
+          router.replace('/login');
         }
       }
     };
 
+    // 8秒経過しても自動遷移しない場合の安全タイマー (低速ネットワーク向けフォールバック)
+    timer = setTimeout(() => {
+      if (isMounted) {
+        router.replace('/login');
+      }
+    }, 8000);
+
     checkAuthAndRedirect().catch((err: unknown) => {
       console.error('RootPage unhandled error:', err);
+      if (timer) clearTimeout(timer);
       if (isMounted) {
-        window.location.replace('/login');
+        router.replace('/login');
       }
     });
 
-    // 1.5秒経過しても自動遷移しない場合の安全タイマー (フォールバック)
-    const timer = setTimeout(() => {
-      if (isMounted) {
-        window.location.replace('/login');
-      }
-    }, 1500);
-
     return () => {
       isMounted = false;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-[#f7f9f5] flex flex-col items-center justify-center p-6 font-sans text-gray-800">
@@ -88,24 +96,17 @@ export default function RootPage() {
         <div className="space-y-2 pt-2">
           <Link
             href="/login"
-            className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-[#1c4d21] text-white font-bold text-sm rounded-2xl hover:bg-[#163e1a] shadow-sm transition active:scale-[0.98]"
+            className="block w-full py-3 bg-[#1c4d21] text-white font-bold rounded-2xl text-xs hover:bg-[#153b19] transition shadow-md cursor-pointer"
           >
-            <span>🔑</span>
-            <span>ログイン画面へ進む</span>
+            ログイン画面へ進む
           </Link>
-          <div className="flex gap-2 justify-center pt-2">
-            <Link
-              href="/teacher/dashboard"
-              className="text-xs text-gray-500 hover:text-emerald-700 underline font-medium px-2 py-1"
-            >
-              講師ダッシュボード
+          <div className="flex justify-center space-x-4 text-[11px] text-gray-400 font-medium">
+            <Link href="/terms" className="hover:underline">
+              利用規約
             </Link>
-            <span className="text-gray-300">|</span>
-            <Link
-              href="/student"
-              className="text-xs text-gray-500 hover:text-emerald-700 underline font-medium px-2 py-1"
-            >
-              受講生ポータル
+            <span>•</span>
+            <Link href="/privacy" className="hover:underline">
+              プライバシーポリシー
             </Link>
           </div>
         </div>

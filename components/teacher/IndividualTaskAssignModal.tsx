@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import Toast from '@/components/ui/Toast';
 
 interface StudentOption {
@@ -40,29 +41,16 @@ export default function IndividualTaskAssignModal({
   const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadOptions = async () => {
       setFetching(true);
       try {
-        // 1. 生徒一覧の取得
-        const { data: usersData } = await supabase
-          .from('users')
-          .select('id, display_name')
-          .eq('role', 'student');
+        const farmId = await resolveActiveFarmId();
 
-        if (usersData && usersData.length > 0) {
-          setStudents(
-            (usersData as Array<{ id: string; display_name: string | null }>).map((u) => ({
-              id: u.id,
-              name: u.display_name || '受講生',
-            }))
-          );
-          if (!selectedStudentId) {
-            setSelectedStudentId(usersData[0].id);
-          }
-        }
+        let usersQuery = supabase.from('users').select('id, display_name').eq('role', 'student');
 
-        // 2. 公開中のタスク一覧の取得 (status = 'todo', deleted_at is null, is_template != true)
-        const { data: tasksData } = await supabase
+        let tasksQuery = supabase
           .from('tasks')
           .select('id, title, target_crop, exp, description')
           .eq('status', 'todo')
@@ -70,20 +58,46 @@ export default function IndividualTaskAssignModal({
           .or('is_template.eq.false,is_template.is.null')
           .order('created_at', { ascending: false });
 
-        if (tasksData) {
-          setTasks(tasksData.map((t) => ({ ...t, exp: t.exp || 50 }) as TaskOption));
+        if (farmId) {
+          usersQuery = usersQuery.eq('farm_id', farmId);
+          tasksQuery = tasksQuery.eq('farm_id', farmId);
+        }
+
+        // 1. 生徒一覧と公開中タスク一覧を並列取得 (Promise.all)
+        const [usersRes, tasksRes] = await Promise.all([usersQuery, tasksQuery]);
+
+        if (!isMounted) return;
+
+        if (usersRes.data && usersRes.data.length > 0) {
+          const studentList = (
+            usersRes.data as Array<{ id: string; display_name: string | null }>
+          ).map((u) => ({
+            id: u.id,
+            name: u.display_name || '受講生',
+          }));
+          setStudents(studentList);
+          // 初期値が未設定の場合のみ先頭生徒をセット (関数型更新で依存配列から除外)
+          setSelectedStudentId((prev) => prev || studentList[0].id);
+        }
+
+        if (tasksRes.data) {
+          setTasks(tasksRes.data.map((t) => ({ ...t, exp: t.exp || 50 }) as TaskOption));
         }
       } catch (err) {
         console.error('Failed to load task assign options:', err);
       } finally {
-        setFetching(false);
+        if (isMounted) setFetching(false);
       }
     };
 
     loadOptions().catch((err) => {
       console.error('loadOptions unhandled error:', err);
     });
-  }, [selectedStudentId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // 作物タグ一覧の抽出
   const cropOptions = useMemo(() => {

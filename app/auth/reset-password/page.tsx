@@ -26,25 +26,47 @@ function ResetPasswordForm() {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [hasValidSession, setHasValidSession] = useState(false);
 
   useEffect(() => {
     let active = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
     const checkRecoverySession = async () => {
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        if (!session && active) {
-          const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-            // recovery event listener
-          });
-          return () => {
-            authListener.subscription.unsubscribe();
-          };
+
+        if (session && active) {
+          setHasValidSession(true);
+          setCheckingSession(false);
+          return;
         }
+
+        // リカバリーURLからの遷移直後でハッシュ解析中の場合、onAuthStateChange で確立を待機
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, s) => {
+          if (!active) return;
+          if (event === 'PASSWORD_RECOVERY' || (s && event === 'SIGNED_IN')) {
+            if (timeoutId) clearTimeout(timeoutId);
+            setHasValidSession(true);
+            setCheckingSession(false);
+          }
+        });
+
+        // 5秒経過してもセッションが確立されない場合は期限切れとして扱う
+        timeoutId = setTimeout(() => {
+          if (active) {
+            setCheckingSession(false);
+          }
+        }, 5000);
+
+        return () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          authListener.subscription.unsubscribe();
+        };
       } catch (e) {
         console.warn('Recovery session check warn:', e);
-      } finally {
         if (active) {
           setCheckingSession(false);
         }
@@ -54,6 +76,7 @@ function ResetPasswordForm() {
     const cleanupPromise = checkRecoverySession();
     return () => {
       active = false;
+      if (timeoutId) clearTimeout(timeoutId);
       cleanupPromise
         .then((cleanup) => {
           if (cleanup) cleanup();
@@ -102,8 +125,41 @@ function ResetPasswordForm() {
 
   if (checkingSession) {
     return (
-      <div className="text-center py-8 text-xs text-gray-500 font-bold">
-        認証セッションを確認しています...
+      <div className="w-full max-w-[420px] bg-white rounded-3xl shadow-xl border border-gray-200/90 p-8 text-center space-y-4 animate-fade-in">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#1c4d21] text-white font-black text-xl shadow-md animate-pulse">
+          🌱
+        </div>
+        <p className="text-xs text-gray-500 font-bold">認証セッションを確認しています...</p>
+      </div>
+    );
+  }
+
+  if (!hasValidSession) {
+    return (
+      <div className="w-full max-w-[420px] bg-white rounded-3xl shadow-xl border border-gray-200/90 p-8 text-center space-y-5 animate-fade-in">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 font-black text-xl shadow-xs">
+          ⚠️
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-base font-black text-gray-900">リンクが無効または期限切れです</h2>
+          <p className="text-xs text-gray-500 font-medium leading-relaxed">
+            パスワード再設定用のURLが無効になっているか、有効期限が切れています。お手数ですが、再度リセットリンクをリクエストしてください。
+          </p>
+        </div>
+        <div className="pt-2 space-y-2">
+          <Link
+            href="/forgot-password"
+            className="block w-full py-3 bg-[#1c4d21] hover:bg-[#153b19] text-white font-bold rounded-2xl text-xs shadow-md transition cursor-pointer"
+          >
+            パスワード再設定をやり直す
+          </Link>
+          <Link
+            href="/login"
+            className="block text-xs text-gray-500 hover:text-gray-700 font-bold hover:underline py-1"
+          >
+            ← ログイン画面に戻る
+          </Link>
+        </div>
       </div>
     );
   }

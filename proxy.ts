@@ -53,7 +53,24 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
     } else {
-      // 2. 講師専用画面 (/teacher) のアクセス制御: ユーザーのロールが 'teacher' でない場合は即座にサーバー側で遮断・リダイレクト
+      // 2. ログイン済みユーザーのルート (/) へのアクセス時: ロールに応じて即座に適切なダッシュボードへリダイレクト
+      if (pathname === '/') {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const targetUrl = request.nextUrl.clone();
+        if (userData?.role === 'teacher') {
+          targetUrl.pathname = '/teacher/dashboard';
+        } else {
+          targetUrl.pathname = '/student';
+        }
+        return NextResponse.redirect(targetUrl);
+      }
+
+      // 3. 講師専用画面 (/teacher) のアクセス制御: ユーザーのロールが 'teacher' でない場合は即座にサーバー側で遮断・リダイレクト
       if (pathname.startsWith('/teacher')) {
         const { data: userData } = await supabase
           .from('users')
@@ -70,11 +87,13 @@ export async function proxy(request: NextRequest) {
     }
   } catch (error) {
     console.error('Middleware error in proxy:', error);
-    // 3. 例外発生時のフェイルクローズ (TC-AUTH-005: 認証エラーや通信障害時に保護ルートを素通しせずログインへ安全誘導)
-    if (pathname.startsWith('/teacher') || pathname.startsWith('/student')) {
+    // 4. 例外発生時のフェイルクローズ (TC-AUTH-005: 認証エラーや通信障害時に保護ルートを素通しせずログインへ安全誘導)
+    if (pathname === '/' || pathname.startsWith('/teacher') || pathname.startsWith('/student')) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = '/login';
-      loginUrl.searchParams.set('redirect', pathname);
+      if (pathname !== '/') {
+        loginUrl.searchParams.set('redirect', pathname);
+      }
       return NextResponse.redirect(loginUrl);
     }
     return response;
@@ -87,5 +106,5 @@ export const middleware = proxy;
 export default proxy;
 
 export const config = {
-  matcher: ['/teacher/:path*', '/student/:path*'],
+  matcher: ['/', '/teacher/:path*', '/student/:path*'],
 };
