@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   experimental: {
     agentUpgrade: 'security',
   },
-  allowedDevOrigins: ['192.168.1.26'],
+  allowedDevOrigins: ['192.168.1.20', '192.168.1.26', '192.168.1.*'],
   async redirects() {
     return [
       {
