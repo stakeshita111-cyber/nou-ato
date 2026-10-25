@@ -34,7 +34,9 @@ export function WeatherMapView({
 }: WeatherMapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<LeafletMapInstance | null>(null);
+  const isInternalMoveRef = useRef(false);
 
+  // マップ初期化・破棄 (モーダルの開閉に連動)
   useEffect(() => {
     const initCenterPinMap = () => {
       const L = window.L;
@@ -42,6 +44,7 @@ export function WeatherMapView({
 
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
+        leafletMapRef.current = null;
       }
 
       const map = L.map(mapContainerRef.current, {
@@ -59,6 +62,11 @@ export function WeatherMapView({
 
       let timer: ReturnType<typeof setTimeout> | undefined;
       map.on('moveend', () => {
+        if (isInternalMoveRef.current) {
+          isInternalMoveRef.current = false;
+          return;
+        }
+
         clearTimeout(timer);
         timer = setTimeout(() => {
           const center = map.getCenter();
@@ -83,15 +91,23 @@ export function WeatherMapView({
 
     if (isOpen && mapContainerRef.current) {
       if (!window.L) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
+        const existingLink = document.querySelector('link[href*="leaflet"]');
+        if (!existingLink) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          document.head.appendChild(link);
+        }
 
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.onload = () => initCenterPinMap();
-        document.body.appendChild(script);
+        const existingScript = document.querySelector('script[src*="leaflet"]');
+        if (!existingScript) {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          script.onload = () => initCenterPinMap();
+          document.body.appendChild(script);
+        } else {
+          existingScript.addEventListener('load', () => initCenterPinMap(), { once: true });
+        }
       } else {
         initCenterPinMap();
       }
@@ -106,7 +122,20 @@ export function WeatherMapView({
         }
       }
     };
-  }, [isOpen, selectedLat, selectedLon]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 親から selectedLat / selectedLon が更新された場合にマップ中心を同期
+  useEffect(() => {
+    if (!leafletMapRef.current) return;
+    const center = leafletMapRef.current.getCenter();
+    const diffLat = Math.abs(center.lat - selectedLat);
+    const diffLon = Math.abs(center.lng - selectedLon);
+    // 0.0005 (約50m) 以上の乖離がある場合のみ外部指示による移動として反映
+    if (diffLat > 0.0005 || diffLon > 0.0005) {
+      isInternalMoveRef.current = true;
+      leafletMapRef.current.setView([selectedLat, selectedLon], 12);
+    }
+  }, [selectedLat, selectedLon]);
 
   return (
     <div className="relative w-full h-52 sm:h-64 rounded-2xl overflow-hidden border border-gray-300 shadow-inner bg-slate-100">

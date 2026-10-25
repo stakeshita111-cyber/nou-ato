@@ -1,20 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { z } from 'zod';
 import type { LeafletMapInstance } from './types';
 import { WeatherMapView } from './WeatherMapView';
-
-const GeocodingItemSchema = z.object({
-  name: z.string(),
-  admin1: z.string().optional(),
-  latitude: z.number(),
-  longitude: z.number(),
-});
-
-const GeocodingResponseSchema = z.object({
-  results: z.array(GeocodingItemSchema).optional(),
-});
+import { searchLocations, type SearchLocationResult } from './geocoding';
 
 interface CitySearchModalProps {
   isOpen: boolean;
@@ -46,9 +35,7 @@ export function CitySearchModal({
   gpsErrorMessage,
 }: CitySearchModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<
-    Array<{ name: string; lat: number; lon: number }>
-  >([]);
+  const [searchResults, setSearchResults] = useState<SearchLocationResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [mapInstance, setMapInstance] = useState<LeafletMapInstance | null>(null);
 
@@ -57,46 +44,44 @@ export function CitySearchModal({
   const updateMapCenter = (cityName: string, latitude: number, longitude: number) => {
     onLocationSelected(latitude, longitude, cityName);
     if (mapInstance) {
-      mapInstance.setView([latitude, longitude], 12);
+      mapInstance.setView([latitude, longitude], 13);
     }
   };
 
   const handleSearchCity = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const query = searchQuery.trim();
+    if (!query) return;
 
     setIsSearching(true);
     try {
-      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery.trim())}&language=ja&count=5`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const rawData: unknown = await res.json();
-        const parseResult = GeocodingResponseSchema.safeParse(rawData);
-        if (
-          parseResult.success &&
-          parseResult.data.results &&
-          parseResult.data.results.length > 0
-        ) {
-          const formatted = parseResult.data.results.map((item) => ({
-            name: `${item.admin1 || ''} ${item.name}`.trim(),
-            lat: Math.round(item.latitude * 10000) / 10000,
-            lon: Math.round(item.longitude * 10000) / 10000,
-          }));
-          setSearchResults(formatted);
-
-          const first = formatted[0];
-          updateMapCenter(first.name, first.lat, first.lon);
-        } else {
-          setSearchResults([]);
-          setToastMessage('⚠️ 該当する市町村が見つかりませんでした。');
-          setShowToast(true);
-        }
+      const results = await searchLocations(query);
+      if (results.length > 0) {
+        setSearchResults(results);
+        const first = results[0];
+        updateMapCenter(first.name, first.lat, first.lon);
+        setToastMessage(`✨ 「${first.name}」を表示しました（候補${results.length}件）`);
+        setShowToast(true);
+      } else {
+        setSearchResults([]);
+        setToastMessage(
+          `⚠️ 「${query}」に該当する市町村が見つかりませんでした。別の名称（例: 千葉市、八王子市等）をお試しください。`
+        );
+        setShowToast(true);
       }
     } catch (err) {
       console.error('City search error:', err);
+      setToastMessage('⚠️ 検索中にエラーが発生しました。通信環境をご確認ください。');
+      setShowToast(true);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleSelectResultItem = (item: SearchLocationResult) => {
+    updateMapCenter(item.name, item.lat, item.lon);
+    setToastMessage(`📍 「${item.name}」へ移動しました`);
+    setShowToast(true);
   };
 
   return (
@@ -157,13 +142,18 @@ export function CitySearchModal({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="市町村名 (例: 八王子市, 松本市, つくば市)..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.nativeEvent.isComposing) {
+                  e.stopPropagation();
+                }
+              }}
+              placeholder="市町村名・地域名 (例: 千葉, 八王子市, 松本市)..."
               className="flex-1 p-2.5 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white text-xs font-bold text-gray-900"
             />
             <button
               type="submit"
               disabled={isSearching}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow transition shrink-0"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold rounded-xl text-xs shadow transition shrink-0"
             >
               {isSearching ? '検索中...' : '🔍 検索'}
             </button>
@@ -176,7 +166,7 @@ export function CitySearchModal({
               <button
                 key={idx}
                 type="button"
-                onClick={() => updateMapCenter(item.name, item.lat, item.lon)}
+                onClick={() => handleSelectResultItem(item)}
                 className="w-full text-left p-1.5 rounded-lg font-bold hover:bg-emerald-100 transition flex justify-between text-gray-800"
               >
                 <span>📍 {item.name}</span>
