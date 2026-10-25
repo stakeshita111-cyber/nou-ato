@@ -9,6 +9,7 @@ import { useFarmStore } from '@/store/useFarmStore';
 import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import { fetchFarmPlotBedIds, cropRecordsFarmFilter } from '@/lib/farm/farmScope';
 import Toast from '@/components/ui/Toast';
+import FormattedChatMessage from '@/components/ui/FormattedChatMessage';
 import SlideSettingsModal, { SlideSettings } from '@/components/teacher/SlideSettingsModal';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
 import { sanitizePersonalNames } from '@/lib/rag/qaKnowledgeRetriever';
@@ -1696,9 +1697,9 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
 
                   {currentJournal.reply && editingReplyId !== currentJournal.id ? (
                     <div className="app-accent-light p-4 rounded-2xl text-xs space-y-1.5 border app-border shadow-xs">
-                      <p className="text-gray-900 leading-relaxed font-medium text-sm whitespace-pre-wrap">
-                        {currentJournal.reply}
-                      </p>
+                      <div className="text-gray-900 leading-relaxed font-medium text-sm">
+                        <FormattedChatMessage text={currentJournal.reply} />
+                      </div>
                       <div className="flex items-center justify-between pt-1 border-t border-emerald-100 text-[10px] text-gray-500">
                         <span>
                           {currentJournal.is_approved
