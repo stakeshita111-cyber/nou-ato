@@ -35,7 +35,7 @@ export default function BedApprovalModal({
       await onApprove(plot.id, bed.id);
       onClose();
     } catch (err) {
-      console.error('Failed to approve bed:', err);
+      console.error('Approval modal error:', err);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -51,7 +51,7 @@ export default function BedApprovalModal({
       await onReject(plot.id, bed.id, rejectReason || '内容の再確認をお願いします');
       onClose();
     } catch (err) {
-      console.error('Failed to reject bed:', err);
+      console.error('Approval modal error:', err);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);

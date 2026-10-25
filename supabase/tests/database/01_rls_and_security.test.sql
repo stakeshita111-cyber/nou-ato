@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(178);
+SELECT plan(209);
 
 -- ==============================================================================
 -- 1. テストフィクスチャのセットアップ (管理者権限)
@@ -1767,6 +1767,336 @@ SELECT is(
     (SELECT farm_id FROM public.users WHERE id = '00000000-0000-0000-0000-000000000004'),
     '11111111-1111-1111-1111-111111111112'::uuid,
     '178. [b5a_leave] 農園A から抜けても講師 0004 の既定の農園は農園B のまま'
+);
+
+RESET ROLE;
+
+-- ==============================================================================
+-- 収穫完了申請・承認・差し戻し RPC (20261025000000_bed_harvest_lifecycle_rpcs.sql)
+-- 先行テストで既存フィクスチャ (生徒A の退会・区画の入れ替え) が変わっているため、専用のフィクスチャを作る
+--   生徒H-A (00a1): 区画 plot-h-a (H1) / 畝 plot-h-a_bed_1, plot-h-a_bed_2
+--   生徒H-B (00a2): 区画 plot-h-b (H2) / 畝 plot-h-b_bed_1
+--   講師1 (0001): 農園A の講師 / 講師B (0004): 農園B だけの講師
+-- ==============================================================================
+RESET ROLE;
+
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES
+    ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_ha@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
+    ('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_hb@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (id, email, display_name, role, farm_id)
+VALUES
+    ('00000000-0000-0000-0000-0000000000a1', 'student_ha@test.local', '生徒HA', 'student', '11111111-1111-1111-1111-111111111111'),
+    ('00000000-0000-0000-0000-0000000000a2', 'student_hb@test.local', '生徒HB', 'student', '11111111-1111-1111-1111-111111111111')
+ON CONFLICT (id) DO UPDATE SET role = 'student', farm_id = '11111111-1111-1111-1111-111111111111';
+
+INSERT INTO public.farm_members (farm_id, user_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000001')
+ON CONFLICT (farm_id, user_id) DO NOTHING;
+DELETE FROM public.farm_members
+WHERE farm_id = '11111111-1111-1111-1111-111111111111'
+  AND user_id = '00000000-0000-0000-0000-000000000004';
+
+INSERT INTO public.farm_plots (id, farm_id, name, code, student_id)
+VALUES
+    ('plot-h-a', '11111111-1111-1111-1111-111111111111', '区画H1', 'H1', '00000000-0000-0000-0000-0000000000a1'),
+    ('plot-h-b', '11111111-1111-1111-1111-111111111111', '区画H2', 'H2', '00000000-0000-0000-0000-0000000000a2');
+
+INSERT INTO public.farm_beds (id, plot_id, bed_number, crop_name, student_id, student_name, status, season)
+VALUES
+    ('plot-h-a_bed_1', 'plot-h-a', '1', 'ミニトマト', '00000000-0000-0000-0000-0000000000a1', '生徒HA', 'active', '2026年 春夏'),
+    ('plot-h-a_bed_2', 'plot-h-a', '2', 'バジル', '00000000-0000-0000-0000-0000000000a1', '生徒HA', 'active', '2026年 春夏'),
+    ('plot-h-b_bed_1', 'plot-h-b', '1', 'きゅうり', '00000000-0000-0000-0000-0000000000a2', '生徒HB', 'active', '2026年 春夏');
+
+INSERT INTO public.crop_records (id, bed_id, plot_id, crop_name, date)
+VALUES
+    ('rec-h-1', 'plot-h-a_bed_1', 'plot-h-a', 'ミニトマト', '2026-05-01'),
+    ('rec-h-2', 'plot-h-a_bed_1', 'plot-h-a', 'ミニトマト', '2026-06-01');
+
+-- ------------------------------------------------------------------------------
+-- 生徒H-A: 申請
+-- ------------------------------------------------------------------------------
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-0000000000a1", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-0000000000a1';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    public.submit_bed_completion('plot-h-a_bed_1', '3kg', 'よく育った', NULL, NULL)->>'status',
+    'submitted',
+    '179. [bed_submit] 区画の生徒は自分の畝の収穫完了を申請できる'
+);
+
+SELECT is(
+    public.submit_bed_completion('plot-h-a_bed_1', '3kg', 'よく育った', NULL, NULL)->>'status',
+    'already_pending',
+    '180. [bed_submit] 承認待ちの畝への再申請は already_pending を返す (再送しても二重にならない)'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.submit_bed_completion('plot-h-b_bed_1', '1kg', NULL, NULL, NULL) $$,
+    '42501',
+    'Permission denied: not your bed',
+    '181. [bed_submit] 他の生徒の畝は申請できない'
+);
+
+SELECT throws_ok(
+    $$ UPDATE public.farm_beds SET status = 'archived' WHERE id = 'plot-h-a_bed_2' $$,
+    '42501',
+    'Students cannot change bed status',
+    '182. [bed_trigger] 生徒による farm_beds.status の直接 UPDATE は従来どおり拒否される'
+);
+
+SELECT lives_ok(
+    $$ UPDATE public.farm_beds SET status = 'completed_pending', total_harvest = '99kg' WHERE id = 'plot-h-a_bed_2' $$,
+    '183. [bed_guard] 生徒が直接 completed_pending にしようとしてもエラーにはならない (値は戻される)'
+);
+
+SELECT throws_ok(
+    $$ INSERT INTO public.journals (student_id, content, role, bed_id)
+       VALUES ('00000000-0000-0000-0000-0000000000a1', '偽の報告', 'student', 'plot-h-b_bed_1') $$,
+    '42501',
+    'journals.bed_id can only be set by bed lifecycle RPCs',
+    '184. [bed_journal_guard] 生徒は journals.bed_id を指定して INSERT できない'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.approve_bed_harvest('plot-h-a', 'plot-h-a_bed_1') $$,
+    '42501',
+    'Target plot does not belong to your farm',
+    '185. [bed_approve] 生徒は承認できない'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.reject_bed_completion('plot-h-a', 'plot-h-a_bed_1', '理由') $$,
+    '42501',
+    'Target plot does not belong to your farm',
+    '186. [bed_reject] 生徒は差し戻しできない'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (SELECT status || '|' || total_harvest || '|' || completion_notes FROM public.farm_beds WHERE id = 'plot-h-a_bed_1')
+        || '|' || (SELECT count(*) FROM public.journals WHERE bed_id = 'plot-h-a_bed_1')::text
+        || '|' || (SELECT is_approved::text FROM public.journals WHERE bed_id = 'plot-h-a_bed_1'),
+    'completed_pending|3kg|よく育った|1|false',
+    '187. [bed_submit] 申請で畝が承認待ちになり、紐付いた未承認の通知が 1 件だけできる'
+);
+
+SELECT is(
+    (SELECT status || '|' || COALESCE(total_harvest, '-') FROM public.farm_beds WHERE id = 'plot-h-a_bed_2'),
+    'active|-',
+    '188. [bed_guard] 生徒の直接 UPDATE で承認待ちにはならず、申請内容も書き換わらない'
+);
+
+-- ------------------------------------------------------------------------------
+-- 講師B (農園B だけの講師): 他の農園の畝は操作できない
+-- ------------------------------------------------------------------------------
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000004", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000004';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT throws_ok(
+    $$ SELECT public.approve_bed_harvest('plot-h-a', 'plot-h-a_bed_1') $$,
+    '42501',
+    'Target plot does not belong to your farm',
+    '189. [bed_approve] 他の農園の講師は承認できない'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.reject_bed_completion('plot-h-a', 'plot-h-a_bed_1', '理由') $$,
+    '42501',
+    'Target plot does not belong to your farm',
+    '190. [bed_reject] 他の農園の講師は差し戻しできない'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.submit_bed_completion('plot-h-b_bed_1', '1kg', NULL, NULL, NULL) $$,
+    '42501',
+    'Permission denied: not your bed',
+    '191. [bed_submit] 他の農園の講師は申請できない'
+);
+
+-- ------------------------------------------------------------------------------
+-- 講師1: 古い画面状態での直接 UPDATE と承認
+-- ------------------------------------------------------------------------------
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT lives_ok(
+    $$ UPDATE public.farm_beds
+       SET status = 'active', total_harvest = NULL, completion_notes = NULL, crop_name = '大玉トマト'
+       WHERE id = 'plot-h-a_bed_1' $$,
+    '192. [bed_guard] 講師が承認待ちの畝を古い状態で UPDATE してもエラーにならない'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (SELECT status || '|' || total_harvest || '|' || completion_notes || '|' || crop_name
+     FROM public.farm_beds WHERE id = 'plot-h-a_bed_1'),
+    'completed_pending|3kg|よく育った|大玉トマト',
+    '193. [bed_guard] 承認待ちと申請内容は残り、作物名など他の列の変更は反映される'
+);
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    public.approve_bed_harvest('plot-h-a', 'plot-h-a_bed_1')->>'moved_records',
+    '2',
+    '194. [bed_approve] 講師は承認でき、観察記録 2 件がアーカイブ畝へ移る'
+);
+
+SELECT throws_ok(
+    $$ SELECT public.approve_bed_harvest('plot-h-a', 'plot-h-a_bed_1') $$,
+    '55000',
+    'Bed is not pending approval',
+    '195. [bed_approve] 同じ畝の二重承認は 55000 で拒否される'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (SELECT count(*)::int FROM public.farm_beds
+     WHERE plot_id = 'plot-h-a' AND status = 'archived' AND bed_number = '1'
+       AND crop_name = '大玉トマト' AND total_harvest = '3kg' AND completion_notes = 'よく育った'
+       AND season = '2026年 春夏' AND progress_percent = 100 AND harvested_at IS NOT NULL
+       AND student_id = '00000000-0000-0000-0000-0000000000a1'),
+    1,
+    '196. [bed_approve] 申請内容をコピーしたアーカイブ畝が 1 件だけできる (二重承認でも増えない)'
+);
+
+SELECT is(
+    (SELECT count(*) FROM public.crop_records WHERE bed_id = 'plot-h-a_bed_1')::text
+        || '|' || (SELECT count(*) FROM public.crop_records cr JOIN public.farm_beds b ON b.id = cr.bed_id
+                   WHERE b.plot_id = 'plot-h-a' AND b.status = 'archived')::text,
+    '0|2',
+    '197. [bed_approve] 観察記録はすべてアーカイブ畝に付け替わり、稼働中の畝には残らない'
+);
+
+SELECT is(
+    (SELECT status || '|' || crop_name || '|' || COALESCE(total_harvest, '-') || '|' || COALESCE(completion_notes, '-')
+            || '|' || COALESCE(harvested_at::text, '-') || '|' || progress_percent::text || '|' || season
+     FROM public.farm_beds WHERE id = 'plot-h-a_bed_1'),
+    'active|未確定 🌱|-|-|-|0|2026年 春夏',
+    '198. [bed_approve] 稼働中の畝は同じ ID のまま次のサイクル用に初期化される (季節は引き継ぐ)'
+);
+
+SELECT is(
+    (SELECT count(*) FROM public.journals j JOIN public.farm_beds b ON b.id = j.bed_id
+     WHERE b.plot_id = 'plot-h-a' AND b.status = 'archived')::text
+        || '|' || (SELECT bool_or(j.is_approved)::text FROM public.journals j JOIN public.farm_beds b ON b.id = j.bed_id
+                   WHERE b.plot_id = 'plot-h-a' AND b.status = 'archived'),
+    '1|false',
+    '199. [bed_approve] 通知はアーカイブ畝に付け替わり、is_approved (AI ナレッジ承認) は変わらない'
+);
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT lives_ok(
+    $$ SELECT public.delete_farm_bed(
+           'plot-h-a',
+           (SELECT id FROM public.farm_beds WHERE plot_id = 'plot-h-a' AND status = 'archived' LIMIT 1)
+       ) $$,
+    '200. [bed_journal_guard] 通知が紐付いた畝も delete_farm_bed で削除できる (ON DELETE SET NULL を止めない)'
+);
+
+-- ------------------------------------------------------------------------------
+-- 差し戻しと再申請
+-- ------------------------------------------------------------------------------
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-0000000000a1", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-0000000000a1';
+
+SELECT is(
+    public.submit_bed_completion('plot-h-a_bed_1', '2kg', '二回目', NULL, NULL)->>'status',
+    'submitted',
+    '201. [bed_submit] 初期化された畝は次のサイクルで再び申請できる'
+);
+
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT is(
+    public.reject_bed_completion('plot-h-a', 'plot-h-a_bed_1', '写真を追加してください')->>'status',
+    'rejected',
+    '202. [bed_reject] 講師は承認待ちの畝を差し戻せる'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (SELECT status || '|' || completion_notes FROM public.farm_beds WHERE id = 'plot-h-a_bed_1'),
+    'rejected|写真を追加してください',
+    '203. [bed_reject] 差し戻すと status が rejected になり、理由が completion_notes に入る'
+);
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-0000000000a1", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-0000000000a1';
+SET LOCAL "request.jwt.claim.role" = 'authenticated';
+
+SELECT is(
+    public.submit_bed_completion('plot-h-a_bed_1', '2kg', '写真を追加しました', NULL, NULL)->>'status',
+    'submitted',
+    '204. [bed_submit] 差し戻された畝は再申請できる'
+);
+
+-- ------------------------------------------------------------------------------
+-- 既存 RPC との共存: 承認待ちの畝を含む区画の入れ替え
+-- ------------------------------------------------------------------------------
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+SELECT lives_ok(
+    $$
+        SELECT public.swap_farm_plots('plot-h-a', 'plot-h-b');
+        SELECT public.swap_farm_plots('plot-h-a', 'plot-h-b');
+    $$,
+    '205. [bed_swap] 承認待ちの畝を含む区画も swap_farm_plots で入れ替えられる'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (SELECT status || '|' || plot_id || '|' || total_harvest || '|' || completion_notes
+     FROM public.farm_beds WHERE id = 'plot-h-a_bed_1'),
+    'completed_pending|plot-h-a|2kg|写真を追加しました',
+    '206. [bed_swap] 入れ替え (DELETE → INSERT) の後も承認待ちと申請内容が保たれる'
+);
+
+-- ------------------------------------------------------------------------------
+-- anon は実行できない
+-- ------------------------------------------------------------------------------
+SET LOCAL ROLE anon;
+SET LOCAL "request.jwt.claims" = '{"role": "anon"}';
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL "request.jwt.claim.role" = 'anon';
+
+SELECT throws_matching(
+    $$ SELECT public.submit_bed_completion('plot-h-a_bed_1', NULL, NULL, NULL, NULL) $$,
+    'permission denied',
+    '207. [anon] submit_bed_completion は実行できない'
+);
+
+SELECT throws_matching(
+    $$ SELECT public.approve_bed_harvest('plot-h-a', 'plot-h-a_bed_1') $$,
+    'permission denied',
+    '208. [anon] approve_bed_harvest は実行できない'
+);
+
+SELECT throws_matching(
+    $$ SELECT public.reject_bed_completion('plot-h-a', 'plot-h-a_bed_1', NULL) $$,
+    'permission denied',
+    '209. [anon] reject_bed_completion は実行できない'
 );
 
 RESET ROLE;

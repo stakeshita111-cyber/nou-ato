@@ -11,6 +11,16 @@ interface StudentTaskPreviewModalProps {
   isAdding?: boolean;
 }
 
+const isSafeHttpUrl = (rawUrl?: string): boolean => {
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 export default function StudentTaskPreviewModal({
   template,
   isOpen,
@@ -298,7 +308,7 @@ export default function StudentTaskPreviewModal({
             </div>
 
             {/* 参考資料リンク */}
-            {template.reference_links && (
+            {isSafeHttpUrl(template.reference_links) && (
               <div className="pt-1">
                 <a
                   href={template.reference_links}

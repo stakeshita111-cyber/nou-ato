@@ -214,3 +214,83 @@ export function processChatHistory(targetList: ChatJournalSourceItem[]): ChatMes
 
   return formatted;
 }
+
+export interface SlideItemRecord {
+  itemType?: 'record';
+  id: string;
+  studentName: string;
+  studentAvatar?: string;
+  title: string;
+  content: string;
+  imageUrl?: string;
+  harvestAmount?: string;
+  dateStr: string;
+  timeStr: string;
+  timestamp: number;
+  plotCode?: string;
+  farmId?: string;
+}
+
+/**
+ * 🌟 生徒作業・観察記録のスライド統合＆重複排除ヘルパー 🌟
+ * - 同一生徒による同一内容（同一画像、または「作業を完了しました」等の同日同一コメント）を統合
+ */
+export function mergeSlideRecords(allRecords: SlideItemRecord[]): SlideItemRecord[] {
+  allRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+  const mergedRecordsMap = new Map<string, SlideItemRecord>();
+
+  allRecords.forEach((r) => {
+    const normalizedContent = (r.content || '').trim().replace(/\s+/g, ' ');
+    const isDefaultCompletionText =
+      !normalizedContent ||
+      normalizedContent === '作業を完了しました。' ||
+      normalizedContent === '作業を完了しました' ||
+      normalizedContent === '（コメントなし）';
+
+    let groupKey = '';
+    if (r.imageUrl && r.imageUrl.trim() && r.imageUrl.startsWith('http')) {
+      groupKey = `img_${r.studentName}_${r.imageUrl.trim()}`;
+    } else if (isDefaultCompletionText) {
+      groupKey = `default_${r.studentName}_${r.dateStr}`;
+    } else if (normalizedContent.length > 0 && normalizedContent.length <= 60) {
+      groupKey = `content_${r.studentName}_${r.dateStr}_${normalizedContent}`;
+    } else {
+      groupKey = `id_${r.id || `${r.studentName}_${r.dateStr}_${r.timeStr}_${r.title}`}`;
+    }
+
+    if (!mergedRecordsMap.has(groupKey)) {
+      mergedRecordsMap.set(groupKey, { ...r });
+    } else {
+      const existing = mergedRecordsMap.get(groupKey)!;
+
+      const existingParts = existing.title.split(',').map((t) => t.trim());
+      const newParts = r.title.split(',').map((t) => t.trim());
+      const mergedTitles = Array.from(new Set([...existingParts, ...newParts])).filter(Boolean);
+
+      if (mergedTitles.length > 2) {
+        existing.title = `${mergedTitles[0]} 他${mergedTitles.length - 1}件`;
+      } else {
+        existing.title = mergedTitles.join(', ');
+      }
+
+      if (!existing.imageUrl && r.imageUrl) {
+        existing.imageUrl = r.imageUrl;
+      }
+
+      if (
+        (!existing.content || existing.content === '作業を完了しました。') &&
+        r.content &&
+        r.content !== '作業を完了しました。'
+      ) {
+        existing.content = r.content;
+      }
+
+      if (!existing.harvestAmount && r.harvestAmount) {
+        existing.harvestAmount = r.harvestAmount;
+      }
+    }
+  });
+
+  return Array.from(mergedRecordsMap.values());
+}

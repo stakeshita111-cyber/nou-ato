@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { EventItem } from '@/types/event';
 import { formatDate } from '@/lib/utils/formatHelper';
 
@@ -36,12 +36,26 @@ export default function EventCalendar({
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayDateFormatted);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // events を日付文字列 (dateStr) をキーとする Map に事前グループ化 (O(1) 参照用)
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, EventItem[]>();
+    for (const e of events) {
+      if (!e.date) continue;
+      const list = map.get(e.date) || [];
+      list.push(e);
+      map.set(e.date, list);
+    }
+    return map;
+  }, [events]);
+
   // 現在表示されている年月以外の月にある予定をチェック
   const currentMonthPrefix = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-  const otherMonthEvents = events.filter((e) => !e.date.startsWith(currentMonthPrefix));
-  const upcomingOtherEvent = otherMonthEvents
-    .filter((e) => e.date > currentMonthPrefix)
-    .sort((a, b) => a.date.localeCompare(b.date))[0];
+  const upcomingOtherEvent = useMemo(() => {
+    const otherMonthEvents = events.filter((e) => !e.date.startsWith(currentMonthPrefix));
+    return otherMonthEvents
+      .filter((e) => e.date > currentMonthPrefix)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+  }, [events, currentMonthPrefix]);
 
   const navigateToDate = (targetDateStr: string) => {
     const parts = targetDateStr.split('-');
@@ -71,26 +85,28 @@ export default function EventCalendar({
     }
   };
 
-  // 月の日数を計算
-  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-  const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0: 日曜日
+  // 日付マス目生成 (表示年月に応じて memoize)
+  const calendarCells = useMemo(() => {
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0: 日曜日
 
-  // 日付マス目生成
-  const calendarCells = [];
-  // 前月埋め
-  for (let i = 0; i < firstDayOfWeek; i++) {
-    calendarCells.push({ day: null, dateStr: '' });
-  }
-  // 今月日
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dayFormatted = String(d).padStart(2, '0');
-    const monthFormatted = String(currentMonth).padStart(2, '0');
-    const dateStr = `${currentYear}-${monthFormatted}-${dayFormatted}`;
-    calendarCells.push({ day: d, dateStr });
-  }
+    const cells: { day: number | null; dateStr: string }[] = [];
+    // 前月埋め
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      cells.push({ day: null, dateStr: '' });
+    }
+    // 今月日
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayFormatted = String(d).padStart(2, '0');
+      const monthFormatted = String(currentMonth).padStart(2, '0');
+      const dateStr = `${currentYear}-${monthFormatted}-${dayFormatted}`;
+      cells.push({ day: d, dateStr });
+    }
+    return cells;
+  }, [currentYear, currentMonth]);
 
-  // 選択日のイベントリスト
-  const selectedDateEvents = events.filter((e) => e.date === selectedDateStr);
+  // 選択日のイベントリスト (O(1) 取得)
+  const selectedDateEvents = eventsByDate.get(selectedDateStr) || [];
 
   return (
     <div className="space-y-6">
@@ -195,7 +211,7 @@ export default function EventCalendar({
                 );
               }
 
-              const dayEvents = events.filter((e) => e.date === cell.dateStr);
+              const dayEvents = eventsByDate.get(cell.dateStr) || [];
               const isSelected = selectedDateStr === cell.dateStr;
               const isSunday = idx % 7 === 0;
               const isSaturday = idx % 7 === 6;
