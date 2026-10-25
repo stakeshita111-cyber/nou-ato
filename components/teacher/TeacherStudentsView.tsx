@@ -255,14 +255,12 @@ export default function TeacherStudentsView() {
           console.warn('fetchStudents student_tasks lookup:', err);
         }
 
-        // Supabase の journals 完了ノート取得
-        const journalCompletedTitlesMap: Record<string, Set<string>> = {};
+        // Supabase の journals から最新の日誌と未読数を取得
         const lastJournalMap: Record<
           string,
           { content?: string; photo_url?: string; created_at?: string }
         > = {};
         const unreadCountMap: Record<string, number> = {};
-        const globalJournalCompletedTitles = new Set<string>();
 
         try {
           let jDataQuery = supabase
@@ -286,18 +284,6 @@ export default function TeacherStudentsView() {
                   photo_url: j.image_url ? String(j.image_url) : undefined,
                   created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
                 };
-              }
-              const journalText = String(j.content || j.text || '');
-              if (
-                journalText &&
-                (journalText.includes('タスク完了') || journalText.includes('完了'))
-              ) {
-                if (!journalCompletedTitlesMap[sid]) {
-                  journalCompletedTitlesMap[sid] = new Set();
-                }
-                const cleanedTitle = journalText.replace('✅【タスク完了】', '').trim();
-                journalCompletedTitlesMap[sid].add(cleanedTitle);
-                globalJournalCompletedTitles.add(cleanedTitle);
               }
             });
           }
