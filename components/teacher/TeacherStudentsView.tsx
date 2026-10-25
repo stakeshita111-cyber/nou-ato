@@ -13,6 +13,7 @@ import { useFarmStore } from '@/store/useFarmStore';
 import { resolveActiveFarmId } from '@/lib/farm/activeFarm';
 import { fetchFarmPlotBedIds } from '@/lib/farm/farmScope';
 import { formatDate } from '@/lib/utils/formatHelper';
+import { countUnreadJournalsByStudent } from '@/lib/utils/journalUnread';
 
 type UserRow = Database['public']['Tables']['users']['Row'];
 type TaskRow = Database['public']['Tables']['tasks']['Row'];
@@ -267,7 +268,7 @@ export default function TeacherStudentsView() {
           let jDataQuery = supabase
             .from('journals')
             .select(
-              'id, student_id, farm_id, content, text, reply, is_approved, image_url, created_at'
+              'id, student_id, farm_id, content, text, reply, is_approved, image_url, created_at, bed_id, farm_beds(status)'
             )
             .order('created_at', { ascending: false });
           if (currentFarmId) {
@@ -275,6 +276,8 @@ export default function TeacherStudentsView() {
           }
           const { data: jData } = await jDataQuery;
           if (jData && jData.length > 0) {
+            // 講師の未読数 (収穫完了報告は承認待ちの畝だけを数える)
+            Object.assign(unreadCountMap, countUnreadJournalsByStudent(jData));
             jData.forEach((j) => {
               const sid = String(j.student_id || 'student_default');
               if (!lastJournalMap[sid]) {
@@ -283,10 +286,6 @@ export default function TeacherStudentsView() {
                   photo_url: j.image_url ? String(j.image_url) : undefined,
                   created_at: j.created_at ? formatDate(String(j.created_at)) : '最近',
                 };
-              }
-              // 講師の未返信かつ未承認の日誌を未読カウントとして集計
-              if (!j.reply && !j.is_approved) {
-                unreadCountMap[sid] = (unreadCountMap[sid] || 0) + 1;
               }
               const journalText = String(j.content || j.text || '');
               if (
