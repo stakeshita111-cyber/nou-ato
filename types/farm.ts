@@ -64,6 +64,7 @@ export type PresetFaqItem = {
   chipLabel: string;
   question: string;
   answer: string;
+  keywords?: string[];
 };
 
 export type Farm = {

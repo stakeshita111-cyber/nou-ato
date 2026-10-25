@@ -32,6 +32,7 @@ const presetFaqItemSchema = z.object({
     .string()
     .min(1, '回答文を入力してください')
     .max(2000, '回答文は2000文字以内で入力してください'),
+  keywords: z.array(z.string()).optional(),
 });
 
 const settingsRequestBodySchema = z
