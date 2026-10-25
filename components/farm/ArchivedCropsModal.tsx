@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { FarmBed, CropRecord } from '@/types/farm';
 
@@ -52,23 +52,46 @@ export default function ArchivedCropsModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // 過去観察記録を bed_id キーの Map に事前集約 & 日付昇順/降順ソート
+  const recordsByBedId = useMemo(() => {
+    const map = new Map<string, CropRecord[]>();
+    for (const r of records) {
+      if (!r.bed_id) continue;
+      const list = map.get(r.bed_id) || [];
+      list.push(r);
+      map.set(r.bed_id, list);
+    }
+    for (const list of map.values()) {
+      list.sort(
+        (a, b) =>
+          new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()
+      );
+    }
+    return map;
+  }, [records]);
 
   // 存在するシーズン一覧のユニーク抽出
-  const seasons = Array.from(new Set(archivedBeds.map((b) => b.season || '2026年 春夏')));
+  const seasons = useMemo(
+    () => Array.from(new Set(archivedBeds.map((b) => b.season || '2026年 春夏'))),
+    [archivedBeds]
+  );
 
   // フィルタリング & 新しい収穫日順（またはIDのタイムスタンプ順）にソート
-  const filteredBeds = [...archivedBeds]
-    .filter((b) => {
-      if (selectedSeason === 'all') return true;
-      return (b.season || '2026年 春夏') === selectedSeason;
-    })
-    .sort((a, b) => {
-      const timeA = a.harvested_at ? new Date(a.harvested_at).getTime() : 0;
-      const timeB = b.harvested_at ? new Date(b.harvested_at).getTime() : 0;
-      if (timeB !== timeA) return timeB - timeA;
-      return b.id.localeCompare(a.id);
-    });
+  const filteredBeds = useMemo(() => {
+    return [...archivedBeds]
+      .filter((b) => {
+        if (selectedSeason === 'all') return true;
+        return (b.season || '2026年 春夏') === selectedSeason;
+      })
+      .sort((a, b) => {
+        const timeA = a.harvested_at ? new Date(a.harvested_at).getTime() : 0;
+        const timeB = b.harvested_at ? new Date(b.harvested_at).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return b.id.localeCompare(a.id);
+      });
+  }, [archivedBeds, selectedSeason]);
+
+  if (!isOpen) return null;
 
   const toggleExpand = (bedId: string) => {
     setExpandedBedIds((prev) =>
@@ -151,14 +174,8 @@ export default function ArchivedCropsModal({
             {filteredBeds.map((bed) => {
               const isExpanded = expandedBedIds.includes(bed.id);
 
-              // 該当アーカイブ畝の過去観察記録（この栽培サイクルで保存された記録のみを厳密にマッチ）
-              const bedRecords = records
-                .filter((r) => r.bed_id === bed.id)
-                .sort(
-                  (a, b) =>
-                    new Date(b.created_at || b.date).getTime() -
-                    new Date(a.created_at || a.date).getTime()
-                );
+              // 該当アーカイブ畝の過去観察記録（事前集約した Map から O(1) 取得）
+              const bedRecords = recordsByBedId.get(bed.id) || [];
 
               return (
                 <div
