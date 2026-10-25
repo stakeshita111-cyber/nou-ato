@@ -167,7 +167,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     setShowToast(true);
   };
 
-  // 🌟【新スライド制御】requestAnimationFrame による精密速度＆逆方向スライド制御 🌟
+  // 🌟【新スライド制御】requestAnimationFrame による精密速度＆逆方向スライド制御 ＆ フリック操作 🌟
   const sliderRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<number>(0);
@@ -175,6 +175,22 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
   const [activeSlideStatus, setActiveSlideStatus] = useState<'forward' | 'paused' | 'reverse'>(
     'forward'
   );
+
+  // フリック・ドラッグ操作連携用 Refs & State
+  const isDraggingRef = useRef(false);
+  const isInteractingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartScrollLeftRef = useRef(0);
+  const resumeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isManualSliding, setIsManualSliding] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current);
+      }
+    };
+  }, []);
 
   const fetchJournals = useCallback(async (isInitial: boolean = false) => {
     await Promise.resolve();
@@ -1140,7 +1156,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     };
   }, [fetchJournals, fetchCropRecords, activeFarmId]);
 
-  // 🌟【要件: 30%低速化 & ホバー一時停止 & 左側ホバーで逆スライド & 設定連動】🌟
+  // 🌟【要件: 自動スライド & フリック・ドラッグ操作両立 & ホバー一時停止 & 設定連動】🌟
   useEffect(() => {
     let animId: number;
     let lastTime = performance.now();
@@ -1170,7 +1186,8 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         if (slideSettings.speed === 'fast') baseSpeed = 1.1;
         if (slideSettings.speed === 'paused') baseSpeed = 0;
 
-        if (halfWidth > 50 && baseSpeed > 0) {
+        // 手動操作（フリック・ドラッグ）中ではない場合のみ自動スクロールを加算
+        if (!isInteractingRef.current && halfWidth > 50 && baseSpeed > 0) {
           if (slideModeRef.current === 'forward') {
             scrollPosRef.current += baseSpeed * delta;
             if (scrollPosRef.current >= halfWidth) {
@@ -1196,31 +1213,164 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
     return () => cancelAnimationFrame(animId);
   }, [slideColumns.length, slideSettings.speed]);
 
-  // マウス位置判定ハンドラー
-  const handleSliderMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  // 👆 フリック・スワイプ操作 (スマホ/タブレット タッチイベント)
+  const handleSliderTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!sliderRef.current) return;
-    const rect = sliderRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const width = rect.width;
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+    isInteractingRef.current = true;
+    isDraggingRef.current = false;
+    dragStartXRef.current = e.touches[0].clientX;
+    dragStartScrollLeftRef.current = sliderRef.current.scrollLeft;
+    scrollPosRef.current = sliderRef.current.scrollLeft;
+    setActiveSlideStatus('paused');
+    setIsManualSliding(true);
+  };
 
-    // 左側28%エリアにカーソルがある場合は逆方向スライド
-    if (mouseX < width * 0.28) {
-      if (slideModeRef.current !== 'reverse') {
-        slideModeRef.current = 'reverse';
-        setActiveSlideStatus('reverse');
+  const handleSliderTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isInteractingRef.current || !sliderRef.current || !trackRef.current) return;
+    const currentX = e.touches[0].clientX;
+    const deltaX = dragStartXRef.current - currentX;
+
+    if (Math.abs(deltaX) > 6) {
+      isDraggingRef.current = true;
+    }
+
+    const halfWidth = trackRef.current.scrollWidth / 2;
+    let newScroll = dragStartScrollLeftRef.current + deltaX;
+
+    if (halfWidth > 50) {
+      while (newScroll >= halfWidth) {
+        newScroll -= halfWidth;
+        dragStartScrollLeftRef.current -= halfWidth;
       }
+      while (newScroll < 0) {
+        newScroll += halfWidth;
+        dragStartScrollLeftRef.current += halfWidth;
+      }
+    }
+
+    sliderRef.current.scrollLeft = newScroll;
+    scrollPosRef.current = newScroll;
+  };
+
+  const handleSliderTouchEnd = () => {
+    if (!isInteractingRef.current) return;
+    isInteractingRef.current = false;
+
+    // クリック誤爆防止フラグの解除は一瞬遅延（clickイベント消化後）
+    setTimeout(() => {
+      isDraggingRef.current = false;
+      setIsManualSliding(false);
+    }, 60);
+
+    if (sliderRef.current) {
+      scrollPosRef.current = sliderRef.current.scrollLeft;
+    }
+
+    // 手動操作終了から 2.5 秒後に自動スクロールを再開
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => {
+      slideModeRef.current = 'forward';
+      setActiveSlideStatus('forward');
+    }, 2500);
+  };
+
+  // 🖱️ マウスドラッグ操作 (PCでの左右フリック・手動スクロール)
+  const handleSliderMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // 内部のボタンクリック等の場合はドラッグを開始しない
+    if ((e.target as HTMLElement).closest('button')) return;
+
+    if (!sliderRef.current) return;
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+    isInteractingRef.current = true;
+    isDraggingRef.current = false;
+    dragStartXRef.current = e.clientX;
+    dragStartScrollLeftRef.current = sliderRef.current.scrollLeft;
+    scrollPosRef.current = sliderRef.current.scrollLeft;
+    setActiveSlideStatus('paused');
+    setIsManualSliding(true);
+  };
+
+  const handleSliderMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isInteractingRef.current && sliderRef.current && trackRef.current) {
+      // ドラッグ中: 移動差分を直接反映
+      const currentX = e.clientX;
+      const deltaX = dragStartXRef.current - currentX;
+
+      if (Math.abs(deltaX) > 6) {
+        isDraggingRef.current = true;
+      }
+
+      const halfWidth = trackRef.current.scrollWidth / 2;
+      let newScroll = dragStartScrollLeftRef.current + deltaX;
+
+      if (halfWidth > 50) {
+        while (newScroll >= halfWidth) {
+          newScroll -= halfWidth;
+          dragStartScrollLeftRef.current -= halfWidth;
+        }
+        while (newScroll < 0) {
+          newScroll += halfWidth;
+          dragStartScrollLeftRef.current += halfWidth;
+        }
+      }
+
+      sliderRef.current.scrollLeft = newScroll;
+      scrollPosRef.current = newScroll;
     } else {
-      // それ以外の領域は一時停止
-      if (slideModeRef.current !== 'paused') {
-        slideModeRef.current = 'paused';
-        setActiveSlideStatus('paused');
+      // 通常のホバー判定 (PCマウス用: 左側28%で逆再生、それ以外で一時停止)
+      if (!sliderRef.current) return;
+      const rect = sliderRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const width = rect.width;
+
+      if (mouseX < width * 0.28) {
+        if (slideModeRef.current !== 'reverse') {
+          slideModeRef.current = 'reverse';
+          setActiveSlideStatus('reverse');
+        }
+      } else {
+        if (slideModeRef.current !== 'paused') {
+          slideModeRef.current = 'paused';
+          setActiveSlideStatus('paused');
+        }
       }
     }
   };
 
+  const handleSliderMouseUp = () => {
+    if (isInteractingRef.current) {
+      isInteractingRef.current = false;
+      setTimeout(() => {
+        isDraggingRef.current = false;
+        setIsManualSliding(false);
+      }, 60);
+
+      if (sliderRef.current) {
+        scrollPosRef.current = sliderRef.current.scrollLeft;
+      }
+
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = setTimeout(() => {
+        slideModeRef.current = 'forward';
+        setActiveSlideStatus('forward');
+      }, 2500);
+    }
+  };
+
   const handleSliderMouseLeave = () => {
-    slideModeRef.current = 'forward';
-    setActiveSlideStatus('forward');
+    if (isInteractingRef.current) {
+      handleSliderMouseUp();
+    } else {
+      slideModeRef.current = 'forward';
+      setActiveSlideStatus('forward');
+    }
   };
 
   return (
@@ -1723,31 +1873,50 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
             </button>
 
             <div className="hidden sm:flex items-center space-x-2 text-[11px] font-bold">
-              {activeSlideStatus === 'reverse' && (
-                <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
-                  <span>◀◀</span>
-                  <span>逆スライド中</span>
+              {isManualSliding ? (
+                <span className="text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center space-x-1 animate-pulse">
+                  <span>✋</span>
+                  <span>手動スライド中 (離すと自動再開)</span>
                 </span>
-              )}
-              {activeSlideStatus === 'paused' && (
-                <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
-                  <span>⏸</span>
-                  <span>一時停止中</span>
-                </span>
-              )}
-              {activeSlideStatus === 'forward' && (
-                <span className="text-gray-400 font-medium">💡 ホバーで停止 / 左端で逆再生</span>
+              ) : (
+                <>
+                  {activeSlideStatus === 'reverse' && (
+                    <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse flex items-center space-x-1">
+                      <span>◀◀</span>
+                      <span>逆スライド中</span>
+                    </span>
+                  )}
+                  {activeSlideStatus === 'paused' && (
+                    <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                      <span>⏸</span>
+                      <span>一時停止中</span>
+                    </span>
+                  )}
+                  {activeSlideStatus === 'forward' && (
+                    <span className="text-gray-400 font-medium">
+                      💡 左右フリックで手動送り / ホバーで停止
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
         </div>
 
-        {/* 2行まとめて流れる無限オートスライダーコンテナ */}
+        {/* 2行まとめて流れる無限オートスライダーコンテナ (フリック・ドラッグ対応) */}
         <div
           ref={sliderRef}
+          onMouseDown={handleSliderMouseDown}
           onMouseMove={handleSliderMouseMove}
+          onMouseUp={handleSliderMouseUp}
           onMouseLeave={handleSliderMouseLeave}
-          className="relative w-full overflow-x-hidden rounded-2xl bg-emerald-50/30 p-3 border border-emerald-100/80 select-none cursor-pointer"
+          onTouchStart={handleSliderTouchStart}
+          onTouchMove={handleSliderTouchMove}
+          onTouchEnd={handleSliderTouchEnd}
+          onTouchCancel={handleSliderTouchEnd}
+          className={`relative w-full overflow-x-hidden rounded-2xl bg-emerald-50/30 p-3 border border-emerald-100/80 select-none ${
+            isManualSliding ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
         >
           {slideColumns.length >= 4 && (
             <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-emerald-100/40 to-transparent pointer-events-none z-10 flex items-center justify-start pl-1">
@@ -1775,6 +1944,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                         <div
                           key={`rec_${item.id}_${colIdx}_${rowIdx}`}
                           onClick={() => {
+                            if (isDraggingRef.current) return;
                             if (item.plotCode) {
                               if (onNavigateToFarm) {
                                 onNavigateToFarm(item.plotCode, item.farmId);
