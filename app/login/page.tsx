@@ -269,7 +269,7 @@ export default function UnifiedLoginPage() {
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black text-emerald-900 flex items-center gap-1">
-                <span>⚡</span> ポートフォリオ確認用デモ
+                <span>⚡</span> ポートフォリオ確認用
               </span>
               <div className="flex items-center gap-1.5">
                 <Link
@@ -288,9 +288,6 @@ export default function UnifiedLoginPage() {
                 >
                   <span>📖</span> README
                 </Link>
-                <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded-full border border-emerald-200">
-                  ワンクリックログイン
-                </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -301,7 +298,7 @@ export default function UnifiedLoginPage() {
                 className="px-3 py-2 bg-white hover:bg-emerald-100/60 active:scale-98 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer disabled:opacity-50"
               >
                 <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
-                  <span>👨‍🌾</span> 講師（即ログイン）
+                  <span>👨‍🌾</span> 講師でログイン
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   test01@example.com
@@ -314,7 +311,7 @@ export default function UnifiedLoginPage() {
                 className="px-3 py-2 bg-white hover:bg-emerald-100/60 active:scale-98 border border-emerald-300 rounded-xl text-left transition shadow-2xs group cursor-pointer disabled:opacity-50"
               >
                 <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 flex items-center gap-1">
-                  <span>👨‍🎓</span> 受講生（即ログイン）
+                  <span>👨‍🎓</span> 生徒でログイン
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   test11@example.com

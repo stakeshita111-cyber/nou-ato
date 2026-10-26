@@ -170,43 +170,43 @@
               <span>📊</span><span class="hidden sm:inline">検証・設計:</span>
             </span>
             <a
-              href="review-checklist-dashboard.html"
+              href="/docs/review-checklist-dashboard.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               ✅ オリアプレビュー (101項目)
             </a>
             <a
-              href="api-docs.html"
+              href="/docs/api-docs.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               ⚡ API仕様 (Swagger UI)
             </a>
             <a
-              href="database-design.html"
+              href="/docs/database-design.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               🗄️ ER図・DB定義書
             </a>
             <a
-              href="test-plan.html"
+              href="/docs/test-plan.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               🧪 品質検査計画 (QA)
             </a>
             <a
-              href="architecture-map.html"
+              href="/docs/architecture-map.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               🗺️ システム構成マップ
             </a>
             <a
-              href="agent-and-skills-guide.html"
+              href="/docs/agent-and-skills-guide.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               🤖 エージェント設計
             </a>
             <a
-              href="screen_flow.html"
+              href="/docs/screen_flow.html"
               class="px-2.5 py-1 rounded-lg bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border border-slate-200 transition"
             >
               📱 画面遷移図
@@ -444,7 +444,8 @@
         document.getElementById('doc-title').textContent = doc.title;
         document.getElementById('doc-desc').textContent = doc.desc;
         document.getElementById('doc-file-badge').textContent = doc.filename;
-        document.getElementById('btn-raw-file').href = doc.filePath;
+        document.getElementById('btn-raw-file').href =
+          'https://raw.githubusercontent.com/stakeshita111-cyber/nou-ato/main/' + doc.githubPath;
         document.getElementById('btn-github').href =
           'https://github.com/stakeshita111-cyber/nou-ato/blob/main/' + doc.githubPath;
 

@@ -29,20 +29,20 @@ const SLIDES: ScreenSlide[] = [
     category: 'common',
     categoryLabel: '認証・開始',
     title: 'ログイン画面',
-    subtitle: 'ワンクリック即ログインで、パスワード入力不要ですぐに全機能を体験できます',
+    subtitle: 'ワンクリック簡単ログインで、パスワード入力不要ですぐに全機能を体験できます',
     imageSrc: '/images/screens/01-login.png',
     deviceType: 'mobile',
     points: [
       {
         icon: '👨‍🎓',
-        label: '受講生（即ログイン）',
+        label: '生徒でログイン',
         desc: '生徒用のスマホ画面へ直通ログイン！野菜タスクやAI相談を体験できます',
         x: 67,
         y: 45,
       },
       {
         icon: '👨‍🌾',
-        label: '講師（即ログイン）',
+        label: '講師でログイン',
         desc: '先生用PC画面へ直通ログイン！生徒管理や畑レイアウト編集を体験できます',
         x: 32,
         y: 45,

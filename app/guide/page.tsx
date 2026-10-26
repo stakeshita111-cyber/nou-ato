@@ -64,7 +64,7 @@ export default function GuidePage() {
             <Link href="/login" className="text-emerald-700 underline font-bold">
               /login
             </Link>
-            ）の<strong>「受講生（即ログイン）」</strong>
+            ）の<strong>「生徒でログイン」</strong>
             ボタンを押すだけで、生徒のスマホ画面に直接入れます。
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -75,7 +75,7 @@ export default function GuidePage() {
               <div className="font-black text-emerald-950 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <span className="text-lg">👨‍🎓</span>
-                  <span>受講生（即ログイン）</span>
+                  <span>生徒でログイン</span>
                 </span>
                 <span className="text-2xs bg-emerald-700 text-white px-2 py-0.5 rounded-full font-bold">
                   おすすめ
@@ -90,7 +90,7 @@ export default function GuidePage() {
             >
               <div className="font-black text-slate-800 flex items-center gap-1.5">
                 <span className="text-lg">👨‍🌾</span>
-                <span>講師（即ログイン）</span>
+                <span>講師でログイン</span>
               </div>
               <div className="text-2xs text-slate-500 mt-1">test01@example.com / PC推奨</div>
             </Link>
