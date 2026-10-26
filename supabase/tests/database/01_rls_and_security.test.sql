@@ -2196,10 +2196,6 @@ BEGIN
         (v_student_deact, 'student', v_farm_a, '退会予定生徒'),
         (v_student_peer, 'student', v_farm_a, '在籍生徒')
     ON CONFLICT (id) DO UPDATE SET farm_id = v_farm_a, role = 'student', deleted_at = NULL;
-
-    INSERT INTO public.farm_members (farm_id, user_id)
-    VALUES (v_farm_a, v_student_del), (v_farm_a, v_student_deact), (v_farm_a, v_student_peer)
-    ON CONFLICT (farm_id, user_id) DO NOTHING;
 END $$;
 
 -- 返信通知は本番と同じ経路（講師1ロール）で INSERT
