@@ -95,6 +95,7 @@ export interface ChatJournalSourceItem {
   date?: string;
   student_id?: string;
   task_title?: string;
+  is_private?: boolean;
 }
 
 export interface ChatMessageItem {
@@ -158,6 +159,12 @@ export function processChatHistory(targetList: ChatJournalSourceItem[]): ChatMes
       j.text === '【返信】講師から相談への回答が届きました' ||
       String(j.text || '').startsWith('【返信】')
     ) {
+      return;
+    }
+
+    // 生徒宛ての broadcast は DB トリガーで is_private = true に強制される（返信通知）。
+    // 返信本文は元の相談レコードの reply から表示するため、通知行は除外する。
+    if (j.role === 'broadcast' && j.is_private === true) {
       return;
     }
 

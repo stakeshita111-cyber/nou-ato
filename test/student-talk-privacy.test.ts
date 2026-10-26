@@ -96,6 +96,116 @@ describe('StudentTalkView Message Parsing & Duplication Prevention', () => {
     );
     expect(studentReplies).toHaveLength(0);
   });
+
+  it('excludes notification broadcast with is_private = true and preserves student-teacher conversation bubbles', () => {
+    const dbJournals = [
+      {
+        id: 'j_c2',
+        role: 'student',
+        content: '追肥のタイミングについて相談したいです。',
+        reply: '花芽がついたタイミングで一握り追肥してください。',
+        is_private: false,
+      },
+      {
+        id: 'j_notif_private',
+        role: 'broadcast',
+        text: '【返信】講師から相談への回答が届きました',
+        content: '花芽がついたタイミングで一握り追肥してください。',
+        reply: '講師からの返信',
+        is_private: true,
+      },
+    ];
+
+    const messages = processChatHistory(dbJournals);
+
+    // Exactly 2 messages: student question and teacher reply. The is_private = true notification broadcast is safely excluded.
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({
+      id: 'q_j_c2',
+      sender: 'student',
+      text: '追肥のタイミングについて相談したいです。',
+    });
+    expect(messages[1]).toMatchObject({
+      id: 'a_j_c2',
+      sender: 'teacher',
+      text: '花芽がついたタイミングで一握り追肥してください。',
+    });
+  });
+
+  it('excludes broadcast notification using is_private = true even when text and reply do not match legacy strings', () => {
+    const consultation = {
+      id: 'j_c3',
+      role: 'student',
+      content: '追肥のタイミングについて相談したいです。',
+      reply: '花芽がついたタイミングで一握り追肥してください。',
+      is_private: false,
+      student_id: '00000000-0000-0000-0000-000000000002',
+    };
+    const notification = {
+      id: 'j_notif_custom',
+      role: 'broadcast',
+      student_id: '00000000-0000-0000-0000-000000000002',
+      text: 'お知らせ',
+      content: '追肥してください。',
+      reply: '講師より',
+      is_private: true,
+    };
+
+    const messages = processChatHistory([consultation, notification]);
+
+    // Exactly 2 messages from the consultation (question and reply). Notification is excluded via is_private = true
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({
+      id: 'q_j_c3',
+      sender: 'student',
+      text: '追肥のタイミングについて相談したいです。',
+    });
+    expect(messages[1]).toMatchObject({
+      id: 'a_j_c3',
+      sender: 'teacher',
+      text: '花芽がついたタイミングで一握り追肥してください。',
+    });
+  });
+
+  it('preserves broadcast message as teacher bubble when is_private = false (regression test)', () => {
+    const consultation = {
+      id: 'j_c3',
+      role: 'student',
+      content: '追肥のタイミングについて相談したいです。',
+      reply: '花芽がついたタイミングで一握り追肥してください。',
+      is_private: false,
+      student_id: '00000000-0000-0000-0000-000000000002',
+    };
+    const publicBroadcast = {
+      id: 'j_broadcast_public',
+      role: 'broadcast',
+      student_id: '00000000-0000-0000-0000-000000000002',
+      text: 'お知らせ',
+      content: '追肥してください。',
+      reply: '講師より',
+      is_private: false,
+    };
+
+    const messages = processChatHistory([consultation, publicBroadcast]);
+
+    // 3 messages: 2 from consultation, 1 from public broadcast
+    expect(messages).toHaveLength(3);
+    expect(messages[0]).toMatchObject({
+      id: 'q_j_c3',
+      sender: 'student',
+      text: '追肥のタイミングについて相談したいです。',
+    });
+    expect(messages[1]).toMatchObject({
+      id: 'a_j_c3',
+      sender: 'teacher',
+      text: '花芽がついたタイミングで一握り追肥してください。',
+    });
+    expect(messages[2]).toMatchObject({
+      id: 't_j_broadcast_public',
+      sender: 'teacher',
+      text: '追肥してください。',
+    });
+  });
 });
 
 describe('StudentTalkView Privacy Features', () => {

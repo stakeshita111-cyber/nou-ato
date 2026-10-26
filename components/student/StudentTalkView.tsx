@@ -220,6 +220,7 @@ export default function StudentTalkView({
           reply: j.reply ?? undefined,
           created_at: j.created_at,
           student_id: j.student_id ?? undefined,
+          is_private: j.is_private ?? undefined,
         }));
       } else if (journals && journals.length > 0) {
         // studentId 未設定の場合でも、他人のデータ混入を防止

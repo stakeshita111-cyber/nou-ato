@@ -350,6 +350,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       setToastMessage('返信の保存に失敗しました: ' + error.message);
     } else {
       // 生徒宛ての個別通知レコードを insert
+      let notifyFailed = false;
       try {
         const isUuid = (str?: string | null) =>
           !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -368,15 +369,18 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               text: '【返信】講師から相談への回答が届きました',
               content: text.trim(),
               reply: '講師からの返信',
+              is_private: true,
               created_at: new Date().toISOString(),
             },
           ]);
           if (insErr) {
             console.warn('Reply broadcast insert warn:', insErr);
+            notifyFailed = true;
           }
         }
       } catch (e) {
         console.warn('Reply broadcast insert exception:', e);
+        notifyFailed = true;
       }
 
       // 送信後、BroadcastChannel 及び nouato_sync_event を送信
@@ -403,11 +407,13 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       );
       setEditingReplyId(null);
       setToastMessage(
-        shouldApprove
-          ? '💬 回答を送信し、★ AIナレッジとして承認保存しました！'
-          : isPreviouslyApproved
-            ? '💬 返信内容が変更されたため、安全のためAIナレッジ承認を取り消しました。再度ナレッジ共有する場合は☆ボタンから承認してください。'
-            : '💬 生徒への回答メッセージを更新・保存しました！'
+        notifyFailed
+          ? '⚠️ 返信は保存しましたが、生徒への通知の保存に失敗しました。時間をおいて再度お試しください。'
+          : shouldApprove
+            ? '💬 回答を送信し、★ AIナレッジとして承認保存しました！'
+            : isPreviouslyApproved
+              ? '💬 返信内容が変更されたため、安全のためAIナレッジ承認を取り消しました。再度ナレッジ共有する場合は☆ボタンから承認してください。'
+              : '💬 生徒への回答メッセージを更新・保存しました！'
       );
     }
     setShowToast(true);
@@ -482,6 +488,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
       if (error) {
         setToastMessage('ナレッジの登録・承認に失敗しました: ' + error.message);
       } else {
+        let notifyFailed = false;
         // 返信アクション経由の場合は生徒宛て通知を挿入
         if (isFromReplyAction && replyText.trim()) {
           try {
@@ -492,7 +499,7 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
               journal.student_id && isUuid(journal.student_id) ? journal.student_id : null;
 
             if (validStudentId) {
-              await supabase.from('journals').insert([
+              const { error: insErr } = await supabase.from('journals').insert([
                 {
                   role: 'broadcast',
                   student_id: validStudentId,
@@ -500,12 +507,18 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
                   text: '【返信】講師から相談への回答が届きました',
                   content: replyText.trim(),
                   reply: '講師からの返信',
+                  is_private: true,
                   created_at: new Date().toISOString(),
                 },
               ]);
+              if (insErr) {
+                console.warn('Broadcast insert warn:', insErr);
+                notifyFailed = true;
+              }
             }
           } catch (e) {
             console.warn('Broadcast insert warn:', e);
+            notifyFailed = true;
           }
 
           if (typeof window !== 'undefined') {
@@ -532,7 +545,11 @@ export default function TeacherJournalsView({ onNavigateToFarm }: TeacherJournal
         );
         setShowKnowledgeModal(false);
         setEditingReplyId(null);
-        setToastMessage('💡 個人情報を確認・一般化し、農園FAQナレッジとして承認登録しました！✨');
+        setToastMessage(
+          notifyFailed
+            ? '⚠️ 返信は保存しましたが、生徒への通知の保存に失敗しました。時間をおいて再度お試しください。'
+            : '💡 個人情報を確認・一般化し、農園FAQナレッジとして承認登録しました！✨'
+        );
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
