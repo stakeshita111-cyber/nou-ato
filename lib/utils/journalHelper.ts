@@ -39,6 +39,33 @@ export const isFarmJournal = (content?: string): boolean => {
   );
 };
 
+export interface FarmJournalTagOptions {
+  isShared?: boolean;
+  bedNumber?: number | string | null;
+  cropName?: string | null;
+  isConsultation?: boolean;
+}
+
+/**
+ * 🌟 畑画面からの日誌・相談用目印タグフォーマットヘルパー 🌟
+ * - 共通選択中: 【区画全体・共通】
+ * - 畝選択中: 【畝 N (作物名)】（作物名が未指定/空の場合は「未確定 🌱」）
+ * - isConsultation が true の場合、末尾に「❗ [相談] 」を付加
+ */
+export const formatFarmJournalTag = (options: FarmJournalTagOptions): string => {
+  const marker = options.isConsultation ? '❗ [相談] ' : '';
+  if (options.isShared) {
+    return `【区画全体・共通】${marker}`;
+  }
+  // 畝番号が未指定または空の場合は壊れた目印（【畝 (未確定 🌱)】等）を生成しない
+  if (options.bedNumber === undefined || options.bedNumber === null || options.bedNumber === '') {
+    return marker;
+  }
+  const bedNum = String(options.bedNumber);
+  const crop = options.cropName?.trim() || '未確定 🌱';
+  return `【畝 ${bedNum} (${crop})】${marker}`;
+};
+
 /**
  * 送信前メッセージのフォーマットヘルパー（全体共有不可・非公開メモタグの制御）
  */

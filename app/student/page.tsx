@@ -458,14 +458,14 @@ function StudentContent() {
   };
 
   // 気づきメモ投稿
-  const handleAddJournal = async () => {
+  const handleAddJournal = async (headerTag?: string) => {
     if (!newJournal.trim()) {
       setToastMessage('気づきメモを入力してください');
       setShowToast(true);
       return;
     }
     try {
-      await addJournal();
+      await addJournal(headerTag);
       setToastMessage('📝 講師へ日誌・気づきメモを送信しました！');
       setShowToast(true);
     } catch (err: unknown) {
