@@ -10,6 +10,7 @@ import ArchivedCropsModal from '@/components/farm/ArchivedCropsModal';
 import { SproutLoader } from '@/components/SproutLoader';
 import { supabase } from '@/lib/supabase';
 import { formatDate, formatHarvestAmount } from '@/lib/utils/formatHelper';
+import { formatFarmJournalTag } from '@/lib/utils/journalHelper';
 import { uploadImageToStorage } from '@/lib/storage';
 import {
   formatBedCropLabel,
@@ -37,7 +38,7 @@ interface StudentFarmRecordViewProps {
   onUncompleteTask?: (id: string) => void;
   newJournal?: string;
   setNewJournal?: (val: string) => void;
-  onAddJournal?: () => void;
+  onAddJournal?: (headerTag?: string) => void;
 }
 
 export default function StudentFarmRecordView({
@@ -407,9 +408,11 @@ export default function StudentFarmRecordView({
             null;
 
           const hasHttpImg = finalImageUrl && finalImageUrl.startsWith('http');
-          const headerTag = isTargetShared
-            ? '【区画全体・共通】'
-            : `【畝 ${currentBed!.bed_number} (${finalCrop})】`;
+          const headerTag = formatFarmJournalTag({
+            isShared: isTargetShared,
+            bedNumber: currentBed?.bed_number,
+            cropName: finalCrop,
+          });
           const journalContent =
             finalImageUrl && !hasHttpImg
               ? `${headerTag}${cleanNotes}\n[IMG:${finalImageUrl}]`
@@ -1347,7 +1350,20 @@ export default function StudentFarmRecordView({
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={onAddJournal}
+                  onClick={() => {
+                    if (!currentBed && !isSharedSelected) {
+                      setToastMessage('⚠️ 対象の畝が見つかりません。畝を選択し直してください');
+                      setShowToast(true);
+                      return;
+                    }
+                    const tag = formatFarmJournalTag({
+                      isShared: isSharedSelected,
+                      bedNumber: currentBed?.bed_number,
+                      cropName: currentBed?.crop_name,
+                      isConsultation: true,
+                    });
+                    onAddJournal?.(tag);
+                  }}
                   disabled={!newJournal || !newJournal.trim()}
                   className={`px-4 py-2 rounded-xl text-xs font-black transition shadow-xs flex items-center gap-1.5 ${
                     newJournal && newJournal.trim()

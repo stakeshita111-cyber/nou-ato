@@ -579,11 +579,12 @@ export function useStudentDashboard() {
     }
   };
 
-  const addJournal = async () => {
+  const addJournal = async (headerTag?: string) => {
     if (!newJournal.trim()) return;
 
     const studentId = user?.id || null;
-    const contentToSave = newJournal.trim();
+    const trimmedInput = newJournal.trim();
+    const contentToSave = headerTag ? `${headerTag}${trimmedInput}` : trimmedInput;
 
     try {
       const { data, error } = await supabase
