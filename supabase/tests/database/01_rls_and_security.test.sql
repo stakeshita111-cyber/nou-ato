@@ -2135,8 +2135,7 @@ SELECT is(
 INSERT INTO storage.objects (id, bucket_id, name, owner)
 VALUES 
     (gen_random_uuid(), 'crop-photos', '00000000-0000-0000-0000-000000000002/test-student-a.jpg', '00000000-0000-0000-0000-000000000002'::uuid),
-    (gen_random_uuid(), 'crop-photos', '00000000-0000-0000-0000-000000000003/test-student-b.jpg', '00000000-0000-0000-0000-000000000003'::uuid)
-ON CONFLICT (bucket_id, name) DO NOTHING;
+    (gen_random_uuid(), 'crop-photos', '00000000-0000-0000-0000-000000000003/test-student-b.jpg', '00000000-0000-0000-0000-000000000003'::uuid);
 
 -- 213. 未ログイン (anon) は一覧・メタデータ取得できない (0件)
 SET LOCAL ROLE anon;
