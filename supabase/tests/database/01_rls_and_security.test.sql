@@ -2174,12 +2174,12 @@ RESET ROLE;
 -- 216-228. [DB-2 v2] journals 返信通知の非公開強制トリガー & RLS 全体お知らせ分離保護
 -- ==============================================================================
 
--- テスト専用の生徒ユーザー（削除対象 0099、退会対象 0098）の準備
+-- テスト専用の生徒ユーザー（削除対象 0199、退会対象 0198）の準備
 DO $$
 DECLARE
     v_farm_a UUID := '11111111-1111-1111-1111-111111111111'::uuid;
-    v_student_del UUID := '00000000-0000-0000-0000-000000000099'::uuid;
-    v_student_deact UUID := '00000000-0000-0000-0000-000000000098'::uuid;
+    v_student_del UUID := '00000000-0000-0000-0000-000000000199'::uuid;
+    v_student_deact UUID := '00000000-0000-0000-0000-000000000198'::uuid;
 BEGIN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
     VALUES 
@@ -2201,9 +2201,9 @@ SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001"
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
--- 講師1が is_private を指定せずに入れた返信通知（宛先 0099）
+-- 講師1が is_private を指定せずに入れた返信通知（宛先 0199）
 INSERT INTO public.journals (id, farm_id, student_id, role, reply, content)
-VALUES ('99999999-0000-0000-0000-000000000001'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000099'::uuid, 'broadcast', '講師からの返信', '秘密の個別返信本文1');
+VALUES ('99999999-0000-0000-0000-000000000001'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000199'::uuid, 'broadcast', '講師からの返信', '秘密の個別返信本文1');
 
 -- 216. 講師が is_private 未指定で INSERT した返信通知が is_private = true で保存されている（管理者権限で確認）
 RESET ROLE;
@@ -2223,7 +2223,7 @@ SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 INSERT INTO public.journals (id, farm_id, student_id, role, reply, content, is_private)
-VALUES ('99999999-0000-0000-0000-000000000011'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000099'::uuid, 'broadcast', '講師からの返信', '秘密の個別返信本文2', false);
+VALUES ('99999999-0000-0000-0000-000000000011'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000199'::uuid, 'broadcast', '講師からの返信', '秘密の個別返信本文2', false);
 
 -- 217. 講師が is_private = false を明示して INSERT しても true になる（管理者権限で確認）
 RESET ROLE;
@@ -2245,19 +2245,19 @@ SELECT is(
     '218. [journals_trigger_force_private_on_update] 管理者権限で UPDATE is_private = false してもトリガーで true のまま維持される'
 );
 
--- 219. 本人生徒（0099）が自分宛ての返信通知を SELECT できる（1件）
+-- 219. 本人生徒（0199）が自分宛ての返信通知を SELECT できる（1件）
 SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000099", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000099';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000199", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000199';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000001'::uuid),
     1,
-    '219. [journals_reply_visible_to_recipient] 本人生徒 0099 は自分宛ての返信通知を SELECT できる (1件)'
+    '219. [journals_reply_visible_to_recipient] 本人生徒 0199 は自分宛ての返信通知を SELECT できる (1件)'
 );
 
--- 220. 在籍中、同じ農園の生徒A（0002）からは 0099 宛ての返信通知が見えない（0件）
+-- 220. 在籍中、同じ農園の生徒A（0002）からは 0199 宛ての返信通知が見えない（0件）
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
@@ -2270,7 +2270,7 @@ SELECT is(
     '220. [journals_reply_hidden_from_other_student] 同じ農園の生徒Aからは他生徒宛ての返信通知が見えない (0件)'
 );
 
--- 221. 講師1（0001）は 0099 宛ての返信通知を SELECT できない（0件）
+-- 221. 講師1（0001）は 0199 宛ての返信通知を SELECT できない（0件）
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
@@ -2283,24 +2283,24 @@ SELECT is(
     '221. [journals_reply_hidden_from_teacher] 講師1も is_private = true の返信通知行を SELECT できない (0件)'
 );
 
--- 222. 0098 宛ての返信通知を作り、生徒が退会（deleted_at = now()）後、行が残って student_id IS NULL かつ is_private = true（管理者権限で確認）
+-- 222. 0198 宛ての返信通知を作り、生徒が退会（deleted_at = now()）後、行が残って student_id IS NULL かつ is_private = true（管理者権限で確認）
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 INSERT INTO public.journals (id, farm_id, student_id, role, reply, content)
-VALUES ('99999999-0000-0000-0000-000000000098'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000098'::uuid, 'broadcast', '講師からの返信', '退会生徒宛て返信');
+VALUES ('99999999-0000-0000-0000-000000000198'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '00000000-0000-0000-0000-000000000198'::uuid, 'broadcast', '講師からの返信', '退会生徒宛て返信');
 
 RESET ROLE;
 SET LOCAL "request.jwt.claims" = '{}';
 SET LOCAL "request.jwt.claim.sub" = '';
 SET LOCAL "request.jwt.claim.role" = '';
-UPDATE public.users SET deleted_at = now() WHERE id = '00000000-0000-0000-0000-000000000098'::uuid;
+UPDATE public.users SET deleted_at = now() WHERE id = '00000000-0000-0000-0000-000000000198'::uuid;
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals 
-     WHERE id = '99999999-0000-0000-0000-000000000098'::uuid
+     WHERE id = '99999999-0000-0000-0000-000000000198'::uuid
        AND student_id IS NULL
        AND is_private = true),
     1,
@@ -2314,17 +2314,17 @@ SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
-    (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000098'::uuid),
+    (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000198'::uuid),
     0,
     '223. [journals_deactivated_reply_hidden_from_student_a] 退会生徒の返信通知行は生徒Aから見えない (0件)'
 );
 
--- 224. DELETE FROM public.users WHERE id = '...0099'（物理削除）の後、返信通知が残り student_id IS NULL かつ is_private = true
+-- 224. DELETE FROM public.users WHERE id = '...0199'（物理削除）の後、返信通知が残り student_id IS NULL かつ is_private = true
 RESET ROLE;
 SET LOCAL "request.jwt.claims" = '{}';
 SET LOCAL "request.jwt.claim.sub" = '';
 SET LOCAL "request.jwt.claim.role" = '';
-DELETE FROM public.users WHERE id = '00000000-0000-0000-0000-000000000099'::uuid;
+DELETE FROM public.users WHERE id = '00000000-0000-0000-0000-000000000199'::uuid;
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals 
