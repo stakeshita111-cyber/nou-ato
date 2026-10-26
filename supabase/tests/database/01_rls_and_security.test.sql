@@ -2174,24 +2174,32 @@ RESET ROLE;
 -- 216-228. [DB-2 v2] journals 返信通知の非公開強制トリガー & RLS 全体お知らせ分離保護
 -- ==============================================================================
 
--- テスト専用の生徒ユーザー（削除対象 0199、退会対象 0198）の準備
+-- テスト専用の生徒ユーザー（削除対象 0199、退会対象 0198、同農園の在籍生徒 0197）の準備
+-- 生徒A（0002）はテスト25で退会済みのため、「同じ農園の他生徒から見えない」確認には在籍生徒 0197 を使う
 DO $$
 DECLARE
     v_farm_a UUID := '11111111-1111-1111-1111-111111111111'::uuid;
     v_student_del UUID := '00000000-0000-0000-0000-000000000199'::uuid;
     v_student_deact UUID := '00000000-0000-0000-0000-000000000198'::uuid;
+    v_student_peer UUID := '00000000-0000-0000-0000-000000000197'::uuid;
 BEGIN
     INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
-    VALUES 
+    VALUES
         (v_student_del, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_del@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
-        (v_student_deact, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_deact@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
+        (v_student_deact, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_deact@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now()),
+        (v_student_peer, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'student_peer@test.local', 'dummy', now(), '{"provider":"email"}', '{}', now(), now())
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO public.users (id, role, farm_id, display_name)
-    VALUES 
+    VALUES
         (v_student_del, 'student', v_farm_a, '削除予定生徒'),
-        (v_student_deact, 'student', v_farm_a, '退会予定生徒')
+        (v_student_deact, 'student', v_farm_a, '退会予定生徒'),
+        (v_student_peer, 'student', v_farm_a, '在籍生徒')
     ON CONFLICT (id) DO UPDATE SET farm_id = v_farm_a, role = 'student', deleted_at = NULL;
+
+    INSERT INTO public.farm_members (farm_id, user_id)
+    VALUES (v_farm_a, v_student_del), (v_farm_a, v_student_deact), (v_farm_a, v_student_peer)
+    ON CONFLICT (farm_id, user_id) DO NOTHING;
 END $$;
 
 -- 返信通知は本番と同じ経路（講師1ロール）で INSERT
@@ -2257,17 +2265,17 @@ SELECT is(
     '219. [journals_reply_visible_to_recipient] 本人生徒 0199 は自分宛ての返信通知を SELECT できる (1件)'
 );
 
--- 220. 在籍中、同じ農園の生徒A（0002）からは 0199 宛ての返信通知が見えない（0件）
+-- 220. 在籍中、同じ農園の在籍生徒（0197）からは 0199 宛ての返信通知が見えない（0件）
 RESET ROLE;
 SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000197", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000197';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000001'::uuid),
     0,
-    '220. [journals_reply_hidden_from_other_student] 同じ農園の生徒Aからは他生徒宛ての返信通知が見えない (0件)'
+    '220. [journals_reply_hidden_from_other_student] 同じ農園の在籍生徒からは他生徒宛ての返信通知が見えない (0件)'
 );
 
 -- 221. 講師1（0001）は 0199 宛ての返信通知を SELECT できない（0件）
@@ -2307,16 +2315,16 @@ SELECT is(
     '222. [journals_reply_preserved_on_deactivation] 生徒退会時に返信通知は物理削除されず student_id IS NULL かつ is_private = true で残る'
 );
 
--- 223. 222 の後、生徒A からその行が見えない（0件）
+-- 223. 222 の後、在籍生徒 からその行が見えない（0件）
 SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000197", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000197';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000198'::uuid),
     0,
-    '223. [journals_deactivated_reply_hidden_from_student_a] 退会生徒の返信通知行は生徒Aから見えない (0件)'
+    '223. [journals_deactivated_reply_hidden_from_student_a] 退会生徒の返信通知行は在籍生徒から見えない (0件)'
 );
 
 -- 224. DELETE FROM public.users WHERE id = '...0199'（物理削除）の後、返信通知が残り student_id IS NULL かつ is_private = true
@@ -2335,19 +2343,19 @@ SELECT is(
     '224. [journals_reply_preserved_on_user_delete] 生徒物理削除時に返信通知は削除されず student_id IS NULL かつ is_private = true で残る'
 );
 
--- 225. 224 の後、生徒A からその行が見えない（0件）
+-- 225. 224 の後、在籍生徒 からその行が見えない（0件）
 SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000197", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000197';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000001'::uuid),
     0,
-    '225. [journals_deleted_user_reply_hidden_from_student_a] 削除生徒の返信通知行は生徒Aから見えない (0件)'
+    '225. [journals_deleted_user_reply_hidden_from_student_a] 削除生徒の返信通知行は在籍生徒から見えない (0件)'
 );
 
--- 226. 管理者権限で student_id = NULL, role = 'broadcast', is_private = true の孤立行を入れる。生徒A から見えない（第3分岐 is_private 条件確認）
+-- 226. 管理者権限で student_id = NULL, role = 'broadcast', is_private = true の孤立行を入れる。在籍生徒 から見えない（第3分岐 is_private 条件確認）
 RESET ROLE;
 SET LOCAL "request.jwt.claims" = '{}';
 SET LOCAL "request.jwt.claim.sub" = '';
@@ -2357,17 +2365,17 @@ VALUES ('99999999-0000-0000-0000-000000000003'::uuid, '11111111-1111-1111-1111-1
 ON CONFLICT (id) DO UPDATE SET student_id = NULL, is_private = true;
 
 SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000197", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000197';
 SET LOCAL "request.jwt.claim.role" = 'authenticated';
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000003'::uuid),
     0,
-    '226. [journals_orphan_reply_hidden_by_rls] is_private = true の孤立行は生徒Aから SELECT できない (0件)'
+    '226. [journals_orphan_reply_hidden_by_rls] is_private = true の孤立行は在籍生徒から SELECT できない (0件)'
 );
 
--- 227. 農園Aの正規の全体お知らせ（講師1が role='broadcast', student_id=NULL で INSERT）を、生徒A が SELECT できる。is_private = false であることも確認
+-- 227. 農園Aの正規の全体お知らせ（講師1が role='broadcast', student_id=NULL で INSERT）を、在籍生徒 が SELECT できる。is_private = false であることも確認
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}';
@@ -2378,14 +2386,14 @@ INSERT INTO public.journals (id, farm_id, student_id, role, reply, content)
 VALUES ('99999999-0000-0000-0000-000000000002'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, NULL, 'broadcast', NULL, '農園Aの正規全体お知らせ本文')
 ON CONFLICT (id) DO UPDATE SET student_id = NULL, reply = NULL;
 
--- 生徒Aとして SELECT
-SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000002", "role": "authenticated"}';
-SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+-- 在籍生徒として SELECT
+SET LOCAL "request.jwt.claims" = '{"sub": "00000000-0000-0000-0000-000000000197", "role": "authenticated"}';
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000197';
 
 SELECT is(
     (SELECT count(*)::int FROM public.journals WHERE id = '99999999-0000-0000-0000-000000000002'::uuid AND is_private IS NOT TRUE),
     1,
-    '227. [journals_announcement_visible_to_student_a] 生徒Aは農園Aの全体お知らせを正常に SELECT でき is_private は false である'
+    '227. [journals_announcement_visible_to_student_a] 在籍生徒は農園Aの全体お知らせを正常に SELECT でき is_private は false である'
 );
 
 -- 228. 227 の全体お知らせが他農園（農園B）の生徒C（0005）からは見えない
