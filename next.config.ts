@@ -37,6 +37,22 @@ const nextConfig: NextConfig = {
         destination: '/student',
         permanent: true,
       },
+      {
+        source:
+          '/:doc(api-docs\.html|database-design\.html|test-plan\.html|architecture-map\.html|agent-and-skills-guide\.html|screen_flow\.html|markdown-viewer\.html|review-checklist-dashboard\.html)',
+        destination: '/docs/:doc',
+        permanent: true,
+      },
+      {
+        source: '/tutorial',
+        destination: '/docs/tutorial/index.html',
+        permanent: true,
+      },
+      {
+        source: '/tutorial/:path*',
+        destination: '/docs/tutorial/:path*',
+        permanent: true,
+      },
     ];
   },
   async headers() {
