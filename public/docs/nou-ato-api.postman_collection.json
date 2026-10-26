@@ -1,0 +1,118 @@
+{
+  "info": {
+    "_postman_id": "nou-ato-api-collection-v1",
+    "name": "NOU-ATO REST API Collection",
+    "description": "体験農業支援アプリ「NOU-ATO」の全APIエンドポイントコレクションです。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "AI相談 (RAG) - チャット質問",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"トマトの脇芽かきはいつ行うべきですか？\",\n  \"studentName\": \"受講生\",\n  \"isMemoOnly\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/chat/rag",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "chat", "rag"]
+        },
+        "description": "Gemini と農園蓄積ナレッジを組み合わせたAIしるべぇチャット回答を生成します。認証Cookieが必要です。"
+      }
+    },
+    {
+      "name": "ナレッジリアルタイム照合 (Check Knowledge)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"追肥のタイミングやおすすめのやり方を教えてください\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/chat/check-knowledge",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "chat", "check-knowledge"]
+        },
+        "description": "入力テキストから作物品種とキーワードを判定し、FAQおよび過去承認日誌から類似ノウハウを即時返却します。"
+      }
+    },
+    {
+      "name": "システム設定 - 取得",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/settings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "settings"]
+        },
+        "description": "生徒画面のAI相談タブ表示フラグなどのシステム設定を取得します。"
+      }
+    },
+    {
+      "name": "システム設定 - 更新",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"showStudentTalkTab\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/settings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "settings"]
+        },
+        "description": "講師画面からシステム設定を動的に更新します。"
+      }
+    },
+    {
+      "name": "講師 - 追加チケット付与 (Tickets Grant)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"studentId\": \"00000000-0000-0000-0000-000000000000\",\n  \"amount\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/grant",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "grant"]
+        },
+        "description": "講師が同一農園の受講生に対して、当日のAI相談チケットを追加付与します。講師認証Cookieが必要です。"
+      }
+    }
+  ]
+}

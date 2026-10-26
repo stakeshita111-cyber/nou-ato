@@ -215,6 +215,18 @@ export default function UnifiedLoginPage() {
           <h1 className="text-2xl font-black text-[#1c4d21] tracking-tight">NOU-ATO</h1>
           <p className="text-xs text-gray-500 font-bold">ログイン</p>
         </div>
+        {/* 🔰 初めての方向け かんたん利用ガイドリンク */}
+        <Link
+          href="/guide"
+          className="block w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/90 rounded-2xl text-center transition group shadow-2xs"
+        >
+          <span className="text-xs font-black text-emerald-900 flex items-center justify-center gap-1.5">
+            <span>🔰</span> 初めての方へ：かんたん利用ガイドを見る
+            <span className="text-emerald-600 group-hover:translate-x-0.5 transition-transform text-[11px]">
+              →
+            </span>
+          </span>
+        </Link>
 
         {/* 💬 LINEでサインイン ボタン */}
         <div className="space-y-3">
@@ -260,6 +272,13 @@ export default function UnifiedLoginPage() {
                 <span>⚡</span> ポートフォリオ確認用デモ
               </span>
               <div className="flex items-center gap-1.5">
+                <Link
+                  href="/guide"
+                  className="text-[10px] text-emerald-800 hover:text-emerald-950 font-bold bg-white/90 hover:bg-white px-2 py-0.5 rounded-full border border-emerald-200 transition flex items-center gap-1 shadow-2xs"
+                  title="初心者向けかんたん利用ガイドを開く"
+                >
+                  <span>🔰</span> ガイド
+                </Link>
                 <Link
                   href="https://github.com/stakeshita111-cyber/nou-ato#readme"
                   target="_blank"

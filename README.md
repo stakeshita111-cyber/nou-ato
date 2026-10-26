@@ -30,6 +30,7 @@
 
 - **本番デプロイURL**: [https://nou-ato.vercel.app](https://nou-ato.vercel.app)
 - **ログインURL**: [https://nou-ato.vercel.app/login](https://nou-ato.vercel.app/login)
+- **🔰 はじめてガイド (利用マニュアル)**: [https://nou-ato.vercel.app/guide](https://nou-ato.vercel.app/guide)（※テスター・初心者向け 3分でわかる画像付き手順書）
 - **API ドキュメント (Swagger UI)**: [`docs/api-docs.html`](docs/api-docs.html)
 - **初心者向け実践解説Webテキスト (HTML)**: [`docs/tutorial/index.html`](docs/tutorial/index.html)（※AI駆動開発の手戻り史と実コード解剖）
 
@@ -47,6 +48,74 @@
 ・講師:   test01@example.com / test01
 ・受講生: test11@example.com / test11
 ```
+
+---
+
+## 🎮 デモ環境の体験ガイド（おすすめの操作ステップ & 注意事項）
+
+デモ環境では、受講生と講師の両方のロール（立場）からアプリの主要機能をご体験いただけます。
+以下のステップに沿って操作していただくのがおすすめです。
+
+### 👨‍🎓 1. 受講生（生徒）として体験する (`test11@example.com`)
+
+|              📱 マイファーム & タスク消化               |                🏆 成長スキルボード                |
+| :-----------------------------------------------------: | :-----------------------------------------------: |
+| ![受講生マイファーム](public/images/student-mobile.png) | ![スキルボード](public/images/student-skills.png) |
+
+1. **マイタスクの消化（立体カードスタック操作）**
+   - 画面中央の立体カードスタック（「土作り」「苗植え」などの課題）をタップします。
+   - 「完了にする」ボタンを押して作業完了を報告（写真添付やメモも可能）。完了するとカードが奥へと滑らかに循環し、次の課題が現れます。
+2. **スキルボードとEXPの獲得**
+   - 上部メニューから「スキル」タブを開きます。
+   - タスク達成によって蓄積された経験値（EXP）と、スロット内で美しく回転する3Dコインバッジのコレクションを確認できます。
+3. **AI「しるべぇ」への栽培相談（RAG連携）**
+   - 「相談」タブを開き、質問チップ（「きゅうりの葉が黄色い」等）をタップするか、テキスト欄に自由に質問を入力して送信します。
+   - 農園の蓄積ノウハウ（RAG）とGeminiを掛け合わせた、的確な栽培アドバイスが即座に返信されます。
+4. **お天気・農園日記の確認**
+   - リアルタイムな農園の24時間詳細天気予報や降水確率をチェック。
+   - 「日記」タブから、日々の観察記録や写真を投稿して講師に共有できます。
+
+---
+
+### 👨‍🌾 2. 講師（先生）として体験する (`test01@example.com`)
+
+|                   📊 講師ダッシュボード                    |              🚜 農地キャンバス (D&D)              |
+| :--------------------------------------------------------: | :-----------------------------------------------: |
+| ![講師ダッシュボード](public/images/teacher-dashboard.png) | ![農地キャンバス](public/images/teacher-farm.png) |
+
+1. **受講生の進捗状況の一元把握**
+   - ダッシュボードで全生徒のタスク消化率や、未読の日誌提出状況をひと目で確認します。
+2. **受講生の日誌レビュー & AIナレッジ化**
+   - 未読日誌を開いてアドバイスを入力・返信します。
+   - 「AIナレッジに登録」ボタンを押すと、そのQ&Aが受講生全体のAI相談（しるべぇ）に即座に学習反映されます。
+3. **農地キャンバスでの畝マネジメント（ドラッグ＆ドロップ）**
+   - 左メニューの「農地キャンバス」を開きます。
+   - 畝カードをドラッグ＆ドロップ（D&D）して並び替えたり、担当生徒や作物の状況をグラフィカルに管理できます。
+4. **一括アナウンスの配信**
+   - 「明日は雨天のため講習時間を変更します」といった全体お知らせを、受講生全員へ即時配信できます。
+
+---
+
+### ⚠️ テスター・共同確認時の注意事項（NGな操作）
+
+複数人で同じデモアカウントを共有して動作確認を行っているため、以下の操作はお控えいただけますようご協力をお願いいたします。
+
+- ❌ **デモ講師アカウントのパスワード変更・メンバー削除**
+  - パスワードを変えたり講師メンバーから外すと、他のテスターがログイン・確認できなくなります。
+- ❌ **農園名・代表者設定の変更**
+  - キャンバス画面の歯車アイコンからの基本情報変更はお控えください。
+- ❌ **機能の表示設定（相談タブON/OFFなど）の切り替え**
+  - 「設定」画面で相談タブを非表示にすると、受講生画面から相談機能自体が消えてしまいます。
+- ❌ **初期デモデータ（畝や区画、既存の相談日誌）の全削除**
+  - 紐づく作物の栽培記録やデモシナリオが崩れる原因となります。
+
+> [!TIP]
+> **💡 どんどん試していただいてOKな操作:**
+>
+> - 生徒として新しい日誌・相談を投稿する
+> - 講師として日誌に返信する
+> - タスクを追加・完了する
+> - AIしるべぇにいろいろな野菜の質問をしてみる
 
 ---
 
@@ -322,16 +391,16 @@ nou-ato/
 
 ### 2. 📑 要件定義＆設計仕様書 (Markdown / ブラウザ統合ビューア)
 
-ブラウザ上で美しく読める [**仕様書統合ビューア (docs/markdown-viewer.html)**](docs/markdown-viewer.html) からも全仕様書をワンクリックで閲覧できます。
+ブラウザ上で美しく読める [**仕様書統合Webビューア**](https://nou-ato.vercel.app/docs/markdown-viewer.html) からも全仕様書をワンクリックで閲覧できます。
 
-| ドキュメント                            | ビューアで閲覧                                         | 生ファイル                                                                   | 内容・役割                                                        |
-| :-------------------------------------- | :----------------------------------------------------- | :--------------------------------------------------------------------------- | :---------------------------------------------------------------- |
-| **要件定義書 (PRD)**                    | [ブラウザで開く](docs/markdown-viewer.html?doc=prd)    | [`PRD.md`](PRD.md)                                                           | プロダクト要求仕様書、ユーザーストーリー、機能要件一覧            |
-| **非機能要件定義書**                    | [ブラウザで開く](docs/markdown-viewer.html?doc=nfr)    | [`docs/NON_FUNCTIONAL_REQUIREMENTS.md`](docs/NON_FUNCTIONAL_REQUIREMENTS.md) | パフォーマンスSLO、可用性99.9%、セキュリティRLS監査規準           |
-| **セキュリティ & コスト防衛ランブック** | [ブラウザで開く](docs/markdown-viewer.html?doc=sec)    | [`docs/SECURITY_RUNBOOK.md`](docs/SECURITY_RUNBOOK.md)                       | GCP 予算アラート設定、Gemini API Quota 上限、緊急キルスイッチ運用 |
-| **ログ設計書**                          | [ブラウザで開く](docs/markdown-viewer.html?doc=log)    | [`docs/LOGGING_DESIGN.md`](docs/LOGGING_DESIGN.md)                           | RFC 7807 統一エラー、機密マスキング、Supabase監査ログ             |
-| **データベース設計書 (ERD)**            | [ブラウザで開く](docs/markdown-viewer.html?doc=erd)    | [`docs/ERD.md`](docs/ERD.md)                                                 | スキーマ設計、テーブルリレーション、インデックス設計              |
-| **API cURLサンプル集**                  | [ブラウザで開く](docs/markdown-viewer.html?doc=curl)   | [`docs/API_CURL_SAMPLES.md`](docs/API_CURL_SAMPLES.md)                       | 各エンドポイントへのリクエスト例・レスポンス定義                  |
-| **画面構造・親子構造図**                | [ブラウザで開く](docs/SITE_STRUCTURE.md)               | [`docs/SITE_STRUCTURE.md`](docs/SITE_STRUCTURE.md)                           | 画面親子ツリー・ルーティング・コンポーネント構成公式設計書        |
-| **DB CRUD & API 照合監査書**            | [ブラウザで開く](docs/DATABASE_CRUD_AUDIT.md)          | [`docs/DATABASE_CRUD_AUDIT.md`](docs/DATABASE_CRUD_AUDIT.md)                 | APIルートとSupabase DB全137箇所CRUD操作の完全対比・監査レポート   |
-| **エージェント運用規定**                | [ブラウザで開く](docs/markdown-viewer.html?doc=agents) | [`AGENTS.md`](AGENTS.md)                                                     | AI開発エージェント規約、自律型セルフコレクション規定              |
+| ドキュメント                            | ビューアで閲覧                                                                    | 生ファイル                                                                   | 内容・役割                                                        |
+| :-------------------------------------- | :-------------------------------------------------------------------------------- | :--------------------------------------------------------------------------- | :---------------------------------------------------------------- |
+| **要件定義書 (PRD)**                    | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=prd)    | [`PRD.md`](PRD.md)                                                           | プロダクト要求仕様書、ユーザーストーリー、機能要件一覧            |
+| **非機能要件定義書**                    | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=nfr)    | [`docs/NON_FUNCTIONAL_REQUIREMENTS.md`](docs/NON_FUNCTIONAL_REQUIREMENTS.md) | パフォーマンスSLO、可用性99.9%、セキュリティRLS監査規準           |
+| **セキュリティ & コスト防衛ランブック** | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=sec)    | [`docs/SECURITY_RUNBOOK.md`](docs/SECURITY_RUNBOOK.md)                       | GCP 予算アラート設定、Gemini API Quota 上限、緊急キルスイッチ運用 |
+| **ログ設計書**                          | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=log)    | [`docs/LOGGING_DESIGN.md`](docs/LOGGING_DESIGN.md)                           | RFC 7807 統一エラー、機密マスキング、Supabase監査ログ             |
+| **データベース設計書 (ERD)**            | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=erd)    | [`docs/ERD.md`](docs/ERD.md)                                                 | スキーマ設計、テーブルリレーション、インデックス設計              |
+| **API cURLサンプル集**                  | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=curl)   | [`docs/API_CURL_SAMPLES.md`](docs/API_CURL_SAMPLES.md)                       | 各エンドポイントへのリクエスト例・レスポンス定義                  |
+| **画面構造・親子構造図**                | [GitHubで開く](docs/SITE_STRUCTURE.md)                                            | [`docs/SITE_STRUCTURE.md`](docs/SITE_STRUCTURE.md)                           | 画面親子ツリー・ルーティング・コンポーネント構成公式設計書        |
+| **DB CRUD & API 照合監査書**            | [GitHubで開く](docs/DATABASE_CRUD_AUDIT.md)                                       | [`docs/DATABASE_CRUD_AUDIT.md`](docs/DATABASE_CRUD_AUDIT.md)                 | APIルートとSupabase DB全137箇所CRUD操作の完全対比・監査レポート   |
+| **エージェント運用規定**                | [ブラウザで開く](https://nou-ato.vercel.app/docs/markdown-viewer.html?doc=agents) | [`AGENTS.md`](AGENTS.md)                                                     | AI開発エージェント規約、自律型セルフコレクション規定              |

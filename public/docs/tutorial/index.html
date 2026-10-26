@@ -1,0 +1,1129 @@
+<!doctype html>
+<html lang="ja" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NOU-ATO 実践解説テキスト | TypeScript / React / Next.js 入門から深層理解へ</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Prism.js CSS (Tomorrow Night Theme) -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css"
+    />
+    <style>
+      /* 日本語フォントと読みやすさの調整 */
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+          'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        color: #1f2937;
+        background-color: #f8fafc;
+      }
+      pre[class*='language-'] {
+        border-radius: 0.75rem;
+        margin: 1rem 0;
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+      code[class*='language-'] {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+          monospace;
+        font-size: 0.9rem;
+      }
+      .callout-analogy {
+        border-left: 4px solid #3b82f6;
+        background-color: #eff6ff;
+      }
+      .callout-code {
+        border-left: 4px solid #10b981;
+        background-color: #f0fdf4;
+      }
+      .callout-trap {
+        border-left: 4px solid #f59e0b;
+        background-color: #fffbeb;
+      }
+    </style>
+  </head>
+  <body class="flex flex-col min-h-screen">
+    <!-- ヘッダー -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <span class="text-2xl">🌱</span>
+          <div>
+            <h1 class="text-lg font-bold text-gray-900 leading-tight">NOU-ATO 実践解説テキスト</h1>
+            <p class="text-xs text-emerald-600 font-medium">
+              実務コードで学ぶ TypeScript / React / Next.js の本質
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-4 text-sm">
+          <button
+            id="toggle-all-btn"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition text-xs font-semibold"
+          >
+            すべての章を展開
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col md:flex-row gap-8 w-full"
+    >
+      <!-- 左サイドバー: 折りたたみ目次 (Sticky) -->
+      <aside class="md:w-72 flex-shrink-0">
+        <div
+          class="sticky top-24 bg-white rounded-xl shadow-sm border border-gray-200 p-5 max-h-[calc(100vh-8rem)] overflow-y-auto"
+        >
+          <h2
+            class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center justify-between"
+          >
+            <span>目次 (Index)</span>
+            <span
+              class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono"
+              >全5章</span
+            >
+          </h2>
+
+          <nav class="space-y-2 text-sm" id="toc-nav">
+            <!-- 第1章 -->
+            <div>
+              <a
+                href="#chapter-1"
+                class="font-bold text-gray-800 hover:text-emerald-600 flex items-center justify-between py-1 group"
+              >
+                <span>第1章: アーキテクチャの鳥瞰図</span>
+              </a>
+              <ul class="pl-3 border-l-2 border-gray-100 space-y-1 text-xs text-gray-600 mt-1">
+                <li>
+                  <a href="#ch1-1" class="hover:text-emerald-600 block py-0.5"
+                    >1-1. Webの3層構造とSupabase</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch1-2" class="hover:text-emerald-600 block py-0.5"
+                    >1-2. 実コード解剖: クライアント初期化</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch1-3" class="hover:text-emerald-600 block py-0.5"
+                    >1-3. AIの落とし穴: 環境変数の漏洩</a
+                  >
+                </li>
+              </ul>
+            </div>
+
+            <!-- 第2章 -->
+            <div class="pt-2 border-t border-gray-100">
+              <a
+                href="#chapter-2"
+                class="font-bold text-gray-800 hover:text-emerald-600 flex items-center justify-between py-1 group"
+              >
+                <span>第2章: Next.js App Routerの境界</span>
+              </a>
+              <ul class="pl-3 border-l-2 border-gray-100 space-y-1 text-xs text-gray-600 mt-1">
+                <li>
+                  <a href="#ch2-1" class="hover:text-emerald-600 block py-0.5"
+                    >2-1. Server vs Client Component</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch2-2" class="hover:text-emerald-600 block py-0.5"
+                    >2-2. 実コード解剖: 遅延読み込みとSSR制御</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch2-3" class="hover:text-emerald-600 block py-0.5"
+                    >2-3. AIの落とし穴: 安易な 'use client'</a
+                  >
+                </li>
+              </ul>
+            </div>
+
+            <!-- 第3章 -->
+            <div class="pt-2 border-t border-gray-100">
+              <a
+                href="#chapter-3"
+                class="font-bold text-gray-800 hover:text-emerald-600 flex items-center justify-between py-1 group"
+              >
+                <span>第3章: TypeScriptの型安全性</span>
+              </a>
+              <ul class="pl-3 border-l-2 border-gray-100 space-y-1 text-xs text-gray-600 mt-1">
+                <li>
+                  <a href="#ch3-1" class="hover:text-emerald-600 block py-0.5"
+                    >3-1. なぜ any を滅ぼすのか？</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch3-2" class="hover:text-emerald-600 block py-0.5"
+                    >3-2. 実コード解剖: RFC 7807 とジェネリクス</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch3-3" class="hover:text-emerald-600 block py-0.5"
+                    >3-3. AIの落とし穴: anyの連鎖と型アサーション</a
+                  >
+                </li>
+              </ul>
+            </div>
+
+            <!-- 第4章 -->
+            <div class="pt-2 border-t border-gray-100">
+              <a
+                href="#chapter-4"
+                class="font-bold text-gray-800 hover:text-emerald-600 flex items-center justify-between py-1 group"
+              >
+                <span>第4章: React Hooksと状態管理</span>
+              </a>
+              <ul class="pl-3 border-l-2 border-gray-100 space-y-1 text-xs text-gray-600 mt-1">
+                <li>
+                  <a href="#ch4-1" class="hover:text-emerald-600 block py-0.5"
+                    >4-1. Stateと再レンダリングの本質</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch4-2" class="hover:text-emerald-600 block py-0.5"
+                    >4-2. 実コード解剖: カンバン操作のカスタムフック</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch4-3" class="hover:text-emerald-600 block py-0.5"
+                    >4-3. AIの落とし穴: useEffect無限ループ</a
+                  >
+                </li>
+              </ul>
+            </div>
+
+            <!-- 第5章 -->
+            <div class="pt-2 border-t border-gray-100">
+              <a
+                href="#chapter-5"
+                class="font-bold text-gray-800 hover:text-emerald-600 flex items-center justify-between py-1 group"
+              >
+                <span>第5章: バリデーションと多層防御</span>
+              </a>
+              <ul class="pl-3 border-l-2 border-gray-100 space-y-1 text-xs text-gray-600 mt-1">
+                <li>
+                  <a href="#ch5-1" class="hover:text-emerald-600 block py-0.5"
+                    >5-1. 多層防御 (UI vs API vs DB)</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch5-2" class="hover:text-emerald-600 block py-0.5"
+                    >5-2. 実コード解剖: Zodによる厳格パース</a
+                  >
+                </li>
+                <li>
+                  <a href="#ch5-3" class="hover:text-emerald-600 block py-0.5"
+                    >5-3. AIの落とし穴: UI検証過信と握りつぶし</a
+                  >
+                </li>
+              </ul>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- 右メインコンテンツエリア -->
+      <main class="flex-1 space-y-8 min-w-0">
+        <!-- 導入カード -->
+        <section
+          class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-6 sm:p-8 text-white shadow-lg"
+        >
+          <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight mb-3">
+            「AIが書いたコード」を、<br class="sm:hidden" />「自分の血肉の知識」に変える。
+          </h2>
+          <p class="text-emerald-100 text-sm sm:text-base leading-relaxed mb-6">
+            AIエージェントと開発を進めると、驚くべきスピードで機能が完成します。しかし、<br
+              class="hidden sm:inline"
+            />
+            「なぜここに <code>'use client'</code> があるのか？」「なぜわざわざ Zod
+            でバリデーションするのか？」<br />
+            これらを腹落ちさせないままでは、不具合が起きた際に手も足も出なくなってしまいます。<br />
+            本テキストは、本リポジトリの実装コードを解剖しながら、Web開発の本質を3ステップで学び直すための特製教材です。
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div class="bg-white/10 backdrop-blur rounded-lg p-3 border border-white/20">
+              <span class="font-bold block mb-1 text-emerald-300">① 日常の例えで理解</span>
+              専門用語を噛み砕き、なぜその仕組みが必要なのかを直感的に掴みます。
+            </div>
+            <div class="bg-white/10 backdrop-blur rounded-lg p-3 border border-white/20">
+              <span class="font-bold block mb-1 text-emerald-300">② 実コードの行単位解剖</span>
+              実際のリポジトリのファイルからコードを引用し、1行ごとの役割を検証します。
+            </div>
+            <div class="bg-white/10 backdrop-blur rounded-lg p-3 border border-white/20">
+              <span class="font-bold block mb-1 text-emerald-300">③ AIの落とし穴・あるある</span>
+              AIに指示した際に陥りがちなアンチパターンと、安全な回避策を学びます。
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+           第1章：アーキテクチャの鳥瞰図
+           ========================================== -->
+        <details
+          id="chapter-1"
+          class="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+          open
+        >
+          <summary
+            class="cursor-pointer p-6 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between select-none border-b border-gray-200"
+          >
+            <div class="flex items-center space-x-3">
+              <span
+                class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm"
+                >1</span
+              >
+              <h3 class="text-xl font-bold text-gray-900">
+                第1章：アーキテクチャの鳥瞰図（Next.js × Supabase）
+              </h3>
+            </div>
+            <span
+              class="text-gray-400 group-open:rotate-180 transition-transform duration-200 text-xl font-bold"
+              >▼</span
+            >
+          </summary>
+
+          <div class="p-6 sm:p-8 space-y-8">
+            <!-- 1-1 -->
+            <div id="ch1-1">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">1-1</span>
+                <span>Webの3層構造とSupabaseの役割</span>
+              </h4>
+
+              <div class="callout-analogy p-4 rounded-xl mb-4 text-sm text-gray-700 space-y-2">
+                <div class="font-bold text-blue-900 flex items-center space-x-1">
+                  <span>💡</span><span>平易な解説：レストランに例えるWebシステム</span>
+                </div>
+                <p>Webアプリの構成は<strong>レストラン</strong>によく似ています。</p>
+                <ul class="list-disc list-inside space-y-1 pl-2">
+                  <li>
+                    <strong>ブラウザ（顧客のテーブル）：</strong>
+                    画面を見たり注文ボタンを押したりする場所。利用者のスマホやPC。
+                  </li>
+                  <li>
+                    <strong>Next.jsサーバー（厨房・ホールスタッフ）：</strong>
+                    レシピに従って料理（HTML/データ）を組み立て、配膳する。
+                  </li>
+                  <li>
+                    <strong>Supabase（巨大な食材倉庫・金庫）：</strong>
+                    大切なデータ（ユーザー情報、畑の畝データ）が厳重に保管されているデータベース。
+                  </li>
+                </ul>
+                <p>
+                  昔のWebは「注文ごとに厨房（サーバー）へ行って料理を全部作り直す」方式でしたが、現在のNext.jsとReactは「テーブル（ブラウザ）側で賢く一部の具材だけを交換する」ことができるハイブリッドな構成になっています。
+                </p>
+              </div>
+            </div>
+
+            <!-- 1-2 -->
+            <div id="ch1-2">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">1-2</span>
+                <span>実コード解剖：Supabaseクライアントの初期化</span>
+              </h4>
+
+              <p class="text-sm text-gray-600 mb-2">
+                このプロジェクトでは、ブラウザ用とサーバー用でSupabaseの初期化コードを明確に分けています。まずはブラウザ用クライアントを見てみましょう。
+              </p>
+              <div class="text-xs text-gray-500 font-mono mb-1">📁 utils/supabase/client.ts</div>
+
+              <pre
+                class="line-numbers"
+              ><code class="language-typescript">import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from '@/types/supabase';
+
+export function createClient() {
+  const isPreviewOrCI =
+    process.env.CI === 'true' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    (process.env.VERCEL === '1' && !process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    (isPreviewOrCI ? 'https://placeholder.supabase.co' : '');
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    (isPreviewOrCI ? 'mock-anon-key-for-preview-and-ci' : '');
+
+  if (!url || !anonKey) {
+    throw new Error(
+      'Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be configured.'
+    );
+  }
+
+  return createBrowserClient&lt;Database&gt;(url, anonKey);
+}</code></pre>
+
+              <div class="callout-code p-4 rounded-xl text-sm text-gray-700 space-y-2 mt-4">
+                <div class="font-bold text-emerald-900 flex items-center space-x-1">
+                  <span>🔍</span><span>コードの解剖ポイント</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1.5 pl-2">
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >createBrowserClient&lt;Database&gt;</strong
+                    >: ブラウザの Cookie
+                    を自動的に使って認証セッションを維持する特別なクライアントです。<code
+                      >&lt;Database&gt;</code
+                    >
+                    という型（ジェネリクス）を渡すことで、「テーブル名やカラム名」をタイポした瞬間にTypeScriptが赤線で警告してくれるようになります。
+                  </li>
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >NEXT_PUBLIC_...</strong
+                    >: Next.jsでは、接頭辞
+                    <code>NEXT_PUBLIC_</code>
+                    がついた環境変数だけが「ブラウザ（JavaScript）」にバンドルされて公開されます。それ以外の変数はサーバー上でしか参照できません。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 1-3 -->
+            <div id="ch1-3">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-amber-600">1-3</span>
+                <span>AIに頼る時の落とし穴（AIあるある）</span>
+              </h4>
+
+              <div class="callout-trap p-4 rounded-xl text-sm text-gray-800 space-y-3">
+                <div class="font-bold text-amber-900 flex items-center space-x-1">
+                  <span>⚠️</span
+                  ><span>危険：service_role キーをクライアントコードで使ってしまう</span>
+                </div>
+                <p>
+                  <strong>AIがやりがちなミス：</strong
+                  >「Supabaseの権限エラー（RLSエラー）が出ました」とAIに相談すると、AIが手っ取り早く解決するために
+                  <code>SUPABASE_SERVICE_ROLE_KEY</code
+                  >（すべてのセキュリティを無視できるマスターキー）をクライアント側のコードに記述してしまうことがあります。
+                </p>
+                <div
+                  class="bg-red-50 border border-red-200 rounded p-2 text-xs font-mono text-red-700"
+                >
+                  // ❌ 絶対にやってはいけない例 (ブラウザで秘密キーが見えてしまう)<br />
+                  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,
+                  process.env.SUPABASE_SERVICE_ROLE_KEY);
+                </div>
+                <p>
+                  <strong>初心者の着眼点：</strong> ブラウザから呼ぶSupabaseクライアントには、必ず
+                  <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code
+                  >（一般公開キー）のみを渡し、アクセス権限はSupabaseの「Row Level Security
+                  (RLS)」ポリシーで守るのが鉄則です。
+                </p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ==========================================
+           第2章：Next.js App Router の境界線
+           ========================================== -->
+        <details
+          id="chapter-2"
+          class="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+          open
+        >
+          <summary
+            class="cursor-pointer p-6 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between select-none border-b border-gray-200"
+          >
+            <div class="flex items-center space-x-3">
+              <span
+                class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm"
+                >2</span
+              >
+              <h3 class="text-xl font-bold text-gray-900">
+                第2章：Next.js App Routerの境界線（Server vs Client）
+              </h3>
+            </div>
+            <span
+              class="text-gray-400 group-open:rotate-180 transition-transform duration-200 text-xl font-bold"
+              >▼</span
+            >
+          </summary>
+
+          <div class="p-6 sm:p-8 space-y-8">
+            <!-- 2-1 -->
+            <div id="ch2-1">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">2-1</span>
+                <span>Server Component と Client Component の物理的な違い</span>
+              </h4>
+
+              <div class="callout-analogy p-4 rounded-xl mb-4 text-sm text-gray-700 space-y-2">
+                <div class="font-bold text-blue-900 flex items-center space-x-1">
+                  <span>💡</span><span>平易な解説：印刷された雑誌 vs タッチパネル画面</span>
+                </div>
+                <p>
+                  Next.js App Router では、すべてのコンポーネントがデフォルトで<strong
+                    >「Server Component」</strong
+                  >です。
+                </p>
+                <ul class="list-disc list-inside space-y-1 pl-2">
+                  <li>
+                    <strong>Server Component（印刷された雑誌）：</strong>
+                    サーバー上で完成したHTMLを生成してブラウザに送ります。ブラウザにJavaScriptコードが送られないため、読み込みが超高速でセキュアですが、クリックしてもページ遷移以外のアニメーションや状態変化はできません。
+                  </li>
+                  <li>
+                    <strong>Client Component（タッチパネル画面）：</strong> 先頭に
+                    <code>'use client'</code>
+                    を書くことで、ブラウザにJavaScriptコードを送り、ボタンクリックや文字入力（State）に応答できるようにします。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 2-2 -->
+            <div id="ch2-2">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">2-2</span>
+                <span>実コード解剖：遅延読み込み (dynamic) と SSR 制御</span>
+              </h4>
+
+              <p class="text-sm text-gray-600 mb-2">
+                講師用ダッシュボードのページを見てみましょう。ここでは巨大なコンポーネントを
+                <code>next/dynamic</code> で遅延ロードしています。
+              </p>
+              <div class="text-xs text-gray-500 font-mono mb-1">
+                📁 app/teacher/dashboard/page.tsx
+              </div>
+
+              <pre class="line-numbers"><code class="language-typescript">'use client';
+
+import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { SproutLoader } from '@/components/SproutLoader';
+
+// 🌟 重量級コンポーネントをクライアント専用遅延読み込み (ssr: false) に分割 🌟
+const TeacherTaskBoardView = dynamic(() => import('@/components/teacher/TeacherTaskBoardView'), {
+  ssr: false,
+  loading: () => &lt;SproutLoader /&gt;,
+});
+const TeacherFarmCanvasView = dynamic(() => import('@/components/teacher/TeacherFarmCanvasView'), {
+  ssr: false,
+  loading: () => &lt;SproutLoader /&gt;,
+});
+
+export default function TeacherDashboardPage() {
+  const [activeTab, setActiveTab] = useState('tasks');
+
+  return (
+    &lt;div&gt;
+      {activeTab === 'tasks' &amp;&amp; &lt;TeacherTaskBoardView /&gt;}
+      {activeTab === 'farm' &amp;&amp; &lt;TeacherFarmCanvasView /&gt;}
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+              <div class="callout-code p-4 rounded-xl text-sm text-gray-700 space-y-2 mt-4">
+                <div class="font-bold text-emerald-900 flex items-center space-x-1">
+                  <span>🔍</span><span>コードの解剖ポイント</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1.5 pl-2">
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >ssr: false</strong
+                    >:
+                    「このコンポーネントはサーバー側でHTMLを組み立てず、ブラウザに届いてから初めて実行してください」という指示です。Canvas描画やドラッグ＆ドロップ（dnd-kit）のように、ブラウザ固有の
+                    <code>window</code> や
+                    <code>document</code>
+                    に依存するライブラリを使う場合、サーバー側で動かすとエラー（Hydration
+                    Mismatch）になるため、これを防いでいます。
+                  </li>
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >loading: () =&gt; &lt;SproutLoader /&gt;</strong
+                    >:
+                    ブラウザがJavaScriptファイルをダウンロードしている間、真っ白な画面ではなくスプラウト（芽）のアニメーションを表示してユーザーを待たせない工夫です。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 2-3 -->
+            <div id="ch2-3">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-amber-600">2-3</span>
+                <span>AIに頼る時の落とし穴（AIあるある）</span>
+              </h4>
+
+              <div class="callout-trap p-4 rounded-xl text-sm text-gray-800 space-y-3">
+                <div class="font-bold text-amber-900 flex items-center space-x-1">
+                  <span>⚠️</span
+                  ><span>危険：エラーが出たら思考停止で全ファイルに 'use client' を貼る</span>
+                </div>
+                <p>
+                  <strong>AIがやりがちなミス：</strong> Next.jsで開発中、<code
+                    >Error: Event handlers cannot be passed to Client Component props...</code
+                  >
+                  といったエラーが出た際、AIに「直して」と頼むと、ルートの
+                  <code>layout.tsx</code> や <code>page.tsx</code> の先頭すべてに
+                  <code>'use client'</code> を付与してしまうことがあります。
+                </p>
+                <p>
+                  <strong>初心者の着眼点：</strong> 画面全体を
+                  <code>'use client'</code> にしてしまうと、せっかくのNext.jsの高速性（Server
+                  Componentの利点）が失われ、アプリ全体のJavaScriptファイルサイズが肥大化します。
+                  「フォーム入力やボタンなど、<strong
+                    >インタラクションが必要な最小の末端部品だけを
+                    <code>'use client'</code> に切り出し、親はServer Componentのまま保つ</strong
+                  >」のが正しい設計です。
+                </p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ==========================================
+           第3章：TypeScriptの型安全性
+           ========================================== -->
+        <details
+          id="chapter-3"
+          class="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+          open
+        >
+          <summary
+            class="cursor-pointer p-6 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between select-none border-b border-gray-200"
+          >
+            <div class="flex items-center space-x-3">
+              <span
+                class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm"
+                >3</span
+              >
+              <h3 class="text-xl font-bold text-gray-900">
+                第3章：TypeScriptの型安全性（any を滅ぼす理由）
+              </h3>
+            </div>
+            <span
+              class="text-gray-400 group-open:rotate-180 transition-transform duration-200 text-xl font-bold"
+              >▼</span
+            >
+          </summary>
+
+          <div class="p-6 sm:p-8 space-y-8">
+            <!-- 3-1 -->
+            <div id="ch3-1">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">3-1</span>
+                <span>なぜ any を使ってはいけないのか？</span>
+              </h4>
+
+              <div class="callout-analogy p-4 rounded-xl mb-4 text-sm text-gray-700 space-y-2">
+                <div class="font-bold text-blue-900 flex items-center space-x-1">
+                  <span>💡</span
+                  ><span>平易な解説：危険物検査を通さない「何でもOKのフリーパス」</span>
+                </div>
+                <p>
+                  TypeScriptの最大のメリットは、<strong>「画面を動かす前に、コードの書き間違いやデータ不整合をコンパイラが見つけて教えてくれること」</strong>です。
+                </p>
+                <p>
+                  しかし、型に
+                  <code>any</code>
+                  を指定すると、コンパイラは「中身が何であれ検査をスキップする」状態になります。これは空港の手荷物検査で「何が入っていても無検査で通す」ようなものです。
+                  その結果、本番環境でユーザーが使っている最中に
+                  <code>TypeError: Cannot read properties of undefined</code>
+                  となって画面がクラッシュします。
+                </p>
+              </div>
+            </div>
+
+            <!-- 3-2 -->
+            <div id="ch3-2">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">3-2</span>
+                <span>実コード解剖：RFC 7807 準拠のレスポンスとジェネリクス</span>
+              </h4>
+
+              <p class="text-sm text-gray-600 mb-2">
+                プロジェクト内でAPIレスポンスの型を統一している
+                <code>lib/apiResponse.ts</code> を見てみましょう。
+              </p>
+              <div class="text-xs text-gray-500 font-mono mb-1">📁 lib/apiResponse.ts</div>
+
+              <pre
+                class="line-numbers"
+              ><code class="language-typescript">import { NextResponse } from 'next/server';
+
+export interface ProblemDetails {
+  type: string;
+  title: string;
+  status: number;
+  detail?: string;
+  invalidParams?: Array<{ name: string; reason: string }>;
+  [key: string]: unknown;
+}
+
+export class ApiResponse {
+  /**
+   * 成功レスポンス（ジェネリクス &lt;T&gt; で返却データの型を保証）
+   */
+  static success&lt;T&gt;(data: T, status = 200, init?: ResponseInit): NextResponse&lt;T&gt; {
+    return NextResponse.json(data, { status, ...init });
+  }
+
+  /**
+   * RFC 7807 に準拠した統一エラーレスポンス
+   */
+  static badRequest(detail: string, invalidParams?: Array<{ name: string; reason: string }>) {
+    return this.problem(400, 'Bad Request', detail, { invalidParams });
+  }
+}</code></pre>
+
+              <div class="callout-code p-4 rounded-xl text-sm text-gray-700 space-y-2 mt-4">
+                <div class="font-bold text-emerald-900 flex items-center space-x-1">
+                  <span>🔍</span><span>コードの解剖ポイント</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1.5 pl-2">
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >success&lt;T&gt;(data: T)</strong
+                    >:
+                    <code>&lt;T&gt;</code>
+                    は「ジェネリクス（型の変数）」です。ユーザー情報を返すときは
+                    <code>User</code> 型、タスクを返すときは
+                    <code>Task[]</code> 型など、渡されたデータの型がそのまま
+                    <code>NextResponse&lt;T&gt;</code>
+                    に引き継がれます。呼び出し側は「このAPIは何を返すのか」を厳密に把握できます。
+                  </li>
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >[key: string]: unknown</strong
+                    >: <code>any</code> ではなく <code>unknown</code> を使っています。<code
+                      >unknown</code
+                    >
+                    は「何が入っているか分からないが、使う前に
+                    <code>typeof</code>
+                    などで型チェックを強制する」型です。安全性を一切損ないません。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 3-3 -->
+            <div id="ch3-3">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-amber-600">3-3</span>
+                <span>AIに頼る時の落とし穴（AIあるある）</span>
+              </h4>
+
+              <div class="callout-trap p-4 rounded-xl text-sm text-gray-800 space-y-3">
+                <div class="font-bold text-amber-900 flex items-center space-x-1">
+                  <span>⚠️</span><span>危険：(data as any) で型エラーを「黙らせる」</span>
+                </div>
+                <p>
+                  <strong>AIがやりがちなミス：</strong>
+                  SupabaseのJOINクエリなどで型定義が一致しないとき、AIはよく
+                  <code>const user = (data as any).user;</code> や
+                  <code>as unknown as MyType</code> というキャストを行います。
+                </p>
+                <p>
+                  <strong>初心者の着眼点：</strong>
+                  <code>as any</code>
+                  はTypeScriptの型チェッカーを「強制的に沈黙」させる行為です。DBのカラム名がリネームされたりNULLが混入した際、ビルドは通るのに画面が真っ白になります。
+                  Supabase CLIの
+                  <code>supabase gen types typescript</code>
+                  を使ってDBと同期した自動生成型（<code>Database</code>）を適用するか、後述する
+                  <code>Zod</code> によるバリデーションを挟むのが正攻法です。
+                </p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ==========================================
+           第4章：React Hooks と状態管理の解剖
+           ========================================== -->
+        <details
+          id="chapter-4"
+          class="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+          open
+        >
+          <summary
+            class="cursor-pointer p-6 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between select-none border-b border-gray-200"
+          >
+            <div class="flex items-center space-x-3">
+              <span
+                class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm"
+                >4</span
+              >
+              <h3 class="text-xl font-bold text-gray-900">
+                第4章：React Hooksと状態管理（再レンダリングの仕組み）
+              </h3>
+            </div>
+            <span
+              class="text-gray-400 group-open:rotate-180 transition-transform duration-200 text-xl font-bold"
+              >▼</span
+            >
+          </summary>
+
+          <div class="p-6 sm:p-8 space-y-8">
+            <!-- 4-1 -->
+            <div id="ch4-1">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">4-1</span>
+                <span>State と再レンダリングの本質</span>
+              </h4>
+
+              <div class="callout-analogy p-4 rounded-xl mb-4 text-sm text-gray-700 space-y-2">
+                <div class="font-bold text-blue-900 flex items-center space-x-1">
+                  <span>💡</span><span>平易な解説：スコアボードが書き換わると全員が顔を上げる</span>
+                </div>
+                <p>
+                  Reactのコンポーネントは、ただの「関数」です。
+                  <code>useState</code>
+                  で管理されている「状態（State）」が更新されると、Reactはそのコンポーネント関数を<strong>もう一度最初から最後まで実行（再レンダリング）</strong>し、画面のDOMを書き換えます。
+                </p>
+                <p>
+                  スコアボード（State）の点数が変わると、観客や審判（子コンポーネントたち）が一斉に顔を上げて反応するイメージです。このとき、適切に関数をメモ化（<code>useCallback</code>）しておかないと、関係ない子コンポーネントまで無駄に再実行されて画面がカクつきます。
+                </p>
+              </div>
+            </div>
+
+            <!-- 4-2 -->
+            <div id="ch4-2">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">4-2</span>
+                <span>実コード解剖：カンバン操作をカプセル化したカスタムフック</span>
+              </h4>
+
+              <p class="text-sm text-gray-600 mb-2">
+                タスク管理画面のロジックを抽出した
+                <code>hooks/useKanbanBoard.ts</code> の一部を抜粋します。
+              </p>
+              <div class="text-xs text-gray-500 font-mono mb-1">📁 hooks/useKanbanBoard.ts</div>
+
+              <pre class="line-numbers"><code class="language-typescript">'use client';
+
+import { useState, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { Task, ColumnType } from '../types/task';
+
+export function useKanbanBoard(columns: ColumnType[]) {
+  const [tasks, setTasks] = useState&lt;Task[]&gt;([]);
+  const [isLoading, setIsLoading] = useState&lt;boolean&gt;(true);
+
+  // タスク取得関数を useCallback で包んで無駄な再生成を防ぐ
+  const fetchTasks = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (data) setTasks(data as unknown as Task[]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // 依存配列が空: この関数インスタンスは初回生成から変化しない
+
+  return { tasks, isLoading, fetchTasks };
+}</code></pre>
+
+              <div class="callout-code p-4 rounded-xl text-sm text-gray-700 space-y-2 mt-4">
+                <div class="font-bold text-emerald-900 flex items-center space-x-1">
+                  <span>🔍</span><span>コードの解剖ポイント</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1.5 pl-2">
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >カスタムフック（useKanbanBoard）</strong
+                    >:
+                    UI（JSXの見た目）と「データ取得・更新のロジック」を分離しています。これにより、コンポーネント側は
+                    <code>const { tasks } = useKanbanBoard(...)</code>
+                    と呼ぶだけで済み、コードの見通しが劇的に良くなります。
+                  </li>
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >useCallback(fn, [])</strong
+                    >: 通常、コンポーネントが再レンダリングされると関数も新しく作り直されます。<code
+                      >useCallback</code
+                    >
+                    を使うことで、中身が変わらない限り「同じ関数の参照」を維持し、子コンポーネントへの余計な再レンダリング伝播を阻止します。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 4-3 -->
+            <div id="ch4-3">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-amber-600">4-3</span>
+                <span>AIに頼る時の落とし穴（AIあるある）</span>
+              </h4>
+
+              <div class="callout-trap p-4 rounded-xl text-sm text-gray-800 space-y-3">
+                <div class="font-bold text-amber-900 flex items-center space-x-1">
+                  <span>⚠️</span
+                  ><span>危険：useEffectの依存配列にオブジェクトやStateを入れて無限ループ</span>
+                </div>
+                <p>
+                  <strong>AIがやりがちなミス：</strong>
+                  <code>useEffect</code>
+                  内でStateを更新しているのに、そのStateや新しいオブジェクト（例:
+                  <code>[tasks]</code> や <code>{ id }</code>）を依存配列に含めてしまい、<strong
+                    >「State更新 → 再レンダリング → useEffect発火 → State更新...」</strong
+                  >
+                  の無限ループでブラウザがフリーズします。
+                </p>
+                <p>
+                  <strong>初心者の着眼点：</strong>
+                  「データフェッチはマウント時の1回だけでいいのか？」「どの値が変わった時だけ再取得すべきか？」を意識し、関数を
+                  <code>useCallback</code> でメモ化するか、不要な
+                  <code>useEffect</code> 自体を減らす設計を心がけましょう。
+                </p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- ==========================================
+           第5章：バリデーションと多層防御
+           ========================================== -->
+        <details
+          id="chapter-5"
+          class="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+          open
+        >
+          <summary
+            class="cursor-pointer p-6 bg-slate-50 hover:bg-slate-100 transition flex items-center justify-between select-none border-b border-gray-200"
+          >
+            <div class="flex items-center space-x-3">
+              <span
+                class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm"
+                >5</span
+              >
+              <h3 class="text-xl font-bold text-gray-900">
+                第5章：バリデーションと多層防御（Zodによる境界防壁）
+              </h3>
+            </div>
+            <span
+              class="text-gray-400 group-open:rotate-180 transition-transform duration-200 text-xl font-bold"
+              >▼</span
+            >
+          </summary>
+
+          <div class="p-6 sm:p-8 space-y-8">
+            <!-- 5-1 -->
+            <div id="ch5-1">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">5-1</span>
+                <span>多層防御：UI検証 vs サーバーAPI検証 vs DB制約</span>
+              </h4>
+
+              <div class="callout-analogy p-4 rounded-xl mb-4 text-sm text-gray-700 space-y-2">
+                <div class="font-bold text-blue-900 flex items-center space-x-1">
+                  <span>💡</span><span>平易な解説：テーマパークのチケット改札</span>
+                </div>
+                <p>セキュリティとデータ品質を守るには、3つの防壁が必要です。</p>
+                <ul class="list-disc list-inside space-y-1 pl-2">
+                  <li>
+                    <strong>第1の壁（UI / フォーム）：</strong>
+                    入力漏れをその場で赤文字表示して親切に教える（UX向上目的。悪意があれば簡単にバイパス可能）。
+                  </li>
+                  <li>
+                    <strong>第2の壁（APIルート / Zod）：</strong>
+                    サーバーの入口で不正なデータ形式や権限不足を完全にブロック（セキュリティ防壁）。
+                  </li>
+                  <li>
+                    <strong>第3の壁（DB / RLS・制約）：</strong>
+                    万が一APIのバグがあっても、DBレベルで他人のデータを書き換えさせない最後の砦。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 5-2 -->
+            <div id="ch5-2">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-emerald-600">5-2</span>
+                <span>実コード解剖：Zod による厳格なリクエストパース</span>
+              </h4>
+
+              <p class="text-sm text-gray-600 mb-2">
+                チケット付与APIの
+                <code>app/api/tickets/grant/route.ts</code> では、スキーマ検証ライブラリ
+                <code>Zod</code> を使って堅牢に検証しています。
+              </p>
+              <div class="text-xs text-gray-500 font-mono mb-1">
+                📁 app/api/tickets/grant/route.ts
+              </div>
+
+              <pre class="line-numbers"><code class="language-typescript">import { z } from 'zod';
+import { ApiResponse } from '@/lib/apiResponse';
+
+// 1. Zod スキーマで許容するデータの形を宣言
+const grantTicketRequestBodySchema = z.object({
+  studentId: z
+    .string()
+    .min(1, '受講生IDは必須です')
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, {
+      message: '有効なUUID形式を指定してください',
+    }),
+  amount: z
+    .number()
+    .int('整数を指定してください')
+    .positive('1以上を指定してください')
+    .max(10, '一度に付与できるチケットは10枚までです')
+    .default(1),
+});
+
+export async function POST(request: Request) {
+  const rawBody = await request.json().catch(() => null);
+
+  // 2. safeParse で安全に検証（例外を投げずに success: false を返す）
+  const parseResult = grantTicketRequestBodySchema.safeParse(rawBody);
+
+  if (!parseResult.success) {
+    const issue = parseResult.error.issues[0];
+    return ApiResponse.badRequest(issue?.message || '不正なリクエストです');
+  }
+
+  // 3. ここを通れば studentId は確実に UUID 文字列、amount は 1〜10 の整数が保証される
+  const { studentId, amount } = parseResult.data;
+  ...
+}</code></pre>
+
+              <div class="callout-code p-4 rounded-xl text-sm text-gray-700 space-y-2 mt-4">
+                <div class="font-bold text-emerald-900 flex items-center space-x-1">
+                  <span>🔍</span><span>コードの解剖ポイント</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1.5 pl-2">
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >z.object({...})</strong
+                    >:
+                    「どんな型か」だけでなく「UUID形式か」「1以上10以下の正の整数か」といった<strong>業務ルール（ドメイン制約）</strong>まで実行時に検証します。
+                  </li>
+                  <li>
+                    <strong class="font-mono text-xs bg-emerald-100 px-1 py-0.5 rounded"
+                      >.safeParse()</strong
+                    >:
+                    <code>.parse()</code>
+                    を呼ぶとエラー時にアプリが例外をスロー（クラッシュ）してしまいますが、<code
+                      >.safeParse()</code
+                    >
+                    なら安全に結果オブジェクトを受け取って上品な400エラーJSONを返せます。
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 5-3 -->
+            <div id="ch5-3">
+              <h4
+                class="text-lg font-bold text-gray-900 flex items-center space-x-2 border-b pb-2 mb-4"
+              >
+                <span class="text-amber-600">5-3</span>
+                <span>AIに頼る時の落とし穴（AIあるある）</span>
+              </h4>
+
+              <div class="callout-trap p-4 rounded-xl text-sm text-gray-800 space-y-3">
+                <div class="font-bold text-amber-900 flex items-center space-x-1">
+                  <span>⚠️</span
+                  ><span>危険：フロントのバリデーションだけで安心してサーバー側を素通しする</span>
+                </div>
+                <p>
+                  <strong>AIがやりがちなミス：</strong> フォーム側で <code>required</code> や
+                  <code>disabled</code> をつけたから大丈夫だと判断し、APIルート側では
+                  <code>const { studentId, amount } = await req.json();</code>
+                  とダイレクトにDBへ渡すコードを生成することが多々あります。
+                </p>
+                <p>
+                  <strong>初心者の着眼点：</strong> ブラウザの開発者ツールや curl
+                  コマンドを使えば、フロントエンドのバリデーションは誰でも1秒で突破できます。<strong>「フロントエンドのチェックは親切心（UX）、サーバーサイドのチェック（Zod）は命綱（セキュリティ）」</strong>と心に刻みましょう。
+                </p>
+              </div>
+            </div>
+          </div>
+        </details>
+      </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-white border-t border-gray-200 py-6 mt-12">
+      <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500">
+        <p>© 2026 NOU-ATO (のうあと) Project - Beginners Practical Learning Guide</p>
+        <p class="mt-1">Generated for learning purpose based on real codebase.</p>
+      </div>
+    </footer>
+
+    <!-- Prism.js & UIスクリプト -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-tsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+
+    <script>
+      // 全章の一括展開/折りたたみ機能
+      const toggleBtn = document.getElementById('toggle-all-btn');
+      const detailsList = document.querySelectorAll('details');
+      let allOpen = true;
+
+      toggleBtn.addEventListener('click', () => {
+        allOpen = !allOpen;
+        detailsList.forEach((d) => {
+          d.open = allOpen;
+        });
+        toggleBtn.textContent = allOpen ? 'すべての章を折りたたむ' : 'すべての章を展開';
+      });
+
+      // スムーズスクロール時にdetailsが閉じていたら自動で開く
+      document.querySelectorAll('#toc-nav a').forEach((anchor) => {
+        anchor.addEventListener('click', (e) => {
+          const href = anchor.getAttribute('href');
+          if (!href.startsWith('#')) return;
+          const targetElement = document.querySelector(href);
+          if (targetElement) {
+            const parentDetails = targetElement.closest('details');
+            if (parentDetails && !parentDetails.open) {
+              parentDetails.open = true;
+            }
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
