@@ -16,6 +16,15 @@ const TYPES_FILE = path.join(process.cwd(), 'types', 'supabase.ts');
 
 let violations = 0;
 
+// (F) の例外: 過去に作り、後のマイグレーション（20261026000000）で削除済みのもの。
+// 削除されたことは pgTAP の storage_no_public_read で確認している。新しい例外は追加しない。
+const ALLOWED_BUCKET_ONLY_POLICIES = new Set([
+  '20261010070000_harden_farm_beds_and_broadcast_rls.sql:crop_photos_public_read',
+]);
+
+const createdTables = new Map();
+const rlsEnabledTables = new Set();
+
 console.log(
   '🛡️  [Database & Schema Gate] Auditing Supabase migrations, RLS policies, and TypeScript type alignment...'
 );
@@ -96,17 +105,56 @@ if (fs.existsSync(MIGRATIONS_DIR)) {
       violations++;
     }
 
-    // (B) 危険な全許可ポリシー (USING (true) / WITH CHECK (true)) の検出
-    lines.forEach((line, idx) => {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('--')) return;
-      if (/USING\s*\(\s*true\s*\)/i.test(line) || /WITH\s+CHECK\s*\(\s*true\s*\)/i.test(line)) {
-        console.error(`\x1b[31m[SECURITY CRITICAL]\x1b[0m ${file}:${idx + 1}`);
-        console.error(`  ↳ 原因: 全許可ポリシー (USING/WITH CHECK (true)) が検出されました。`);
-        console.error(`  ↳ 該当行: \x1b[33m${trimmed}\x1b[0m`);
-        violations++;
-      }
-    });
+    // コメントを空白に置き換えた本文。改行をまたぐ書き方も検出するため、行単位ではなく全体で見る
+    // （行番号がずれないよう、コメント内の改行は残す）
+    const code = sql
+      .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '))
+      .replace(/--.*$/gm, '');
+    const lineOf = (index) => code.slice(0, index).split('\n').length;
+
+    // (B) 危険な全許可ポリシー (USING (true) / WITH CHECK (true) / 1=1) の検出
+    for (const m of code.matchAll(/(?:USING|WITH\s+CHECK)\s*\(\s*(?:true|1\s*=\s*1)\s*\)/gi)) {
+      const lineNumber = lineOf(m.index);
+      console.error(`\x1b[31m[SECURITY CRITICAL]\x1b[0m ${file}:${lineNumber}`);
+      console.error(`  ↳ 原因: 全許可ポリシー (USING/WITH CHECK (true)) が検出されました。`);
+      console.error(`  ↳ 該当行: \x1b[33m${lines[lineNumber - 1].trim()}\x1b[0m`);
+      violations++;
+    }
+
+    // (F) バケット名だけで読めるストレージポリシー（他人のファイルの一覧・取得を許す）
+    for (const m of code.matchAll(
+      /CREATE\s+POLICY\s+("[^"]+"|\w+)\s+ON\s+storage\.objects\b([^;]*);/gi
+    )) {
+      const [, name, body] = m;
+      if (/\bFOR\s+(INSERT|UPDATE|DELETE)\b/i.test(body)) continue;
+      if (!/USING\s*\(\s*bucket_id\s*=\s*'[^']+'\s*\)/i.test(body)) continue;
+      const policy = name.replaceAll('"', '');
+      if (ALLOWED_BUCKET_ONLY_POLICIES.has(`${file}:${policy}`)) continue;
+      console.error(`\x1b[31m[SECURITY CRITICAL]\x1b[0m ${file}:${lineOf(m.index)}`);
+      console.error(
+        `  ↳ 原因: ストレージのポリシー [${policy}] がバケット名だけで読み取りを許可しています。所有者などの条件を加えてください。`
+      );
+      violations++;
+    }
+
+    // (G) RLS の無効化
+    for (const m of code.matchAll(/DISABLE\s+ROW\s+LEVEL\s+SECURITY/gi)) {
+      console.error(`\x1b[31m[SECURITY CRITICAL]\x1b[0m ${file}:${lineOf(m.index)}`);
+      console.error(`  ↳ 原因: RLS を無効化しています。`);
+      violations++;
+    }
+
+    // (H) RLS を有効にしていない public テーブル（マイグレーション全体で判定）
+    for (const m of code.matchAll(
+      /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(\w+)\s*\(/gi
+    )) {
+      if (!createdTables.has(m[1].toLowerCase())) createdTables.set(m[1].toLowerCase(), file);
+    }
+    for (const m of code.matchAll(
+      /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:public\.)?(\w+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi
+    )) {
+      rlsEnabledTables.add(m[1].toLowerCase());
+    }
 
     // (C) VIEW の RLS 貫通防止 (WITH (security_invoker = true) 必須化)
     const viewMatches = sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+([^\s]+)[\s\S]*?AS/gi);
@@ -134,6 +182,19 @@ if (fs.existsSync(MIGRATIONS_DIR)) {
       }
     }
 
+    // (D-2) 本体の後ろで SECURITY DEFINER を宣言した関数（(D) は本体の前の宣言だけを見る）
+    for (const m of code.matchAll(
+      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([^\s(]+)([\s\S]*?)(\$\w*\$)[\s\S]*?\3([^;]*);/gi
+    )) {
+      const [, name, head, , tail] = m;
+      if (!/SECURITY\s+DEFINER/i.test(tail) || /SET\s+search_path\s*=/i.test(head + tail)) continue;
+      console.error(`\x1b[31m[SECURITY HIGH]\x1b[0m ${file}:${lineOf(m.index)}`);
+      console.error(
+        `  ↳ 原因: SECURITY DEFINER 関数 [${name}] に 'SET search_path = public' が欠落しています。`
+      );
+      violations++;
+    }
+
     // (E) PL/pgSQL 無効構文の検出 (END FOR 防止)
     if (/\bEND\s+FOR\s*;/i.test(sql)) {
       console.error(
@@ -142,6 +203,23 @@ if (fs.existsSync(MIGRATIONS_DIR)) {
       violations++;
     }
   }
+
+  for (const [table, file] of createdTables) {
+    if (rlsEnabledTables.has(table)) continue;
+    console.error(`\x1b[31m[SECURITY CRITICAL]\x1b[0m ${file}`);
+    console.error(`  ↳ 原因: テーブル [${table}] で RLS を有効にしていません。`);
+    violations++;
+  }
+
+  if (migrationFiles.length === 0) {
+    console.error(`\x1b[31m[VIOLATION]\x1b[0m 検査対象のマイグレーションが0件です。`);
+    violations++;
+  }
+} else {
+  console.error(
+    `\x1b[31m[VIOLATION]\x1b[0m 検査対象のマイグレーションが0件です（フォルダがありません）。`
+  );
+  violations++;
 }
 
 if (violations > 0) {
